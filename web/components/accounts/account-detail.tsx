@@ -474,7 +474,7 @@ export function AccountDetailScreen({
 
   const overviewItems = [
     // FIRST ROW (client ruling, 14 Sep 2026): "who the account responsible
-    // or account manager is." An avatar chip, never a bare name (R35) — "—"
+    // or account manager is." An avatar chip, never a bare name (R35) — "-"
     // is a real, honest answer for the accounts that predate this field.
     {
       label: t("Account manager"),
@@ -484,15 +484,15 @@ export function AccountDetailScreen({
           {manager.name}
         </span>
       ) : (
-        "—"
+        ""
       ),
     },
     { label: t("Parent account"), value: parent ? parent.name : t("Sits on its own") },
-    { label: t("Reference"), value: account.code || "—" },
-    { label: t("Industry"), value: account.industry || "—" },
-    { label: t("Email"), value: account.email || "—" },
-    { label: t("Phone"), value: account.phone || "—" },
-    { label: t("Address"), value: where || "—" },
+    { label: t("Reference"), value: account.code || "" },
+    { label: t("Industry"), value: account.industry || "" },
+    { label: t("Email"), value: account.email || "" },
+    { label: t("Phone"), value: account.phone || "" },
+    { label: t("Address"), value: where || "" },
     { label: t("Language"), value: account.locale || "Ours" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
@@ -573,7 +573,7 @@ export function AccountDetailScreen({
             },
             {
               value: "sprints",
-              label: t("Sprints"),
+              label: t("Phases"),
               icon: CONCEPT_ICON.sprints,
               badge: formatCount(sprintsTotal),
               badgeVariant: "" as const,
@@ -995,7 +995,7 @@ export function AccountDetailScreen({
           // patched by the publish the door already sends (R1/R15).
           invalidate(sliceKey("sprints-account", accountId))
           invalidate(sprintsKey(teamId))
-          toast.success(t("Sprint started."))
+          toast.success(t("Phase started."))
         }}
       />
       )}

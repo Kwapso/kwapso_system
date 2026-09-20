@@ -260,7 +260,7 @@ export interface BrandTypeStep {
  */
 const BRAND_COLOURS: readonly BrandSwatch[] = [
   { token: "--surface-brand", label: "Accent", note: "Mango. A fill, never a data colour; one filled action per screen." },
-  { token: "--ink-on-accent", label: "Ink on the accent", note: "Charcoal, at both palette values — the accent law as a token." },
+  { token: "--ink-on-accent", label: "Ink on the accent", note: "Charcoal, at both palette values: the accent law as a token." },
   { token: "--ink-on-accent-secondary", label: "Second ink on the accent", note: "A solid value, never an opacity (override 13)." },
   { token: "--surface-inverse", label: "Inverse surface", note: "The charcoal fill a person's own words take." },
   { token: "--ink-on-inverse", label: "Ink on the inverse", note: "And its quieter twin below it." },
@@ -320,11 +320,11 @@ const FACTS: readonly BrandFact[] = [
   { id: "legalName", label: "Legal entity", value: "Northgale Studio GmbH" },
   { id: "replyTo", label: "Reply-to", value: "hello@studio.example" },
   { id: "typePairing", label: "Type pairing", value: "Grotesk with a condensed serif" },
-  { id: "toneOfVoice", label: "Tone", value: "Plain — say what happened, then the next step" },
+  { id: "toneOfVoice", label: "Tone", value: "Plain: say what happened, then the next step" },
   {
     id: "mailSignoff",
     label: "Mail sign-off",
-    value: "Northgale Studio — we build the thing you actually run on.",
+    value: "Northgale Studio: we build the thing you actually run on.",
     full: true,
   } as BrandFact & { full?: boolean },
 ];
@@ -481,7 +481,7 @@ function BrandRoute({
   railLabel,
   eyebrow = "Settings",
   title = "Brand",
-  description = "For reference. Nothing on this screen can be changed here — the values are read live from the system’s own tokens, so what you see is what it renders.",
+  description = "For reference. Nothing on this screen can be changed here. The values are read live from the system’s own tokens, so what you see is what it renders.",
   lightMark,
   darkMark,
   lightMarkLabel = "On paper",
@@ -520,7 +520,7 @@ function BrandRoute({
     );
     if (missing.length > 0) {
       console.warn(
-        `BrandRoute: these tokens resolve to nothing on :root and would draw an empty row — ${missing.join(", ")}`,
+        `BrandRoute: these tokens resolve to nothing on :root and would draw an empty row: ${missing.join(", ")}`,
       );
     }
   }

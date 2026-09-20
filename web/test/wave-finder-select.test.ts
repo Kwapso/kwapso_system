@@ -41,6 +41,7 @@ function sprint(over: Partial<Sprint> & { id: string; name: string; waveId: stri
     ref: null,
     refWas: null,
     goal: null,
+    goalSummary: null,
     sprintType: null,
     accountId: null,
     accountName: null,

@@ -171,7 +171,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
             </span>
             <span className="text-sm tabular-nums whitespace-nowrap">{hoursText(line.savedSecondsPerMonth)}</span>
             <span className="text-sm tabular-nums whitespace-nowrap">
-              {line.moneyCentsPerMonth == null ? "—" : moneyText(line.moneyCentsPerMonth, null)}
+              {line.moneyCentsPerMonth == null ? "" : moneyText(line.moneyCentsPerMonth, null)}
             </span>
           </li>
         ))}

@@ -372,7 +372,7 @@ export const clientToolPriceFields = (): InternalField[] => [
 ]
 
 export const purposeFields = (departments: string[]): InternalField[] => [
-  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Sprint review" },
+  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Phase review" },
   { key: "department", label: "Department", kind: "text", options: departments, placeholder: "Delivery, Sales…" },
   { key: "description", label: "Description", kind: "prose", placeholder: "Why we meet, and who is in the room." },
 ]

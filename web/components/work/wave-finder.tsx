@@ -296,7 +296,7 @@ export function WaveFinder({
     // is the plain word (`sprintTypeName`, never `sprintTypeLabel`'s own
     // `mark` prefix, which this facet's own `mark` slot now carries as a
     // real element instead).
-    { field: "sprintType", label: t("Sprint type"), control: "select" as const, ordered: true,
+    { field: "sprintType", label: t("Phase type"), control: "select" as const, ordered: true,
       options: sprintTypes.map((o) => ({
         value: o.value,
         label: sprintTypeName(o, lang),
@@ -515,7 +515,7 @@ export function WaveFinder({
                   { value: "name", label: t("Name") },
                   { value: "client", label: t("Account") },
                   { value: "runs", label: t("When it runs") },
-                  { value: "sprints", label: t("Sprints inside it") },
+                  { value: "sprints", label: t("Phases inside it") },
                 ]}
                 value={query.sortBy}
                 onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}

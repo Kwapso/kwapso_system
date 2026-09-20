@@ -253,7 +253,7 @@ async function googleFetch(
       throw new GuardError(
         403,
         "google_forbidden",
-        "Google wouldn't allow that — this item may not be shared with you.",
+        "Google wouldn't allow that: this item may not be shared with you.",
         `${detail} — a fact about this RESOURCE, not the connection: the next call may be fine.`
       )
     // 404 IS THE SAME SENTENCE AS 403, and it took a fourth instance of this bug

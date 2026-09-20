@@ -2256,8 +2256,76 @@ const ASIDE_TAB = cn("pt-[var(--aside-inset)]");
    the narrow sheet, where it restates rather than fights the identical
    value the outer wrapper already sets. `verify/badge` §8 gained its own
    `aside-paper-docked` probe the same day, proving this pair rather than
-   asserting it. */
-const ASIDE_BODY = cn("[--badge-quiet-fill:var(--surface-panel)]");
+   asserting it.
+
+   `relative z-[2]` ADDED 20 SEP 2026, AND IT IS THE PANEL'S OWN HALF OF THE
+   TAB-STRIP LAYERING FIX. Aurora, verbatim, with her crop of the assistant
+   strip: "loos at screenshot. i see the bottom of th eincactive tabs for
+   the assistant but they shoudl be behind the shape!" The strip above
+   (`screen-shell-aside-tab`, `BreadcrumbFolders`) rides `--folder-tab-
+   overlap` onto this box by the same construction the content column's own
+   trail rides onto `CARD` — an inactive tab's lower ~17px sits over this
+   box's own top ~17px, and whichever of the two wins that shared band is
+   the one the reader sees "on top". `CARD` (below) answers that question
+   explicitly: `relative z-[2]`. This box never did, and MEASURED live
+   (`agency-staging`, the assistant open, `document.elementFromPoint` at a
+   point inside an inactive tab's own overlap band) it lost anyway —
+   `document.elementFromPoint` there returned the tab's own `<a>`, not this
+   box or anything inside it, on EVERY rest tab, not only the one in her
+   crop.
+
+   WHY A PLAIN, NON-POSITIONED BOX LOST TO A NEGATIVE-Z-INDEX TAB. It reads
+   backwards until the mechanism is named: `breadcrumb-folders.tsx`'s own
+   `STRIP_SHRINK_SCROLL`/`STRIP_SHRINK_PINNED` carry `isolation: isolate`
+   (v1.2.126, load-bearing — see that file's own comment — it is what keeps
+   a rest tab's negative `z-index` clickable at all, and it must stay).
+   `isolation: isolate` on a `position: static` element still creates a new
+   stacking context, and a browser places a context created this way — by
+   `isolation`, not by `position` + `z-index` — at the SAME painting step as
+   an ordinary `z-index: 0` POSITIONED sibling, one step ABOVE plain
+   non-positioned, in-flow, DOM-order content (CSS 2.1 Appendix E, steps 4
+   vs 7). This box, before today, was exactly that: `position: static`, no
+   `z-index`, no `isolation` — step 4. The isolated `<ol>` two levels up the
+   tab strip's own tree is step 7, by construction, whether or not anyone
+   asked it to be. Step 7 always paints over step 4, DOM order or not, so
+   the ENTIRE tab strip — every tab in it, negative z-index and all —
+   already outranked this box before either of them had anything to do with
+   the tab reader is actually looking at.
+
+   `CARD` (the content column's own analogue of this box) never hit the
+   defect for the identical reason its own comment gives for `relative
+   z-[2]`: `2` beats step 7's implicit `0` the same way it beats step 4's
+   implicit nothing, so the content trail's tabs — SAME `isolate`d `<ol>`s,
+   same mechanism — have always painted under the card. This box is the one
+   place in the shell that draws the same folder-tab attachment without the
+   same explicit stacking participation, and that gap is the whole defect.
+
+   `z-[2]`, THE SAME NUMBER AS `CARD`'S OWN, NOT A NEW ONE — this box is the
+   assistant's card, in the same sense `CARD` is the content column's; both
+   sit one rung above the strip that rides onto them, and a caller reading
+   either file should find the identical number for the identical job
+   rather than two numbers to keep in step by hand. MEASURED after: the
+   same `elementFromPoint` probe, same overlap-band point, now returns a
+   descendant of THIS box (`screen-shell-aside-body`), never the tab, on
+   every rest tab; a point in a tab's own upper body — above the overlap
+   band entirely — still returns the tab, and a real click at each tab's
+   own visible centre still reaches it (verified: `check-pointer.mjs`'s own
+   proof is unaffected, since nothing about `isolate` or any tab's own
+   z-index changed here — only what this box, its sibling, now outranks).
+   The active/live tab's own overlap band is covered by the identical
+   construction — it was never a SEPARATE requirement in practice, only a
+   separate-sounding one: the live tab's paper IS this box's own (`--kw-
+   crumb-live` reads `--surface-raised`, the same value `CARD` itself
+   paints, and this box's own descendant reads `--surface-raised` too by
+   the time it is actually painted), so covering it here costs nothing to
+   look at — `breadcrumb-folders.tsx`'s own `TAB_LIVE`/`restZIndex` comment
+   makes the identical argument for `CARD`, at length, and it holds here
+   for the same reason: "only one of them can hide content", and neither
+   one does, because they are the same paper. See
+   `verify/agent-tab-strip-fit/page.tsx`'s own layering assertion and
+   `check-breadcrumb-folders.mjs`'s pin of it for the harness proof this
+   comment argues from. */
+const ASIDE_BODY = cn("relative z-[2] [--badge-quiet-fill:var(--surface-panel)]");
 
 /* How much air each door spends. Structure is identical; only the inset moves.
 
@@ -5896,55 +5964,51 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                   "pointer-events-auto",
                   isAsideOpen
                     ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
-                    : cn(
-                        "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
-                        /* SIZED TO FILL THE BAND IT STANDS IN, 18 SEP 2026 —
-                           A SECOND RULING THE SAME DAY, VERBATIM, over the
-                           26px fix directly below this comment's own history:
-                           "need to be bigger, as big as the space allows it."
+                    : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
+                  /* THE SHUT HANDLE NO LONGER SIZES ITSELF TO ITS OWN BAND —
+                     REVERSED 20 SEP 2026, CLIENT-RULED, VERBATIM: "make the
+                     open assistant mango button same size as the one on the
+                     sidebar to compress/open the sidebar." Two 18 Sep
+                     rulings, in order, had shrunk the shut branch to fit the
+                     16px-to-card-top band exactly — first to
+                     `--control-height-pill` (26px, "not overlapping with
+                     main content"), then to `--folder-lip` (30.48px, "as big
+                     as the space allows it") — both scoped to that one
+                     branch's OWN `size-[…]` override, which won the `cn()`
+                     merge against `HANDLE_HIT`'s own default every time
+                     (last write, same utility group). Today's ruling is not
+                     a third rung on that same ladder; it names a DIFFERENT
+                     button — the rail's own collapse/expand handle
+                     (`edge="rail"`, below, MEASURED live at 40×40px,
+                     `--control-height-button`) — and asks this one to match
+                     IT rather than its own band. `HANDLE_HIT` already sizes
+                     every edge handle to that same step by default (see
+                     that constant's own "SAME SIZE AS A COLLECTION'S +"
+                     comment); the override this
+                     block used to add was the ONLY thing that ever made the
+                     two edges disagree. Deleting it, rather than swapping in
+                     a third value, is "unify on one constant" literally —
+                     both handles now read their size off the identical
+                     class in the identical shared component, so a future
+                     density-scale change can never move one without the
+                     other. MEASURED both live, before this change:
+                     `edge="rail"` 40×40 at (144, 850); `edge="aside"`
+                     (shut) 30.47×30.47 at (1378.5, 16) — the `--folder-lip`
+                     rung the 18 Sep ruling left behind. After: both 40×40.
 
-                           THE BAND ITSELF DID NOT MOVE. It is still exactly
-                           `--folder-lip` (30.48px) — `top-[var(--shell-
-                           gutter)]` (16px) down to the content card's own top
-                           edge (46.48px = the same 16px column padding plus
-                           `--folder-lip`; see `trail-line.tsx`'s identical
-                           math, "the box a control may occupy is the
-                           difference — `--folder-lip`, 30.48"). What moved is
-                           which token fills it. The PREVIOUS fix reached for
-                           `--control-height-pill` (26) — `trail-line.tsx`'s
-                           own answer for a DIFFERENT control (its close chip)
-                           sharing this exact band — and that borrowed number
-                           left 2.24px of air on every side: correct for a
-                           button that sits ON a tab, wrong for the one button
-                           THIS band exists to hold. "As big as the space
-                           allows" is not another borrowed rung; it is the
-                           band's OWN height, so this branch now reaches for
-                           `--folder-lip` directly rather than a second file's
-                           control size — `size-[var(--folder-lip)]` wins the
-                           `cn()` merge against `HANDLE_HIT`'s own `size-[var(
-                           --control-height-button)]` (last write wins, same
-                           utility group) exactly as the 26px fix did, so this
-                           is a value swap, not a new mechanism.
-
-                           NEW BOTTOM EDGE: 16 + 30.48 = 46.48px — the content
-                           card's own top edge, EXACTLY, zero clearance either
-                           side: not the 9.52px overlap the first ruling
-                           fixed, not the 4.48px of unclaimed air the second
-                           fix left. `size-` sets both axes, so the box is a
-                           true square at the new height with no separate
-                           width to pick — "width follows the height" is free.
-                           See `check-screen-shell.mjs`'s own pin, extended to
-                           this ruling.
-
-                           THE ICON INSIDE STILL DOES NOT SHRINK: `HANDLE_HIT`'s
-                           `[&_svg]:size-[var(--icon-button)]` is unchanged at
-                           16px, so growing the box from 26 to 30.48 only grows
-                           the air around the mark (2.24px of it per side
-                           before, 7.24px now) — the same glyph, more visibly
-                           the tallest thing in its own band, which is the
-                           whole ask. */
-                        "size-[var(--folder-lip)]",
-                      ),
+                     THE BAND-OVERLAP TRADE-OFF THE 18 SEP RULINGS ANSWERED
+                     IS BACK, KNOWINGLY. At 40px the shut handle's bottom
+                     edge (16 + 40 = 56px) again runs 9.52px past the
+                     content card's own top edge (46.48px) — precisely what
+                     the FIRST 18 Sep ruling ("not overlapping with main
+                     content") fixed. That ruling is not being un-ruled by
+                     accident: it is superseded by a later, more specific
+                     one from the same client, and this file's own law is
+                     that the later ruling on the same control wins. See
+                     `check-screen-shell.mjs`'s own pin, rewritten for this
+                     ruling rather than extended, because the two pins
+                     (fit-the-band vs. match-the-rail) cannot both hold at
+                     once. */
                 )}
               />
             )}

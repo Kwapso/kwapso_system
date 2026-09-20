@@ -269,7 +269,7 @@ const DEFAULT_LABELS: BulkEditLabels = {
   panelBody:
     "Only the fields you touch are changed. Everything else stays as it is on each record.",
   panelBodyNarrow: "Only the fields you touch are changed.",
-  mixed: "Mixed — leave as they are",
+  mixed: "Mixed: leave as they are",
   logLine: "One log line per record.",
   cancel: "Cancel",
   closeLabel: "Close",

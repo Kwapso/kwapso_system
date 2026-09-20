@@ -391,7 +391,7 @@ const Queue = React.forwardRef<HTMLDivElement, QueueProps>(
       const before = totalOnSkip.current;
       if (before !== undefined && total !== undefined && total < before) {
         console.warn(
-          `Queue: \`total\` fell from ${String(before)} to ${String(total)} across a skip. Skipping RE-QUEUES (override 34, amended 2026-08-23) — the item goes to the end of the sitting and nothing leaves it, so \`total\` is fixed for the sitting's life. A caller that drops it is still running the overturned "plain advance".`,
+          `Queue: \`total\` fell from ${String(before)} to ${String(total)} across a skip. Skipping RE-QUEUES (override 34, amended 2026-08-23): the item goes to the end of the sitting and nothing leaves it, so \`total\` is fixed for the sitting's life. A caller that drops it is still running the overturned "plain advance".`,
         );
       }
     });

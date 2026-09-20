@@ -138,7 +138,7 @@ export function knowledgeCreateOutcome(
     return {
       kind: "silent-video",
       message: t(
-        "Saved, but we didn't read anything from the link — the assistant won't know what this video says yet."
+        "Saved, but we didn't read anything from the link. The assistant won't know what this video says yet."
       ),
     }
   return { kind: "ordinary", message: t('The assistant can now use "{title}".', { title: values.title }) }

@@ -858,9 +858,9 @@ export interface RangeFacetProps
   defaultValue?: RangeFacetValue;
   onValueChange?: (value: RangeFacetValue) => void;
   /**
-   * What sits between the two fields. A prop, because it is on screen: an en
-   * dash reads as a range in English and is wrong in scripts that do not use
-   * one.
+   * What sits between the two fields. A prop, because it is on screen: the
+   * default is the kit's own middle dot, and a caller can swap it for
+   * whatever a range means in its script.
    */
   separator?: React.ReactNode;
   /** A unit shown after the upper field — "kg", "days". Translatable. */
@@ -937,7 +937,7 @@ const RangeFacet = React.forwardRef<HTMLDivElement, RangeFacetProps>(
       value,
       defaultValue,
       onValueChange,
-      separator = "–",
+      separator = "·",
       unit,
       loading = false,
       error = false,

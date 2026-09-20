@@ -1257,6 +1257,13 @@ again, which is the only property that matters here.
   for an `orderChips(` call; a real reason for skipping one goes in
   `CHIP_ORDER_EXEMPT`, keyed by the id chip's own value expression, never a
   line number.
+- **R95 `no-em-dash`** — no em dash (U+2014) or en dash (U+2013) in anything a
+  person reads: your module's copy, its catalogue entries, an email it sends,
+  the glossary word it adds. No exemptions table — fix the sentence, don't
+  name it into a registry. `web/test/no-em-dash.test.ts` censuses the
+  translation catalogue and seed, every JSX text node/`t(...)` argument
+  reachable from either front door, `shared/web/`, `shared/workers/
+  email-template.ts` and every send site, and `shared/glossary.ts`.
 
 **The words** (the ones that catch every new module, every time)
 

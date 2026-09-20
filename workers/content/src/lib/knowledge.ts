@@ -4726,7 +4726,7 @@ export async function retrieve(
       // be able to see that a guess was made, that it paid nothing, and that
       // the search widened because of it — the receipt this whole rebuild
       // keeps insisting on, applied to A3's own retry rather than assumed.
-      reason: `The question names ${accountName}, so I first searched ${accountName}'s material — found nothing there, so I searched the whole knowledge base instead.`,
+      reason: `The question names ${accountName}, so I first searched ${accountName}'s material. Found nothing there, so I searched the whole knowledge base instead.`,
       records: route.records,
     }
     ;({ fused, top1Score, belowStrictFloor } = await searchArms(route))

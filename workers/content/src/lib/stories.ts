@@ -47,6 +47,7 @@ import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/
 import { rankAtTop } from "@shared/workers/rank"
 import {
   MOSCOW_VALUES,
+  PHASE_GOAL_MAX_CHARS,
   STORY_STATUSES,
   TITLE_MAX_CHARS,
   type MoscowValue,
@@ -104,6 +105,9 @@ type StoryRow = {
   category: string
   acceptance_criteria: string | null
   moscow: string | null
+  /** AURORA'S "CONTRIBUTES TO THE GOAL" RULING, 20 SEP 2026 — paired with
+   * `sprints.goal_summary`. 0/1, team migration 0107. */
+  contributes_to_goal: number
   app_name?: string | null
   review_note: string | null
   review_file_url: string | null
@@ -122,7 +126,7 @@ type StoryRow = {
 const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.sprint_id, s.app_id,
   s.process_id, s.step_key, s.changes_no_step, s.assignee_id, s.assignee_name, s.reviewer_id,
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
-  s.story_type, s.category, s.acceptance_criteria, s.moscow, s.review_note, s.review_file_url, s.review_file_name,
+  s.story_type, s.category, s.acceptance_criteria, s.moscow, s.contributes_to_goal, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
   -- A story list that made a query per story to learn its processes would be
@@ -227,6 +231,7 @@ function toStory(r: StoryRow): Story {
     // direction `status` above takes: an unrecognised or blank word reads as
     // "not set" rather than a lie against the closed `MoscowValue` union.
     moscow: (MOSCOW_VALUES as readonly string[]).includes(r.moscow ?? "") ? (r.moscow as MoscowValue) : null,
+    contributesToGoal: r.contributes_to_goal === 1,
     reviewNote: r.review_note,
     reviewFileUrl: r.review_file_url,
     reviewFileName: r.review_file_name,
@@ -628,6 +633,11 @@ export type StoryInput = {
    * only ever checked against the closed `MOSCOW_VALUES` list when one is
    * sent. */
   moscow?: unknown
+  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
+   * 2026.) A plain boolean, never validated against a vocabulary — the same
+   * shape `changesNoStep` already takes on this same door. Optional; a value
+   * left unsaid reads as false, exactly like a create that never turns it on. */
+  contributesToGoal?: unknown
 }
 
 /** ONE OF MUST/SHOULD/COULD/WON'T, OR NOTHING SAID (Aurora's ruling, 20 Sep
@@ -931,6 +941,7 @@ export async function createStory(
   // identical long-text limit `detail` above already reads.
   const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
+  const contributesToGoal = input.contributesToGoal === true
   // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — checked on the resolved
   // words, before the wave below spends a round trip on anything else.
   refuseEnablerWithNoTicket(category, ticketId ?? null)
@@ -980,9 +991,9 @@ export async function createStory(
     cfg,
     guard.databaseId,
     `INSERT INTO stories (id, ref, account_id, ticket_id, app_id, process_id, step_key, changes_no_step,
-       sprint_id, title, detail, story_type, category, acceptance_criteria, moscow, assignee_id, assignee_name, reviewer_id, reviewer_name,
+       sprint_id, title, detail, story_type, category, acceptance_criteria, moscow, contributes_to_goal, assignee_id, assignee_name, reviewer_id, reviewer_name,
        starts_on, due_on, status, rank, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(moscow)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(moscow)}, ${contributesToGoal ? 1 : 0}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await setProcesses(cfg, guard, actor, id, processIds)
 
@@ -1025,6 +1036,7 @@ export async function updateStory(
   const category = requireText(input.category, "Category", TEXT_LIMITS.short)
   const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
+  const contributesToGoal = input.contributesToGoal === true
   // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — read on the RESOLVED
   // ticket, exactly as the create door does: this door replaces every field
   // it reads (`StoryInput`'s own doc), so an edit that drops the ticket while
@@ -1051,7 +1063,7 @@ export async function updateStory(
     cfg,
     guard.databaseId,
     `UPDATE stories SET title = ?, detail = ?, ticket_id = ?, app_id = ?, process_id = ?, step_key = ?,
-       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, moscow = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
+       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, moscow = ?, contributes_to_goal = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
        reviewer_name = ?, starts_on = ?, due_on = ?, account_id = ?, updated_at = ?,
        editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
@@ -1070,6 +1082,7 @@ export async function updateStory(
       category,
       acceptanceCriteria,
       moscow,
+      contributesToGoal ? 1 : 0,
       assignee?.id ?? null,
       assignee?.name ?? null,
       reviewer?.id ?? null,
@@ -1091,6 +1104,11 @@ export async function updateStory(
     { label: "Type", from: before.story_type, to: storyType },
     { label: "Category", from: before.category, to: category },
     { label: "Priority", from: before.moscow, to: moscow },
+    {
+      label: "Contributes to the goal",
+      from: before.contributes_to_goal === 1 ? "Yes" : "No",
+      to: contributesToGoal ? "Yes" : "No",
+    },
     { label: "Assignee", from: before.assignee_name, to: assignee?.name ?? null },
     { label: "Due", from: before.due_on, to: dueOn },
     { label: "Sprint", from: before.sprint_id, to: sprintId, hideValues: true },
@@ -1293,6 +1311,14 @@ type SprintRow = {
   ref: string | null
   name: string
   goal: string | null
+  /** AURORA'S 20 SEP 2026 RULING — "Sprint Goal": one sentence naming the main
+   * outcome the cycle is organized around, shown at the top of the phase board.
+   * A SEPARATE column from `goal` above on purpose: `goal` ("What it's for")
+   * already existed as a free rich-text field before this ruling, and this is a
+   * short, one-line SUMMARY (`PHASE_GOAL_MAX_CHARS`-capped, R87-style, with a
+   * counter) — reusing `goal` would have silently changed the meaning of every
+   * sprint that already has one. Team migration 0107. */
+  goal_summary: string | null
   sprint_type: string | null
   account_id: string | null
   account_name: string | null
@@ -1313,7 +1339,7 @@ type SprintRow = {
   ref_was: string | null
 }
 
-const SPRINT_COLS = `sp.id, sp.ref, sp.name, sp.goal, sp.sprint_type, sp.account_id, sp.app_id,
+const SPRINT_COLS = `sp.id, sp.ref, sp.name, sp.goal, sp.goal_summary, sp.sprint_type, sp.account_id, sp.app_id,
   sp.wave_id, sp.starts_on, sp.ends_on, sp.sold_price_cents, sp.currency, sp.completed_at,
   sp.deactivated_at, sp.created_at, sp.creator_name,
   (SELECT a.name FROM accounts a WHERE a.id = sp.account_id) AS account_name,
@@ -1345,6 +1371,7 @@ function toSprint(r: SprintRow): Sprint {
     ref: r.ref,
     name: r.name,
     goal: r.goal,
+    goalSummary: r.goal_summary,
     sprintType: r.sprint_type,
     accountId: r.account_id,
     accountName: r.account_name,
@@ -1448,6 +1475,10 @@ export async function countSprints(
 export type SprintInput = {
   name?: unknown
   goal?: unknown
+  /** THE PHASE GOAL (Aurora's ruling, 20 Sep 2026) — one sentence, optional,
+   * capped at `PHASE_GOAL_MAX_CHARS`. See `Sprint.goalSummary`'s own doc for
+   * why this is a separate field from `goal` above. */
+  goalSummary?: unknown
   sprintType?: unknown
   accountId?: unknown
   appId?: unknown
@@ -1477,7 +1508,8 @@ export async function createSprint(
 ): Promise<{ id: string; accountId: string | null }> {
   const name = requireText(input.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const goal = optionalText(input.goal, "Goal", TEXT_LIMITS.long) ?? null
-  const sprintType = optionalText(input.sprintType, "Sprint type", TEXT_LIMITS.short) ?? null
+  const goalSummary = optionalText(input.goalSummary, "Phase goal", PHASE_GOAL_MAX_CHARS) ?? null
+  const sprintType = optionalText(input.sprintType, "Phase type", TEXT_LIMITS.short) ?? null
   const appId = optionalText(input.appId, "App", TEXT_LIMITS.short)
   const named = optionalText(input.accountId, "Client", TEXT_LIMITS.short)
   const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null
@@ -1496,9 +1528,9 @@ export async function createSprint(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO sprints (id, ref, account_id, app_id, name, sprint_type, goal, starts_on, ends_on,
+    `INSERT INTO sprints (id, ref, account_id, app_id, name, sprint_type, goal, goal_summary, starts_on, ends_on,
        sold_price_cents, currency, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(appId ?? null)}, ${sqlString(name)}, ${sqlString(sprintType)}, ${sqlString(goal)}, ${sqlString(startsOn)}, ${sqlString(endsOn)}, ${cents}, ${sqlString(currency)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(appId ?? null)}, ${sqlString(name)}, ${sqlString(sprintType)}, ${sqlString(goal)}, ${sqlString(goalSummary)}, ${sqlString(startsOn)}, ${sqlString(endsOn)}, ${cents}, ${sqlString(currency)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Sprint created",
@@ -1547,7 +1579,8 @@ export async function updateSprint(
 
   const name = requireText(input.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const goal = optionalText(input.goal, "Goal", TEXT_LIMITS.long) ?? null
-  const sprintType = optionalText(input.sprintType, "Sprint type", TEXT_LIMITS.short) ?? null
+  const goalSummary = optionalText(input.goalSummary, "Phase goal", PHASE_GOAL_MAX_CHARS) ?? null
+  const sprintType = optionalText(input.sprintType, "Phase type", TEXT_LIMITS.short) ?? null
   const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null
   const endsOn = optionalText(input.endsOn, "End date", TEXT_LIMITS.short) ?? null
   const currency = optionalText(input.currency, "Currency", TEXT_LIMITS.short) ?? null
@@ -1557,15 +1590,16 @@ export async function updateSprint(
   await d1Query(
     cfg,
     guard.databaseId,
-    `UPDATE sprints SET name = ?, sprint_type = ?, goal = ?, starts_on = ?, ends_on = ?,
+    `UPDATE sprints SET name = ?, sprint_type = ?, goal = ?, goal_summary = ?, starts_on = ?, ends_on = ?,
        sold_price_cents = ?, currency = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
-    [name, sprintType, goal, startsOn, endsOn, cents, currency, now, actor.id, actor.email, actor.name, id]
+    [name, sprintType, goal, goalSummary, startsOn, endsOn, cents, currency, now, actor.id, actor.email, actor.name, id]
   )
 
   const changes = describeChanges([
     { label: "Name", from: before.name, to: name },
     { label: "Type", from: before.sprint_type, to: sprintType },
+    { label: "Goal", from: before.goal_summary, to: goalSummary },
     { label: "Runs", from: before.starts_on, to: startsOn },
     { label: "Ends", from: before.ends_on, to: endsOn },
     // The FIGURE is deliberately hidden from the history line. A sprint's price

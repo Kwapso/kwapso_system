@@ -57,6 +57,15 @@ export type SprintTypeArt = {
   icon: string
 }
 
+// FROZEN, 20 SEP 2026. Team migration 0098 (`workers/tenancy/src/team-schema/
+// migrations.ts`) builds its SQL by reading this array AT MODULE LOAD TIME —
+// it is a plain JS expression inside that migration's own `sql:` template,
+// not a snapshot — so editing the seven names or their order here would
+// silently rewrite an already-shipped, append-only migration's statements
+// the next time this file is imported. `PHASE_TYPES`, below, is the CURRENT
+// vocabulary (Aurora's 20 Sep 2026 renames + the Wave-lifecycle reorder) and
+// every runtime caller reads that one now; this array and `sprintTypeIcon`
+// exist solely so 0098 keeps generating the SQL it always has.
 export const SPRINT_TYPES: SprintTypeArt[] = [
   { name: "Not started", icon: "Circle" },
   { name: "Audit", icon: "MagnifyingGlass" },
@@ -69,8 +78,119 @@ export const SPRINT_TYPES: SprintTypeArt[] = [
 
 /** The icon name for a sprint type, empty for one the code has never met (a
  * team's own word, or one migration 0098 retired) — the same "reads as
- * itself, draws no glyph" answer every retired-word lookup in this app gives. */
+ * itself, draws no glyph" answer every retired-word lookup in this app gives.
+ *
+ * FROZEN, LIKE `SPRINT_TYPES` ABOVE IT. Kept only because team migration
+ * 0098's own generated SQL calls it (`workers/tenancy/src/team-schema/migrations.ts`
+ * evaluates this at module load, so mutating either array in place would
+ * silently rewrite an already-shipped migration's statements). Current code
+ * reads `phaseTypeIcon`/`PHASE_TYPES`, below. */
 export function sprintTypeIcon(name: string | null | undefined): string {
   if (!name) return ""
   return SPRINT_TYPES.find((s) => s.name === name)?.icon ?? ""
+}
+
+// ── THE PHASE TYPE VOCABULARY, 20 SEP 2026 ──────────────────────────────────
+//
+// Aurora's rulings, the same session, read together as one vocabulary move
+// (never edited into `SPRINT_TYPES` above — see that constant's own new
+// header note for why a second, live array is the safe shape):
+//
+//   1. "Rename 'sprint' to 'phase.'" — every user-facing word moves, this
+//      dropdown group's own name included: `selectable_data.type` moves from
+//      "Sprint type" to "Phase type" (team migration 0107, the 0094/0098
+//      pattern — rewrite the stored word and the dropdown row together).
+//   2. "Rename the sprint type 'Refinement' to 'Revision.'" / "Rename the
+//      phase 'Validation' to 'Pilot.'" — two of the seven words move.
+//   3. "Update the Wave lifecycle stages and set the full order as: Audit →
+//      Plan → Build → Pilot → Revision → Deploy → Hypercare" — this IS the
+//      same vocabulary read from the WAVE's side (a wave's own screen shows
+//      each sprint/phase inside it through this exact set of words,
+//      `shared/waves.ts`'s `WaveSprint.sprintType`) rather than a second,
+//      separate "wave stage" column anywhere in the schema — there isn't
+//      one. Reordered AND narrowed: "Not started" and "Enhancement" drop out
+//      of the ordered lifecycle (a phase that has not begun yet is simply
+//      absent from a wave's board, which is what "Not started" always meant
+//      operationally), "Deploy" and "Hypercare" are new.
+//
+// DEFINITIONS, stored as help text here (there is no `selectable_data`
+// column for a value's own description). Aurora's own one-line definitions,
+// shown wherever a phase-type pill's own tooltip/help text is drawn. R34
+// (glossary-in-copy) reads this user-facing text same as any other: "customer"
+// and "user(s)" are banned synonyms for this app's own words, so the two spots
+// that named the party buying the work say "account" and the one spot that
+// named the people using the release says "the account" too, in place of
+// Aurora's own "customer"/"users" wording.
+//
+// COLOUR — PROPOSED, THEN DROPPED, 20 SEP 2026. The brief that produced this
+// file raised a tone per phase type (Audit orange, Plan/Build black, Pilot
+// purple, Revision the app's "blue" token, Deploy borrowing Plan/Build's
+// tone, Hypercare a neutral) and asked for it to be wired in ONLY if a real
+// chip component had a tone slot to take it. It does not: every live call
+// site that draws a phase/sprint type is icon-only by a standing, twice-
+// repeated ruling — `sprints-screen.tsx`'s R86 ("the sprint TYPE glyph
+// beside the name stays uncoloured") and `sprint-detail.tsx`'s own chip
+// comment, both quoting the client's original 16 Sep 2026 words verbatim:
+// "they will not have colors, but icons." Wiring a tone into either would
+// reopen a ruling nobody has asked to reopen, so the colour map was never
+// added — a table with no reader is worse than no table, per this repo's own
+// dead-export law, and re-deciding the mapping later costs nothing a fresh
+// look wouldn't also cost now. */
+export type PhaseTypeArt = {
+  name: string
+  icon: string
+  /** Aurora's own one-line definition, verbatim (20 Sep 2026 ruling). */
+  description: string
+}
+
+export const PHASE_TYPE_GROUP = "Phase type"
+
+export const PHASE_TYPES: PhaseTypeArt[] = [
+  {
+    name: "Audit",
+    icon: "MagnifyingGlass",
+    description: "Assess the current state and gather requirements before work is scoped.",
+  },
+  { name: "Plan", icon: "Compass", description: "Scope, prioritize, and schedule the stories for the wave." },
+  { name: "Build", icon: "Hammer", description: "Implement the stories." },
+  {
+    name: "Pilot",
+    icon: "CheckCircle",
+    description:
+      "The period where the account uses the app and confirms it meets their needs and signs off, before full release.",
+  },
+  {
+    name: "Revision",
+    icon: "Sliders",
+    description: "Implement changes and adjustments requested by the account after they have used the release.",
+  },
+  {
+    name: "Deploy",
+    icon: "Rocket",
+    description:
+      "Release the accepted work to production, includes the release checklist, smoke tests, rollout (phased/canary if needed), release notes, and a rollback plan.",
+  },
+  {
+    name: "Hypercare",
+    icon: "Heartbeat",
+    description:
+      "A short, intensive support window immediately after deploy where the team closely monitors the release, fixes urgent issues fast, and supports the account during adoption.",
+  },
+]
+
+/** The icon name for a phase type — current code's own answer, `sprintTypeIcon`'s
+ * replacement. Same "unmatched reads as itself, draws no glyph" fallback. */
+export function phaseTypeIcon(name: string | null | undefined): string {
+  if (!name) return ""
+  return PHASE_TYPES.find((p) => p.name === name)?.icon ?? ""
+}
+
+/** The one-line definition for a phase type, read where the type is picked
+ * (`sprint-form-dialog.tsx`'s type field, through `t()`) so a person choosing
+ * "Pilot" sees what it means rather than only the word. Null for a word this
+ * vocabulary does not carry a definition for (a team's own added value, or a
+ * retired one). */
+export function phaseTypeDescription(name: string | null | undefined): string | null {
+  if (!name) return null
+  return PHASE_TYPES.find((p) => p.name === name)?.description ?? null
 }

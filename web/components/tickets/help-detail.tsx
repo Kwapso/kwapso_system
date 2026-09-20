@@ -66,6 +66,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Card } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TicketThread, type ThreadAttachment } from "@shared/ui/components/ticket-thread/ticket-thread"
@@ -116,6 +117,7 @@ function mentionableTeamMembers(
 }
 
 import type {
+  AppRow,
   HelpAttachment,
   HelpMessage,
   HelpMessageAttachment,
@@ -139,7 +141,7 @@ import {
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
-import { assignableMembers } from "@/lib/members"
+import { assignableMembers, staffedOn } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
 import { mergePage, invalidate, primeCache, removeFromPage, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
@@ -152,7 +154,8 @@ import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
 // reuses off this file's own `membersQ`: `members:<teamId>` lists every login
 // on the team, staff and portal client alike (`TeamMember.isClient`'s own
 // header), so one lookup answers both populations without a second read.
-import { memberFace } from "@/components/tickets/tickets-collection"
+import { acceptTriagedTicket, memberFace, triageAct } from "@/components/tickets/tickets-collection"
+import { RecordPicker, type PickerOption } from "@/components/records/record-picker"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { ticketTypeIconName } from "@shared/ticket-types"
 import { Icon } from "@shared/web/screen-engine/icon"
@@ -168,9 +171,9 @@ import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/time
 import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { totalKey } from "@/lib/live-resources"
+import { appsKey, listFetch, totalKey, triageKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
-import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
+import { RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
 import { orderChips } from "@shared/web/chip-order"
 import { useConfirm } from "@shared/web/use-confirm"
@@ -363,6 +366,17 @@ export function HelpDetailScreen({
   const membersQ = useCached<TeamMember[]>(have ? `members:${teamId}` : null, () =>
     tenancy.members().then((r) => r.members)
   )
+  /** WHO COULD PICK UP AN ISSUE OR A REQUEST STILL IN TRIAGE — read only
+   * while the ticket could possibly ask for it (`status === "new"`), through
+   * the SAME cache key the triage queue itself reads (`appsKey`,
+   * `TriageQueue`), so a reader with the Triage tab open in another pane
+   * pays for this list once (R56). See `triageAssignOptions` below for why
+   * the detail head needs an app's own staff at all — Aurora's ruling, 20
+   * Sep 2026: the head offers the queue's own decision while a ticket sits
+   * at `new`, and Issue/Request need a person the identical way there. */
+  const appsQ = useCached<AppRow[]>(ticket?.status === "new" ? appsKey(teamId) : null, () =>
+    listFetch.apps(teamId)
+  )
   // The generic record feed (Law R5) + the exact server total its tab badges
   // (R8 for the place, R16 for the number — never the loaded page's length).
   const activity = useRecordActivity("help", have ? helpId : null)
@@ -486,10 +500,22 @@ export function HelpDetailScreen({
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
+  /** WHETHER THE TRIAGE ASSIGN ROW IS OPEN — the head's own version of the
+   * queue's `picker`/`rowPicker` (`TriageQueue`), one boolean rather than
+   * two: this screen shows exactly one ticket, so there is nothing here that
+   * plays the "which row" part `rowPicker` answers there. */
+  const [triagePickerOpen, setTriagePickerOpen] = React.useState(false)
   // Archive is the one destructive act on this screen — one confirm dialog
   // (shared/web/use-confirm.tsx) rather than a hand-rolled one. Restoring stays
   // confirm-free, as the button beside it already says.
   const { busy: archiveBusy, ask: askArchive, run: runArchive, dialog: archiveDialog } = useConfirm()
+  // A REPLY'S OWN DELETE — a second, independent confirm dialog (the hook is
+  // "one per screen serves all of them", not "one per screen, full stop"; a
+  // reply removal mid-conversation and the ticket's own archive are two
+  // different destructive acts and must not share one open/close state).
+  // Edit carries no confirm — the kit's own inline editor (Save/Cancel) is
+  // already the ask.
+  const { ask: askDeleteReply, run: runDeleteReply, dialog: deleteReplyDialog } = useConfirm()
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total titles the panel
@@ -808,6 +834,53 @@ export function HelpDetailScreen({
     await content.removeHelpAttachment(helpId, attachmentId)
   }
 
+  /** CHANGE A REPLY ALREADY SENT — Aurora's 20 Sep 2026 ruling, the Edit half
+   * (kit v1.2.139's `TicketThread.actions.onEdit`, wired below on the thread's
+   * `messages` — see the JSX for why every reply's `body` has to be the plain
+   * string rather than the `<RichText>` node the bubble otherwise draws: the
+   * kit's own inline editor seeds itself from `typeof message.body ===
+   * "string"`, and there is no second, string-only slot to hand it one). The
+   * door's own fence (`assertMayChangeReply`, workers/content/src/lib/help.ts)
+   * is what actually decides whether this call succeeds; this just carries it
+   * and reconciles the thread with what came back. Fire-and-forget from the
+   * kit's own side (`saveEdit` closes the editor the instant it calls this,
+   * with no promise to await), so a refusal is told here, not there. */
+  async function editReply(id: string, newBody: string): Promise<void> {
+    try {
+      const { replies: fresh } = await content.updateHelpReply(id, newBody)
+      primeCache(`help-thread:${helpId}`, fresh)
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update that reply."))
+    }
+  }
+
+  /** TAKE A REPLY BACK OUT — the Delete half of the same ruling
+   * (`TicketThread.actions.onDelete`). The kit fires this the moment Delete is
+   * chosen, with no dialog of its own (`ThreadMessageActions.onDelete`'s own
+   * doc) — asking first is deliberately the CALLER's job, so this is where
+   * `useConfirm`'s dialog (the same pattern `archiveTicket` below already
+   * uses, its own header explains why it isn't the kit's `overlays/
+   * delete-confirmation` composition) actually lands. NOTHING ON A TICKET IS
+   * EVER REMOVED: the door soft-deletes (`deactivated_at`), the row and its
+   * activity entry both survive, and the wording below says so rather than
+   * claiming a delete this app's own law never performs. */
+  function confirmDeleteReply(id: string) {
+    askDeleteReply({
+      title: t("Delete this reply?"),
+      body: t("It stops showing in this conversation. Nothing is deleted: the reply and its history stay exactly as they are."),
+      action: t("Delete"),
+      run: () =>
+        runDeleteReply(
+          async () => {
+            const { replies: fresh } = await content.deleteHelpReply(id)
+            primeCache(`help-thread:${helpId}`, fresh)
+          },
+          t("Removed."),
+          t("Couldn't remove that reply.")
+        ),
+    })
+  }
+
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped and no screen ever called it, so a ticket could be archived by the
    * assistant and then be unreachable by a person. Nothing is deleted: the
@@ -846,6 +919,40 @@ export function HelpDetailScreen({
       toast.success(t("Taken back out."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
+    } finally {
+      setStatusBusy(false)
+    }
+  }
+
+  /** THE TRIAGE QUEUE'S OWN DECISION, MADE FROM THE HEAD — Aurora's ruling,
+   * 20 Sep 2026, verbatim: "when ticket is in status triage, also in main
+   * screen the visible buttons should change: same as in queue." The two
+   * door calls are `acceptTriagedTicket` (tickets-collection.tsx), the exact
+   * function `TriageQueue.accept` itself now calls, so "same as in queue"
+   * means the same doors and not a second hand-written copy of them.
+   *
+   * WHAT THIS FUNCTION OWNS INSTEAD is the single ticket's own caches: the
+   * list page this record rides in (`mergePage`, same as `editTicket`
+   * above), the facets, this record's own activity feed, and the Triage
+   * tab's own badge/queue (`triageKey`) — dropped rather than merged,
+   * because the door's answer no longer NAMES this ticket among the waiting
+   * ones, and a queue is exactly what `TriageQueue` already re-reads fresh
+   * on its next open. */
+  async function triageDecide(assignTo?: string) {
+    setStatusBusy(true)
+    try {
+      const { tickets, byType, byStatus, byAccount } = await acceptTriagedTicket(helpId, assignTo)
+      mergePage(`help:${teamId}`, "id", tickets as unknown as Record<string, unknown>[])
+      if (byType) primeCache(`help-by-type:${teamId}`, byType)
+      if (byStatus) primeCache(`help-by-status:${teamId}`, byStatus)
+      if (byAccount) primeCache(`help-by-account:${teamId}`, byAccount)
+      invalidate(`help:one:${helpId}`)
+      invalidate(recordActivityKey("help", helpId))
+      invalidate(triageKey(teamId))
+      setTriagePickerOpen(false)
+      toast.success(t("Triaged."))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
     } finally {
       setStatusBusy(false)
     }
@@ -965,6 +1072,12 @@ export function HelpDetailScreen({
     const isLastOfRun = !next || next.authorId !== r.authorId
     return {
       id: r.id,
+      // CARRIED THROUGH FOR THE ACTIONS MENU BELOW (kit v1.2.139's
+      // `TicketThread.actions`, Aurora's 20 Sep 2026 ruling) — "only the
+      // author... get Edit/Delete" needs the raw id to compare against
+      // `myUserId`, which nothing else on this returned shape otherwise
+      // carries past this point.
+      authorId: r.authorId,
       // R54: a thread in the agency app has BOTH sides on it. A colleague is named
       // by their first name; a contact who replied about their own question keeps
       // their name whole. `authorIsClient` is the row's own answer — the same
@@ -1086,6 +1199,29 @@ export function HelpDetailScreen({
      unaffected: it still opens from the footer's Latest activity eyebrow,
      through `activity` on `RecordScreen` below. */
 
+  /* THE TRIAGE STAGE — Aurora's ruling, 20 Sep 2026, verbatim: "when ticket
+   * is in status triage, also in main screen the visible buttons should
+   * change: same as in queue." `new` IS the pre-triage state itself
+   * (`TriageQueue`'s own undo comment says so, and `HELP_STATUS.new` —
+   * shape.tsx — labels it "New"), so a ticket at `new` is exactly the set
+   * the Triage tab's queue holds. `triageActInfo` is the identical decision
+   * a row in that queue offers for THIS ticket's own type (`triageAct`,
+   * tickets-collection.tsx — Accept/Assign/Plan), and `triageAssignOptions`
+   * is the identical narrowing the queue's own `peopleFor` applies
+   * (`staffedOn`), over the SAME app-staff cache (`appsQ`, above) and the
+   * same members cache this screen already reads for @mentions — built even
+   * when the type does not need a person, so this stays a plain derivation
+   * rather than one more conditional hook. */
+  const inTriageStage = ticket.status === "new"
+  const triageActInfo = triageAct(ticket.helpType, t)
+  const triageAppStaff = new Map((appsQ.data ?? []).map((a) => [a.id, a.staff.map((p) => p.userId)]))
+  const triageAssignOptions: PickerOption[] = staffedOn(
+    assignableMembers(membersQ.data),
+    triageAppStaff,
+    ticket.appId,
+    myUserId
+  ).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))
+
   /* B0294/T3657 — "the close button needs to move to the top." CLOSING IS
    * `help:update`, the right `/help/resolve` itself gates on, and there is
    * nothing to close on a ticket already answered — so the control is not
@@ -1093,8 +1229,13 @@ export function HelpDetailScreen({
    * button below AND (until 16 Sep 2026) by the bottom composer's own
    * "Send and close" — now removed, so this is its only reader, but it keeps
    * the name because it is still the seam: whatever "closeable" means on this
-   * screen is decided once, here. */
-  const canClose = canEdit && ticket.status !== "resolved"
+   * screen is decided once, here.
+   *
+   * NEVER WHILE THE TICKET IS STILL IN TRIAGE (20 Sep 2026 ruling, above) —
+   * there is nothing to close on a request nobody on our side has read yet,
+   * and the row that replaces Close/the timer at `new` is drawn separately,
+   * below. */
+  const canClose = canEdit && ticket.status !== "resolved" && !inTriageStage
 
   /* THE ENABLE GATE. The client's ruling, 17 Sep 2026, verbatim: "reduce to
    * close and make it only available, but still visible at all times, only
@@ -1202,7 +1343,25 @@ export function HelpDetailScreen({
           },
         ]
       : []),
-    ...(timerAction ? [timerAction] : []),
+    // THE TRIAGE QUEUE'S OWN DECISION, FOLDED — same slot Close leaves
+    // empty while the ticket sits at `new` (20 Sep 2026 ruling, above): the
+    // fold names the same act the wide row's own button does, below.
+    ...(inTriageStage && canEdit
+      ? [
+          {
+            key: "triage-decide",
+            label: triageActInfo.label,
+            icon: <CheckCircle className="size-3.5" />,
+            onSelect: () =>
+              triageActInfo.assigns ? setTriagePickerOpen((v) => !v) : void triageDecide(),
+            disabled: statusBusy,
+          },
+        ]
+      : []),
+    // THE TIMER IS OFF THE TABLE TOO WHILE THE TICKET IS STILL IN TRIAGE —
+    // the same 20 Sep 2026 ruling: nothing is loggable against a request
+    // nobody on our side has read yet.
+    ...(!inTriageStage && timerAction ? [timerAction] : []),
     ...(canEdit
       ? [
           {
@@ -1266,15 +1425,44 @@ export function HelpDetailScreen({
           {t("Close")}
         </Button>
       )}
+      {/* THE TRIAGE QUEUE'S OWN DECISION, ON THE HEAD — Aurora's ruling, 20
+          Sep 2026, verbatim: "when ticket is in status triage, also in main
+          screen the visible buttons should change: same as in queue." This
+          takes Close's own mango/primary slot exactly while `canClose`
+          above is false for the one reason `inTriageStage` names, so the
+          row never carries both. The label and whether it opens a person
+          row first come from `triageAct` — the SAME function a row in the
+          Triage tab's own list reads for this ticket's type — and the door
+          calls behind it are `acceptTriagedTicket`, the SAME function
+          `TriageQueue.accept` itself calls. Assign/Plan opens the picker
+          below (`headerExtra`) instead of deciding straight away, exactly
+          as the queue's own row opens its strip. */}
+      {inTriageStage && canEdit && (
+        <Button
+          disabled={statusBusy}
+          onClick={() =>
+            triageActInfo.assigns ? setTriagePickerOpen((v) => !v) : void triageDecide()
+          }
+          className="shrink-0 gap-1"
+        >
+          <CheckCircle className="size-3.5" />
+          {triageActInfo.label}
+        </Button>
+      )}
       {/* THE CLOCK ON A REQUEST. Reading, triaging and resolving one is real work
-          and BUILD-1 §5 is explicit that it is loggable against the request. */}
-      <RecordTimerButton
-        teamId={teamId}
-        targetTable="help"
-        targetId={helpId}
-        canLog={canLogTime}
-        disabled={ticket.status === "resolved"}
-      />
+          and BUILD-1 §5 is explicit that it is loggable against the request.
+          NOT WHILE THE TICKET IS STILL IN TRIAGE, per the same ruling — there
+          is nothing loggable against a request nobody on our side has read
+          yet, and the triage decision above takes this slot instead. */}
+      {!inTriageStage && (
+        <RecordTimerButton
+          teamId={teamId}
+          targetTable="help"
+          targetId={helpId}
+          canLog={canLogTime}
+          disabled={ticket.status === "resolved"}
+        />
+      )}
       {/* EDIT, STANDALONE — client ruling, 17 Sep 2026, verbatim: "The edit
           button: put it outside, just the pen." It left the ⋯ menu (see
           `overflow`'s own comment above) for an icon-only button right here,
@@ -1477,7 +1665,33 @@ export function HelpDetailScreen({
          exemption is filed where R67 keeps its debts,
          `UNCONTAINED_SECTION_OK` in shared/rules/registry.ts, in her words,
          the same shape the Tasks progress line's own entry uses. */
-      headerExtra={<TicketStages ticketId={helpId} status={ticket.status} />}
+      headerExtra={
+        <>
+          <TicketStages ticketId={helpId} status={ticket.status} createdAt={ticket.createdAt} />
+          {/* THE PERSON ROW, BENEATH THE LADDER — the head's own version of
+              the queue's card picker (`TriageQueue`'s own `pickerRow`,
+              triage-queue.tsx), opened by the triage decide button above
+              when this ticket's type needs a person (Issue/Request). Same
+              component, same strings, same well card: Aurora's ruling that
+              this screen offers the queue's own decision means the picker
+              reads as one pattern with it too, not a second one built for
+              this screen alone. */}
+          {inTriageStage && triagePickerOpen && (
+            <Card variant="well" className="p-3">
+              <RecordPicker
+                layout="row"
+                ariaLabel={t("Who is picking this up?")}
+                value=""
+                onChange={(v) => void triageDecide(v)}
+                options={triageAssignOptions}
+                searchPlaceholder={t("Who is picking this up?")}
+                emptyText={t("Nobody on this team can be given work yet.")}
+                disabled={statusBusy}
+              />
+            </Card>
+          )}
+        </>
+      }
       // D7 / CHECKLIST 11.3: who made it and who last touched it, now the
       // kit's own ink footer's Record column rather than five rows in the
       // middle of Overview.
@@ -1643,12 +1857,43 @@ export function HelpDetailScreen({
                       initials: r.initials,
                       image: r.image,
                       time: r.time,
-                      body:
-                        typeof r.body === "string" ? (
-                          <RichText html={r.body} className={ON_INVERSE_UNTIL_THE_KIT_RULES} />
-                        ) : (
-                          r.body
-                        ),
+                      // THE PLAIN STRING, NOT `<RichText>` — a reply now carries
+                      // the actions menu (below), and the kit reads `message.
+                      // body` itself for BOTH `onCopy`'s clipboard text and
+                      // `onEdit`'s inline-editor seed (`ticket-thread.tsx`:
+                      // `typeof message.body === "string"`, twice). Wrapping it
+                      // in `<RichText>` — the node the description bubble above
+                      // still uses, and this bubble used to — makes both read as
+                      // absent: Copy would put an empty string on the
+                      // clipboard and Edit would always open blank. There is no
+                      // second, string-only slot the kit offers instead, so
+                      // this trades the ON_INVERSE_UNTIL_THE_KIT_RULES link/bold
+                      // treatment (and RichText's auto-linking) away on every
+                      // reply for a working Copy/Edit — a kit contract gap
+                      // logged beside the one that comment already names, not a
+                      // choice this file is making for its own reasons.
+                      body: r.body,
+                      // AURORA'S 20 SEP 2026 RULING — the chat edit pencil:
+                      // "make it like p4 wth the 3 options menu (edit,
+                      // copy/delete)". Copy needs no handler to work (the kit's
+                      // own doc on `ThreadMessageActions`) — it is set
+                      // unconditionally so every reply draws the trigger at
+                      // all. Edit/Delete are the reply's OWN fence: the person
+                      // who wrote it always, and past that whoever already
+                      // holds the ticket edit right (`canEdit`, defined above —
+                      // the same `help:update` the door itself checks,
+                      // `assertMayChangeReply`, workers/content/src/lib/help.ts)
+                      // — never a client login here, because this screen is
+                      // staff-only.
+                      actions: {
+                        onCopy: () => { toast.success(t("Copied.")) },
+                        ...(r.authorId === myUserId || canEdit
+                          ? {
+                              onEdit: (id: string, newBody: string) => { void editReply(id, newBody) },
+                              onDelete: (id: string) => { confirmDeleteReply(id) },
+                            }
+                          : {}),
+                      },
                       // team migration 0105 — a pill chip per file
                       // (`attachments`) and an image's own well (`media`),
                       // both already built onto `r` by `messageFilesFor`.
@@ -1816,7 +2061,7 @@ export function HelpDetailScreen({
                               className="shrink-0"
                               icon={typeIconName ? <Icon name={typeIconName} className="size-3.5 shrink-0" /> : undefined}
                             >
-                              {s.storyType ?? "—"}
+                              {s.storyType ?? null}
                             </Badge>
                           ),
                         },
@@ -2089,6 +2334,7 @@ export function HelpDetailScreen({
       />
 
       {archiveDialog}
+      {deleteReplyDialog}
     </>
   )
 }

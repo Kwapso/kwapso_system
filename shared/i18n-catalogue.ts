@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 785 strings · 3 languages · 1431 of the entries below are hand-written seed.
+// 768 strings · 3 languages · 1473 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -61,7 +61,6 @@ export const CATALOGUE: Catalogue = {
   "Agreed so far:": { de: "Bisher vereinbart:", es: "Acordado hasta ahora:", ca: "Acordat fins ara:" },
   "All": { de: "Alle", es: "Todo", ca: "Tot" },
   "All sections": { de: "Alle Abschnitte", es: "Todas las secciones", ca: "Totes les seccions" },
-  "All sprints": { de: "Alle Sprints", es: "Todos los sprints", ca: "Tots els sprints" },
   "All tickets": { de: "Alle Tickets", es: "Todos los tickets", ca: "Tots els tiquets" },
   "Almost there": { de: "Fast fertig", es: "Casi listo", ca: "Gairebé a punt" },
   "Answer this ticket": { de: "Dieses Ticket beantworten", es: "Responder este ticket", ca: "Respondre aquest tiquet" },
@@ -120,7 +119,6 @@ export const CATALOGUE: Catalogue = {
   "Company": { de: "Unternehmen", es: "Empresa", ca: "Empresa" },
   "Complete": { de: "Abschließen", es: "Completar", ca: "Completar" },
   "Completed": { de: "Abgeschlossen", es: "Completado", ca: "Completat" },
-  "Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.": { de: "Das Abschließen dieses Sprints erstellt eine neue Version aller Prozesse in dessen App, sodass die Einsparungen anhand der Änderungen gemessen werden können.", es: "Completar este sprint genera una nueva versión de cada proceso en su aplicación, para que los ahorros se puedan medir por lo que cambió.", ca: "Completar aquest sprint genera una nova versió de cada procés dins de l'app, de manera que els estalvis es poden mesurar a partir del que ha canviat." },
   "Connect": { de: "Verbinden", es: "Conectar", ca: "Connectar" },
   "Connected.": { de: "Verbunden.", es: "Conectado.", ca: "Connectat." },
   "Contact": { de: "Kontakt", es: "Contacto", ca: "Contacte" },
@@ -146,8 +144,6 @@ export const CATALOGUE: Catalogue = {
   "Couldn't load the process.": { de: "Prozess konnte nicht geladen werden.", es: "No se pudo cargar el proceso.", ca: "No s'ha pogut carregar el procés." },
   "Couldn't load the processes.": { de: "Prozesse konnten nicht geladen werden.", es: "No se pudieron cargar los procesos.", ca: "No s'ha pogut carregar els processos." },
   "Couldn't load the source.": { de: "Quelle konnte nicht geladen werden.", es: "No se pudo cargar la fuente.", ca: "No s'ha pogut carregar la font." },
-  "Couldn't load the sprint.": { de: "Sprint konnte nicht geladen werden.", es: "No se pudo cargar el sprint.", ca: "No s'ha pogut carregar el sprint." },
-  "Couldn't load the sprints.": { de: "Sprints konnten nicht geladen werden.", es: "No se pudieron cargar los sprints.", ca: "No s'ha pogut carregar els sprints." },
   "Couldn't load the story.": { de: "Story konnte nicht geladen werden.", es: "No se pudo cargar la historia.", ca: "No s'ha pogut carregar la història." },
   "Couldn't load the tasks.": { de: "Aufgaben konnten nicht geladen werden.", es: "No se pudieron cargar las tareas.", ca: "No s'ha pogut carregar les tasques." },
   "Couldn't load the team.": { de: "Team konnte nicht geladen werden.", es: "No se pudo cargar el equipo.", ca: "No s'ha pogut carregar l'equip." },
@@ -364,7 +360,6 @@ export const CATALOGUE: Catalogue = {
   "No meetings about this app yet.": { de: "Noch keine Treffen zu dieser App.", es: "Sin reuniones sobre esta aplicación aún.", ca: "Cap reunió sobre aquesta aplicació encara." },
   "No meetings with them yet.": { de: "Noch keine Treffen mit ihnen.", es: "Sin reuniones con ellos aún.", ca: "Cap reunió amb ells encara." },
   "No processes drawn inside this app yet.": { de: "In dieser App wurden noch keine Prozesse erfasst.", es: "Ningún proceso dibujado dentro de esta aplicación todavía.", ca: "Cap procés dibuixat dins aquesta app encara." },
-  "No sprints yet.": { de: "Noch keine Sprints.", es: "Ningún sprint todavía.", ca: "Cap sprint encara." },
   "No text yet.": { de: "Noch kein Text.", es: "Ningún texto todavía.", ca: "Cap text encara." },
   "No tickets raised for them yet.": { de: "Es wurden noch keine Tickets dafür erstellt.", es: "Ningún ticket levantado para ellos todavía.", ca: "Cap tiquet obert per a ells encara." },
   "No time has been logged yet.": { de: "Es wurde noch keine Zeit erfasst.", es: "No se ha registrado tiempo aún.", ca: "No s'ha registrat temps encara." },
@@ -375,7 +370,6 @@ export const CATALOGUE: Catalogue = {
   "No usage yet today.": { de: "Heute noch keine Nutzung.", es: "Ningún uso todavía hoy.", ca: "Cap ús avui fins ara." },
   "No value to show yet.": { de: "Noch kein Wert zum Anzeigen.", es: "Ningún valor para mostrar todavía.", ca: "Cap valor per mostrar encara." },
   "No work has been sold against this app yet.": { de: "Es wurde noch keine Arbeit für diese App verkauft.", es: "Ningún trabajo ha sido vendido contra esta aplicación todavía.", ca: "Cap treball s'ha venut contra aquesta app encara." },
-  "No work in this sprint yet.": { de: "Noch keine Arbeit in diesem Sprint.", es: "Ningún trabajo en este sprint todavía.", ca: "Cap treball en aquest sprint encara." },
   "Nobody else is on the invitation.": { de: "Niemand sonst ist in der Einladung.", es: "Nadie más está en la invitación.", ca: "No hi ha ningú més en la invitació." },
   "Nobody is on triage this week": { de: "Niemand ist diese Woche bei der Triage", es: "Nadie está en triage esta semana", ca: "Ningú està en triatge aquesta setmana" },
   "Nobody is on triage this week.": { de: "Niemand ist diese Woche bei der Triage.", es: "Nadie está en triage esta semana.", ca: "Ningú està en triatge aquesta setmana." },
@@ -535,16 +529,8 @@ export const CATALOGUE: Catalogue = {
   "Something to show": { de: "Etwas zum Anzeigen", es: "Algo para mostrar", ca: "Alguna cosa a mostrar" },
   "Source": { de: "Quelle", es: "Origen", ca: "Origen" },
   "Source updated.": { de: "Quelle aktualisiert.", es: "Origen actualizado.", ca: "Origen actualitzat." },
-  "Sprint": { de: "Sprint", es: "Sprint", ca: "Sprint" },
-  "Sprint name": { de: "Sprint-Name", es: "Nombre del sprint", ca: "Nom del sprint" },
-  "Sprint review": { de: "Sprint-Überprüfung", es: "Revisión del sprint", ca: "Revisió del sprint" },
-  "Sprint started.": { de: "Sprint gestartet.", es: "Sprint iniciado.", ca: "Sprint iniciat." },
-  "Sprint type": { de: "Sprintart", es: "Tipo de sprint", ca: "Tipus de sprint" },
-  "Sprint updated.": { de: "Sprint aktualisiert.", es: "Sprint actualizado.", ca: "Sprint actualitzat." },
-  "Sprints": { de: "Sprints", es: "Sprints", ca: "Sprints" },
   "Stage": { de: "Phase", es: "Etapa", ca: "Etapa" },
   "Stakeholders": { de: "Stakeholder", es: "Partes interesadas", ca: "Grups interessats" },
-  "Start a sprint": { de: "Einen Sprint starten", es: "Iniciar un sprint", ca: "Iniciar un sprint" },
   "Start a timer on a story, or log an hour by hand, and the weeks fill in here.": { de: "Starten Sie einen Timer für eine Story, oder protokollieren Sie manuell eine Stunde, und die Wochen füllen sich hier auf.", es: "Inicia un temporizador en una historia, o registra una hora manualmente, y aquí se rellenan las semanas.", ca: "Inicia un cronòmetre en una història, o registra una hora manualment, i les setmanes es completen aquí." },
   "Start timer": { de: "Zeit starten", es: "Iniciar temporizador", ca: "Iniciar temporitzador" },
   "Started": { de: "Gestartet", es: "Iniciado", ca: "Iniciat" },
@@ -604,7 +590,6 @@ export const CATALOGUE: Catalogue = {
   "That record no longer exists.": { de: "Der Datensatz existiert nicht mehr.", es: "Ese registro ya no existe.", ca: "Aquest registre ja no existeix." },
   "That screen doesn't exist.": { de: "Der Bildschirm existiert nicht.", es: "Esa pantalla no existe.", ca: "Aquesta pantalla no existeix." },
   "That source doesn't exist.": { de: "Die Quelle existiert nicht.", es: "Esa fuente no existe.", ca: "Aquesta font no existeix." },
-  "That sprint no longer exists.": { de: "Der Sprint existiert nicht mehr.", es: "Ese sprint ya no existe.", ca: "Aquest sprint ja no existeix." },
   "That story no longer exists.": { de: "Die Geschichte existiert nicht mehr.", es: "Esa historia ya no existe.", ca: "Aquesta història ja no existeix." },
   "That ticket no longer exists.": { de: "Das Ticket existiert nicht mehr.", es: "Ese ticket ya no existe.", ca: "Aquest tiquet ja no existeix." },
   "The agency's own": { de: "Das Eigene der Agentur", es: "De la agencia.", ca: "Propi de l'agència." },
@@ -735,7 +720,6 @@ export const CATALOGUE: Catalogue = {
   "Withdrawn.": { de: "Zurückgezogen.", es: "Retirada.", ca: "Retirada." },
   "Work in hand": { de: "Laufende Arbeit", es: "Trabajo en mano", ca: "Treball en curs" },
   "Work inside it": { de: "Darin arbeiten", es: "Trabajar en él", ca: "Treballa dins d'aquí" },
-  "Work inside the running sprints": { de: "Arbeit in den laufenden Sprints", es: "Trabajo dentro de los sprints en marcha", ca: "Treball dins dels sprints en execució" },
   "Work logs": { de: "Zeiterfassung", es: "Registros de tiempo", ca: "Registres de temps" },
   "Write a reply…": { de: "Schreib eine Antwort…", es: "Escribir una respuesta…", ca: "Escriu una resposta…" },
   "Write it the way you would explain it to a new colleague.": { de: "Schreib es so, wie du es einem neuen Kollegen erklären würdest.", es: "Escríbelo como se lo explicarías a un compañero nuevo.", ca: "Escriu-ho de la manera que l'explicaries a un company nou." },
@@ -777,7 +761,6 @@ export const CATALOGUE: Catalogue = {
   "e.g. Bookkeeper": { de: "z.B. Buchhalter", es: "p.ej. Contable", ca: "p. ex. Comptable" },
   "e.g. Check the invoice against the order": { de: "z.B. Rechnung mit Bestellung abgleichen", es: "p.ej. Verificar la factura contra el pedido", ca: "p. ex. Comprovar la factura amb la comanda" },
   "e.g. Dispatch": { de: "z.B. Versand", es: "p.ej. Despacho", ca: "p. ex. Enviament" },
-  "e.g. Dispatch, sprint 4": { de: "z.B. Versand, Sprint 4", es: "p.ej. Despacho, sprint 4", ca: "p. ex. Enviament, sprint 4" },
   "e.g. File the quarterly VAT return": { de: "z.B. Vierteljährliche Umsatzsteuererklärung einreichen", es: "p.ej. Presentar la declaración trimestral del IVA", ca: "p. ex. Arxivar la declaració trimestral d'IVA" },
   "e.g. Firmenbuchnummer FN 123456a, UID ATU12345678": { de: "z.B. Firmenbuchnummer FN 123456a, UID ATU12345678", es: "p.ej. Firmenbuchnummer FN 123456a, UID ATU12345678", ca: "p. ex. Firmenbuchnummer FN 123456a, UID ATU12345678" },
   "e.g. How we handle a Bergman dispatch outage": { de: "z.B. Wie wir einen Bergman-Versandausfall handhaben", es: "p.ej. Cómo manejamos una interrupción de despacho de Bergman", ca: "p. ex. Com gestionem una avaria d'enviament de Bergman" },

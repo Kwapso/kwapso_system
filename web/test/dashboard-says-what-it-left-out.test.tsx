@@ -601,7 +601,7 @@ describe("the stage axis reads as a journey, and a stage nobody is in is not dra
     // plus a cell for every kind, three of them showing nothing.
     const at = stages.indexOf("In progress")
     const row = [...grid.children].slice(stride * (at + 1) + 1, stride * (at + 2))
-    expect(row.filter((c) => c.textContent === "–").length, "the empty cells beside the one bar are missing").toBe(
+    expect(row.filter((c) => c.textContent === "").length, "the empty cells beside the one bar are missing").toBe(
       TYPES.length - 1
     )
   })

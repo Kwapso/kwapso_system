@@ -236,6 +236,8 @@ export const CLIENT_READABLE_WRITE_DOORS: readonly string[] = [
   "POST /api/tenancy/portal/switch-account",
   "POST /api/content/help",
   "POST /api/content/help/reply",
+  "POST /api/content/help/reply/update",
+  "POST /api/content/help/reply/delete",
   "POST /api/content/help/update",
   "POST /api/content/help/rank",
   "POST /api/content/help/attachments",

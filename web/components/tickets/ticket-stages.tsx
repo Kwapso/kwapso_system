@@ -331,15 +331,50 @@ type Rung = {
   reopened: boolean
 }
 
+/** THE TRIAGED RUNG'S SPAN, ON A TICKET CLOSED WITH NO RECORDED ROW —
+ * Aurora's ruling, 20 Sep 2026, verbatim: "pls the column at triage makes me
+ * crazy. if a ticket is closed already (all except 15) of course it went
+ * through triage (back in the day, we dont have the date)." Stage recording
+ * began with team migration 0066 (this file's own header, "WHAT IT DRAWS
+ * WHEN THE HISTORY IS THIN"); a ticket resolved before that date, or moved
+ * once straight through without a recorded `triaged` row, has no span on its
+ * Triaged rung, and a blank second line reads as "never triaged" on a ticket
+ * that plainly was — nothing reaches `resolved` without passing it.
+ *
+ * LIVES AT THE DATA SEAM, NOT THE RENDER. `buildRungs`, below, gives the
+ * rung a REAL `span` here so the render stays one honest read of
+ * `rung.span.from` for every rung, recorded or stood-in — never a second
+ * function the render has to remember to call instead. `to`/`workingDays`
+ * are not real measurements (there is no row to measure from) and are never
+ * read by anything: `null`/`0` say so plainly rather than inventing a
+ * number.
+ *
+ * SCOPED TO THE ONE RUNG AND THE ONE STATE SHE NAMED: `status === "triaged"`
+ * (never a different empty rung — an open ticket missing an earlier span is
+ * a different, unasked question) on a ticket whose CURRENT status is
+ * `resolved` (a reopened ticket is a different question too, and she said
+ * "closed already"). `createdAt` stands in, plain — the one date every
+ * ticket has, and the simpler of the two shapes the brief offered ("the
+ * created date, plain" over a muted "(before records)" note). */
+function standInTriagedSpan(status: HelpStatus, createdAt: string): TicketStageSpan | null {
+  if (status !== "resolved") return null
+  return { status: "triaged", from: createdAt, to: null, workingDays: 0 }
+}
+
 /** THE WHOLE DRAWING, WORKED OUT ONCE.
  *
  * `status` is the ticket's own stored stage and is the authority on where the
  * ticket IS; `spans` are the moves we have rows for and are the authority on
  * WHEN. The two are read separately on purpose — see this file's header — so a
- * missing history costs the screen its timestamps and never its position. */
+ * missing history costs the screen its timestamps and never its position.
+ *
+ * `createdAt` feeds only `standInTriagedSpan` above — the one date every
+ * ticket has, reached for when a closed ticket has no recorded `triaged`
+ * row. */
 function buildRungs(
   spans: readonly TicketStageSpan[],
-  status: HelpStatus
+  status: HelpStatus,
+  createdAt: string
 ): { rungs: Rung[]; current: number } {
   // A retired stage earns its rung only by having been stood on.
   const stoodOn = new Set<HelpStatusEver>(spans.map((s) => s.status))
@@ -367,7 +402,9 @@ function buildRungs(
       key: `climb0:${stage}`,
       status: stage,
       number: rank(stage) + 1,
-      span: first.find((s) => s.status === stage) ?? null,
+      span:
+        first.find((s) => s.status === stage) ??
+        (stage === "triaged" ? standInTriagedSpan(status, createdAt) : null),
       reopened: false,
     })
   // EVERY LATER CLIMB IS DRAWN AS IT HAPPENED, not folded back into the rungs
@@ -437,14 +474,26 @@ const STAGE_COLUMN = "7.5rem"
  * `--badge-quiet-fill` already opens for `TicketChips`/`TriageChips`. */
 const SMALLER_DOT = "[--control-height-pill:1.25rem]"
 
-export function TicketStages({ ticketId, status }: { ticketId: string; status: HelpStatus }) {
+export function TicketStages({
+  ticketId,
+  status,
+  createdAt,
+}: {
+  ticketId: string
+  status: HelpStatus
+  /** THE ONE DATE A TICKET ALWAYS HAS — the fallback `standInTriagedSpan`
+   * (above `buildRungs`) reaches for on a closed ticket with no recorded
+   * `triaged` span. See that function's own header for Aurora's ruling,
+   * 20 Sep 2026. */
+  createdAt: string
+}) {
   const { t, lang } = useLanguage()
   const stagesQ = useCached<TicketStageHistory>(helpStagesKey(ticketId), () =>
     contentApi.helpStages(ticketId)
   )
   const history = stagesQ.data
 
-  const { rungs, current } = buildRungs(history?.spans ?? [], status)
+  const { rungs, current } = buildRungs(history?.spans ?? [], status, createdAt)
 
   const stages: StatusStage[] = rungs.map((rung) => ({
     id: rung.key,

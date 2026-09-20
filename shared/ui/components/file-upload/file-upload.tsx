@@ -507,7 +507,7 @@ function FileUploadTile({
     typeof file.error === "string" ? file.error : undefined,
   ]
     .filter((part): part is string => part !== undefined)
-    .join(" — ");
+    .join(" · ");
 
   return (
     <div

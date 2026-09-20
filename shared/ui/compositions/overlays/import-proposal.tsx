@@ -242,7 +242,7 @@ const DEFAULT_MAPPINGS: readonly ProposedMapping[] = [
     source: "Frist",
     value: "due",
     confidence: 41,
-    samples: '"14.08.26", "ASAP", "—"',
+    samples: '"14.08.26", "ASAP", ""',
   },
 ];
 
@@ -447,7 +447,7 @@ function ImportProposalScreen({
         {dot}
         <Text as="span" size="sm" className="min-w-0">
           {words.needsYou}
-          {mapping.samples === undefined ? null : ` — ${mapping.samples}`}
+          {mapping.samples === undefined ? null : `: ${mapping.samples}`}
         </Text>
       </span>
     );

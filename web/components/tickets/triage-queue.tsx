@@ -158,6 +158,7 @@ import { richTextPlain } from "@shared/web/rich-text"
 import {
   TicketRowsTable,
   TRIAGE_SORTS,
+  acceptTriagedTicket,
   narrowTriage,
   triageAct,
   triageFacets,
@@ -599,12 +600,17 @@ export function TriageQueue({
    * so there is no state in which a colleague has been named and the ticket is
    * still sitting unread. If the second call fails the first is left standing —
    * which is the right way round: somebody on a ticket that is still in triage
-   * is untidy, a triaged ticket nobody was given is lost. */
+   * is untidy, a triaged ticket nobody was given is lost.
+   *
+   * THE TWO DOOR CALLS THEMSELVES ARE `acceptTriagedTicket` NOW (tickets-
+   * collection.tsx), shared with the ticket detail head (20 Sep 2026 ruling:
+   * the same actions there while a ticket sits at `new`) — this function
+   * keeps everything that is the SITTING's own: the busy flag, the toast, and
+   * folding the result into `decided`/`assigned`/`skipped`. */
   async function accept(w: TriageWaiting, assignTo?: string) {
     setBusy(true)
     try {
-      if (assignTo) await contentApi.addStakeholder(w.id, assignTo)
-      absorb(await contentApi.triageRead(w.id))
+      absorb(await acceptTriagedTicket(w.id, assignTo))
       setDecided((d) => [...d, w.id])
       if (assignTo) setAssigned((a) => [...a, w.id])
       setSkipped((s) => s.filter((id) => id !== w.id))
@@ -1044,11 +1050,6 @@ export function TriageQueue({
           onOpen={onOpen}
           label={t("Triage queue")}
           teamId={teamId}
-          // CLIENT RULING, 20 SEP 2026: "on tickets triage queue, under
-          // 'Raised by' add the raised-on date." Scoped to this one call
-          // site — see `raisedByShowsDate`'s own header on `TicketRowsTable`
-          // for why Open, Closed and All keep the 18 Sep separation.
-          raisedByShowsDate
           decide={{
             // "no header" — client, asked directly, and it is what her own
             // reference screenshot does. The component keeps the column
@@ -1077,9 +1078,11 @@ export function TriageQueue({
             // THE PEOPLE ROW, BENEATH ITS OWN ROW — the client picked L3 over a
             // panel and a dialog, knowing it pushes the rows below it down. Only
             // ever under an Issue or a Request, the two verbs that need a
-            // person: Accept and Store never open anything, which is why half a
-            // list of tickets is pressed straight through. Returning `null` for
-            // every other row is what tells the table there is no strip to draw.
+            // person: Accept never opens anything (an Extra takes the same
+            // path since the Store button was removed, 20 Sep 2026), which is
+            // why half a list of tickets is pressed straight through.
+            // Returning `null` for every other row is what tells the table
+            // there is no strip to draw.
             strip: (w) =>
               rowPicker === w.id ? (
                 <RecordPicker
@@ -1235,8 +1238,12 @@ export function TriageQueue({
               <>
                 {/* THE ONE DECISION THIS SCREEN EXISTS TO MAKE, and it says
                     what it does now (client ruling, 2026-09-06): Accept a
-                    question, Assign an issue, Plan a request, Store an extra.
-                    The word and the behaviour come from ONE place (`triageAct`)
+                    question or an extra, Assign an issue, Plan a request. The
+                    Store button an extra used to wear was removed 20 Sep
+                    2026, her ruling on this exact screen: "remove the store
+                    button" — it filed the ticket and did nothing else, which
+                    "Accept" already says honestly. The word and the
+                    behaviour come from ONE place (`triageAct`)
                     precisely so they cannot come apart — a button that said
                     "Assign" and filed the ticket without asking is worse than
                     the single "Accept" it replaces.

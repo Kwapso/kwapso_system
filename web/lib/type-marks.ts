@@ -55,7 +55,10 @@ export const MARK_GROUP = {
    * block below this one. Her
    * ruling names tickets and stops there, so this stops there too. */
   story: "Story type",
-  sprint: "Sprint type",
+  // "Sprint type" -> "Phase type", Aurora's ruling, 20 Sep 2026, team
+  // migration 0107. The MAP's own key stays `sprint` — an internal id,
+  // `MarkGroup`'s own closed union, never displayed.
+  sprint: "Phase type",
   /* NO `sprintStatus` HERE EITHER, SINCE 11 SEP 2026, and its absence is a
    * different argument from the one above — that one is a display ruling, this
    * one is a broken join.

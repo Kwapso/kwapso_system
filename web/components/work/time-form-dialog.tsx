@@ -180,7 +180,7 @@ export function TimeFormDialog({
           // the server would quietly drop; on a new entry opened from a record
           // because the record IS the answer. shared/web/fact-row.tsx, the one
           // shape every settled parent value renders through.
-          <FactRow id="time-target" name={fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")} />
+          <FactRow id="time-target" name={fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "")} />
         ) : (
           // BOTH HALVES PAGE (R14), so both are asked of their own door. This
           // used to read the two list caches, which hold page one each — so an

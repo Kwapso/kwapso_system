@@ -324,7 +324,7 @@ function contactGalleryBody({
                     picture={row.logoUrl}
                     mark={nameInitials(row.name)}
                     markName={row.name}
-                    chip={<Badge>{row.account}</Badge>}
+                    chip={row.account ? <Badge>{row.account}</Badge> : undefined}
                     title={<CardTitle className="text-sm">{row.name}</CardTitle>}
                     secondary={row.status}
                   />

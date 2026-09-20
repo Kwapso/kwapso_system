@@ -146,7 +146,7 @@ export function WaveDetailScreen({
       // sprint is already in the package — so this is a note rather than an
       // error, and the band under the header keeps saying it afterwards.
       if (overlaps.length > 0)
-        toast.warning(t("Saved. Two sprints in this wave run over each other."))
+        toast.warning(t("Saved. Two phases in this wave run over each other."))
     } catch (e) {
       toast.error(
         e instanceof ApiFailure
@@ -212,22 +212,22 @@ export function WaveDetailScreen({
   )
 
   const overviewItems = [
-    { label: t("Account"), value: wave.accountName || "—" },
+    { label: t("Account"), value: wave.accountName || "" },
     {
       label: t("What the package is for"),
-      value: wave.goal ? <RichText html={wave.goal} /> : "—",
+      value: wave.goal ? <RichText html={wave.goal} /> : "",
     },
     // DERIVED FROM THE SPRINTS, said as one line so it reads the way somebody
     // would say it. Never typed — see the header.
     { label: t("Runs"), value: waveDates(wave, t, lang) },
     {
-      label: t("Sprints inside it"),
+      label: t("Phases inside it"),
       value:
         wave.sprintCount === 1
-          ? t("1 sprint")
+          ? t("1 phase")
           : wave.sprintCount === 0
-            ? t("No sprints planned yet")
-            : `${wave.sprintCount} ${t("sprints")}`,
+            ? t("No phases planned yet")
+            : `${wave.sprintCount} ${t("phases")}`,
     },
     // The audit rows live in the record footer (D7 / CHECKLIST 11.3).
   ]
@@ -238,7 +238,7 @@ export function WaveDetailScreen({
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "sprints",
-        label: t("Sprints"),
+        label: t("Phases"),
         icon: CONCEPT_ICON.sprints,
         badge: formatCount(wave.sprintCount),
         badgeVariant: "" as const,
@@ -345,14 +345,14 @@ export function WaveDetailScreen({
           somebody would otherwise have to work out from two date ranges. */}
       {overlaps.length > 0 && (
         <div className="bg-warning/10 flex flex-col gap-1 rounded-[var(--radius)] p-3 text-sm">
-          <p className="font-medium text-warning">{t("Two sprints in this wave run over each other.")}</p>
+          <p className="font-medium text-warning">{t("Two phases in this wave run over each other.")}</p>
           {overlaps.map((o) => (
             <p key={`${o.firstId}-${o.secondId}`} className="text-muted-foreground">
               {o.firstName} · {o.secondName}
             </p>
           ))}
           <p className="text-muted-foreground">
-            {t("That can be right — it is saved either way. Change a sprint's dates if it is not.")}
+            {t("That can be right. It is saved either way. Change a phase's dates if it is not.")}
           </p>
         </div>
       )}
@@ -397,9 +397,9 @@ export function WaveDetailScreen({
                           value={sprintQuery}
                           onChange={(e) => setSprintQuery(e.target.value)}
                           onClear={() => setSprintQuery("")}
-                          placeholder={t("Search sprints in this wave…")}
+                          placeholder={t("Search phases in this wave…")}
                           className="flex-1"
-                          aria-label={t("Search sprints in this wave")}
+                          aria-label={t("Search phases in this wave")}
                         />
                       )
                     }
@@ -425,7 +425,7 @@ export function WaveDetailScreen({
                     actions={
                       <>
                         {canCreate && (
-                          <AddButton label={t("Plan a sprint")} onClick={() => setPlanOpen(true)} disabled={busy} />
+                          <AddButton label={t("Plan a phase")} onClick={() => setPlanOpen(true)} disabled={busy} />
                         )}
                         {canEdit && addable.length > 0 && (
                           <RecordPicker
@@ -433,9 +433,9 @@ export function WaveDetailScreen({
                             value=""
                             onChange={(sprintId) => void moveSprint(sprintId, waveId)}
                             options={sortedOptions(addable, lang, (s) => s.name).map((s) => ({ value: s.id, label: s.name, picture: null }))}
-                            placeholder={t("Put a sprint in this wave")}
-                            searchPlaceholder={t("Search sprints…")}
-                            emptyText={t("No sprint matched.")}
+                            placeholder={t("Put a phase in this wave")}
+                            searchPlaceholder={t("Search phases…")}
+                            emptyText={t("No phase matched.")}
                             disabled={busy}
                           />
                         )}
@@ -449,8 +449,8 @@ export function WaveDetailScreen({
                 {shownSprints.length === 0 ? (
                   <CollectionEmptyState
                     filtered={sprints.length > 0}
-                    title={t("No sprints in this wave yet.")}
-                    description={t("The wave is sold first; the sprints inside it are planned afterwards.")}
+                    title={t("No phases in this wave yet.")}
+                    description={t("The wave is sold first; the phases inside it are planned afterwards.")}
                     onCreate={canCreate ? () => setPlanOpen(true) : undefined}
                   />
                 ) : (
@@ -556,7 +556,7 @@ export function WaveDetailScreen({
           if (created) await moveSprint(created.id, waveId)
           invalidate(sprintsKey(teamId))
           if (wave.accountId) invalidate(sliceKey("sprints-account", wave.accountId))
-          toast.success(t("Sprint planned, and it is in this wave."))
+          toast.success(t("Phase planned, and it is in this wave."))
         }}
       />
 

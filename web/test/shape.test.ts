@@ -333,15 +333,15 @@ describe("shapeInviteDetail", () => {
     expect(data.sets?.activity?.[0].id).toBe("a1")
   })
 
-  it('shows accepted as "—" when the invite was not accepted', () => {
+  it('shows accepted as "" when the invite was not accepted', () => {
     const data = shapeInviteDetail(invite, audit, activity, "en")
-    expect(data.record?.accepted).toBe("—")
+    expect(data.record?.accepted).toBe("")
   })
 
-  it('falls back invitedBy to "—" when there is no audit', () => {
+  it('falls back invitedBy to "" when there is no audit', () => {
     const data = shapeInviteDetail(invite, null, activity, "en")
-    expect(data.record?.invitedBy).toBe("—")
-    expect(data.record?.accepted).toBe("—")
+    expect(data.record?.invitedBy).toBe("")
+    expect(data.record?.accepted).toBe("")
   })
 })
 
@@ -425,7 +425,7 @@ describe("shapeAccountsList", () => {
     ])
     expect(rows?.[0].mark, "the leading column must hold a node, not a string").toBeTypeOf("object")
     expect(rows?.[0].manager, "nobody assigned yet is a real, honest answer").toBeNull()
-    expect(rows?.[0].country, "no country typed yet is a real, honest answer").toBe("—")
+    expect(rows?.[0].country, "no country typed yet is a real, honest answer").toBe("")
     expect(rows?.[0].status, "the archive flag, worded, is a node — a coloured badge").toBeTypeOf("object")
   })
 
@@ -498,14 +498,14 @@ describe("shapeContactsTable", () => {
   })
 
   // AN UNLINKED CONTACT NAMES NO COMPANY — an ordinary absence (22 of 110 real
-  // contacts), not a record with no picture, so the cell draws the SAME em
-  // dash `account` already falls back to rather than an empty-name tile.
-  it("an unlinked contact draws the plain em dash, not an empty mark", () => {
+  // contacts), so the row draws nothing at all rather than an em dash or an
+  // empty-name tile (no placeholder character, per the no-em-dash law: R95).
+  it("an unlinked contact draws nothing, not an empty mark", () => {
     const rows = shapeContactsTable([
       account({ id: "p1", name: "Luis Vera", accountType: "individual" }),
     ]).rows
-    expect(rows?.[0].account).toBe("—")
-    expect(rows?.[0].accountCell).toBe("—")
+    expect(rows?.[0].account).toBe("")
+    expect(rows?.[0].accountCell).toBeNull()
   })
 })
 
@@ -598,7 +598,7 @@ const selectableValue = (over: Partial<SelectableValue> & { id: string; type: st
 })
 
 const choicesGroupHome: Map<string, ChoiceGroupHome> = new Map([
-  ["Sprint type", { segment: "work", title: "Work" }],
+  ["Phase type", { segment: "work", title: "Work" }],
   ["Story type", { segment: "work", title: "Work" }],
   ["App stage", { segment: "apps", title: "Apps" }],
   ["Industry", { segment: "accounts", title: "Accounts" }],
@@ -611,7 +611,7 @@ describe("shapeChoicesTable", () => {
   // word) and a duration (`standardDays`, a real column).
   it("draws the icon for a sprint type row that has one, and the door's own duration", () => {
     const rows = shapeChoicesTable(
-      [selectableValue({ id: "s1", type: "Sprint type", value: "Build", standardDays: 5 })],
+      [selectableValue({ id: "s1", type: "Phase type", value: "Build", standardDays: 5 })],
       choicesGroupHome,
       "en"
     ).rows
@@ -636,7 +636,7 @@ describe("shapeChoicesTable", () => {
   // that the same way it reads any other type with nothing to show.
   it("draws nothing for a sprint type row the icon vocabulary has never met, with no duration either", () => {
     const rows = shapeChoicesTable(
-      [selectableValue({ id: "s2", type: "Sprint type", value: "Retro" })],
+      [selectableValue({ id: "s2", type: "Phase type", value: "Retro" })],
       choicesGroupHome,
       "en"
     ).rows

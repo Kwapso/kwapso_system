@@ -85,6 +85,26 @@ export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
   // (Kwapso-initiated upkeep). The word is stored on the record the same way
   // `story_type` is, for the same reason.
   "Story category": { columns: [{ table: "stories", column: "category" }] },
+  // "Sprint type" -> "Phase type", Aurora's ruling, 20 Sep 2026 ("rename
+  // 'sprint' to 'phase'"), team migration 0107. The COLUMN stays `sprint_type`
+  // — a database column is never user-visible, and the ruling only moves what
+  // a person reads. `workers/tenancy/src/lib/selectable.ts`'s live rename
+  // door reads THIS key, off the group name a row currently carries, so it
+  // has to be the CURRENT live name.
+  "Phase type": { columns: [{ table: "sprints", column: "sprint_type" }] },
+  // KEPT, EVEN THOUGH NOTHING IS NAMED "Sprint type" ON A LIVE TEAM ANY MORE
+  // AFTER 0107 RUNS. `workers/tenancy/src/team-schema/migrations.ts`'s own
+  // team migration 0098 calls `storedWordColumns(SPRINT_TYPE_GROUP)` — SQL
+  // GENERATED AT MODULE LOAD TIME, from whatever this map answers right now,
+  // not a value frozen when 0098 was written (`SPRINT_TYPES`'s own header in
+  // `shared/sprint-types.ts` explains the mechanism in full). Deleting this
+  // key the way the group itself is renamed would silently empty out 0098's
+  // "FOUR PLAIN RENAMES" clause for every team that has not run 0098 yet —
+  // including a newborn team replaying the WHOLE ledger from migration 0001,
+  // which still meets "Sprint type" first and "Phase type" only two
+  // migrations later. Both keys point at the identical column on purpose:
+  // 0098 and 0107 are renaming the same column's stored words, one after the
+  // other, under two different group names.
   "Sprint type": { columns: [{ table: "sprints", column: "sprint_type" }] },
   "Brand asset category": { columns: [{ table: "brand_assets", column: "category" }] },
   "Deliverable kind": { columns: [{ table: "deliverables", column: "kind" }] },
@@ -111,6 +131,14 @@ export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
   // A sprint's state is DERIVED from its dates (`sprintState`), so there is even
   // less to rewrite here than for the two above — nothing stores it at all. The
   // rows carry the word the groups are headed with and the glyph beside it.
+  // "Sprint status" -> "Phase status", same ruling and migration as "Phase
+  // type" above.
+  "Phase status": "labels",
+  // KEPT for the identical reason "Sprint type" is kept just above — no
+  // record stores this group's word either way (it is a "labels" group), but
+  // the KEY still has to exist so a rot-check or a future reader asking
+  // "does this file know about every group a historical migration ever
+  // seeded" gets a real answer rather than a gap that looks like an oversight.
   "Sprint status": "labels",
 
   /* ---- groups that back nothing ------------------------------------------ */

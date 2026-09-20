@@ -318,7 +318,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "A module's filterable fields, types, enum values and the client names in use. `module` takes the app's aliases (`help` = tickets); omit it to list modules.",
     detail:
-      "What can I ask about this module? Give it `module` — and if you know that thing by another name here, use it: the modules answer to the names the rest of this catalogue uses, so `help` reaches tickets. It answers with every field you may filter, group or sort by — the field's name, its type (text, number, date, boolean, id or enum), the values an enum accepts, and what an id points at. It also lists the client NAMES actually in use on that module, so you can see the company is spelled 'FluClinic' before searching for 'flu clinic' and finding nothing. Call it BEFORE query_records on a module you have not queried this conversation, and never guess a field name or a client's spelling: a wrong field is refused outright, and a field answers to the word this app uses for it as well as its own name. It marks the fields whose values have a past — a reference these records used to wear still finds them through query_records, so a number quoted in an old email is worth trying as it was given to you. With no `module` at all it lists the modules this caller may read, one line each. Enum values that the team edits themselves (ticket types, sprint types, industries) are read live from their own dropdown list, so they are the words actually in use rather than the words that shipped.",
+      "What can I ask about this module? Give it `module` — and if you know that thing by another name here, use it: the modules answer to the names the rest of this catalogue uses, so `help` reaches tickets. It answers with every field you may filter, group or sort by — the field's name, its type (text, number, date, boolean, id or enum), the values an enum accepts, and what an id points at. It also lists the client NAMES actually in use on that module, so you can see the company is spelled 'FluClinic' before searching for 'flu clinic' and finding nothing. Call it BEFORE query_records on a module you have not queried this conversation, and never guess a field name or a client's spelling: a wrong field is refused outright, and a field answers to the word this app uses for it as well as its own name. It marks the fields whose values have a past — a reference these records used to wear still finds them through query_records, so a number quoted in an old email is worth trying as it was given to you. With no `module` at all it lists the modules this caller may read, one line each. Enum values that the team edits themselves (ticket types, phase types, industries) are read live from their own dropdown list, so they are the words actually in use rather than the words that shipped.",
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/query/describe",
@@ -939,7 +939,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Move a ticket along: new, triaged, scheduled, in_progress or ready. It will NOT take 'resolved' — that is resolve_help_ticket, which needs the words to send.",
     detail:
-      "Move a ticket along its lifecycle, by id. A STATUS IS A FACT here, not a switch, five of the six stages are reached by something happening, so setting one by hand is a correction rather than the ordinary path. In order: new (raised, nobody has read it), triaged (somebody read it. Set by triage_help_ticket), scheduled (its work is booked into a sprint, happens by itself), in_progress (a timer started on it or on one of its stories, happens by itself), ready (every story closed, happens by itself), resolved (answered and closed). `status` will NOT accept 'resolved': answering a client is resolve_help_ticket, which requires the words to send. Moving a resolved ticket back to triaged is how a ticket is reopened, there is no separate reopened state.",
+      "Move a ticket along its lifecycle, by id. A STATUS IS A FACT here, not a switch, five of the six stages are reached by something happening, so setting one by hand is a correction rather than the ordinary path. In order: new (raised, nobody has read it), triaged (somebody read it. Set by triage_help_ticket), scheduled (its work is booked into a phase, happens by itself), in_progress (a timer started on it or on one of its stories, happens by itself), ready (every story closed, happens by itself), resolved (answered and closed). `status` will NOT accept 'resolved': answering a client is resolve_help_ticket, which requires the words to send. Moving a resolved ticket back to triaged is how a ticket is reopened, there is no separate reopened state.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/status",
     schema: obj({ id: S, status: S }, ["id", "status"]),
     buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status") }),
@@ -1145,6 +1145,44 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
+    // R22 parity with POST /api/content/help/reply/update — Aurora's 20 Sep
+    // 2026 ruling's Edit half. Same fence as the door: the author may always
+    // change their own reply, past that `help:update` reaches every other
+    // one. No confirm — a plain word edit, same register as `reply_help_ticket`
+    // itself with no audience.
+    name: "update_help_reply",
+    summary: "Change a reply already sent (`id`). Yours always; another author's needs the ticket edit right.",
+    detail:
+      "Change the text of a reply already sent, by its own id (from list_help_thread or the id a prior reply_help_ticket/update_help_reply call returned). You may always change a reply you wrote yourself; changing someone else's needs the ticket edit right (help:update), the same right resolve_help_ticket and archive_help_ticket already require. A client login may only ever change its own reply, never a staff one, whatever right it holds.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/reply/update",
+    schema: obj({ id: S, body: S }, ["id", "body"]),
+    buildBody: (i) => ({ id: str(i, "id"), body: str(i, "body") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit reply ${str(i, "id")}` },
+  },
+  {
+    // R22 parity with POST /api/content/help/reply/delete — the Delete half of
+    // the same ruling. Soft delete only (deactivate-never-delete): the row and
+    // its activity entry both survive, it just stops appearing in the thread.
+    name: "delete_help_reply",
+    summary: "Take a reply back out of the thread (`id`). Nothing is deleted: it stops showing, the history stays.",
+    detail:
+      "Take a reply back out of a ticket's thread, by its own id. NOTHING is deleted: the row and its activity entry both survive exactly as they were, it simply stops appearing when the thread is read. Same fence as update_help_reply: your own reply always, someone else's needs the ticket edit right (help:update), and a client login may only ever remove its own.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/reply/delete",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: {
+      write: true,
+      // CONFIRM — the one clause `reply_help_ticket`'s own header argues
+      // against and this tool is the opposite case of: no audience is ever
+      // addressed, but the act is the one irreversible-LOOKING one on this
+      // surface (§ delete_help_reply's own detail says otherwise, a model
+      // reading only the tool name would not), and undoing a wrongly-removed
+      // reply has no door on this catalogue at all.
+      confirm: true,
+      summarize: (i) => `Remove reply ${str(i, "id")}`,
+    },
+  },
+  {
     name: "resolve_help_ticket",
     summary:
       "ANSWER a ticket and email the client: `resolution` is the words they read. Read the ticket's draft resolution first. A second call sends nothing.",
@@ -1175,7 +1213,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "The work we do. `status`: open, in_progress, in_review or done. `view` 'open' hides finished work; `detail` is null on a page. For prose, ask_knowledge.",
     detail:
-      "List the team's STORIES, the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system, a story always has an app and only sometimes a sprint), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work. Pass 'all' to include it). Pass `id` to fetch one story. A PAGE LEAVES OUT `detail`, the words of the work itself — it is 40% of a page and no list shows it, so it comes back null in a page and whole on the one story you ask for by `id`. `q` still searches it either way. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'deadline', 'created', 'status', 'assignee' or 'title'. The order is the DOOR's, so 'the three latest deadlines' is the whole backlog's three and not the loaded page's. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's STORIES, the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId` (one phase's own work), `appId` (all the work on one system, a story always has an app and only sometimes a phase), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work. Pass 'all' to include it). Pass `id` to fetch one story. A PAGE LEAVES OUT `detail`, the words of the work itself — it is 40% of a page and no list shows it, so it comes back null in a page and whole on the one story you ask for by `id`. `q` still searches it either way. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'deadline', 'created', 'status', 'assignee' or 'title'. The order is the DOOR's, so 'the three latest deadlines' is the whole backlog's three and not the loaded page's. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/stories",
     schema: obj({
       id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, q: S, view: S,
@@ -1196,13 +1234,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Write down one piece of work. `title`, `storyType` and one of `processIds`/`changesNoStep` are required; `category` defaults to Client-requested.",
     detail:
-      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Enabler (Kwapso-initiated upkeep — renamed from Internal on 20 Sep 2026) — leave it off for the ordinary case. An Enabler story must also name `ticketId`, the door refuses with 'ticket_required' otherwise. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket (or the story is Enabler). `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it. `acceptanceCriteria` writes down what 'done' looks like — a long-text field, same design and limit as `detail`. `moscow` sets the MoSCoW priority, one of Must, Should, Could or Won't — optional, and (like `acceptanceCriteria`) never guessed at for a story written before either field existed.",
+      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Enabler (Kwapso-initiated upkeep — renamed from Internal on 20 Sep 2026) — leave it off for the ordinary case. An Enabler story must also name `ticketId`, the door refuses with 'ticket_required' otherwise. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket (or the story is Enabler). `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it. `acceptanceCriteria` writes down what 'done' looks like — a long-text field, same design and limit as `detail`. `moscow` sets the MoSCoW priority, one of Must, Should, Could or Won't — optional, and (like `acceptanceCriteria`) never guessed at for a story written before either field existed. `contributesToGoal` (true/false, default false) flags this story as one of the ones serving `sprintId`'s own one-sentence goal — only meaningful once `sprintId` is set.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories",
     schema: obj(
       {
         title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
         processIds: { type: "array" }, storyType: S, category: S,
-        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES),
+        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES), contributesToGoal: B,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["title", "storyType"]
@@ -1223,6 +1261,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
       acceptanceCriteria: opt(i, "acceptanceCriteria"),
       moscow: opt(i, "moscow"),
+      contributesToGoal: i.contributesToGoal === true ? true : undefined,
       stepKey: opt(i, "stepKey"),
       changesNoStep: i.changesNoStep === true ? true : undefined,
       assigneeId: opt(i, "assigneeId"),
@@ -1238,13 +1277,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Edit a story by `id`. Same fields as create_story; `title`, `storyType` and `category` are all required here, `processIds` replaces the set.",
     detail:
-      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Enabler) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. Switching to Enabler is refused here, not silently written, unless `ticketId` is also sent — the door answers 'ticket_required'. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it. `acceptanceCriteria` and `moscow` are optional, same shape and limit as create_story (`moscow` one of Must, Should, Could or Won't), and are replaced whole like every other field here — leaving either off on an edit clears it rather than keeping the old value.",
+      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Enabler) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. Switching to Enabler is refused here, not silently written, unless `ticketId` is also sent — the door answers 'ticket_required'. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it. `acceptanceCriteria`, `moscow` and `contributesToGoal` are optional, same shape as create_story, and are replaced whole like every other field here — leaving any of them off on an edit clears it rather than keeping the old value.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
     schema: obj(
       {
         id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
         processIds: { type: "array" }, storyType: S, category: S,
-        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES),
+        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES), contributesToGoal: B,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["id", "title", "storyType", "category"]
@@ -1262,6 +1301,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
       acceptanceCriteria: opt(i, "acceptanceCriteria"),
       moscow: opt(i, "moscow"),
+      contributesToGoal: i.contributesToGoal === true ? true : undefined,
       stepKey: opt(i, "stepKey"),
       changesNoStep: i.changesNoStep === true ? true : undefined,
       assigneeId: opt(i, "assigneeId"),
@@ -1296,10 +1336,17 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "list_sprints",
+    // NAMED `list_sprints` STILL — Aurora's ruling, 20 Sep 2026: "Rename
+    // 'sprint' to 'phase'." Every USER-FACING word moves; the tool's own
+    // NAME does not, kept for backward compatibility the same way the
+    // ticket module's tools are still named `help` — a machine caller
+    // already integrated against this name would break on a silent rename.
+    // The WORDS a person reads (`summary`/`detail` below) say "phase"
+    // throughout.
     summary:
-      "Blocks of delivery work sold, newest first, with dates, flat price and stories done. `accountId` or `appId` narrows; `when` 'open' drops finished ones.",
+      "Phases (blocks of delivery work sold), newest first, with dates, flat price and stories done. `accountId` or `appId` narrows; `when` 'open' drops finished ones.",
     detail:
-      "List the blocks of delivery work sold, newest first, each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a sprint covers exactly one app). `when` is 'all' by default; pass 'open' for only the blocks still worth putting work into, not completed, not archived, and not already past their end date. Bounded, not paged: a sprint is a contract, so there are few of them.",
+      "List the phases — blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents), its one-sentence goal (`goalSummary`, if set) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a phase covers exactly one app). `when` is 'all' by default; pass 'open' for only the blocks still worth putting work into, not completed, not archived, and not already past their end date. Bounded, not paged: a phase is a contract, so there are few of them.",
     binding: "CONTENT", method: "GET", path: "/api/content/sprints",
     schema: obj({ accountId: S, appId: S, when: S }),
     buildQuery: (i) => {
@@ -1312,17 +1359,18 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_sprint",
     summary:
-      "Start a sprint on one account. `soldPriceCents` is WHOLE CENTS (4,500 euros is 450000). `sprintType` is Planning, Implementation or Iteration.",
+      "Start a phase on one account. `soldPriceCents` is WHOLE CENTS (4,500 euros is 450000). `sprintType` is Audit, Plan, Build, Pilot, Revision, Deploy or Hypercare.",
     detail:
-      "Start a sprint, a block of delivery work sold to one account, with a start, an end and a flat price. `soldPriceCents` is WHOLE CENTS (4500 euros is 450000), because a fractional price loses money between here and a margin. `sprintType` is Planning, Implementation or Iteration; a 'blueprint' is a PRICED PLANNING sprint, not a fourth kind.",
+      "Start a phase, a block of delivery work sold to one account, with a start, an end and a flat price. `soldPriceCents` is WHOLE CENTS (4500 euros is 450000), because a fractional price loses money between here and a margin. `sprintType` is the phase's place in the Wave lifecycle — Audit, Plan, Build, Pilot, Revision, Deploy or Hypercare, in that order; a team may add its own on the Dropdown values screen. `goalSummary` is one sentence naming the main outcome this phase is organized around (shown at the top of the phase board) — a SEPARATE field from `goal`, which is the older, longer 'what it's for' note.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints",
     schema: obj(
-      { name: S, goal: S, sprintType: S, accountId: S, appId: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
+      { name: S, goal: S, goalSummary: S, sprintType: S, accountId: S, appId: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
       ["name"]
     ),
     buildBody: (i) => ({
       name: str(i, "name"),
       goal: opt(i, "goal"),
+      goalSummary: opt(i, "goalSummary"),
       sprintType: opt(i, "sprintType"),
       accountId: opt(i, "accountId"),
       appId: opt(i, "appId"),
@@ -1331,50 +1379,51 @@ export const SHARED_TOOLS: SharedTool[] = [
       soldPriceCents: typeof i.soldPriceCents === "number" ? i.soldPriceCents : undefined,
       currency: opt(i, "currency"),
     }),
-    agent: { write: true, confirm: false, summarize: (i) => `Start sprint "${str(i, "name")}"` },
+    agent: { write: true, confirm: false, summarize: (i) => `Start phase "${str(i, "name")}"` },
   },
   {
     name: "update_sprint",
     summary:
-      "Edit a sprint by `id`. Omitted fields are CLEARED — send the whole sprint. `soldPriceCents` is whole cents. The client and the app cannot be changed.",
+      "Edit a phase by `id`. Omitted fields are CLEARED — send the whole phase. `soldPriceCents` is whole cents. The client and the app cannot be changed.",
     detail:
-      "Edit a sprint by id, its name, kind, goal, dates and the flat price it was sold for. `soldPriceCents` is WHOLE CENTS, like `create_sprint`, and it is the field this door exists for: a sprint's price is the revenue half of every margin, and it was previously settable only at the moment the sprint was started. The CLIENT and the APP are NOT on this door and cannot be changed: the reference a client quotes was minted against the account, and the sprint's figures feed that account's margin, so re-pointing either would rewrite what an already-published number means. (Process-map versions are cut by hand on the map itself, not by completing a sprint — that automatic cut was purged in migration 0051.) Omitted fields are CLEARED, not kept: send the whole sprint as it should end up.",
+      "Edit a phase by id, its name, kind, goal, one-sentence `goalSummary`, dates and the flat price it was sold for. `soldPriceCents` is WHOLE CENTS, like `create_sprint`, and it is the field this door exists for: a phase's price is the revenue half of every margin, and it was previously settable only at the moment the phase was started. The CLIENT and the APP are NOT on this door and cannot be changed: the reference a client quotes was minted against the account, and the phase's figures feed that account's margin, so re-pointing either would rewrite what an already-published number means. (Process-map versions are cut by hand on the map itself, not by completing a phase — that automatic cut was purged in migration 0051.) Omitted fields are CLEARED, not kept: send the whole phase as it should end up.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints/update",
     schema: obj(
-      { id: S, name: S, goal: S, sprintType: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
+      { id: S, name: S, goal: S, goalSummary: S, sprintType: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
       ["id", "name"]
     ),
     buildBody: (i) => ({
       id: str(i, "id"),
       name: str(i, "name"),
       goal: opt(i, "goal"),
+      goalSummary: opt(i, "goalSummary"),
       sprintType: opt(i, "sprintType"),
       startsOn: opt(i, "startsOn"),
       endsOn: opt(i, "endsOn"),
       soldPriceCents: typeof i.soldPriceCents === "number" ? i.soldPriceCents : undefined,
       currency: opt(i, "currency"),
     }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit sprint ${str(i, "id")}` },
+    agent: { write: true, confirm: false, summarize: (i) => `Edit phase ${str(i, "id")}` },
   },
   {
     name: "complete_sprint",
     summary:
-      "Mark a sprint finished, or reopen it (`complete` true/false). Re-completing a complete sprint changes nothing.",
+      "Mark a phase finished, or reopen it (`complete` true/false). Re-completing a complete phase changes nothing.",
     detail:
-      "Mark a sprint finished, or reopen it (`complete`: true / false). Completion is the delivery milestone the wave and the margin read. Process-map versions are cut BY HAND on the map itself — the automatic cut on completion was purged in migration 0051, so completing a sprint changes no map. Re-completing an already-complete sprint changes nothing.",
+      "Mark a phase finished, or reopen it (`complete`: true / false). Completion is the delivery milestone the wave and the margin read. Process-map versions are cut BY HAND on the map itself — the automatic cut on completion was purged in migration 0051, so completing a phase changes no map. Re-completing an already-complete phase changes nothing.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints/complete",
     schema: obj({ id: S, complete: B }, ["id", "complete"]),
     buildBody: (i) => ({ id: str(i, "id"), complete: i.complete === true }),
     agent: {
       write: true,
       // CONFIRM, and it is the only work-engine write that does. Completing a
-      // sprint is the delivery milestone the wave's progress and the account's
+      // phase is the delivery milestone the wave's progress and the account's
       // margin both read — a figure a client sees moves with it. (It used to
       // ALSO cut every map's next version; 0051 moved the cut to the map
       // itself.) A model reaching it while reading a ticket somebody else
       // wrote should stop and ask.
       confirm: (i) => i.complete === true,
-      summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
+      summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} phase ${str(i, "id")}`,
     },
   },
   /* --------------------------------- triage --------------------------------- */
@@ -1936,7 +1985,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Is the knowledge base in step? One row per kind: how far the sweep read, when it last ran and last SUCCEEDED, and `lastError` if it failed.",
     detail:
-      "Is the knowledge base in step? One row per kind of material the app keeps in step for you — the customer spine (accounts, contacts), the built systems and their process maps, and the work (tickets, sprints, stories, meetings, to-dos, tasks): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday'. Read this before trusting an answer that seems to be missing something recent.",
+      "Is the knowledge base in step? One row per kind of material the app keeps in step for you — the customer spine (accounts, contacts), the built systems and their process maps, and the work (tickets, phases, stories, meetings, to-dos, tasks): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday'. Read this before trusting an answer that seems to be missing something recent.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/sync",
     schema: obj({}),
     agent: { write: false, summarize: () => "Check whether the knowledge base is up to date" },
@@ -1983,7 +2032,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Bring the knowledge base into step with the app's own rows, a slice at a time. Keep calling while `caughtUp` is false. Mainly for a first fill.",
     detail:
-      "Bring the knowledge base into step with the app's own rows, tickets, accounts, apps, stories and sprints, one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
+      "Bring the knowledge base into step with the app's own rows, tickets, accounts, apps, stories and phases, one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync",
     schema: obj({}),
     buildBody: () => ({}),
@@ -2554,9 +2603,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_waves",
     summary:
-      "The packages clients have bought. `accountId`, `sprintType` and `appId` narrow. Dates are derived from sprints inside.",
+      "The packages clients have bought. `accountId`, `sprintType` and `appId` narrow. Dates are derived from the phases inside.",
     detail:
-      "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's, `sprintType` narrows to waves holding a live sprint of one type as the team spells it, and `appId` narrows to the one system a wave covers. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
+      "The packages clients have bought. A Wave is several phases sold together; `accountId` narrows to one client's, `sprintType` narrows to waves holding a live phase of one type as the team spells it (the Wave-lifecycle vocabulary: Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare), and `appId` narrows to the one system a wave covers. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the phases inside and stored, so a wave with no phases yet has none.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/waves",
     schema: obj({ accountId: S, sprintType: S, appId: S }),
     buildQuery: (i) => {
@@ -2570,9 +2619,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_wave",
     summary:
-      "One wave in full (`id`): what it is for, the sprints inside it, and any clash between their dates. A clash is reported, never refused.",
+      "One wave in full (`id`): what it is for, the phases inside it, and any clash between their dates. A clash is reported, never refused.",
     detail:
-      "One wave in full (by `id`): what it is for, the sprints inside it, and any clash between their dates. A clash is reported and never refused — two sprints really can overlap, and a door that said no would be describing a rule nobody agreed to.",
+      "One wave in full (by `id`): what it is for, the phases inside it, and any clash between their dates. A clash is reported and never refused — two phases really can overlap, and a door that said no would be describing a rule nobody agreed to.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/waves/one",
     schema: obj({ id: S }, ["id"]),
     buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
@@ -2581,9 +2630,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_wave",
     summary:
-      "Sell a wave: `accountId`, `name`, `goal`, `appId`. No price. Sprints go in afterwards with set_sprint_wave.",
+      "Sell a wave: `accountId`, `name`, `goal`, `appId`. No price. Phases go in afterwards with set_sprint_wave.",
     detail:
-      "Sell a wave: `accountId` is whose it is, `name` is what it is called, `goal` is what it is for, and `appId` is the one system it covers, if any — it must belong to the same account. It carries NO price — what a wave costs is deliberately out of this module's first version. Sprints are put in afterwards with `set_sprint_wave`, and the wave's dates follow them.",
+      "Sell a wave: `accountId` is whose it is, `name` is what it is called, `goal` is what it is for, and `appId` is the one system it covers, if any — it must belong to the same account. It carries NO price — what a wave costs is deliberately out of this module's first version. Phases are put in afterwards with `set_sprint_wave`, and the wave's dates follow them.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves",
     schema: obj({ accountId: S, name: S, goal: S, appId: S }, ["accountId", "name"]),
     buildBody: (i) => ({
@@ -2599,7 +2648,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Rename a wave by `id`, re-word its `goal`, or set/clear which app it covers (`appId`). Never its dates.",
     detail:
-      "Rename a wave (by `id`), re-word what it is for, or say which app it covers (`appId`, must belong to the same account — empty clears it). Never its dates: those are derived from the sprints in it, and a date somebody typed would disagree with the sprints the moment one moved.",
+      "Rename a wave (by `id`), re-word what it is for, or say which app it covers (`appId`, must belong to the same account — empty clears it). Never its dates: those are derived from the phases in it, and a date somebody typed would disagree with the phases the moment one moved.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/update",
     schema: obj({ id: S, name: S, goal: S, appId: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), goal: sent(i, "goal"), appId: sent(i, "appId") }),
@@ -2608,13 +2657,13 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_sprint_wave",
     summary:
-      "Put a sprint into a wave, or take it out: `sprintId`, and `waveId` (empty to remove). Both waves' dates are recalculated.",
+      "Put a phase into a wave, or take it out: `sprintId`, and `waveId` (empty to remove). Both waves' dates are recalculated.",
     detail:
-      "Put a sprint into a wave, or take it out. `sprintId` is the sprint; `waveId` is the wave, or leave it empty to take the sprint out of whichever wave it is in. The wave's start and end dates are recalculated on both ends, so a sprint moving between waves re-dates the one it left as well as the one it joined.",
+      "Put a phase into a wave, or take it out. `sprintId` is the phase; `waveId` is the wave, or leave it empty to take the phase out of whichever wave it is in. The wave's start and end dates are recalculated on both ends, so a phase moving between waves re-dates the one it left as well as the one it joined.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/sprint",
     schema: obj({ sprintId: S, waveId: S }, ["sprintId"]),
     buildBody: (i) => ({ sprintId: str(i, "sprintId"), waveId: sent(i, "waveId") }),
-    agent: { write: true, confirm: false, summarize: () => "Move a sprint between waves" },
+    agent: { write: true, confirm: false, summarize: () => "Move a phase between waves" },
   },
   {
     name: "set_audit_date",

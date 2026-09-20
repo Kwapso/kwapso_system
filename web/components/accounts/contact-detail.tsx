@@ -302,11 +302,11 @@ export function ContactDetailScreen({
   // and where she appears on a company's Contacts tab, was on no screen at all.
   const overviewItems = [
     { label: t("Parent account"), value: parent ? parent.name : t("No company yet") },
-    { label: t("Email"), value: account.email || "—" },
-    { label: t("Phone"), value: account.phone || "—" },
-    { label: t("Where they are"), value: where || "—" },
+    { label: t("Email"), value: account.email || "" },
+    { label: t("Phone"), value: account.phone || "" },
+    { label: t("Where they are"), value: where || "" },
     { label: t("Language"), value: account.locale || "Ours" },
-    { label: t("Reference"), value: account.code || "—" },
+    { label: t("Reference"), value: account.code || "" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 

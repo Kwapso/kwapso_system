@@ -417,7 +417,7 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
                   description={
                     isApp
                       ? t(
-                          "Everything the assistant knows about this app will show up here — its tickets, process maps and meetings, and anything filed against it by hand."
+                          "Everything the assistant knows about this app will show up here: its tickets, process maps and meetings, and anything filed against it by hand."
                         )
                       : t(
                           "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."

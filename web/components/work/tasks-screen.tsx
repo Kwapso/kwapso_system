@@ -241,13 +241,13 @@
 // 5 · "On Everyone's, add the column 'Closed On' or 'Finished On'." Everyone's
 //     gains an eighth column, `closed` — the same `completedAt`-sourced cell
 //     Completed's own eighth column already draws (`shapeTasks`'s `closed`
-//     field, below) — blank ("—") for a task still open, exactly as
+//     field, below) — blank ("-") for a task still open, exactly as
 //     Completed's own reads for nothing to report. `EVERYONE_COLUMNS` below
 //     is the only one of the four column sets naming it: Everyone's is
 //     status-agnostic (open and done both land on it), so it is the one tab
 //     where "when did this close" is a genuine, sometimes-blank question — on
 //     Overdue/Planned every row is open by construction and the answer would
-//     be "—" down every line, the identical furniture reasoning Status and
+//     be "-" down every line, the identical furniture reasoning Status and
 //     "Who has it" were already dropped for (this file's header, above).
 // 6 · R80, a coordinator-relayed ruling mid-pass, verbatim: "I don't like this
 //     table anywhere, so anywhere in the app where you have it, replace it
@@ -427,7 +427,7 @@ function shapeTasks(tasks: Task[], lang: Language) {
         // The department's own mark leads its name, in the colour the agency
         // already chose for it. A word a team invented itself has no mark and
         // simply reads as itself.
-        department: t.department ? `${mark} ${t.department}`.trim() : "—",
+        department: t.department ? `${mark} ${t.department}`.trim() : "",
         // THE APP AND ACCOUNT CELLS CARRY A LOGO NOW (client ruling, 2026-09-15:
         // "add the logos to account and app") — the identical node
         // `shape.tsx`'s `shapeAccountsList` draws for the Accounts table's own
@@ -436,7 +436,7 @@ function shapeTasks(tasks: Task[], lang: Language) {
         // table row's own text line rather than setting its height (client
         // ruling, 18 Sep 2026: "when avatar/icon on list view, make the avatar
         // smaller. should not be the cause of more height to the overall
-        // row"). A row with no app/account still reads "—", exactly as it did
+        // row"). A row with no app/account still reads "-", exactly as it did
         // in words alone; `RecordMark` draws nothing when handed no name to
         // initial.
         app: t.appName ? (
@@ -444,17 +444,13 @@ function shapeTasks(tasks: Task[], lang: Language) {
             <RecordMark picture={t.appLogoUrl} name={t.appName} size="choice" />
             <span>{t.appName}</span>
           </span>
-        ) : (
-          "—"
-        ),
+        ) : null,
         client: t.accountName ? (
           <span className="flex items-center gap-2">
             <RecordMark picture={t.accountLogoUrl} name={t.accountName} size="choice" />
             <span>{t.accountName}</span>
           </span>
-        ) : (
-          "—"
-        ),
+        ) : null,
         // R54: a task is ours, so its assignee is named by first name.
         assignee: staffNameFromSnapshot(t.assigneeName) || "Nobody yet",
         // THE TWO DATE CELLS — locale-formatted, the same words the summary
@@ -462,8 +458,8 @@ function shapeTasks(tasks: Task[], lang: Language) {
         // before shaping (`compareTasks`), never these formatted words, which
         // would answer differently in each of the four languages this app
         // ships.
-        deadline: t.dueOn ? formatDate(t.dueOn, lang) : "—",
-        closed: t.completedAt ? formatDate(t.completedAt, lang) : "—",
+        deadline: t.dueOn ? formatDate(t.dueOn, lang) : "",
+        closed: t.completedAt ? formatDate(t.completedAt, lang) : "",
       }
     }),
   }
@@ -510,14 +506,14 @@ const COMPLETED_COLUMNS = [...TASK_COLUMNS, field("closed", "Closed")]
  * "CLOSED ON" IS THE EIGHTH, LAST — client, same evening: "On Everyone's, add
  * the column 'Closed On' or 'Finished On'." Reads the identical row key
  * Completed's own eighth column does (`closed`, `shapeTasks` below —
- * `t.completedAt`, blank "—" for a task still open), under its own label
+ * `t.completedAt`, blank "-" for a task still open), under its own label
  * rather than Completed's plain "Closed": the two tables answer a different
  * question with the same fact — Completed's rows are ALL done, so "Closed"
  * alone reads as a fact about the row; Everyone's mixes open and done, so the
  * fuller "Closed on" reads correctly beside a row that has no answer yet.
  * Everyone's is the only tab where this is a genuine, sometimes-blank
  * question — every row on Overdue/Planned is open by construction, so the
- * column would read "—" down every line there, the identical furniture
+ * column would read "-" down every line there, the identical furniture
  * reasoning Status and "Who has it" were already dropped for (this file's
  * header, above). */
 const EVERYONE_COLUMNS = [

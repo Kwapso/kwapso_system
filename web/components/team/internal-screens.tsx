@@ -406,13 +406,13 @@ export function MeetingTypesPanel({
         p.name
       ),
       nameText: p.name,
-      department: p.department ?? "—",
+      department: p.department ?? "",
       status: (
         <button
           type="button"
           className="cursor-pointer"
           onClick={() => setActive(p, !p.active)}
-          aria-label={`${p.name} — ${statusWord}`}
+          aria-label={`${p.name}, ${statusWord}`}
         >
           <Badge variant="status" dot={AUTOMATION_STATUS_DOT[p.active ? "on" : "off"]}>
             {statusWord}

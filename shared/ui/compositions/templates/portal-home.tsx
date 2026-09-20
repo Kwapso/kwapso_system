@@ -468,7 +468,7 @@ function savingsItem(
   if (!hasArithmetic(savings.inputs)) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
-        "PortalHome: ruling D7-3 = 3A — a savings figure always shows the arithmetic behind it, as label / value pairs under the figure. The figure was dropped because there were no inputs to check it against.",
+        "PortalHome: ruling D7-3 = 3A: a savings figure always shows the arithmetic behind it, as label / value pairs under the figure. The figure was dropped because there were no inputs to check it against.",
       );
     }
     return null;

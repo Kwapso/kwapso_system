@@ -22,6 +22,8 @@
 //   POST /api/content/help/rank           -> drag-rank a ticket between two others
 //   POST /api/content/help/archive        -> archive / restore a ticket (any state)
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
+//   POST /api/content/help/reply/update   -> change a reply already sent (author, or the ticket edit right)
+//   POST /api/content/help/reply/delete   -> take a reply back out of the thread (soft delete, same fence)
 //   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
 //   GET  /api/content/help/dashboard      -> the Dashboard tab's grouped reads, ?accountId/?helpType/?appId/?q (agency only)
 //   GET  /api/content/help/stages         -> one ticket's stage history + time in each (?id=<ticketId>, agency only)
@@ -108,6 +110,8 @@ import {
   postHelpArchive,
   postHelpRank,
   postHelpReply,
+  postHelpReplyUpdate,
+  postHelpReplyDelete,
   postHelpStatus,
   postUpdateHelp,
   postBulkHelpStatusByFilter,
@@ -382,6 +386,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/rank": { handler: postHelpRank, kind: "mutation" },
   "POST /api/content/help/archive": { handler: postHelpArchive, kind: "mutation" },
   "POST /api/content/help/reply": { handler: postHelpReply, kind: "mutation" },
+  // AURORA'S 20 SEP 2026 RULING — the chat edit pencil, p1's placement + p4's
+  // menu (kit v1.2.139's `TicketThread.actions`). Same fence, both doors: the
+  // author always may, past that help:update reaches every other reply too.
+  "POST /api/content/help/reply/update": { handler: postHelpReplyUpdate, kind: "mutation" },
+  "POST /api/content/help/reply/delete": { handler: postHelpReplyDelete, kind: "mutation" },
   // COME BACK TO THE CLIENT — the second and last thing that emails one.
   "POST /api/content/help/resolve": { handler: postResolveHelp, kind: "mutation" },
   // THE TWO ACTS ON THE LADDER A MACHINE CANNOT INFER (CHECKLIST 5.11, 5.13).

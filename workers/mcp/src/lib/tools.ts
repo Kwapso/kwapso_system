@@ -314,7 +314,7 @@ export async function forwardTool(
         error: "not_on_this_surface",
         // Says what to do instead, or an outside developer files it as a bug and
         // the next person "fixes" it by deleting the guard.
-        message: `${tool.name} reads a money figure a client's own screen may withhold, which is not available to a personal access token — a leaked token's blast radius must not include a price we have not shown that client. Ask the assistant for it through agent_chat instead: same rights, and it can refuse to repeat the number where a client would read it.`,
+        message: `${tool.name} reads a money figure a client's own screen may withhold, which is not available to a personal access token: a leaked token's blast radius must not include a price we have not shown that client. Ask the assistant for it through agent_chat instead: same rights, and it can refuse to repeat the number where a client would read it.`,
       }),
     }
   let res: Response

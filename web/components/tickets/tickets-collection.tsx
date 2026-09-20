@@ -807,11 +807,19 @@ export function narrowTriage(
  *                        question is answered later by whoever is free.
  *   Issue    → "Assign"  opens the people row. Somebody has to pick it up.
  *   Request  → "Plan"    opens the people row. Same act as Issue.
- *   Extra    → "Store"   put away for later. Nobody assigned, and — this is the
- *                        client's own scope line for this pass — an Extra does
- *                        NOTHING to the client in this version: no validation
- *                        request, no portal state, no mail. It is `accept`,
- *                        unchanged, exactly as Question is.
+ *   Extra    → "Accept"  same word and the same act as Question. An Extra
+ *                        does NOTHING to the client in this version: no
+ *                        validation request, no portal state, no mail. It is
+ *                        `accept`, unchanged.
+ *
+ * EXTRA STOPPED SAYING "Store" ON 20 SEP 2026. Her ruling on the triage list
+ * view, verbatim: "remove the store button." The word named the whole of what
+ * it did honestly ("put away for later", nothing else happens) and that
+ * honesty was the problem: a button that files a decision and acts on
+ * nothing beyond that is not a decision a reader can tell apart from
+ * "Accept" by anything but the label. It is dropped here rather than
+ * disabled, so an Extra now takes the identical path as a Question — one
+ * fewer word for the same act, not a fifth kind of nothing.
  *
  * "PLAN" IS HER PICK OUT OF A LIST OF ALTERNATIVES and it is shipped as ruled.
  * It is the one word here that names a different act from the one the button
@@ -845,11 +853,28 @@ export function triageAct(
       return { label: t("Assign"), assigns: true }
     case "request":
       return { label: t("Plan"), assigns: true }
-    case "extra":
-      return { label: t("Store"), assigns: false }
     default:
       return { label: t("Accept"), assigns: false }
   }
+}
+
+/** THE TRIAGE DECISION'S OWN TWO DOOR CALLS, SHARED — Aurora's ruling, 20 Sep
+ * 2026, verbatim: "when ticket is in status triage, also in main screen the
+ * visible buttons should change: same as in queue." The ticket detail head
+ * (`help-detail.tsx`) now offers the identical decision the queue's own row
+ * does while a ticket sits at `new`, and "identical" has to mean the same
+ * two door calls, not two hand-written copies that could quietly drift the
+ * day one of them changes. Assign first, when a person is named, so nobody
+ * is left triaged-and-unowned if the second call fails — `TriageQueue.accept`'s
+ * own ordering, unchanged, just named so a second caller can reuse it.
+ *
+ * CALLERS OWN THEIR OWN BUSY STATE, CACHE ABSORPTION AND TOAST. This is only
+ * the two doors: `TriageQueue` folds the result into its sitting's own
+ * bookkeeping (`decided`/`assigned`/`skipped`); the detail head folds it into
+ * the single ticket's own caches instead. Neither belongs here. */
+export async function acceptTriagedTicket(id: string, assignTo?: string) {
+  if (assignTo) await contentApi.addStakeholder(id, assignTo)
+  return contentApi.triageRead(id)
 }
 
 /* THE RECIPE, THE RIGHTS AND `onAction` ARE GONE FROM THIS SIGNATURE (2026-09-06),
@@ -1885,7 +1910,6 @@ export function TicketRowsTable<T extends TicketFace>({
   columns = TICKET_COLUMNS_DEFAULT,
   decide,
   members,
-  raisedByShowsDate,
 }: {
   rows: readonly T[]
   onOpen: (id: string) => void
@@ -1934,18 +1958,6 @@ export function TicketRowsTable<T extends TicketFace>({
    * a `raiserId` at all (`TicketFace`'s own header), so a caller with nothing
    * to resolve passes nothing rather than fetching a cache it never reads. */
   members?: TeamMember[]
-  /** A SECOND, MUTED LINE UNDER THE RAISER'S NAME CARRYING THE RAISED DATE —
-   * client ruling, 20 Sep 2026: "on tickets triage queue, under 'Raised by'
-   * add the raised-on date." Scoped to the ONE CALL SITE that asked for it
-   * (`TriageQueue`'s own list view): the 18 Sep 2026 ruling ("raised separate
-   * by and date! not in one together") still governs Open, Closed and All,
-   * so this cannot become the `raisedBy` cell's default without quietly
-   * reopening that ruling everywhere it was never asked to reopen. The date
-   * itself is `w.createdAt` through the identical `formatDate` the `created`
-   * column beside it already uses — the same fact, the same formatter, the
-   * same language, just also read where triage's own list already keeps eyes
-   * on who raised a row. */
-  raisedByShowsDate?: boolean
 }) {
   const { t, lang } = useLanguage()
   const span = columns.length + (decide ? 1 : 0)
@@ -2189,7 +2201,7 @@ export function TicketRowsTable<T extends TicketFace>({
                       ) : undefined
                     }
                   >
-                    {w.helpType ?? "—"}
+                    {w.helpType ?? null}
                   </Badge>
                 </TableCell>
               )}
@@ -2228,7 +2240,7 @@ export function TicketRowsTable<T extends TicketFace>({
                     {w.appName ? (
                       <RecordMark picture={w.appLogo} name={w.appName} size="choice" />
                     ) : null}
-                    <span className="min-w-0 truncate">{w.appName ?? "—"}</span>
+                    <span className="min-w-0 truncate">{w.appName ?? ""}</span>
                   </span>
                 </TableCell>
               )}
@@ -2242,58 +2254,50 @@ export function TicketRowsTable<T extends TicketFace>({
                   client CONTACT the ticket is for — the same fact the triage
                   card already calls "who asked" and never trims (a contact is
                   never staff). Neither ever both: `TicketFace`'s own header
-                  says why the two shapes cannot collapse into one. */}
+                  says why the two shapes cannot collapse into one.
+
+                  A SECOND LINE UNDER THIS NAME, CARRYING THE RAISED DATE, LIVED
+                  HERE FOR TWO DAYS. Her ruling, 20 Sep 2026: "on tickets triage
+                  list view remove the date from under the raised by person (we
+                  have an own column for that!)" — the `created` column beside
+                  this one already carries the same date, so the second line
+                  was one fact said twice on the one call site that asked for
+                  it (`TriageQueue`'s own list view). The column stays; only
+                  the extra line goes. */}
               {columns.includes("raisedBy") && (
                 <TableCell className="text-muted-foreground">
                   {w.raiserName ? (
-                    <span className="flex flex-col gap-0.5">
-                      <span className="flex items-center gap-2">
-                        {/* THE STAFF RAISER'S FACE (R35) — `memberFace`, one
-                            function up: `HelpTicket` carries no picture for
-                            `raiserId`, so it is resolved against the members
-                            cache this table's caller passes in. A CLIENT login
-                            raising their own ticket also has `raiserId` (an
-                            ordinary team member, `w.raiserIsClient`), and the
-                            same lookup finds their face too — the members
-                            cache holds every login on the team, not staff
-                            alone. */}
-                        <RecordMark
-                          picture={memberFace(members, w.raiserId)}
-                          name={w.raiserName}
-                          shape="round"
-                          size="choice"
-                        />
-                        <span className="min-w-0 truncate">
-                          {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
-                        </span>
+                    <span className="flex items-center gap-2">
+                      {/* THE STAFF RAISER'S FACE (R35) — `memberFace`, one
+                          function up: `HelpTicket` carries no picture for
+                          `raiserId`, so it is resolved against the members
+                          cache this table's caller passes in. A CLIENT login
+                          raising their own ticket also has `raiserId` (an
+                          ordinary team member, `w.raiserIsClient`), and the
+                          same lookup finds their face too — the members
+                          cache holds every login on the team, not staff
+                          alone. */}
+                      <RecordMark
+                        picture={memberFace(members, w.raiserId)}
+                        name={w.raiserName}
+                        shape="round"
+                        size="choice"
+                      />
+                      <span className="min-w-0 truncate">
+                        {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
                       </span>
-                      {/* THE RAISED-ON DATE, A SECOND LINE — `raisedByShowsDate`'s
-                          own header says why this is a prop rather than the
-                          cell's default: the 18 Sep ruling that split "who" from
-                          "when" into two columns still stands everywhere but the
-                          one call site that asked to fold them back. */}
-                      {raisedByShowsDate && (
-                        <span className="text-xs tabular-nums">{formatDate(w.createdAt, lang)}</span>
-                      )}
                     </span>
                   ) : w.raisedByContactName ? (
-                    <span className="flex flex-col gap-0.5">
-                      <span className="flex items-center gap-2">
-                        <RecordMark
-                          picture={w.raisedByContactLogo}
-                          name={w.raisedByContactName}
-                          shape="round"
-                          size="choice"
-                        />
-                        <span className="min-w-0 truncate">{w.raisedByContactName}</span>
-                      </span>
-                      {raisedByShowsDate && (
-                        <span className="text-xs tabular-nums">{formatDate(w.createdAt, lang)}</span>
-                      )}
+                    <span className="flex items-center gap-2">
+                      <RecordMark
+                        picture={w.raisedByContactLogo}
+                        name={w.raisedByContactName}
+                        shape="round"
+                        size="choice"
+                      />
+                      <span className="min-w-0 truncate">{w.raisedByContactName}</span>
                     </span>
-                  ) : (
-                    "—"
-                  )}
+                  ) : null}
                 </TableCell>
               )}
               {columns.includes("created") && (
@@ -2377,9 +2381,7 @@ export function TicketRowsTable<T extends TicketFace>({
                         {formatDate(w.resolvedAt, lang)}
                       </span>
                     </span>
-                  ) : (
-                    "—"
-                  )}
+                  ) : null}
                 </TableCell>
               )}
               {decide && (
@@ -2887,7 +2889,7 @@ function OpenBoard({
               "Cards are the tickets that matched, as far as they have loaded. Waiting repeats cards from the stages before it. Click a card to open the ticket."
             )
           : t(
-              "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets — the ones where a client owes us an answer — so the columns don't add up to the total. Click a card to open the ticket."
+              "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets, the ones where a client owes us an answer, so the columns don't add up to the total. Click a card to open the ticket."
             )
       }
       emptyColumnLabel={t("Nothing at this stage.")}
@@ -3012,7 +3014,7 @@ function AllBoard({
         narrowed
           ? t("Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.")
           : t(
-              "Each column counts every ticket at that stage — every ticket is in exactly one. Click a card to open the ticket."
+              "Each column counts every ticket at that stage. Every ticket is in exactly one. Click a card to open the ticket."
             )
       }
       emptyColumnLabel={t("Nothing at this stage.")}

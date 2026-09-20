@@ -467,43 +467,46 @@ function accountsWhere(
   // The narrowing, first, so nothing below can widen past it.
   if (!sight.mayListPeople) filters.push("account_type = 'entity'")
 
-  // A CONTACT IS A ROLE, NOT A PEER ACCOUNT (SCOPE ch.03, glossary "Contact":
-  // "the child rows linked under an account are called its contacts … not a
-  // table"). Aurora, 19 Sep 2026, verbatim: "why am i seeing ocntacts under
-  // accounts? thats wrong>" — the row was `PORTAL SMOKE · contact`, an
-  // `accountType: "individual"` row carrying an ACTIVE `account_links` row to
-  // "PORTAL SMOKE · their company", rendering as a peer of real accounts on
-  // the Accounts screen (`web/components/accounts/accounts-screen.tsx` asks
-  // this door with NO `type` filter — entities and individuals together, its
-  // own header: "an individual account (a sole trader) shows up … exactly as
-  // a company does"). That sole trader belongs on the list; a person who is
-  // someone else's contact does not — she belongs on the Contacts screen and
-  // on her company's own Contacts panel (`listAccountLinks`, untouched below).
+  // A PERSON IS A CONTACT, PERIOD — NOT "A CONTACT UNLESS NOBODY LINKED HER
+  // YET" (SCOPE ch.03, glossary "Contact": "the child rows linked under an
+  // account are called its contacts … not a table"). Aurora ruled this
+  // TWICE. 19 Sep 2026, verbatim: "why am i seeing ocntacts under accounts?
+  // thats wrong>" — the row was `PORTAL SMOKE · contact`, an
+  // `accountType: "individual"` row carrying an ACTIVE `account_links` row,
+  // rendering as a peer of real accounts on the Accounts screen. The first
+  // fix answered exactly that shape: it excluded an individual with a LIVE
+  // link and left a STANDALONE individual (no `account_links` row at all)
+  // riding the list unchanged — which is precisely what she caught again the
+  // next day, 20 Sep 2026, verbatim: "no, i still see contacts udner
+  // accounts! f.e. Jonathan Sargent Alexander Kaulich" — two standalone
+  // individuals on the Kwapso team, no link to anyone, that yesterday's
+  // narrower rule still counted as accounts. Her rule, stated twice now, is
+  // not about linkage at all: **a person is a contact; the Accounts screen
+  // lists COMPANIES.** Full stop — linked or not, a "sole trader" included.
+  // She belongs on the Contacts screen and on her company's own Contacts
+  // panel (`listAccountLinks`, untouched below), never here.
   //
-  // KEYED ON `opts.type !== "individual"` RATHER THAN A NEW FILTER, because
-  // `type: "individual"` already has a second, working caller this file must
-  // not break: `ContactLinkDialog`'s search
+  // SO THE PARTITION IS BY `account_type`, NOT BY WHETHER A LINK ROW EXISTS —
+  // simpler than the retired EXISTS subquery above it, and exact where that
+  // one was not. Fires only for the UNTYPED read (no `type` at all — the
+  // Accounts screen's own call, `web/components/accounts/accounts-screen.tsx`),
+  // which is the one question with no other narrowing to lean on; an explicit
+  // `type: "entity"` gets to the identical answer through the plain
+  // `account_type = ?` clause a few lines down instead, so this clause never
+  // has to fire for it. `type: "individual"` stands down entirely, because it
+  // has a second, working caller this file must not break: `ContactLinkDialog`'s
+  // search
   // (`web/components/accounts/contact-link-dialog.tsx`) asks this exact shape
   // for "someone we ALREADY hold" — a standalone person, to link for the
   // FIRST time, or an already-linked one, to add as a contact of a SECOND
   // company (SCOPE ch.03: "the same person can be a contact of more than one
   // company", Marta of both Bergman and Delaval in the chapter's own figure).
-  // Narrowing `type: "individual"` itself to "linked only" would silently
-  // break that search — a brand-new standalone person would never again be
-  // findable to link — so the Contacts screen's own listing keeps reading
-  // every individual it does today (companies + standalone people ride along
-  // in that answer too, unaffected by this note, not this lane's file to
-  // change). The clause below fires for the COMBINED read (no `type` — the
-  // Accounts screen's own call) and for an explicit `type: "entity"` (a
-  // no-op there: the CASE only ever matches `account_type = 'individual'`),
-  // and stands down for `type: "individual"`.
-  if (opts.type !== "individual") {
-    filters.push(
-      `NOT (account_type = 'individual' AND EXISTS (
-        SELECT 1 FROM account_links cl
-         WHERE cl.person_account_id = accounts.id AND cl.deactivated_at IS NULL
-      ))`
-    )
+  // The Contacts screen's own listing (`contacts-screen.tsx`, always sending
+  // `{type: "individual"}`) reads exactly the same way: EVERY individual,
+  // standalone and linked alike, because every person is a contact and this
+  // is where all of them live.
+  if (!opts.type) {
+    filters.push("account_type = 'entity'")
   }
 
   if (opts.q) {

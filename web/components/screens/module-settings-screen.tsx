@@ -402,7 +402,7 @@ function navPageTitle(segment: string): string {
   const section = TEAM_SECTIONS.find((s) => s.segment === segment)
   if (!section)
     throw new Error(
-      `MODULE_SETTINGS: "${segment}" names no TEAM_SECTIONS destination — give it a nav entry, or spell its ` +
+      `MODULE_SETTINGS: "${segment}" names no TEAM_SECTIONS destination: give it a nav entry, or spell its ` +
         `title by hand with a comment saying why (the way the "team" segment below does)`
     )
   return section.title
@@ -566,8 +566,11 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         key: "sprint-type",
         gate: { module: "selectable_data", right: "read" },
         kind: "vocabulary",
-        types: ["Sprint type"],
-        title: "Sprint types",
+        // "Sprint type" -> "Phase type", Aurora's ruling, 20 Sep 2026 (team
+        // migration 0107). The settings section's own `key` stays as it is —
+        // an internal identifier, never displayed.
+        types: ["Phase type"],
+        title: "Phase types",
         create: true,
       },
     ],

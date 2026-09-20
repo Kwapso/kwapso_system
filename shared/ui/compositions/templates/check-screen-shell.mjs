@@ -547,10 +547,24 @@ const cardExportBlock = cardSrc.slice(cardSrc.lastIndexOf("export {"));
 if (!/CARD_CONTENT_INSET_X/.test(cardExportBlock)) {
   insetFindings.push(`${cardRel} does not export CARD_CONTENT_INSET_X from its own export block.`);
 }
-if (!/className=\{cn\("min-w-0 flex-1 py-6 lg:py-\[var\(--space-7\)\]", CARD_CONTENT_INSET_X, className\)\}/.test(cardSrc)) {
+if (
+  !/className=\{cn\("min-w-0 flex-1", CARD_CONTENT_INSET_Y\[inset\], CARD_CONTENT_INSET_X, className\)\}/.test(
+    cardSrc,
+  )
+) {
   insetFindings.push(
     `${cardRel}'s CardContent does not spend CARD_CONTENT_INSET_X for its own left/right padding — ` +
       "a literal px-[...] here would silently stop matching what DENSITY_BODY reads.",
+  );
+}
+// The `inset` prop (added for a compact CardContent body) must leave the
+// DEFAULT vertical rhythm exactly where Ruling 2 measured it — the same
+// "py-6 lg:py-[var(--space-7)]" figure this check has always pinned, now
+// read through CARD_CONTENT_INSET_Y_DEFAULT rather than inlined.
+if (!/const CARD_CONTENT_INSET_Y_DEFAULT = "py-6 lg:py-\[var\(--space-7\)\]";/.test(cardSrc)) {
+  insetFindings.push(
+    `${cardRel} does not read CARD_CONTENT_INSET_Y_DEFAULT = "py-6 lg:py-[var(--space-7)]" — the ` +
+      "inset=\"default\" vertical rhythm Ruling 2 measured must stay exactly this figure.",
   );
 }
 
@@ -855,98 +869,100 @@ console.log(
 );
 
 /* ============================================================================
-   THE 18 SEP 2026 ASSISTANT-HANDLE-IN-THE-BAND CHECK — client, verbatim: "put
-   the open assistant button completely on the top margin, not liek now that
-   its slightly overlaping with main content." EXTENDED THE SAME DAY, A
-   SECOND RULING, verbatim: "need to be bigger, as big as the space allows
-   it."
+   THE 20 SEP 2026 ASSISTANT-HANDLE-MATCHES-RAIL-HANDLE CHECK — REWRITES,
+   NOT EXTENDS, THE RETIRED 18 SEP ASSISTANT-HANDLE-IN-THE-BAND CHECK.
+   Client, verbatim: "make the open assistant mango button same size as the
+   one on the sidebar to compress/open the sidebar."
 
-   MEASURED, `agency-staging`, a ticket record, 1440 viewport, BEFORE the
-   FIRST fix: the shut aside handle at top 16px (`--shell-gutter`),
-   `HANDLE_HIT`'s own 40px (`--control-height-button`) box put its bottom
-   edge at 56px — 9.52px past the content card's own top edge (46.48px).
-   That fix sized this ONE branch to `--control-height-pill` (26px), the
-   same token `trail-line.tsx` already proved fits the identical
-   `--folder-lip` (30.48px) band; bottom edge 42px, 4.48px clear of the
-   card — correct against the overlap complaint, but "as big as the space
-   allows" is bigger than that: the SECOND fix sizes the branch to the
-   band's own height, `--folder-lip` (30.48px) directly, so the bottom edge
-   lands at 16 + 30.48 = 46.48px — exactly the card's own top edge, the same
-   number by construction, not a coincidence this check can drift away from
-   without also catching the band's own two component tokens moving apart. */
+   THE TWO 18 SEP RULINGS THIS REPLACES sized the SHUT aside handle to fit
+   its own 16px-to-card-top band -- first --control-height-pill (26px,
+   "not overlapping with main content"), then --folder-lip (30.48px, "as
+   big as the space allows it") -- both spent as a size-[...] override on
+   that one branch, winning the cn() merge against HANDLE_HIT's own
+   default. Today's ruling asks for a DIFFERENT thing: this handle need not
+   fit its own band at all, it must equal the rail's own handle
+   (edge="rail"), which has never carried a size override and has always
+   read HANDLE_HIT's own size-[var(--control-height-button)] (40px). The
+   two pins cannot both hold -- fit-the-band caps the shut handle below
+   40px, match-the-rail requires exactly 40px -- so this check replaces the
+   retired one rather than sitting beside it.
+
+   MEASURED, agency-staging, a ticket record, 1440 viewport: BEFORE this
+   fix, edge="rail" was 40x40 (--control-height-button) at (144, 850) and
+   the shut edge="aside" was 30.47x30.47 (--folder-lip) at (1378.5, 16) --
+   the two edge handles disagreeing by exactly the token the 18 Sep rulings
+   had left on the aside branch alone. AFTER: both 40x40, because the
+   override is gone and both edges now read the identical HANDLE_HIT
+   default -- "unify on one constant" literally, not a third hand-typed
+   number chosen to match the rail's by coincidence. */
 const assistantHandleFindings = [];
 
+// THE SHUT BRANCH CARRIES NO SIZE OVERRIDE OF ITS OWN ANY MORE -- neither
+// retired rung (26px pill, 30.48px folder-lip) and no third value either.
+// HANDLE_HIT's own default is what must size it, so nothing in this
+// component's own placement string may spend a size-[...] utility at all.
+const assistantHandleBlock = src.match(
+  /placement=\{cn\(\s*"pointer-events-auto",\s*isAsideOpen[\s\S]{0,4000}?\n {16}\)\}/,
+);
+if (!assistantHandleBlock) {
+  assistantHandleFindings.push(
+    `${rel} has no recognisable aside-handle placement={cn("pointer-events-auto", isAsideOpen ? ... : ...)} block to check.`,
+  );
+} else if (/size-\[var\(--folder-lip\)\]/.test(assistantHandleBlock[0])) {
+  assistantHandleFindings.push(
+    `${rel}'s aside handle placement still reads size-[var(--folder-lip)] -- the 20 Sep "same size as the ` +
+      'sidebar" ruling retired the 18 Sep band-fill sizing outright; the shut branch must carry no size ' +
+      "override at all and fall through to HANDLE_HIT's own size-[var(--control-height-button)].",
+  );
+} else if (/size-\[var\(--control-height-pill\)\]/.test(assistantHandleBlock[0])) {
+  assistantHandleFindings.push(
+    `${rel}'s aside handle placement still reads size-[var(--control-height-pill)] -- the first, even smaller ` +
+      "18 Sep rung must stay gone too.",
+  );
+} else if (/size-\[var\(/.test(assistantHandleBlock[0])) {
+  assistantHandleFindings.push(
+    `${rel}'s aside handle placement spends a size-[var(...)] utility of some other kind -- the 20 Sep ruling ` +
+      "is that this handle takes HANDLE_HIT's own default, not a third hand-picked size.",
+  );
+}
+
+// BOTH BRANCHES (open mid-edge grab, shut top-strip corner) MUST STILL BE
+// THE INSET-ONLY STRINGS THEY WERE BEFORE EITHER 18 SEP RULING -- the fix is
+// a deletion, not a rewrite of the insets themselves.
 if (
-  !/: cn\(\s*"max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",[\s\S]{0,3200}?"size-\[var\(--folder-lip\)\]",\s*\),/.test(
+  !/isAsideOpen\s*\n\s*\? "max-\[45rem\]:hidden top-1\/2 -translate-y-1\/2 end-\[var\(--shell-gutter\)\]"\s*\n\s*: "max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",/.test(
     src,
   )
 ) {
   assistantHandleFindings.push(
-    `${rel}'s shut aside handle placement does not size itself to size-[var(--folder-lip)] — at HANDLE_HIT's own ` +
-      "40px (--control-height-button) its bottom edge (top-[var(--shell-gutter)] + 40px) runs past the content " +
-      "card's own top edge, and at the retired --control-height-pill (26px) it falls short of the 18 Sep " +
-      '"as big as the space allows it" ruling.',
+    `${rel}'s aside handle open/shut insets no longer match the expected "isAsideOpen ? ... : ..." pair, each a ` +
+      "bare inset string with no trailing size utility.",
   );
 }
 
-// THE OLD, UNDERSIZED FIX MUST STAY GONE — a regression that reverts to the
-// first ruling's own answer (26px, correct for the overlap complaint alone)
-// would pass every other check here and still fail the second ruling.
-if (/"max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",[\s\S]{0,3200}?"size-\[var\(--control-height-pill\)\]",/.test(src)) {
+// THE RAIL'S OWN HANDLE STAYS UNTOUCHED -- no size override there either,
+// today or before; it is the reference the aside handle now matches.
+if (/edge="rail"\s*\n\s*open=\{!isRailCollapsed\}[\s\S]{0,2000}?size-\[var\(/.test(src)) {
   assistantHandleFindings.push(
-    `${rel}'s shut aside handle still sizes itself to size-[var(--control-height-pill)] (26px) in the shut-band ` +
-      "branch — the 18 Sep \"as big as the space allows it\" ruling replaced that with size-[var(--folder-lip)] " +
-      "(30.48px), the band's own full height, not another borrowed control size.",
-  );
-}
-
-// THE OPEN BRANCH MUST STAY UNTOUCHED — it is a mid-edge grab against the
-// open column, not a top-strip corner, and HANDLE_HIT's own 40px still
-// applies to it (and to the rail's own handle, both states) exactly as
-// before either ruling.
-if (!/isAsideOpen\s*\n\s*\? "max-\[45rem\]:hidden top-1\/2 -translate-y-1\/2 end-\[var\(--shell-gutter\)\]"/.test(src)) {
-  assistantHandleFindings.push(
-    `${rel}'s open aside handle placement changed — it must stay the mid-edge grab at HANDLE_HIT's own 40px; ` +
-      "only the SHUT branch's own top-strip corner is sized by either 18 Sep ruling.",
-  );
-}
-
-// THE PINNED MATH ITSELF — --shell-gutter is --space-4 (16px, tokens.css)
-// and --folder-lip is 1.905rem (30.48px, tokens.css), so the shut handle's
-// bottom edge (top inset + its own height, both these same two tokens) must
-// land AT OR BEFORE the content card's own top edge (46.48px — the same
-// 16px column padding plus --folder-lip; see this file's own comment and
-// trail-line.tsx's identical math). Equal is the ruling's own answer ("as
-// big as the space allows", not "smaller than the space"); past it is the
-// exact overlap the FIRST ruling already fixed once and this must not
-// reopen.
-const SHELL_GUTTER_PX = 16;
-const FOLDER_LIP_PX = 30.48;
-const CARD_TOP_PX = 46.48;
-const handleBottomPx = SHELL_GUTTER_PX + FOLDER_LIP_PX;
-if (handleBottomPx > CARD_TOP_PX + 0.005) {
-  assistantHandleFindings.push(
-    `The shut aside handle's pinned math no longer holds in ${rel}: --shell-gutter (${SHELL_GUTTER_PX}px) + ` +
-      `--folder-lip (${FOLDER_LIP_PX}px) = ${handleBottomPx.toFixed(2)}px, which now runs past the content ` +
-      `card's own top edge (${CARD_TOP_PX}px) — the handle would overlap the card again, the exact defect the ` +
-      "first 18 Sep ruling fixed.",
+    `${rel}'s rail handle (edge="rail") now reads a size-[var(...)] override of its own -- it must stay the ` +
+      "reference size (HANDLE_HIT's own default), unchanged by this ruling.",
   );
 }
 
 if (assistantHandleFindings.length > 0) {
   console.error(
-    "FAIL screen-shell assistant-handle-in-the-band check (18 Sep rulings):\n" +
+    "FAIL screen-shell assistant-handle-matches-rail-handle check (20 Sep ruling):\n" +
       assistantHandleFindings.map((f) => `  - ${f}`).join("\n"),
   );
   process.exit(1);
 }
 
 console.log(
-  "OK screen-shell assistant-handle-in-the-band check: the shut aside handle sizes itself to --folder-lip " +
-    "(30.48px) — the band's own full height, \"as big as the space allows it\" — its pinned bottom edge " +
-    "(--shell-gutter + --folder-lip = 46.48px) lands exactly at, never past, the content card's own top edge, " +
-    "the retired --control-height-pill (26px) sizing stays gone, and the open branch's mid-edge grab is " +
-    "untouched.",
+  "OK screen-shell assistant-handle-matches-rail-handle check: the shut aside handle carries no size-[...] " +
+    "override of its own (neither retired 18 Sep rung, --control-height-pill nor --folder-lip), the rail " +
+    "handle carries none either, and both edge handles fall through to the identical HANDLE_HIT default " +
+    "(size-[var(--control-height-button)], 40px) -- measured live, both 40x40 -- so a future density-scale " +
+    "change can never move one without the other.",
 );
 
 /* ============================================================================

@@ -1253,8 +1253,8 @@ function lockedSlotSkin(held: boolean): string {
  */
 const SLOT_UNOFFERED = "text-ink-tertiary";
 
-/** The kit's own mark for a value that is not there. See `SLOT_UNOFFERED`. */
-const NO_VALUE = "—";
+/** The kit's own mark for a value that is not there: nothing. See `SLOT_UNOFFERED`. */
+const NO_VALUE = "";
 
 /**
  * THE PAPER A PINNED NAME COLUMN PAINTS, one entry per paper a kit table
@@ -1313,7 +1313,11 @@ function LegendRun({
       {capabilities.map((capability, index) => {
         if (offered !== undefined && !offered(index)) {
           return (
-            <span key={capability.id} className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}>
+            <span
+              key={capability.id}
+              data-slot="permission-matrix-unoffered"
+              className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}
+            >
               {NO_VALUE}
             </span>
           );
@@ -1430,6 +1434,7 @@ function PermissionRun({
           return (
             <span
               key={capability.id}
+              data-slot="permission-matrix-unoffered"
               aria-hidden="true"
               className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}
             >

@@ -375,12 +375,12 @@ export function MeetingDetailScreen({
 
   const overviewItems = [
     { label: t("Who it is with"), value: item.accountName ?? "Nobody, it is ours" },
-    { label: t("Which app"), value: item.appName ?? "—" },
-    { label: t("Why we are meeting"), value: item.purposeName ?? "—" },
+    { label: t("Which app"), value: item.appName ?? "" },
+    { label: t("Why we are meeting"), value: item.purposeName ?? "" },
     { label: t("When"), value: formatDateTime(item.startsAt, lang) },
-    { label: t("Until"), value: item.endsAt ? formatDateTime(item.endsAt, lang) : "—" },
-    { label: t("Where"), value: item.location ?? "—" },
-    { label: t("Reference"), value: item.ref ?? "—" },
+    { label: t("Until"), value: item.endsAt ? formatDateTime(item.endsAt, lang) : "" },
+    { label: t("Where"), value: item.location ?? "" },
+    { label: t("Reference"), value: item.ref ?? "" },
     {
       label: t("In your calendar"),
       // Said as a fact rather than as a link: the entry lives in the person's own
@@ -1054,14 +1054,14 @@ function CalendarPanel({
           which tab they are on. */}
       <OverviewList
         items={[
-          { label: t("Where"), value: meeting.location ?? "—" },
+          { label: t("Where"), value: meeting.location ?? "" },
           {
             label: t("Time zone"),
             // AN HOUR IS NOT A FACT WITHOUT ONE. The same stamp read in two
             // places is two different meetings to the people reading it.
-            value: meeting.googleTimeZone ?? "—",
+            value: meeting.googleTimeZone ?? "",
           },
-          { label: t("Organiser"), value: meeting.googleOrganizer ?? "—" },
+          { label: t("Organiser"), value: meeting.googleOrganizer ?? "" },
           {
             label: t("Repeats"),
             // Google's own RRULE is not a sentence anybody reads, so it is shown
@@ -1077,11 +1077,11 @@ function CalendarPanel({
                   ? "Not confirmed"
                   : meeting.googleStatus === "confirmed"
                     ? "Confirmed"
-                    : "—",
+                    : "",
           },
           {
             label: t("Rooms"),
-            value: rooms.length ? rooms.map((r) => r.name || r.email).join(", ") : "—",
+            value: rooms.length ? rooms.map((r) => r.name || r.email).join(", ") : "",
           },
         ]}
       />

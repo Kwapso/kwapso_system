@@ -58,7 +58,7 @@ export async function sendPortalWelcome(
       intro:
         `${first ? `Hello ${first}. ` : ""}${opts.teamName} has given you a login to their client portal. ` +
         `You can see the work in progress, raise a request and follow it through, and read anything shared with you. ` +
-        `Sign in with this email address — there is no password to remember, we send you a code.`,
+        `Sign in with this email address, there is no password to remember, we send you a code.`,
       ctaLabel: link.label,
       ctaUrl: link.url,
       footnote: `If you weren't expecting this, you can ignore this email and nobody will be able to sign in as you.`,

@@ -118,6 +118,16 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/content/help/thread": "CONTENT",
   "POST /api/content/help": "CONTENT",
   "POST /api/content/help/reply": "CONTENT",
+  // A REPLY'S OWN EDIT/DELETE (team migration 0108, Aurora's 20 Sep 2026 chat-
+  // edit-pencil ruling) — the same door either side of it: a client may change
+  // or take back a reply THEY wrote, exactly as they may correct their own
+  // ticket wording below, and never a colleague's staff answer. The fence is
+  // not this table, it is `assertMayChangeReply` (workers/content/src/lib/
+  // help.ts): the author always may, and a client login is refused the SECOND
+  // half (the ticket edit right reaching someone else's reply) outright,
+  // whatever right their role happens to hold.
+  "POST /api/content/help/reply/update": "CONTENT",
+  "POST /api/content/help/reply/delete": "CONTENT",
   // EDIT AND RE-RANK, the two things SCOPE ch.07 says the account owns. Both are
   // governed by the LOCK rather than by this table: a client may correct their
   // own question and drag their company's requests into the order they want

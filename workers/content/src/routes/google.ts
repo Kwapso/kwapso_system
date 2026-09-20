@@ -867,7 +867,7 @@ export async function postGoogleDriveSaveMail(request: Request, env: Env): Promi
     mimeType: "text/plain",
     text: messages
       .map((m) => `From: ${m.from}\nTo: ${m.to}\nDate: ${m.date ?? ""}\nSubject: ${m.subject}\n\n${m.text || m.snippet}`)
-      .join("\n\n———\n\n"),
+      .join("\n\n---\n\n"),
   })
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,

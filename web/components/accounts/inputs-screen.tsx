@@ -173,7 +173,7 @@ function shapeInputs(todos: Todo[], view: InputView, lang: Language, t: (s: stri
       accountCell: (
         <span className="flex items-center gap-2">
           <RecordMark picture={todo.accountLogoUrl} name={todo.accountName} size="choice" />
-          <span>{todo.accountName ?? "—"}</span>
+          <span>{todo.accountName ?? ""}</span>
         </span>
       ),
       account: todo.accountName ?? "",
@@ -184,12 +184,12 @@ function shapeInputs(todos: Todo[], view: InputView, lang: Language, t: (s: stri
       // on Waiting/Overdue rather than a guess.
       contact: todo.completedAt
         ? todo.completedByIsClient
-          ? (todo.completedByName ?? "—")
-          : staffNameFromSnapshot(todo.completedByName) || "—"
-        : "—",
-      due: todo.dueOn ? formatDate(todo.dueOn, lang) : "—",
+          ? (todo.completedByName ?? "")
+          : staffNameFromSnapshot(todo.completedByName) || ""
+        : "",
+      due: todo.dueOn ? formatDate(todo.dueOn, lang) : "",
       waiting: waitingBadge(todo, view, t),
-      receivedOn: todo.completedAt ? formatDate(todo.completedAt, lang) : "—",
+      receivedOn: todo.completedAt ? formatDate(todo.completedAt, lang) : "",
     })),
   }
 }

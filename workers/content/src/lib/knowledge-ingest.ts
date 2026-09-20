@@ -536,7 +536,12 @@ export const INGEST_KINDS: IngestKind[] = [
     // to `false`, always. Same body as before, but no longer a card, so the
     // very same rollup that already existed gets chunked and embedded for
     // the first time. See the flag's own comment below.
-    textVersion: 4,
+    //
+    // v5: R95 (no-em-dash), 20 Sep 2026 — the app/role separator and the
+    // "Their tickets — N still open" sentence both carried an em dash; both
+    // now read with a comma/colon instead. The words changed, so every
+    // account already indexed re-reads to pick up the new punctuation.
+    textVersion: 5,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -585,12 +590,12 @@ export const INGEST_KINDS: IngestKind[] = [
                 (SELECT p.name FROM accounts p WHERE p.id = a.parent_account_id) AS parent_name,
                 COALESCE(a.updated_at, a.created_at) AS sort_at,
                 ${childLines(
-                  `SELECT ap.name || COALESCE(' — ' || ap.stage, '') AS line FROM apps ap
+                  `SELECT ap.name || COALESCE(', ' || ap.stage, '') AS line FROM apps ap
                     WHERE ap.account_id = a.id AND ap.deactivated_at IS NULL
                     ORDER BY ap.created_at LIMIT ${ROLLUP_ROWS}`
                 )} AS apps,
                 ${childLines(
-                  `SELECT p.name || COALESCE(' — ' || l.relationship, '') ||
+                  `SELECT p.name || COALESCE(', ' || l.relationship, '') ||
                           CASE WHEN l.is_main_stakeholder = 1 THEN ' (the main contact)' ELSE '' END AS line
                      FROM account_links l JOIN accounts p ON p.id = l.person_account_id
                     WHERE l.account_id = a.id AND l.deactivated_at IS NULL
@@ -692,7 +697,7 @@ export const INGEST_KINDS: IngestKind[] = [
             r.apps ? `The systems we have built for them:\n${r.apps}` : "",
             r.sprints ? `The blocks of work sold to them:\n${r.sprints}` : "",
             r.processes ? `The ways of working we have mapped for them:\n${r.processes}` : "",
-            r.tickets ? `Their tickets — ${r.open_tickets} still open:\n${r.tickets}` : "",
+            r.tickets ? `Their tickets: ${r.open_tickets} still open:\n${r.tickets}` : "",
             r.todos ? `What we are waiting on them for:\n${r.todos}` : "",
             r.last_met ? `We last met on ${r.last_met.slice(0, 10)}.` : "",
           ]
@@ -916,7 +921,10 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "process",
     table: "processes",
     label: "process maps",
-    textVersion: 1,
+    // v2: R95 (no-em-dash), 20 Sep 2026 — the step name/description separator
+    // carried an em dash; it now reads with a comma instead. The words
+    // changed, so every process map already indexed re-reads.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(p.updated_at, p.created_at)", "p.id")
       const rows = await d1Query<{
@@ -946,7 +954,7 @@ export const INGEST_KINDS: IngestKind[] = [
                 COALESCE(p.updated_at, p.created_at) AS sort_at,
                 (SELECT MAX(v.version_no) FROM process_versions v WHERE v.process_id = p.id) AS version_no,
                 ${childLines(
-                  `SELECT st.name || COALESCE(' — ' || st.description, '') ||
+                  `SELECT st.name || COALESCE(', ' || st.description, '') ||
                           CASE WHEN st.seconds_per_run > 0
                                THEN ' (about ' || (st.seconds_per_run / 60) || ' minutes, ' ||
                                     st.runs_per_month || ' times a month)'
@@ -1408,7 +1416,10 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "todo",
     table: "todos",
     label: "to-dos",
-    textVersion: 1,
+    // v2: R95 (no-em-dash), 20 Sep 2026 — "They sent it — Name" carried an em
+    // dash; it now reads "They sent it, by Name". The words changed, so
+    // every to-do already indexed re-reads.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
       const rows = await d1Query<{
@@ -1469,7 +1480,7 @@ export const INGEST_KINDS: IngestKind[] = [
               .join(" "),
             r.detail ?? "",
             r.completed_at
-              ? `They sent it${r.completer_name ? ` — ${r.completer_name}` : ""}${
+              ? `They sent it${r.completer_name ? `, by ${r.completer_name}` : ""}${
                   r.file_name ? `, as ${r.file_name}` : ""
                 }.`
               : "",
@@ -1862,7 +1873,10 @@ export const INGEST_KINDS: IngestKind[] = [
     // v2: the false pre-selection sentence above, replaced. Every dropdown
     // source already filed says the old words, so the bump is what walks the
     // cursor back over them.
-    textVersion: 2,
+    // v3: R95 (no-em-dash), 20 Sep 2026 — "a pre-selection — no form here
+    // picks..." carried an em dash; it now reads with a colon. The words
+    // changed, so every dropdown vocabulary already indexed re-reads.
+    textVersion: 3,
     rollup: true,
     // One source per LIST, so the thing mirrored is the distinct `type`.
     oneSourcePer: "type",
@@ -1916,7 +1930,7 @@ export const INGEST_KINDS: IngestKind[] = [
           // say so is the passage itself.
           Number(r.guarded) === 0
             ? ""
-            : `${Number(r.guarded) === Number(r.live) ? "Every choice in this list is protected" : `${r.guarded} of these choices are protected`}: a protected choice can't be switched off until somebody takes its protection off first. It is not a pre-selection — no form here picks a choice for anybody, so a person filling one in chooses from all of them equally.`,
+            : `${Number(r.guarded) === Number(r.live) ? "Every choice in this list is protected" : `${r.guarded} of these choices are protected`}: a protected choice can't be switched off until somebody takes its protection off first. It is not a pre-selection: no form here picks a choice for anybody, so a person filling one in chooses from all of them equally.`,
         ]
           .filter(Boolean)
           .join("\n\n"),

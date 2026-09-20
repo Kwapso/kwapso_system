@@ -438,7 +438,7 @@ function RecordChrome({
      believing it had a field. */
   if (process.env.NODE_ENV !== "production" && door === "portal" && onAddNote !== undefined) {
     console.warn(
-      'RecordChrome: door="portal" draws no add-a-note field — ch27.8, the portal ' +
+      'RecordChrome: door="portal" draws no add-a-note field: ch27.8, the portal ' +
         "never shows internal notes, only what was said to the client.",
     );
   }

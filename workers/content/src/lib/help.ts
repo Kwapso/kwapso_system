@@ -58,7 +58,7 @@ import { TRIAGE_AFTER_DAYS } from "./triage"
 // order, and for why this one seam does not swallow its own failures the way
 // `logActivity` does.
 import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./help-stages"
-import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import { GuardError, hasRight, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { TITLE_MAX_CHARS } from "@shared/types"
 import {
@@ -1791,7 +1791,7 @@ export async function listReplies(
     guard.databaseId,
     `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at,
             EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help_threads.creator_id) AS from_client
-       FROM help_threads WHERE help_id = ?${fence.sql} ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
+       FROM help_threads WHERE help_id = ? AND deactivated_at IS NULL${fence.sql} ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
     [ticketId, ...fence.params]
   )
   // THE NAME AND THE HANDLE, not just the name. Blanking `creator_name` alone
@@ -1835,7 +1835,7 @@ export async function countReplies(
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM help_threads WHERE help_id = ?${fence.sql}`,
+    `SELECT COUNT(*) AS n FROM help_threads WHERE help_id = ? AND deactivated_at IS NULL${fence.sql}`,
     [ticketId, ...fence.params]
   )
   return rows[0]?.n ?? 0
@@ -2883,6 +2883,153 @@ UPDATE help SET updated_at = ${sqlString(now)} WHERE id = ${sqlString(ticketId)}
   )
 
   return { id, raiserId: ticket.creator_id }
+}
+
+/** THE REPLY-LEVEL TWIN OF `ticketOrThrow` — a live reply this caller may see AT
+ * ALL (the same thread fence `listReplies` reads through), or a clean 404. Needed
+ * now that a reply can be changed on its own, not only read as part of the whole
+ * thread. A DEACTIVATED reply is treated as gone here too: eligibility for an
+ * edit, or for a second delete, ends the moment the first delete lands — the
+ * same "not there" answer a foreign id gets, for the same 404-not-403 reason
+ * `ticketOrThrow`'s own header states. */
+async function replyOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string
+): Promise<ReplyRow> {
+  const fence = threadFence(guard, scope)
+  const rows = await d1Query<ReplyRow>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at
+       FROM help_threads WHERE id = ? AND deactivated_at IS NULL${fence.sql}`,
+    [id, ...fence.params]
+  )
+  if (!rows[0]) throw new GuardError(404, "reply_not_found", "That reply doesn't exist.")
+  return rows[0]
+}
+
+/** MAY THIS CALLER CHANGE THIS ONE REPLY? — the fence `updateReply`/`deleteReply`
+ * share, and the whole of Aurora's 20 Sep 2026 ruling's permission half.
+ *
+ * THE AUTHOR ALWAYS MAY. Changing your own words needs no separate grant — the
+ * same reasoning `updateTicket`'s own portal branch states for the ticket's
+ * wording one table up.
+ *
+ * PAST THAT, help:update — "the ticket edit right", the SAME right the ticket's
+ * own Edit button and status stepper already gate on (`canEdit`, the app's own
+ * `usePermissions` client-side) — reaches every OTHER member's reply too. One
+ * right, the one already governing the rest of this ticket, rather than a
+ * second permission nobody would remember exists or think to grant.
+ *
+ * A CLIENT LOGIN NEVER REACHES THE SECOND HALF. The portal surface grants no
+ * help:update right to begin with — no role a contact can hold carries it — so
+ * this is provably already true without the branch below. It is asserted
+ * anyway rather than left to fall out of a `hasRight` lookup that would simply
+ * always answer false for a portal caller: a rule this load-bearing ("a client
+ * login cannot edit staff replies") earns its own sentence, the same call
+ * `postHelpReply`'s own mention refusal makes for the identical reason, not an
+ * inference from a permissions table a future role change could quietly grow a
+ * hole in. */
+async function assertMayChangeReply(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  row: Pick<ReplyRow, "creator_id">
+): Promise<void> {
+  if (row.creator_id === guard.userId) return
+  if (scope.kind === "portal")
+    throw new GuardError(403, "not_yours", "That one isn't yours to change.")
+  if (await hasRight(cfg, guard, "help", "update")) return
+  throw new GuardError(
+    403,
+    "forbidden",
+    "Only the person who wrote this reply, or someone who can edit tickets, may change it."
+  )
+}
+
+/** CHANGE A REPLY ALREADY SENT — Aurora's 20 Sep 2026 ruling, the Edit half.
+ * `body` arrives already validated (`requireText`, the route's own boundary,
+ * TEXT_LIMITS.long — the same cap a NEW reply is held to). Stamps the SAME
+ * `updated_at`/`editor_*` audit block `updateTicket` stamps on the ticket
+ * itself, one table along (team migration 0108) — the words move, and the row
+ * says who moved them and when, exactly as every other edit in this file does.
+ *
+ * Returns the ticket id (for the route's own `listReplies`/`countReplies`
+ * refresh) and its account (for the live ping's targeting) — the write path
+ * already read both resolving the fence, so the route does not pay a second
+ * round trip for either. */
+export async function updateReply(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  body: string
+): Promise<{ helpId: string; accountId: string | null }> {
+  const row = await replyOrThrow(cfg, guard, scope, id)
+  await assertMayChangeReply(cfg, guard, scope, row)
+  const ticket = await ticketOrThrow(cfg, guard, scope, row.help_id)
+  const now = new Date().toISOString()
+  await d1ExecScript(
+    cfg,
+    guard.databaseId,
+    `UPDATE help_threads SET message_body = ${sqlString(body)}, updated_at = ${sqlString(now)},
+       editor_id = ${sqlString(actor.id)}, editor_name = ${sqlString(actor.name)}
+     WHERE id = ${sqlString(id)};`
+  )
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Reply edited",
+    description: `${actor.name} edited a reply on ${ticket.ref ?? "a ticket"}`,
+    relatedTable: "help_threads",
+    relatedRowId: id,
+  })
+  return { helpId: row.help_id, accountId: ticket.account_id }
+}
+
+/** TAKE A REPLY BACK OUT — Aurora's 20 Sep 2026 ruling, the Delete half.
+ * NOTHING ON A TICKET IS EVER REMOVED (CONVENTIONS.md): the row stays exactly
+ * where it was, in `help_threads` and in the activity log, and only
+ * `deactivated_at` moves. `listReplies`/`countReplies` (team migration 0108,
+ * their own WHERE) are the one place that stops drawing it — the same
+ * deactivate-never-delete shape every other soft-delete in this schema keeps.
+ *
+ * The SAME editor stamp `updateReply` writes lands in the SAME statement as
+ * `deactivated_at`, which is the whole of this table's audit trail for a
+ * delete: one write, one actor, no second `deactivator_*` pair naming a fact
+ * the `editor_*` columns already say. */
+export async function deleteReply(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string
+): Promise<{ helpId: string; accountId: string | null }> {
+  const row = await replyOrThrow(cfg, guard, scope, id)
+  await assertMayChangeReply(cfg, guard, scope, row)
+  const ticket = await ticketOrThrow(cfg, guard, scope, row.help_id)
+  const now = new Date().toISOString()
+  // R17: idempotent by construction, not only by `replyOrThrow`'s own fence
+  // above — the current-status predicate rides the WRITE too, the same shape
+  // `setTicketArchived` uses one table along, so two concurrent deletes racing
+  // past that same read still move at most one row and write history once.
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE help_threads SET deactivated_at = ?, updated_at = ?, editor_id = ?, editor_name = ?
+     WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+    [now, now, actor.id, actor.name, id]
+  )
+  if (!changed[0]) return { helpId: row.help_id, accountId: ticket.account_id }
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Reply removed",
+    description: `${actor.name} removed a reply on ${ticket.ref ?? "a ticket"}`,
+    relatedTable: "help_threads",
+    relatedRowId: id,
+  })
+  return { helpId: row.help_id, accountId: ticket.account_id }
 }
 
 /** HOOK (Phase 3) — the AI agent drafts the FIRST reply here, labelled "Drafted by

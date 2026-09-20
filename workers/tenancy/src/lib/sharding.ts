@@ -353,7 +353,7 @@ export async function ourDatabases<T extends { uuid: string }>(
     const results = rows.results ?? []
     if (results.length >= OWNED_DB_CAP)
       console.error(
-        `[sharding] ourDatabases hit the ${OWNED_DB_CAP} ceiling — the ownership set is INCOMPLETE and some of our own databases are going unwatched.`
+        `[sharding] ourDatabases hit the ${OWNED_DB_CAP} ceiling: the ownership set is INCOMPLETE and some of our own databases are going unwatched.`
       )
     for (const r of results) if (r.database_id) mine.add(r.database_id)
   } catch (e) {
@@ -596,8 +596,8 @@ export async function alertNewAlarms(
         // The action, not just the fact — the same rule the console line has always
         // followed. OPERATIONS.md § Growth watch is the runbook it points at.
         footnote: accountAlarmed
-          ? "DO NOT RUN THE MODULE MOVER for this one. The mover's first step is creating another database, and the ceiling here is the account's TOTAL D1 storage (1 TB), so moving a module spends the very thing that is running out — and when it is gone, D1 refuses new writes and new databases across every tenant at once. The levers that actually work are archiving or deleting data (OPERATIONS.md, Growth watch), asking whether the other products sharing this account can reclaim theirs, or moving to a second Cloudflare account. Any per-database line above is a separate problem with its own, opposite remedy."
-          : "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). If the team is also SLOW rather than just big, that is the moment to put its database on a native binding (OPERATIONS.md, the native-binding runbook) — the two fixes are independent. There is about 2 GB of headroom left above the alarm line.",
+          ? "DO NOT RUN THE MODULE MOVER for this one. The mover's first step is creating another database, and the ceiling here is the account's TOTAL D1 storage (1 TB), so moving a module spends the very thing that is running out. When it is gone, D1 refuses new writes and new databases across every tenant at once. The levers that actually work are archiving or deleting data (OPERATIONS.md, Growth watch), asking whether the other products sharing this account can reclaim theirs, or moving to a second Cloudflare account. Any per-database line above is a separate problem with its own, opposite remedy."
+          : "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). If the team is also SLOW rather than just big, that is the moment to put its database on a native binding (OPERATIONS.md, the native-binding runbook): the two fixes are independent. There is about 2 GB of headroom left above the alarm line.",
       }
     )
     if (ok) mailed++

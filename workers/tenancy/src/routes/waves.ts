@@ -68,7 +68,7 @@ function accountFilter(request: Request): string | null {
  * 16 Sep 2026), answered by `listWaves`/`countWaves` as an `EXISTS` over the
  * wave's own live sprints (a wave carries no such column itself). */
 function sprintTypeFilter(request: Request): string | null {
-  return queryText(new URL(request.url).searchParams.get("sprintType"), "Sprint type") || null
+  return queryText(new URL(request.url).searchParams.get("sprintType"), "Phase type") || null
 }
 
 /** WHICH APP, off the query string — the App facet (team migration 0099

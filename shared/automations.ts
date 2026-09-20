@@ -305,7 +305,7 @@ export const AUTOMATIONS: Automation[] = [
     description: "Starting a timer stops the ones you already had running.",
     switchable: false,
     helpText:
-      "Each person decides this for themselves — it is stored against your own account and not the team's. Today the only way to set it is to ask the assistant, which is a gap rather than a design.",
+      "Each person decides this for themselves. It is stored against your own account and not the team's. Today the only way to set it is to ask the assistant, which is a gap rather than a design.",
   },
   {
     key: "time.runaway-flag",
@@ -316,7 +316,7 @@ export const AUTOMATIONS: Automation[] = [
     description: "A timer still running after eight hours is flagged for you to settle.",
     switchable: false,
     helpText:
-      "Nothing happens on its own here — the timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.",
+      "Nothing happens on its own here. The timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.",
   },
 
   /* ── MEETINGS ─────────────────────────────────────────────────────────── */
@@ -533,7 +533,7 @@ export const AUTOMATIONS: Automation[] = [
     description: "New and worsening faults are gathered every night.",
     switchable: false,
     helpText:
-      "The gathering cannot be switched off — it is what the fault record is made of. The email already is: it is addressed to nobody on purpose, and the faults are read here instead.",
+      "The gathering cannot be switched off. It is what the fault record is made of. The email already is: it is addressed to nobody on purpose, and the faults are read here instead.",
   },
   {
     key: "team.cron-heartbeat",

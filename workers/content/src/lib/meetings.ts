@@ -1026,7 +1026,7 @@ export async function captureTranscript(
   // the entry.
   const event = await scopedCalendarEvent(cfg, guard, calendarToken, meeting.googleEventId)
   if (!event)
-    return nothing("That calendar entry isn't in reach any more — check what Calendar is allowed to read.")
+    return nothing("That calendar entry isn't in reach any more. Check what Calendar is allowed to read.")
   // BELOW THE CALENDAR READ, because a refresh hunts and the hunt starts from
   // this entry. See `refreshTranscript` for why it is a hunt and not a re-read.
   if (meeting.transcriptCapturedAt)
@@ -1260,7 +1260,7 @@ async function refreshTranscript(
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting transcript read",
-    description: `${actor.name} read more of the transcript of "${meeting.title}" — a fuller record of the call had been written since it was first read`,
+    description: `${actor.name} read more of the transcript of "${meeting.title}": a fuller record of the call had been written since it was first read`,
     relatedTable: "meetings",
     relatedRowId: meeting.id,
   })

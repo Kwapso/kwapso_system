@@ -663,7 +663,7 @@ export function MembersGallery({
                             <Button
                               variant="ghost"
                               size="icon"
-                              aria-label={`${t("Revoke invite")} — ${i.email}`}
+                              aria-label={`${t("Revoke invite")}: ${i.email}`}
                               onClick={() =>
                                 setConfirm({ kind: "invites.revoke", inviteId: i.id })
                               }

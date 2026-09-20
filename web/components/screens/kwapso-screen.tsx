@@ -150,7 +150,7 @@ export function KwapsoScreen({
             <div className="flex flex-col gap-4">
               <OverviewList
                 items={[
-                  // No "—" fallback: `undefined` lets `OverviewList` filter
+                  // No "-" fallback: `undefined` lets `OverviewList` filter
                   // the row out entirely (W2 — an unset fact is dropped,
                   // label and all, not dashed and not left as an empty
                   // value beside its own label).

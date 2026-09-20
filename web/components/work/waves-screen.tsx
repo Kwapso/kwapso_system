@@ -90,7 +90,7 @@ export function waveDates(
   lang: Language
 ): string {
   if (wave.startsOn && wave.endsOn) return `${formatDate(wave.startsOn, lang)} → ${formatDate(wave.endsOn, lang)}`
-  return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No sprints planned yet")
+  return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No phases planned yet")
 }
 
 /* ============================================================================
@@ -165,7 +165,7 @@ export function waveWeekWindow(offset: number, t: (s: string) => string, lang: L
   }
   const windowLabel =
     weeks.length > 0
-      ? `${weeks[0]} – ${weeks[weeks.length - 1]}`
+      ? `${weeks[0]} to ${weeks[weeks.length - 1]}`
       : t("This week")
   return { weekStarts, weeks, todayIndex, windowLabel }
 }
@@ -292,7 +292,7 @@ export function buildWaveTimelineRows(
           start: clippedStart,
           span: clippedSpan,
           tone: sprintState(r.sprint, today),
-          title: `${r.sprint.name}${r.sprint.sprintType ? ` · ${r.sprint.sprintType}` : ""} · ${formatDate(r.sprint.startsOn, lang)} – ${formatDate(r.sprint.endsOn, lang)}`,
+          title: `${r.sprint.name}${r.sprint.sprintType ? ` · ${r.sprint.sprintType}` : ""} · ${formatDate(r.sprint.startsOn, lang)} to ${formatDate(r.sprint.endsOn, lang)}`,
           onSelect: () => softNavigate(`${basePath}/${w.id}/sprints/${r.sprint!.id}`),
         })
       } else {
@@ -373,7 +373,7 @@ export function buildWaveCalendarEntries(
       day: s.startsOn.slice(0, 10),
       endDay: s.endsOn ? s.endsOn.slice(0, 10) : undefined,
       title: s.name,
-      kind: t("Sprint"),
+      kind: t("Phase"),
       detail: s.waveName ?? undefined,
       // The SAME hash as the wave's own entry above — a sprint's chip lands
       // in its wave's own colour, for free, off the identical `accentClass`
@@ -515,7 +515,7 @@ export function waveListRows(
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex min-w-0 flex-wrap items-center gap-2">
             <RecordMark picture={null} name={w.accountName ?? ""} size="choice" />
-            <span className="min-w-0 truncate">{w.accountName ?? "—"}</span>
+            <span className="min-w-0 truncate">{w.accountName ?? ""}</span>
           </span>
           {app ? (
             <span className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-1 text-xs">
@@ -541,8 +541,8 @@ export function waveListRows(
           ) : null}
         </span>
       ),
-      start: formatDate(w.startsOn, lang) || "—",
-      end: formatDate(w.endsOn, lang) || "—",
+      start: formatDate(w.startsOn, lang) || "",
+      end: formatDate(w.endsOn, lang) || "",
       // A COLOURED PILL, ALWAYS — client, 16 Sep 2026: "make status a
       // colored pill." Deactivated wins over the temporal read (a wave that
       // ran to its own end date and was then switched off is switched off,
@@ -578,7 +578,7 @@ export function waveListColumns(t: (s: string) => string): TableColumn[] {
     // translated. R34's own argument: a word already means this, so this
     // column does not invent a second one for it.
     { key: "state", label: t("Status") },
-    { key: "sprints", label: t("Sprints") },
+    { key: "sprints", label: t("Phases") },
     { key: "start", label: t("Start") },
     { key: "end", label: t("End") },
     { key: "account", label: t("Account"), searchKey: "accountName" },
@@ -959,7 +959,7 @@ export function WaveCollection({
               if (waveId && sprintId) softNavigate(`${basePath}/${waveId}/sprints/${sprintId}`)
             }}
             emptyText={
-              asking ? t("No waves match that.") : t("No waves or sprints have a start date yet.")
+              asking ? t("No waves match that.") : t("No waves or phases have a start date yet.")
             }
           />
         ) : rows.length === 0 ? (
@@ -979,7 +979,7 @@ export function WaveCollection({
             <CollectionEmptyState
               title={t("No waves yet.")}
               description={t(
-                "A wave is a package of sprints an account bought: sell it first, plan the sprints inside it afterwards."
+                "A wave is a package of phases an account bought: sell it first, plan the phases inside it afterwards."
               )}
               onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
             />
@@ -1081,7 +1081,7 @@ export function WaveCollection({
           <AlertDialogHeader>
             <AlertDialogTitle>{t("Switch this wave off?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("It stops being offered when a sprint is filed, and stays on the record with everything already in it. You can bring it back.")}
+              {t("It stops being offered when a phase is filed, and stays on the record with everything already in it. You can bring it back.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

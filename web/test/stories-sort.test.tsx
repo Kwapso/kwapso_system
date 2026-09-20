@@ -94,6 +94,7 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
     category: "Client-requested",
     acceptanceCriteria: null,
     moscow: null,
+    contributesToGoal: false,
     reviewNote: null,
     reviewFileUrl: null,
     reviewFileName: null,
@@ -182,6 +183,6 @@ describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)
     // tab") — `PLANNED_BACKLOG_COLUMNS`. MoSCoW is deliberately NOT a
     // seventh column here (R82's six-column ceiling) — it is a card tag and
     // a toolbar filter/sort instead (`MOSCOW_DOT_TONE`/facet, same file).
-    expect(headers).toEqual(["ID", "Story", "Type", "Category", "Status", "Sprint"])
+    expect(headers).toEqual(["ID", "Story", "Type", "Category", "Status", "Phase"])
   })
 })

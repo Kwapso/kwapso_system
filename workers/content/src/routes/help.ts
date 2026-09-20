@@ -30,6 +30,8 @@ import {
   setStatus,
   setTicketArchived,
   setTicketRank,
+  updateReply,
+  deleteReply,
   updateTicket,
   type HelpStatus,
   type TicketFilter,
@@ -578,6 +580,55 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     )
   )
   // The same pair, on the other most common action: sending a reply.
+  const [replies, total] = await Promise.all([
+    listReplies(cfg, guard, scope, helpId),
+    countReplies(cfg, guard, scope, helpId),
+  ])
+  return json({ replies, total })
+}
+
+/** POST /api/content/help/reply/update — change a reply already sent (help:read,
+ * the same open `postHelpReply` uses: any member who can see the ticket may
+ * open the door, and the FENCE that decides whether THIS reply is theirs to
+ * change lives one level down, in `updateReply`/`assertMayChangeReply`,
+ * lib/help.ts). Aurora's 20 Sep 2026 ruling, the Edit half — p1's placement (a
+ * control beside the bubble, hidden until hover) and p4's contents (a menu:
+ * edit / copy / delete), now shipped as `TicketThread`'s `actions` prop (kit
+ * v1.2.139).
+ *
+ * NO EMAIL. The two doors that email a client are named and counted in
+ * `postResolveHelp`'s own header ("the second and last thing in the product
+ * that emails one") — a reply CHANGING its own words is not a third. */
+export async function postHelpReplyUpdate(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; body?: string }>(request, env, "help", "read")
+  const id = requireText(body.id, "Reply", TEXT_LIMITS.short)
+  const replyBody = requireText(body.body, "Reply", TEXT_LIMITS.long)
+  const scope = await callerScope(cfg, guard)
+  const { helpId, accountId } = await updateReply(cfg, guard, scope, actor, id, replyBody)
+  await publishChange(env, guard.teamId, "help_threads", id, "edit", accountId ?? undefined)
+  const [replies, total] = await Promise.all([
+    listReplies(cfg, guard, scope, helpId),
+    countReplies(cfg, guard, scope, helpId),
+  ])
+  return json({ replies, total })
+}
+
+/** POST /api/content/help/reply/delete — take a reply back out of the thread
+ * (help:read, the SAME open and the SAME fence `postHelpReplyUpdate` uses,
+ * immediately above — one function decides "may this caller touch this one
+ * reply" for both doors, `assertMayChangeReply`, lib/help.ts).
+ *
+ * NOTHING ON A TICKET IS EVER REMOVED: `deleteReply` moves `deactivated_at`,
+ * never a row. The thread this door's own response reads back
+ * (`listReplies`) is the one place that stops drawing it; the activity log
+ * and the table both keep it exactly as it was. No email, for the same reason
+ * the Edit door above carries none. */
+export async function postHelpReplyDelete(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: string }>(request, env, "help", "read")
+  const id = requireText(body.id, "Reply", TEXT_LIMITS.short)
+  const scope = await callerScope(cfg, guard)
+  const { helpId, accountId } = await deleteReply(cfg, guard, scope, actor, id)
+  await publishChange(env, guard.teamId, "help_threads", id, "remove", accountId ?? undefined)
   const [replies, total] = await Promise.all([
     listReplies(cfg, guard, scope, helpId),
     countReplies(cfg, guard, scope, helpId),

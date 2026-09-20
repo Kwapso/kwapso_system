@@ -133,7 +133,7 @@ export function brandedEmail(o: BrandedEmail): { html: string; text: string } {
     // useless there; this line is the whole way back to the record.
     o.ctaLabel && o.ctaUrl ? `\n${o.ctaLabel}:\n${o.ctaUrl}` : "",
     o.footnote ? `\n${o.footnote}` : "",
-    `\n— ${brand.name} · ${brand.motto}`,
+    `\n${brand.name} · ${brand.motto}`,
   ]
     .filter((l) => l !== "")
     .join("\n")

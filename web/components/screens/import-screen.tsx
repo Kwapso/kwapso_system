@@ -310,7 +310,7 @@ export function ImportScreen({
       errorTitle={t("The import didn't finish")}
       errorBody={
         resumable
-          ? `${runFailed ?? ""} ${t("It got part of the way through. Carry on from where it stopped — sending the file again would add everything it already wrote a second time.")}`.trim()
+          ? `${runFailed ?? ""} ${t("It got part of the way through. Carry on from where it stopped. Sending the file again would add everything it already wrote a second time.")}`.trim()
           : (runFailed ?? undefined)
       }
       errorAction={
@@ -592,7 +592,7 @@ function PlanReview({ plan }: { plan: NonNullable<ImportBatchView["plan"]> }) {
             .map((step) => (
               <div key={step.fileId} className="flex flex-col gap-1 p-3">
                 <p className="text-warning text-xs font-medium">
-                  {step.fileName} —{" "}
+                  {step.fileName}:{" "}
                   {t("{skipped} of {total} row(s) will be skipped", {
                     skipped: step.predictedRejects,
                     total: step.rowCount,
@@ -612,7 +612,7 @@ function PlanReview({ plan }: { plan: NonNullable<ImportBatchView["plan"]> }) {
                         ellipsis here would keep the sentence out of the
                         catalogue entirely and ship it in English to everybody
                         — extracted by nothing, so flagged by nothing. */}
-                    {t("And {count} more — download the list above.", { count: step.predictedRejects - 3 })}
+                    {t("And {count} more: download the list above.", { count: step.predictedRejects - 3 })}
                   </p>
                 )}
               </div>

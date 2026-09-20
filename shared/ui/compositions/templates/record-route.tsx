@@ -211,7 +211,7 @@ const DEFAULT_FACTS: DescriptionListItem[] = [
   { id: "account", label: "Account", value: "Nordlicht Sport" },
   { id: "raised", label: "Raised by", value: "Desk lead, from the portal" },
   { id: "owner", label: "Owner", value: "M. Renz" },
-  { id: "sprint", label: "Sprint", value: "S-34 · 18 Aug – 29 Aug" },
+  { id: "sprint", label: "Sprint", value: "S-34 · 18 Aug to 29 Aug" },
   { id: "purpose", label: "Purpose", value: "Fewer phone calls at the desk" },
   { id: "logged", label: "Time logged", value: "5 h 05" },
 ];

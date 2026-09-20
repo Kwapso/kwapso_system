@@ -434,7 +434,7 @@ const accountsListRecipe: ScreenRecipe = {
   surface: "none",
   binding: { module: "accounts" },
   gate: { module: "accounts", right: "read" },
-  // 0091 — `manager` is a NODE column (an avatar chip + name, or "—") on
+  // 0091 — `manager` is a NODE column (an avatar chip + name, or "-") on
   // every row `shapeAccountsList` produces, client ruling 14 Sep 2026: "who
   // the account responsible or account manager is." DRAWN NOW, on both the
   // gallery card and the table's own column — see the recipe's own header.
@@ -680,7 +680,7 @@ const sprintsListRecipe: ScreenRecipe = {
   surface: "none",
   binding: { module: "sprints" },
   gate: { module: "work", right: "read" },
-  fields: [field("name", "Sprint"), field("detail", "Details")],
+  fields: [field("name", "Phase"), field("detail", "Details")],
   // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
   // to the left, with the usual black chip design"). The engine draws it as the
   // black chip through `RecordRef`; this only names the column the shaper puts
@@ -704,7 +704,7 @@ const sprintsListRecipe: ScreenRecipe = {
   // narrowed list from the rows the chosen client leaves. That is why the
   // relationship needed no registry: on the declared side it is the record's
   // own owning column, and on this side it is the data.
-  collection: listCollection("No sprints yet.", "Search sprints…", [
+  collection: listCollection("No phases yet.", "Search phases…", [
     // ACCOUNT, NOT CLIENT — her 2026-09-09 correction, applied to every facet
     // that names this record (the note that carries the argument sits on the
     // tickets facet in web/lib/collection-filters.ts). The FIELD is the shaped

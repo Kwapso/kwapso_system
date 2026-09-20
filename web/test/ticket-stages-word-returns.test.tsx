@@ -43,9 +43,9 @@ beforeEach(() => {
   history.value = null as unknown as TicketStageHistory
 })
 
-function renderLadder(status: HelpStatus, h: TicketStageHistory) {
+function renderLadder(status: HelpStatus, h: TicketStageHistory, createdAt = "2025-03-03T08:00:00.000Z") {
   history.value = h
-  return render(<TicketStages ticketId="help-1" status={status} />)
+  return render(<TicketStages ticketId="help-1" status={status} createdAt={createdAt} />)
 }
 
 // The live ladder, in state-machine order — the same order `buildRungs`
@@ -138,5 +138,50 @@ describe("the stage name, restored 19 Sep 2026 above the date on every rung", ()
     })
     const region = await screen.findByRole("group", { name: "Stages" })
     expect(within(region).getByText("Waiting on you")).toBeTruthy()
+  })
+
+  // AURORA, 20 SEP 2026, VERBATIM: "pls the column at triage makes me crazy.
+  // if a ticket is closed already (all except 15) of course it went through
+  // triage (back in the day, we dont have the date)." A ticket resolved
+  // before stage recording began (team migration 0066) has no recorded
+  // `triaged` span, and the blank second line used to read as "never
+  // triaged" — this proves the created date stands in instead, plain, and
+  // only for the one rung and the one state she named.
+  it("shows the created date on the Triaged rung when a CLOSED ticket has no recorded triaged span", async () => {
+    renderLadder(
+      "resolved",
+      {
+        recorded: true,
+        fromCreation: false,
+        events: [],
+        // NO "triaged" SPAN — the pre-migration gap her ruling is about.
+        spans: [{ status: "resolved", from: "2026-08-10T09:00:00.000Z", to: null, workingDays: 4 }],
+        reopens: null,
+      },
+      "2025-03-03T08:00:00.000Z"
+    )
+    const region = await screen.findByRole("group", { name: "Stages" })
+    const items = within(region).getAllByRole("listitem")
+    const triagedItem = items[1]
+    expect(within(triagedItem).getByText("Triaged")).toBeTruthy()
+    // THE CREATED DATE, PLAIN — never an empty/dash/"not triaged" mark.
+    expect(within(triagedItem).getByText(/^Mar 3, 2025/)).toBeTruthy()
+  })
+
+  it("leaves the Triaged rung blank on a ticket that is NOT closed yet, even with no recorded span", async () => {
+    renderLadder("scheduled", {
+      recorded: true,
+      fromCreation: false,
+      events: [],
+      // NO "triaged" SPAN, and the ticket is still open — a different
+      // question from the one she asked, so the gap still reads as a gap.
+      spans: [{ status: "scheduled", from: "2026-08-10T09:00:00.000Z", to: null, workingDays: 4 }],
+      reopens: null,
+    })
+    const region = await screen.findByRole("group", { name: "Stages" })
+    const items = within(region).getAllByRole("listitem")
+    const triagedItem = items[1]
+    expect(within(triagedItem).getByText("Triaged")).toBeTruthy()
+    expect(within(triagedItem).queryByText(/\d{2}h/)).toBeNull()
   })
 })

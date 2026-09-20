@@ -386,7 +386,7 @@ export default function OnboardingPage() {
               renders perfectly. */}
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
-              ? t("An admin can invite you back — ask them to send a new invite to this email address.")
+              ? t("An admin can invite you back. Ask them to send a new invite to this email address.")
               : t("Tell us who you are, and we'll take you into your team.")}
           </p>
         </div>

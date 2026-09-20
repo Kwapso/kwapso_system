@@ -22,7 +22,7 @@ import { TICKET_TYPE_GROUP, TICKET_TYPES } from "@shared/ticket-types"
 import { ulid } from "@shared/workers/id"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
-import { SPRINT_TYPES } from "@shared/sprint-types"
+import { PHASE_TYPES } from "@shared/sprint-types"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { MeetingTypeIcon } from "@shared/meeting-icons"
 
@@ -302,9 +302,12 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // can never be set from here, so these rows carry only what a person reads —
   // the word and the mark beside it. Renaming one can never move a sprint, and
   // changing a glyph on the Dropdown values screen reaches every sprint at once.
-  { type: "Sprint status", value: "Running now", mark: "RN" },
-  { type: "Sprint status", value: "Coming up", mark: "CU" },
-  { type: "Sprint status", value: "Wrapped", mark: "WR" },
+  // "Sprint status" -> "Phase status", Aurora's ruling, 20 Sep 2026 ("rename
+  // 'sprint' to 'phase'"), team migration 0107 carries the same rename to an
+  // existing team.
+  { type: "Phase status", value: "Running now", mark: "RN" },
+  { type: "Phase status", value: "Coming up", mark: "CU" },
+  { type: "Phase status", value: "Wrapped", mark: "WR" },
   { type: "Ticket status", value: "New" },
   { type: "Ticket status", value: "Triaged" },
   { type: "Ticket status", value: "In progress" },
@@ -327,16 +330,18 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // exported — an existing team's migration 0098 reads it to know which old
   // word renames onto which new one, and a team already using one of these
   // words on a live sprint keeps that exact word (deactivate, never delete).
-  ...SPRINT_TYPES.map((s, i) => ({
-    type: "Sprint type",
+  // "Sprint type" -> "Phase type" (Aurora's 20 Sep 2026 rename), and the
+  // Wave-lifecycle reorder the same session: `PHASE_TYPES`
+  // (shared/sprint-types.ts) carries the current seven words — Audit, Plan,
+  // Build, Pilot, Revision, Deploy, Hypercare — never `SPRINT_TYPES`, which is
+  // frozen for migration 0098's own sake (see that constant's own header).
+  ...PHASE_TYPES.map((s, i) => ({
+    type: "Phase type",
     value: s.name,
-    // THE SAME TWO-LETTER MARK THE MATCHING APP STAGE WORD CARRIES — the
-    // seven names coincide (the misread that named this vocabulary onto App
-    // stage first), so the mark is reused rather than invented a second
-    // time for the same word. Not drawn anywhere any more (icons replace it,
-    // `shared/sprint-types.ts`'s own `icon` field), kept only because a
-    // dropdown row's `mark` column is general-purpose and other surfaces
-    // (CSV export, the generic Choices screen) still read it.
+    // THE SAME TWO-LETTER MARK THE MATCHING APP STAGE WORD CARRIES, where one
+    // exists — Audit/Plan/Build still coincide with an App stage word; Pilot/
+    // Revision/Deploy/Hypercare are new to THIS vocabulary and do not, so they
+    // seed with no mark rather than a borrowed one that means something else.
     mark: APP_STAGES.find((a) => a.name === s.name)?.mark ?? null,
     position: i + 1,
   })),

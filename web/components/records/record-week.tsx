@@ -151,7 +151,7 @@ function weekRangeLabel(monday: Date, lang: Language): string {
     sameMonth ? { day: "numeric" } : { month: "short", day: "numeric" }
   )
   const year = sunday.toLocaleDateString(lang, { year: "numeric" })
-  return `${start}–${end}, ${year}`
+  return `${start} to ${end}, ${year}`
 }
 
 /** A day key read as a full sentence, for the overflow dialog's own title —

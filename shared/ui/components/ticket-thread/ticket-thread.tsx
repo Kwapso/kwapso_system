@@ -90,13 +90,25 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "../avatar/avatar";
 import { Badge } from "../badge/badge";
+import { buttonVariants } from "../button/button";
 import { Skeleton } from "../skeleton/skeleton";
 import {
+  Copy,
+  DotsThree,
   Paperclip,
   PaperPlaneTilt,
+  PencilSimple,
+  Trash,
 } from "../../foundations/icons";
 import { Checkbox } from "../checkbox/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../dropdown-menu/dropdown-menu";
 import { ScreenRegister } from "../screen-renderer/screen-renderer";
+import { Textarea } from "../textarea/textarea";
 
 /**
  * Which side of the thread a message sits on.
@@ -106,6 +118,44 @@ import { ScreenRegister } from "../screen-renderer/screen-renderer";
  * of conversation (ch27.10), in each of which "mine" means someone else.
  */
 export type ThreadSide = "mine" | "theirs";
+
+/**
+ * A message's edit/copy/delete affordance — 20 Sep 2026, client-ruled,
+ * verbatim: "for chat edit pencil: i like from p1 that its besides and
+ * appears when hover, but make it like p4 wth the 3 options menu (edit,
+ * copy/delete)." Two earlier drawings, merged: p1's PLACEMENT (a small
+ * round control beside the bubble, hidden until hover) and p4's CONTENTS
+ * (a menu, not a single pencil).
+ *
+ * Set here for the whole thread, or on `ThreadMessage.actions` for one
+ * message — the per-message value wins where both are given (`message.
+ * actions ?? actions`, read once per row). Undefined at both levels draws
+ * no affordance at all: this is opt in, the same contract `onClose`/
+ * `onInternalChange` already hold elsewhere in this kit.
+ *
+ * COPY NEEDS NO HANDLER TO WORK. `navigator.clipboard.writeText` runs
+ * unconditionally the moment the row renders at all (any one of the three
+ * being set is enough to draw the trigger, and Copy is the one item that
+ * always appears once it does); `onCopy` is a told-you, not a permission.
+ * `onEdit`/`onDelete` gate their OWN row — a menu with a Delete item nobody
+ * wired would commit to nothing.
+ */
+export interface ThreadMessageActions {
+  /**
+   * Puts the bubble into an inline editor seeded with its own body (Save /
+   * Cancel underneath) and is called with the message's own id and the
+   * edited text once Save is pressed. Absent, no Edit row.
+   */
+  onEdit?: (id: string, newBody: string) => void;
+  /** Told after the body was copied to the clipboard — see this type's own header. */
+  onCopy?: (id: string) => void;
+  /**
+   * Removes the message. Confirming is the caller's own job — this fires
+   * the moment Delete is chosen, with no dialog of its own. Absent, no
+   * Delete row.
+   */
+  onDelete?: (id: string) => void;
+}
 
 export interface ThreadAttachment {
   /** Stable key. Falls back to the index. */
@@ -167,6 +217,12 @@ export interface ThreadMessage {
    * see.
    */
   daySeparator?: React.ReactNode;
+  /**
+   * This message's own edit/copy/delete affordance, overriding
+   * `TicketThreadProps.actions` for this one row. See `ThreadMessageActions`
+   * for the full contract, including why an absent value draws nothing.
+   */
+  actions?: ThreadMessageActions;
 }
 
 /**
@@ -264,6 +320,27 @@ export interface TicketThreadProps
   attachLabel?: string;
   /** What a quiet `Badge` says over a message the other side cannot see. */
   internalLabel?: string;
+  /**
+   * The thread-wide edit/copy/delete affordance, applied to every message
+   * that does not set its own `ThreadMessage.actions`. See that type's own
+   * doc for the full contract. Absent at both levels, no message draws the
+   * affordance at all.
+   */
+  actions?: ThreadMessageActions;
+  /** The per-message actions trigger's accessible name — an icon, no visible label. */
+  messageActionsLabel?: string;
+  /** The Edit row's label, and the inline editor's own heading word. */
+  editActionLabel?: string;
+  /** The Copy row's label. */
+  copyActionLabel?: string;
+  /** The Delete row's label. */
+  deleteActionLabel?: string;
+  /** The inline editor's field, when no visible label sits above it. */
+  editFieldLabel?: string;
+  /** The inline editor's Save control. */
+  editSaveLabel?: string;
+  /** The inline editor's Cancel control. */
+  editCancelLabel?: string;
   /* -- 27.10's CARD composer ------------------------------------------------
      "The composer is a soft-paper card at the bottom of the thread with the
      internal switch, the audience line, and a round PaperPlaneRight furthest right —
@@ -399,6 +476,14 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
       sendLabel = "Send",
       attachLabel = "Attach a file",
       internalLabel = "Internal only",
+      actions,
+      messageActionsLabel = "Message actions",
+      editActionLabel = "Edit",
+      copyActionLabel = "Copy",
+      deleteActionLabel = "Delete",
+      editFieldLabel = "Edit message",
+      editSaveLabel = "Save",
+      editCancelLabel = "Cancel",
       internal = false,
       onInternalChange,
       internalChoiceLabel = "Internal only",
@@ -423,6 +508,33 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
     const setText = (next: string) => {
       if (!controlled) setInternalValue(next);
       onValueChange?.(next);
+    };
+
+    /* Which message (by its own resolved key — `message.id ?? index`, the
+       identical fallback the render below already uses) is mid-edit, and
+       the draft it is editing. One editor at a time: starting a second
+       edit silently replaces the first rather than stacking two open
+       textareas in one thread. */
+    const [editingKey, setEditingKey] = React.useState<string | null>(null);
+    const [editDraft, setEditDraft] = React.useState("");
+
+    const startEdit = (key: string, currentBody: React.ReactNode) => {
+      // Seeded from a STRING body only — a bubble carrying a mention pill or
+      // a link (`body: React.ReactNode`) has no plain-text form this file
+      // can invent, so an edit on one of those opens empty rather than
+      // guessing at a serialization. Plain-text bodies, the ordinary case,
+      // round-trip exactly.
+      setEditDraft(typeof currentBody === "string" ? currentBody : "");
+      setEditingKey(key);
+    };
+    const cancelEdit = () => {
+      setEditingKey(null);
+      setEditDraft("");
+    };
+    const saveEdit = (key: string, onEdit: (id: string, newBody: string) => void) => {
+      onEdit(key, editDraft);
+      setEditingKey(null);
+      setEditDraft("");
     };
 
     const resolved = state === "ready" && messages.length === 0 ? "empty" : state;
@@ -518,6 +630,11 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
               message.time !== undefined ||
               Boolean(message.internal);
             const below = bylinePlacement === "below";
+            // Per-message wins over the thread-wide default — see
+            // `ThreadMessage.actions`'s own doc. Undefined at both levels
+            // draws no affordance and no menu.
+            const effectiveActions = message.actions ?? actions;
+            const isEditingThis = editingKey === key;
 
             // Author, org and time. Ch27.10 draws all three at the caption
             // and badge steps; `bylinePlacement` only moves the whole line
@@ -608,12 +725,151 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                     ) : null}
 
                     {message.body !== undefined && message.body !== null ? (
-                      <div
-                        data-slot="thread-bubble"
-                        className={cn(BUBBLE_BASE, BUBBLE_SIDE[side])}
-                      >
-                        {message.body}
-                      </div>
+                      isEditingThis ? (
+                        /* THE INLINE EDITOR — the bubble's own shape (radius,
+                           side fill, inset), holding a field instead of the
+                           body, Save/Cancel underneath. Client, verbatim: "i
+                           like from p1 that its besides and appears when
+                           hover, but make it like p4 wth the 3 options menu"
+                           — p1's control OPENS this; this is what it opens
+                           INTO, in the bubble's own place rather than a
+                           second surface (a popover, a sheet) layered over
+                           it, so the reader edits where the message already
+                           is. */
+                        <div
+                          data-slot="thread-edit"
+                          className={cn(BUBBLE_BASE, BUBBLE_SIDE[side], "flex flex-col gap-2")}
+                        >
+                          <Textarea
+                            autoFocus
+                            autoGrow
+                            value={editDraft}
+                            onChange={(event) => { setEditDraft(event.target.value); }}
+                            aria-label={editFieldLabel}
+                            className={cn(
+                              "min-h-0 resize-none border-0 bg-transparent p-0",
+                              "[font:inherit] text-[inherit]",
+                            )}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              className={cn(buttonVariants({ variant: "cancel", size: "sm" }))}
+                            >
+                              {editCancelLabel}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={effectiveActions?.onEdit === undefined}
+                              onClick={() => {
+                                if (effectiveActions?.onEdit) saveEdit(key, effectiveActions.onEdit);
+                              }}
+                              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+                            >
+                              {editSaveLabel}
+                            </button>
+                          </div>
+                        </div>
+                      ) : effectiveActions ? (
+                        /* `group/actions` — THE HOVER/FOCUS GATE FOR THE
+                           TRIGGER BESIDE IT, below. `items-end` keeps the
+                           trigger on the bubble's own last line rather than
+                           centred against a tall, multi-line one. ONLY DRAWN
+                           WHEN A CALLER ACTUALLY PASSES `actions` — a caller
+                           that never does keeps the exact single-`<div data-
+                           slot="thread-bubble">` markup this file always
+                           rendered (the plain branch just below), so nothing
+                           about today's callers or tests moves. */
+                        <div
+                          data-slot="thread-bubble-row"
+                          className={cn(
+                            "group/actions relative flex items-end gap-1",
+                            mine && "flex-row-reverse",
+                          )}
+                        >
+                          <div
+                            data-slot="thread-bubble"
+                            className={cn(BUBBLE_BASE, BUBBLE_SIDE[side])}
+                          >
+                            {message.body}
+                          </div>
+
+                          {
+                            /* THE TRIGGER — `buttonVariants({ variant:
+                               "secondary", size: "icon" })` is the exact
+                               construction `EditPenButton` (kwapso_system's
+                               own `shared/web/edit-pen-button.tsx`) spends:
+                               same size step, same secondary skin, so a
+                               reader who already knows that control
+                               recognises this one. Hidden until the row is
+                               hovered or holds focus (`group-hover/actions`,
+                               `group-focus-within/actions` — both scoped
+                               `@media (hover: hover)` by Tailwind itself, so
+                               a touch tap never fights a sticky hover), and
+                               ALWAYS visible on a coarse pointer
+                               (`pointer-coarse:`) — a touch reader has no
+                               hover state to reveal it with. */
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                data-slot="thread-message-actions-trigger"
+                                aria-label={messageActionsLabel}
+                                className={cn(
+                                  buttonVariants({ variant: "secondary", size: "icon" }),
+                                  "shrink-0 self-end",
+                                  "opacity-0 pointer-events-none",
+                                  "group-hover/actions:opacity-100 group-hover/actions:pointer-events-auto",
+                                  "group-focus-within/actions:opacity-100 group-focus-within/actions:pointer-events-auto",
+                                  "pointer-coarse:opacity-100 pointer-coarse:pointer-events-auto",
+                                )}
+                              >
+                                <DotsThree size={16} aria-hidden="true" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align={mine ? "end" : "start"}>
+                                {effectiveActions.onEdit ? (
+                                  <DropdownMenuItem
+                                    icon={<PencilSimple size={16} aria-hidden="true" />}
+                                    onSelect={() => { startEdit(key, message.body); }}
+                                  >
+                                    {editActionLabel}
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {/* COPY NEEDS NO HANDLER — see
+                                    `ThreadMessageActions`'s own header. It
+                                    draws whenever the row does at all. */}
+                                <DropdownMenuItem
+                                  icon={<Copy size={16} aria-hidden="true" />}
+                                  onSelect={() => {
+                                    const plain = typeof message.body === "string" ? message.body : "";
+                                    void navigator.clipboard?.writeText(plain);
+                                    effectiveActions.onCopy?.(key);
+                                  }}
+                                >
+                                  {copyActionLabel}
+                                </DropdownMenuItem>
+                                {effectiveActions.onDelete ? (
+                                  <DropdownMenuItem
+                                    danger
+                                    icon={<Trash size={16} aria-hidden="true" />}
+                                    onSelect={() => { effectiveActions.onDelete?.(key); }}
+                                  >
+                                    {deleteActionLabel}
+                                  </DropdownMenuItem>
+                                ) : null}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          }
+                        </div>
+                      ) : (
+                        /* THE PLAIN BRANCH — byte-identical to every render
+                           this file produced before `actions` existed. */
+                        <div
+                          data-slot="thread-bubble"
+                          className={cn(BUBBLE_BASE, BUBBLE_SIDE[side])}
+                        >
+                          {message.body}
+                        </div>
+                      )
                     ) : null}
 
                     {/* Attachments. One chip per file, under the bubble and

@@ -342,6 +342,7 @@ export async function createSprintFrom(
   await contentApi.createSprint({
     name: values.name,
     goal: values.goal || undefined,
+    goalSummary: values.goalSummary || undefined,
     sprintType: values.sprintType || undefined,
     accountId: values.accountId || undefined,
     appId: values.appId || undefined,
@@ -351,7 +352,7 @@ export async function createSprintFrom(
     currency: values.currency || undefined,
   })
   invalidate(sprintsKey(teamId))
-  toast.success(t("Sprint started."))
+  toast.success(t("Phase started."))
 }
 
 export function SprintsScreen({
@@ -456,7 +457,7 @@ export function SprintsScreen({
       <ShapeStateBody
         shape="collectionScreen"
         state="error"
-        copy={{ errorTitle: t("Couldn't load the sprints.") }}
+        copy={{ errorTitle: t("Couldn't load the phases.") }}
         action={
           <Button variant="secondary" onClick={() => sprintsQ.refresh()}>
             {t("Try again")}
@@ -515,13 +516,13 @@ export function SprintsScreen({
           // SAME PLACEHOLDER the "All sprints" tab's own search box uses
           // (screens.ts's `sprintsListRecipe`) — one search box in one
           // collection's words, wherever it appears.
-          placeholder={t("Search sprints…")}
+          placeholder={t("Search phases…")}
           className="w-full"
         />
       }
       filters={filterPill}
       toolbarPanel={filterPanel}
-      actions={canCreate && <AddButton label={t("Start a sprint")} onClick={() => setAddOpen(true)} />}
+      actions={canCreate && <AddButton label={t("Start a phase")} onClick={() => setAddOpen(true)} />}
     />
   )
 
@@ -540,7 +541,7 @@ export function SprintsScreen({
         badgeVariant: "" as const,
       },
       { value: "calendar", label: t("Calendar"), icon: "calendar-blank", badge, badgeVariant: "" as const },
-      { value: "all", label: t("All sprints"), icon: "asterisk", badge, badgeVariant: "" as const },
+      { value: "all", label: t("All phases"), icon: "asterisk", badge, badgeVariant: "" as const },
     ],
   }
 
@@ -608,7 +609,7 @@ export function SprintsScreen({
   // tabs say one thing. No `onImport`: sprints have no import target.
   const sprintsEmpty = (
     <CollectionEmptyState
-      title={t("No sprints yet.")}
+      title={t("No phases yet.")}
       onCreate={canCreate ? () => setAddOpen(true) : undefined}
     />
   )
@@ -630,7 +631,7 @@ export function SprintsScreen({
            "Nothing matched." and withdraws "Add the first" itself. */
         <CollectionEmptyState
           filtered
-          title={t("No sprints yet.")}
+          title={t("No phases yet.")}
           onCreate={canCreate ? () => setAddOpen(true) : undefined}
         />
       )}
@@ -701,7 +702,7 @@ export function SprintsScreen({
           OF the rows below it, so it reads perfectly well after them, and the
           person who came to find a sprint finds one first. */}
       {burndown.length > 0 && (
-        <BandCard title={t("Work inside the running sprints")}>
+        <BandCard title={t("Work inside the running phases")}>
           <SprintBurndownChart rows={burndown} doneLabel={t("Done")} openLabel={t("Still open")} />
         </BandCard>
       )}
@@ -727,7 +728,7 @@ export function SprintsScreen({
 
         <SectionWithCreate
           show={canCreate}
-          label={t("Start a sprint")}
+          label={t("Start a phase")}
           icon="plus"
           onCreate={() => setAddOpen(true)}
           // The view strip scopes what the collection card shows, so it sits
@@ -774,7 +775,7 @@ export function SprintsScreen({
                   emptyText={
                     askingSprints && narrowedSprints.length === 0
                       ? t("Nothing matched.")
-                      : t("No sprints start this month.")
+                      : t("No phases start this month.")
                   }
                 />
               )}

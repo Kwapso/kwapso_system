@@ -100,7 +100,7 @@ export function AskTheAssistant({
         <p className="text-sm font-medium">{t("Asking a question needs the assistant")}</p>
         <p className="text-muted-foreground text-sm">
           {t(
-            "Your role can read the knowledge base — every source is here, and so is the record behind it — but asking it a question goes through the assistant, which your role can't use. A team admin can turn that on for your role."
+            "Your role can read the knowledge base. Every source is here, and so is the record behind it. But asking it a question goes through the assistant, which your role can't use. A team admin can turn that on for your role."
           )}
         </p>
       </div>
@@ -126,7 +126,7 @@ export function AskTheAssistant({
           a panel somewhere else is a surprise unless the box says so. */}
       <p className="text-muted-foreground text-xs">
         {t(
-          "The assistant opens with your question, answers from the knowledge base, and marks each claim with the source it came from — press a mark's source to read the passage itself. Each question uses one of the team's assistant credits."
+          "The assistant opens with your question, answers from the knowledge base, and marks each claim with the source it came from. Press a mark's source to read the passage itself. Each question uses one of the team's assistant credits."
         )}
       </p>
       {/* SAID OUT LOUD, because the question that gets asked is not the question

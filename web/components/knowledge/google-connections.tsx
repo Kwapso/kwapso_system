@@ -280,7 +280,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
               // the work for — and R34 is the law that the screens speak the
               // glossary. The old sentence said "your own Google account" for
               // the same reason; the word Google is doing work, not repeating.
-              "Drive, Gmail, Calendar and Chat in one approval, on your own Google account — {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.",
+              "Drive, Gmail, Calendar and Chat in one approval, on your own Google account. {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.",
               BRAND
             )}
             createLabel={t("Connect everything")}
@@ -470,7 +470,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                     )}
                     {named.length === 0 && !SCOPED.includes(service) ? (
                       <p className="text-muted-foreground text-xs">
-                        {t("Nothing shared yet — {scope}", {
+                        {t("Nothing shared yet: {scope}", {
                           scope: t(SERVICE_COPY[service].scope, BRAND),
                         })}
                       </p>
@@ -635,7 +635,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             // it, and somebody who was not told will read that as a fault.
             toast.success(
               r.forgotten > 0
-                ? t("Saved. {count} sources let go — the assistant will read them again from the start.", {
+                ? t("Saved. {count} sources let go. The assistant will read them again from the start.", {
                     count: r.forgotten,
                   })
                 : t("Saved.")

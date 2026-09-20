@@ -208,8 +208,8 @@ describe("Inputs — the three tabs, no Mine tab", () => {
     )
     const cells = Array.from(row?.querySelectorAll("td") ?? []).map((td) => td.textContent?.trim() ?? "")
     // Input, Account, Contact, Due, Waiting, Received on
-    expect(cells[2], "no contact before completion").toBe("—")
-    expect(cells[5], "no received date on an open row").toBe("—")
+    expect(cells[2], "no contact before completion").toBe("")
+    expect(cells[5], "no received date on an open row").toBe("")
   })
 
   it("a Received row names its own Contact and Received on date, and carries a green Received badge — client ruling, 17 Sep 2026: \"switch inputs to only colored dot, received green\"", async () => {
@@ -231,7 +231,7 @@ describe("Inputs — the three tabs, no Mine tab", () => {
       row?.querySelector('[data-slot="badge"][data-dot="shipped"]'),
       "the Received chip must carry the green (shipped) dot"
     ).toBeTruthy()
-    expect(cells[5], "the received date").not.toBe("—")
+    expect(cells[5], "the received date").not.toBe("")
   })
 
   it("the Waiting dot is orange regardless of days waited, Overdue stays red, both a neutral pill — client ruling, 16 Sep 2026 evening (\"For inputs waiting, let's use orange\") and 17 Sep 2026 (\"switch inputs to only colored dot\")", async () => {

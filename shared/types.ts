@@ -42,6 +42,18 @@ import type { ProcessSaving } from "./workers/savings"
  * renderer draws it (R87's other half). */
 export const TITLE_MAX_CHARS = 50
 
+/** AURORA'S "SPRINT GOAL" RULING, 20 SEP 2026, verbatim: "a single sentence
+ * describing the main outcome the cycle is organized around." The same
+ * `TITLE_MAX_CHARS` shape one field along — a hard cap plus a live counter at
+ * every write door and every form (R20 positional, R87's own pattern) — with a
+ * ceiling picked for this field rather than borrowed: 160 characters is about
+ * two ordinary sentences, generous enough for a real outcome statement and
+ * still short enough that it reads as ONE line at the top of the phase board,
+ * never a paragraph. `sprints.goal_summary` (team migration 0107) is the
+ * column; `sprints.goal` ("What it's for") is a separate, older, unbounded
+ * rich-text field and is untouched by this cap. */
+export const PHASE_GOAL_MAX_CHARS = 160
+
 /** A signed-in person, as the auth worker returns them to the browser. */
 export type SessionUser = {
   id: string
@@ -2174,6 +2186,15 @@ export type Story = {
    * backfilled, for `acceptanceCriteria`'s own reason: nobody can honestly
    * say what a pre-existing story's priority WAS. */
   moscow: MoscowValue | null
+  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
+   * 2026, paired with `Sprint.goalSummary`.) A per-story flag, toggled on the
+   * story row inside the phase board and on the story form once a phase is
+   * chosen, shown as a small mark on the story card. Defaults false — most
+   * stories are ordinary backlog work, and a phase with no goal set has
+   * nothing for this to mean, but the flag is stored independently of whether
+   * a goal is set so ticking it early and setting the goal later never loses
+   * the tick. */
+  contributesToGoal: boolean
   accountId: string | null
   createdAt: string
   updatedAt: string | null
@@ -2246,6 +2267,13 @@ export type Sprint = {
   refWas: string | null
   name: string
   goal: string | null
+  /** THE PHASE GOAL (Aurora's ruling, 20 Sep 2026) — one sentence, capped at
+   * `PHASE_GOAL_MAX_CHARS`, naming the main outcome this cycle is organized
+   * around. Shown at the top of the phase board, above the stories. A
+   * SEPARATE field from `goal` above, which predates this ruling and is a
+   * longer, free-form "what it's for" note. Nullable: most existing phases
+   * were never asked this question. */
+  goalSummary: string | null
   sprintType: string | null
   accountId: string | null
   accountName: string | null

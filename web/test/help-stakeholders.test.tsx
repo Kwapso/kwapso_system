@@ -154,6 +154,23 @@ describe("HelpStakeholders — Raised by, one tile", () => {
     expect(content.className).not.toContain("cursor-pointer")
   })
 
+  // Aurora, 20 Sep 2026, from the live measurement: "the Raised by card in
+  // help-stakeholders.tsx measures 102px because CardContent still carries
+  // lg:py-[var(--space-7)] beating py-3; remove the lg override so the card
+  // is ≈60px at every width." The kit's own `CardContent`
+  // (shared/ui/components/card/card.tsx) carries `py-6 lg:py-[var(--space-7)]`
+  // — a call site's own `py-3` only wins at the base breakpoint, sharing no
+  // prefix with `lg:py-…`, so the kit's own padding kept winning above that
+  // width. This locks the app-side override at the SAME breakpoint.
+  it("overrides the kit's lg:py padding on the Raised-by card, not only the base one", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    const card = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    const content = card.firstElementChild as HTMLElement
+    expect(content.className).toContain("py-3")
+    expect(content.className).toContain("lg:py-3")
+    expect(content.className).not.toContain("lg:py-[var(--space-7)]")
+  })
+
   it("takes no LOOP-picker props — StaffPillPicker/onAdd/canAdd/members are gone from its signature", () => {
     // The component's own contract for the LOOP half stayed shrunk (17 Sep
     // 2026 ruling); reading the SOURCE'S own export signature narrowly so a

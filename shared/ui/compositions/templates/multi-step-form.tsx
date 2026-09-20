@@ -278,12 +278,12 @@ function MultiStepForm({
   if (process.env.NODE_ENV !== "production") {
     if (steps.length > MAX_WIZARD_STEPS) {
       console.warn(
-        `MultiStepForm: ${steps.length} steps. CH27.38 allows three and no more — "splitting a flat form into pages only hides its length". Use FormScreen with sections.`,
+        `MultiStepForm: ${steps.length} steps. CH27.38 allows three and no more: "splitting a flat form into pages only hides its length". Use FormScreen with sections.`,
       );
     }
     if (!dependsOnEarlierStep) {
       console.warn(
-        'MultiStepForm: dependsOnEarlierStep is false. CH27.38 — "A form becomes a wizard only when a later step depends on an earlier one." Use FormScreen with sections.',
+        'MultiStepForm: dependsOnEarlierStep is false. CH27.38: "A form becomes a wizard only when a later step depends on an earlier one." Use FormScreen with sections.',
       );
     }
   }
@@ -316,7 +316,7 @@ function MultiStepForm({
             <Button
               variant="text"
               onClick={onStepChange === undefined ? undefined : () => onStepChange(item.id)}
-              aria-label={`${words.change} — ${item.name}`}
+              aria-label={`${words.change} · ${item.name}`}
             >
               {words.change}
             </Button>

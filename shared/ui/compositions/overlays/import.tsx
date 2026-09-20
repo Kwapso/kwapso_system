@@ -336,7 +336,7 @@ const DEFAULT_COLUMNS: readonly ImportColumnMapping[] = [
   { id: "owner_email", source: "owner_email", value: "owner", firstValue: "aurora@kwapso.com" },
   { id: "stage", source: "stage", value: "status", firstValue: "in build" },
   { id: "opened", source: "opened", value: "opened", firstValue: "13/06/2026" },
-  { id: "notes", source: "notes", value: NOT_IMPORTED, firstValue: "—" },
+  { id: "notes", source: "notes", value: NOT_IMPORTED, firstValue: "" },
   { id: "legacy_id", source: "legacy_id", value: NOT_IMPORTED, firstValue: "88214" },
 ];
 
@@ -369,7 +369,7 @@ const DEFAULT_FAILURES: readonly ImportFailure[] = [
   {
     id: "88",
     origin: "Row 88",
-    values: { title: "—", owner: "aurora@kwapso.com", status: "waiting", opened: "02/07/2026" },
+    values: { title: "", owner: "aurora@kwapso.com", status: "waiting", opened: "02/07/2026" },
     issues: { title: "Empty." },
     issue: "A record cannot be written without a title.",
   },

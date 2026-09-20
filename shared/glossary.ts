@@ -98,7 +98,7 @@ export const GLOSSARY = {
   // story is what WE DO about it, a to-do is what we are waiting on THEM for, and
   // a task is our own admin. Keeping those four apart in the words is what keeps
   // them apart on the screens.
-  story: { term: "Story", def: "One piece of work we do. It carries who's doing it and by when, and lives in a sprint." },
+  story: { term: "Story", def: "One piece of work we do. It carries who's doing it and by when, and lives in a phase." },
   // THE FIVE STORY TYPES, AND THE TWO CATEGORIES BESIDE THEM — the client's
   // ruling, 15 Sep 2026, in her own words (team migration 0094 carries the
   // ruling verbatim; this is the short form for the dictionary). Type answers
@@ -111,7 +111,7 @@ export const GLOSSARY = {
   storyTypeTech: { term: "Tech", def: "A story type: work under the hood, invisible to the people using the system." },
   storyTypeBug: { term: "Bug", def: "A story type: something that should work is broken, missing or wrong." },
   storyTypeFeature: { term: "Feature", def: "A story type: a brand-new capability that did not exist before." },
-  storyTypeChange: { term: "Change", def: "A story type, and the default: modifying something that already works — copy and email wording included." },
+  storyTypeChange: { term: "Change", def: "A story type, and the default: modifying something that already works, copy and email wording included." },
   storyCategoryClientRequested: { term: "Client-requested", def: "A story's category, and the default: it traces back to a client ticket or ask." },
   // TIGHTENED 2026-09-16 to the client's own two words for it (documents/
   // UI-RULEBOOK.md K26, migration `0094_story_type_and_category`'s own
@@ -123,10 +123,15 @@ export const GLOSSARY = {
   storyCategoryInternal: { term: "Internal", def: "A story's category: Kwapso-initiated upkeep, not asked for by a client." },
   todo: { term: "Input", def: "Something we need from a client. It sits in their portal with a due date." },
   task: { term: "Task", def: "Our own internal admin, something for us, not for an account's delivery." },
-  sprint: { term: "Sprint", def: "A block of delivery work sold to one account, with a start, an end and a price." },
+  // "Sprint" -> "Phase", Aurora's ruling, 20 Sep 2026, verbatim: "Rename
+  // 'sprint' to 'phase.' Also change the id to P0000." The record id prefix
+  // moves from S0000 to P0000 (team migration 0107, `shared/workers/refs.ts`);
+  // routes, the permission module and the underlying table (`sprints`) stay
+  // as they are — none of them is a word a person reads.
+  sprint: { term: "Phase", def: "A block of delivery work sold to one account, with a start, an end and a price." },
   // The one nav section whose noun the glossary did not define — found by the
   // round-one docs review. The definition is the owner's own (waves.ts header).
-  wave: { term: "Wave", def: "A package of sprints sold to one account. Told apart by its name and its dates, nothing else." },
+  wave: { term: "Wave", def: "A package of phases sold to one account. Told apart by its name and its dates, nothing else." },
   app: { term: "App", def: "A system we build for an account, the thing with its own address. One goal can need two." },
   // THE CLIENT'S RULING, 16 Sep 2026, verbatim: "the sprint types are: not
   // started, audit (this is new), plan (the old blueprint), build (the old
@@ -156,20 +161,25 @@ export const GLOSSARY = {
   // that have an icon." Seven words, `shared/sprint-types.ts`'s own order,
   // each with an icon and no colour — the mirror image of a ticket's or a
   // story's own status, which has a colour and no icon.
+  // RENAMED 20 SEP 2026 (Aurora's ruling) — "Sprint type" -> "Phase type",
+  // and the words themselves moved with it: two renames (Validation ->
+  // Pilot, Refinements -> Revision) plus the Wave-lifecycle reorder that
+  // drops "Not started"/"Enhancement" and adds "Deploy"/"Hypercare"
+  // (`shared/sprint-types.ts` PHASE_TYPES, team migration 0107).
   sprintType: {
-    term: "Sprint type",
-    def: "What kind of block a sprint is: not started, audit, plan, build, validation, refinements, or enhancement. Icons, never a colour.",
+    term: "Phase type",
+    def: "Where a phase sits in its lifecycle: audit, plan, build, pilot, revision, deploy, or hypercare. Icons, not colour.",
   },
   workLog: { term: "Work log", def: "One row of time: who, what they worked on, and how long, in whole seconds." },
   timer: { term: "Timer", def: "A work log still running. Start it in one click; it waits in the header until you stop it." },
   triage: { term: "Triage", def: "The first read of a new ticket. Answer it, or split it into stories." },
   engagementType: { term: "Engagement type", def: "A label on time saying how it was sold: blueprint, sprint, support or hourly." },
-  recordReference: { term: "Reference number", def: "The short number on a ticket, story or sprint. BERG-T0412, so anyone can say which one they mean." },
+  recordReference: { term: "Reference number", def: "The short number on a ticket, story or phase. BERG-T0412, so anyone can say which one they mean." },
   stakeholder: { term: "Stakeholder", def: "Someone kept in the loop on a ticket, the person who raised it, your admins, and anyone mentioned." },
   // RENAMED FROM "Dropdown values" TO "Choices" (2026-09-01), the day the
   // screen itself moved into Settings as its own tab — the key stays (nothing
   // reads the object key as a word), only the term a person reads changes.
-  dropdownValues: { term: "Choices", def: "The options behind your team's dropdowns, like Ticket types and Sprint types." },
+  dropdownValues: { term: "Choices", def: "The options behind your team's dropdowns, like Ticket types and Phase types." },
   // "DEFAULT" WAS THE WRONG WORD, AND THE CLIENT SAID SO (2026-09-10): "find an
   // accurate word for what Default means. I don't think Default represents
   // an… Find a good word and rename it."

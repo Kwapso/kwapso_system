@@ -203,7 +203,7 @@ export function KnowledgeDetailScreen({
   function stopUsing() {
     askStop({
       title: t("Stop using this source?"),
-      body: t("The assistant stops reading it right away. Nothing is deleted, and the sweep won't put it back — you can turn it on again here any time."),
+      body: t("The assistant stops reading it right away. Nothing is deleted, and the sweep won't put it back. You can turn it on again here any time."),
       action: t("Stop using this"),
       run: () =>
         runActive(
@@ -293,7 +293,7 @@ export function KnowledgeDetailScreen({
           },
         ]
       : []),
-    { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt, lang) : "—" },
+    { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt, lang) : "" },
     ...auditItems(
       {
         createdByName: item.creatorName,
@@ -499,7 +499,7 @@ export function KnowledgeDetailScreen({
                       scrolled can possibly be looking at. */}
                   {item.bodyTruncated && (
                     <p className="text-muted-foreground mt-3 text-sm">
-                      {t("That is the end of what this screen shows, not the end of the material —")}{" "}
+                      {t("That is the end of what this screen shows, not the end of the material:")}{" "}
                       {Math.round(item.bodyBytes / 1000).toLocaleString()}{" "}
                       {t("KB is kept in full and every word of it is searchable. Open the original below to read the rest.")}
                     </p>

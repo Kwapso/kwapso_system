@@ -198,9 +198,10 @@ describe("the contacts screen draws a table", () => {
     expect(first[4]).toBe("Portal")
   })
 
-  it("an absent company and an absent role are an em dash, not an error", async () => {
+  it("an absent company and an absent role draw a blank cell, not an error", async () => {
     // Two-fifths of the real address book lands in one of these two states, so
-    // the quiet answer is the correct one — the same dash the tickets list draws
+    // the quiet answer is the correct one — no placeholder character at all
+    // (R95: no em dash anywhere), the same blank the tickets list draws
     // for a ticket with no app.
     draw()
     await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
@@ -214,21 +215,21 @@ describe("the contacts screen draws a table", () => {
     // (R35) — "DDelaval Nord", the same shape as the Contact column — so this
     // is matched loosely too; the em dash beside it is exact.
     expect(ines[1], "a company, wearing its own face").toContain("Delaval Nord")
-    expect(ines[2], "nobody's word for what she does").toBe("—")
+    expect(ines[2], "nobody's word for what she does").toBe("")
     // INES IS LIVE TOO — green, the fourth cell.
     expect(ines[3], "live, said in words").toBe("Live")
-    // AN ORDINARY "NO", never an em dash — a Portal cell is never blank the
-    // way Account/Role can be: `hasPortalLogin` is a real fact about every
-    // person on this door (`false` on the fixture), so the fifth cell reads
-    // "No portal" rather than "—".
+    // AN ORDINARY "NO", never a placeholder character — a Portal cell is never
+    // blank the way Account/Role can be: `hasPortalLogin` is a real fact about
+    // every person on this door (`false` on the fixture), so the fifth cell
+    // reads "No portal" rather than blank.
     expect(ines[4], "not a live login, said in words").toBe("No portal")
     const tomas = cellsOf("Tomas Roig")
     expect(tomas[0]).toContain("Tomas Roig")
-    // NO COMPANY LINKED AT ALL draws the PLAIN em dash, no mark — the same
-    // absent-record treatment the ticket table's own App column gives an
-    // unset app: an ordinary absence is not a record with no picture, so
-    // there is no face to draw and nothing to match loosely here.
-    expect(tomas.slice(1, 3), "nobody has filed him under a company yet").toEqual(["—", "—"])
+    // NO COMPANY LINKED AT ALL draws a BLANK cell, no mark, no placeholder
+    // character — the same absent-record treatment the ticket table's own App
+    // column gives an unset app: an ordinary absence is not a record with no
+    // picture, so there is no face to draw and nothing to match loosely here.
+    expect(tomas.slice(1, 3), "nobody has filed him under a company yet").toEqual(["", ""])
     // TOMAS IS THE ARCHIVED ONE OF THE THREE (`active: false` on the
     // fixture) — grey, the fourth cell, never a dash: an archive flag is
     // always a real answer, not an absence.

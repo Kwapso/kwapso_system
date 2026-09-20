@@ -533,7 +533,7 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS, cont
     JSON.stringify({ ...rest(), [key]: kept }) +
     `\n[${kept.length} of ${list.length} ${key} are shown; the rest were dropped to fit.` +
     (dropped.length
-      ? ` ${dropped.join(", ")} ${dropped.length === 1 ? "was" : "were"} left out to make room for the rows — ask for that tally on its own if you need it.`
+      ? ` ${dropped.join(", ")} ${dropped.length === 1 ? "was" : "were"} left out to make room for the rows, ask for that tally on its own if you need it.`
       : "") +
     ` Every other field above is complete and counts the whole set, not what is shown.]`
   )
@@ -548,7 +548,7 @@ export function trimResult(data: unknown, allowance: number = RECORD_CHARS, cont
  *  budget `max_tokens` caps (model.ts's own note on glm), so a long or
  *  reasoning-heavy step can exhaust it before the visible answer is even done. */
 export const TRUNCATED_TURN_NOTE =
-  "…I ran out of room partway through that — ask me to continue and I'll pick up from here."
+  "…I ran out of room partway through that. Ask me to continue and I'll pick up from here."
 
 /** The text of a turn that ended in prose (no tool calls). Folds in the honest
  *  note when the model's own output budget ran out mid-answer, so "the model
@@ -567,7 +567,7 @@ export const TRUNCATED_TURN_NOTE =
  *  (STALL_NUDGE) and only lands here when the model stalls twice in one turn,
  *  at which point the honest sentence is this one. */
 export const STALLED_TURN_NOTE =
-  "I lost the thread of that one partway and couldn't finish the answer — ask me again, or narrow it down and I'll be quicker."
+  "I lost the thread of that one partway and couldn't finish the answer. Ask me again, or narrow it down and I'll be quicker."
 
 /** MODEL-FACING, NEVER SAVED: the one push a stalled model gets before the turn
  *  gives up. Measured on the replayed context that produced the greeting — with
@@ -818,7 +818,7 @@ function traceIds(input: Record<string, unknown>): Record<string, string> | unde
 }
 
 const FAIL_NOTE =
-  "I couldn't finish — one of the steps was refused, so I stopped there. Nothing further was changed."
+  "I couldn't finish. One of the steps was refused, so I stopped there. Nothing further was changed."
 
 /** One extra (UNMETERED — same user turn) model call after a failed step. The FAILED
  * tool results are already in the convo with the door's exact reason (e.g. which
@@ -924,7 +924,7 @@ export const MAX_SEGMENTS = 4
 /** What the person reads while the next segment is being asked for. Saved,
  *  because a reopened thread must show the turn was still going, not that it
  *  had stopped. Model-facing side of the same handover: CARRY_ON_NUDGE. */
-export const CARRYING_ON_NOTE = "Still working on that one — carrying on from where I got to."
+export const CARRYING_ON_NOTE = "Still working on that one, carrying on from where I got to."
 
 /** The one user-role line a continuation opens with. It follows the exact
  *  replay of the turn so far, results included, so "carry on" means carry on. */
@@ -1321,7 +1321,7 @@ async function runToolCall(
   // provider would reject a tool_use with no result of its own.
   const cached = t ? ctx.repeats.recall(!!t.write, tc) : null
   if (cached !== null) {
-    const again = `${summary} — answered from the same call earlier this turn`
+    const again = `${summary}: answered from the same call earlier this turn`
     emit?.({ t: "step_start", tool: tc.name, summary: again, ids: traceIds(tc.input) })
     emit?.({ t: "step_end", tool: tc.name, ok: true, summary: again })
     await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
@@ -1337,7 +1337,7 @@ async function runToolCall(
   // really did ask, and a trail that hid it would make the next one invisible.
   const nudge = t ? ctx.paging.check(!!t.write, tc.name, tc.input) : null
   if (nudge !== null) {
-    const capped = `${summary} — asked again; narrowing is cheaper than the next page`
+    const capped = `${summary}: asked again, narrowing is cheaper than the next page`
     emit?.({ t: "step_start", tool: tc.name, summary: capped, ids: traceIds(tc.input) })
     emit?.({ t: "step_end", tool: tc.name, ok: true, summary: capped })
     await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
@@ -1383,7 +1383,7 @@ async function runToolCall(
     toolCallsJson: JSON.stringify([
       {
         tool: tc.name,
-        summary: failMsg ? `${summary} — ${failMsg}` : summary,
+        summary: failMsg ? `${summary}: ${failMsg}` : summary,
         status: result.ok ? "done" : "failed",
       },
     ]),
@@ -1458,7 +1458,7 @@ async function planAttachedFiles(
 ): Promise<string> {
   const metered = await consumeAiUnit(env, guard.teamId)
   if (!metered.ok)
-    throw new GuardError(429, "over_quota", "You're out of assistant credits for now — planning an import uses the assistant. The free ones come back tomorrow, or an admin can add more.")
+    throw new GuardError(429, "over_quota", "You're out of assistant credits for now: planning an import uses the assistant. The free ones come back tomorrow, or an admin can add more.")
   let batch = await createBatch(cfg, guard, actor)
   for (const f of files) batch = await addBatchFile(cfg, guard, batch.id, f.name, f.csv)
   batch = await planBatch(env, cfg, guard, batch.id)
@@ -1549,7 +1549,7 @@ export async function panelInput(
   const n = (x: number) => x.toLocaleString("en-GB")
   const total = steps.reduce((sum, s) => sum + Math.max(0, s.rowCount - s.predictedRejects), 0)
   const summary = steps.length
-    ? `${n(total)} rows in total — ` +
+    ? `${n(total)} rows in total: ` +
       steps
         .map(
           (s) =>
@@ -1557,7 +1557,7 @@ export async function panelInput(
             (s.predictedRejects ? ` (${n(s.predictedRejects)} skipped)` : "")
         )
         .join("; ")
-    : "Nothing — this import has no plan, so it would write no rows."
+    : "Nothing: this import has no plan, so it would write no rows."
   return { ...tc.input, summary }
 }
 
@@ -1868,7 +1868,7 @@ async function runPlanLoop(
       const c = await consumeAiUnit(env, guard.teamId)
       quota = c.quota
       if (!c.ok) {
-        const msg = "You're out of assistant credits for now — today's free ones and the balance an admin added are both used up. The free ones come back tomorrow, or an admin can add more."
+        const msg = "You're out of assistant credits for now: today's free ones and the balance an admin added are both used up. The free ones come back tomorrow, or an admin can add more."
         say(msg)
         await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: msg, source: opts.source })
         if (opts.tally.credits > 0) await log()
@@ -2252,7 +2252,7 @@ export async function confirmAndRun(
     // lands. A decline SPENDS the proposal, exactly as an approval does — and is
     // recorded as a decline, not as work done.
     await consumePendingProposal(cfg, guard, opts.threadId, "declined")
-    const msg = "Okay — I've left that alone."
+    const msg = "Okay, I've left that alone."
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: msg, source: opts.source })
     return { done: true, threadId: opts.threadId, reply: msg, quota: await getQuota(env, guard.teamId) }
   }

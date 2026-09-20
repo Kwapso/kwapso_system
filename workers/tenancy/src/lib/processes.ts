@@ -2481,7 +2481,7 @@ export async function deleteStep(
   // takes the gap — now a loud, recorded one instead of a silent one.
   await writeActivity(cfg, guard.databaseId, actor, {
     type: "Step deleted",
-    description: `${actor.name} deleted the step "${before.name}" — added by mistake, never part of an agreed version`,
+    description: `${actor.name} deleted the step "${before.name}": added by mistake, never part of an agreed version`,
     relatedTable: "process_steps",
     relatedRowId: id,
   })

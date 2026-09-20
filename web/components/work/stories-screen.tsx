@@ -24,7 +24,7 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Kanban, type KanbanColumn, type KanbanMove } from "@shared/ui/components/kanban/kanban"
-import { ListBullets, Kanban as KanbanGlyph, CalendarDots, Stack as StackGlyph } from "@shared/ui/foundations/icons"
+import { ListBullets, Kanban as KanbanGlyph, CalendarDots, Stack as StackGlyph, Target } from "@shared/ui/foundations/icons"
 import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { RecipeField, ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import {
@@ -230,6 +230,7 @@ export async function createStoryFrom(
       changesNoStep: values.changesNoStep,
       acceptanceCriteria: values.acceptanceCriteria || undefined,
       moscow: values.moscow || undefined,
+      contributesToGoal: values.contributesToGoal,
     })
     invalidate(storiesKey(teamId))
     invalidate(sprintsKey(teamId))
@@ -297,7 +298,7 @@ export async function createStoryFrom(
  * EXPORTED so `story-detail.tsx`'s Overview "Type" row draws the identical
  * chip rather than a second idea of what a story's type looks like. */
 export function storyTypeChip(value: string | null | undefined): React.ReactNode {
-  if (!value) return <span className="text-muted-foreground text-sm">—</span>
+  if (!value) return null
   const iconName = storyTypeIconName(value)
   const Icon = iconName ? iconComponent(iconName) : null
   // THE GLYPH RIDES BADGE'S OWN `icon` SLOT, NOT A PLAIN CHILD — client
@@ -415,7 +416,7 @@ const KANBAN_STATUS_LABEL: Record<(typeof KANBAN_STATUSES)[number], string> = {
  * "No sprint" reads as a plain, quiet line, never a blank cell. */
 function sprintCell(s: Story, waveNames: Map<string, string | null>): React.ReactNode {
   if (!s.sprintId || !s.sprintName)
-    return <span className="text-muted-foreground text-sm italic">—</span>
+    return null
   const wave = waveNames.get(s.sprintId)
   return (
     <span className="flex flex-col">
@@ -446,7 +447,7 @@ function shapeStories(
       id: s.id,
       // THE STANDALONE ID COLUMN (Planned/Backlog only, see `leadingRef`
       // above) — the same reference `storyLead`'s own badge already draws.
-      ref: s.ref || "—",
+      ref: s.ref || "",
       name: leadingRef ? storyLead(s) : <span className="truncate">{s.title}</span>,
       // THE PLAIN TITLE, FOR A TAB — `name` above is a rendered node (chip +
       // title), which cannot label the tab a cmd/ctrl/middle-click opens
@@ -462,12 +463,12 @@ function shapeStories(
       // dash rather than an empty cell for the 3,677 pre-existing stories
       // that predate the field, the same fallback every other optional chip
       // on this row already takes.
-      moscow: s.moscow ? <MoscowChip value={s.moscow} /> : <span className="text-muted-foreground text-sm">—</span>,
+      moscow: s.moscow ? <MoscowChip value={s.moscow} /> : null,
       status: STORY_STATUS_LABEL[s.status],
       sprint: sprintCell(s, waveNames),
       assignee: staffNameFromSnapshot(s.assigneeName) || "Nobody yet",
-      app: s.appName ?? "—",
-      closedOn: s.closedAt ? formatDate(s.closedAt, lang) : "—",
+      app: s.appName ?? "",
+      closedOn: s.closedAt ? formatDate(s.closedAt, lang) : "",
     })),
   }
 }
@@ -483,13 +484,13 @@ const MINE_COLUMNS = [
   field("type", "Type"),
   field("category", "Category"),
   field("status", "Status"),
-  field("sprint", "Sprint"),
+  field("sprint", "Phase"),
 ]
 const COMPLETED_COLUMNS = [
   field("name", "Story"),
   field("type", "Type"),
   field("category", "Category"),
-  field("sprint", "Sprint"),
+  field("sprint", "Phase"),
 ]
 const EVERYONE_COLUMNS = [
   field("name", "Story"),
@@ -497,7 +498,7 @@ const EVERYONE_COLUMNS = [
   field("assignee", "Who has it"),
   field("category", "Category"),
   field("status", "Status"),
-  field("sprint", "Sprint"),
+  field("sprint", "Phase"),
 ]
 /** THE STANDALONE ID COLUMN, FIRST — Aurora's ruling, 20 Sep 2026: "On
  * stories 'Planned,' add id as the first column. Same on the 'Backlog'
@@ -640,14 +641,16 @@ function ReviewsQueue({
             </Badge>
           </div>
           <span className="font-medium">{s.title}</span>
-          <span className="text-muted-foreground text-sm">{richTextPlain(s.detail) || "—"}</span>
+          <span className="text-muted-foreground text-sm">{richTextPlain(s.detail)}</span>
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <span>
               {t("Completed by")}: {staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")}
             </span>
-            <span>
-              {t("Completed on")}: {s.closedAt ? formatDate(s.closedAt, lang) : "—"}
-            </span>
+            {s.closedAt && (
+              <span>
+                {t("Completed on")}: {formatDate(s.closedAt, lang)}
+              </span>
+            )}
           </div>
         </li>
       ))}
@@ -932,6 +935,17 @@ export function StoriesScreen({
           {s.appName ?? t("No app")}
         </Badge>
         {s.moscow && <MoscowChip value={s.moscow} />}
+        {/* CONTRIBUTES TO THE PHASE'S GOAL (Aurora's ruling, 20 Sep 2026) — a
+            small mark on the story card, icon only (R93's visual-accompanies-
+            text is about a categorical field's own colour/icon riding beside
+            its text; this is a plain boolean flag, so a bare icon with an
+            accessible label is the honest shape rather than inventing a
+            word for "on"). */}
+        {s.contributesToGoal && (
+          <span title={t("Contributes to the phase's goal")} aria-label={t("Contributes to the phase's goal")}>
+            <Target className="size-3.5 text-muted-foreground" />
+          </span>
+        )}
       </>
     ),
     // SPRINT, THEN WHO'S DOING IT WITH AN AVATAR — the ruling's own order,
@@ -940,7 +954,7 @@ export function StoriesScreen({
     description: (
       <span className="flex flex-col gap-1">
         <span className={s.sprintName ? "text-sm" : "text-sm italic opacity-55"}>
-          {s.sprintName ?? t("No sprint")}
+          {s.sprintName ?? t("No phase")}
         </span>
         <span className="flex items-center gap-1.5">
           <RecordMark name={staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")} shape="round" size="choice" />
@@ -964,7 +978,7 @@ export function StoriesScreen({
   const sprintGroups = new Map<string, { name: string; cards: Story[] }>()
   for (const s of filteredRows) {
     const key = s.sprintId ?? "__none__"
-    const group = sprintGroups.get(key) ?? { name: s.sprintName ?? t("No sprint"), cards: [] }
+    const group = sprintGroups.get(key) ?? { name: s.sprintName ?? t("No phase"), cards: [] }
     group.cards.push(s)
     sprintGroups.set(key, group)
   }

@@ -447,7 +447,7 @@ export function KnowledgeFormDialog({
         ) : nothingToRead ? (
           <p className="text-warning mt-2 text-sm">
             {t(
-              "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
+              "A link on its own gives the assistant nothing to read. We don't open the page for you. Paste or write what it says above and this source is good to go."
             )}
           </p>
         ) : null}

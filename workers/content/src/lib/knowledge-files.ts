@@ -307,7 +307,7 @@ export async function extractLink(url: string): Promise<LinkExtraction> {
       // however it is written — flagged to the hub 11 Sep 2026, ruled a
       // real but structurally unfixable debt from here, matching the
       // existing UNREADABLE_REASON sentences beside it).
-      note: `We couldn't read the words in this ${kind.label} — it may not have a public transcript, or we couldn't reach it just now. It's kept here as a source either way; add the transcript yourself in the note below if you want the assistant to read it.`,
+      note: `We couldn't read the words in this ${kind.label}. It may not have a public transcript, or we couldn't reach it just now. It's kept here as a source either way; add the transcript yourself in the note below if you want the assistant to read it.`,
       read: null,
     }
   const capped = capToRow(text)

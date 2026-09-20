@@ -72,22 +72,27 @@ function inTheDatabase(where: string): string[] {
     .sort()
 }
 
-/** Companion clause to `accountsWhere`'s own contact-link exclusion (Aurora, 19
- * Sep 2026, "why am i seeing ocntacts under accounts?"): an individual carrying
- * a LIVE `account_links` row is someone's contact, not a plain "book" row, once
- * the read is not itself asking `type: "individual"` (the Contacts screen's own
- * question). Written independently, in raw SQL, the same way `inTheDatabase`
- * itself is — so proving the door agrees with it stays an independent check,
- * never a reading of the door's own WHERE back to itself. The harness's two
- * linked people are Marta (Bergman, Bergman Marine) and Diego (Delaval). */
-const NOT_SOMEONE_ELSES_CONTACT =
-  "NOT (account_type = 'individual' AND EXISTS (SELECT 1 FROM account_links l WHERE l.person_account_id = accounts.id AND l.deactivated_at IS NULL))"
+/** Companion clause to `accountsWhere`'s own type partition (Aurora, 19 Sep
+ * 2026, "why am i seeing ocntacts under accounts?", AMENDED 20 Sep 2026, "no,
+ * i still see contacts udner accounts! f.e. Jonathan Sargent Alexander
+ * Kaulich"): an UNTYPED read — the Accounts screen's own question, nobody
+ * asked `type` at all — is companies, full stop. Not "companies plus a
+ * standalone person" (the 19 Sep answer, which still let a person with no
+ * `account_links` row ride the list) — every individual, linked or not,
+ * belongs to the `type: "individual"` question instead (the Contacts
+ * screen's own). Written independently, in raw SQL, the same way
+ * `inTheDatabase` itself is — so proving the door agrees with it stays an
+ * independent check, never a reading of the door's own WHERE back to
+ * itself. */
+const UNTYPED_IS_COMPANIES_ONLY = "account_type = 'entity'"
 
 describe("an accounts filter narrows the rows AND the count", () => {
-  it("unfiltered, it is the whole book — archived rows included", async () => {
+  it("unfiltered, it is the companies only — archived rows included", async () => {
     const all = await findAccounts({})
-    expect(all).toEqual(inTheDatabase(NOT_SOMEONE_ELSES_CONTACT))
+    expect(all).toEqual(inTheDatabase(UNTYPED_IS_COMPANIES_ONLY))
     expect(all, "deactivate-never-delete: a put-away account is still listable").toContain("A_GONE_CO")
+    expect(all, "a person is a contact, never a peer row on the untyped read").not.toContain("A_LIVE_ONE")
+    expect(all).not.toContain("A_GONE_ONE")
   })
 
   it("type: companies only, and the count moves with it", async () => {
@@ -97,12 +102,12 @@ describe("an accounts filter narrows the rows AND the count", () => {
     expect(companies).not.toContain("A_LIVE_ONE")
   })
 
-  it("archived: either pile on its own", async () => {
+  it("archived: either pile on its own — companies only, same as the unfiltered read", async () => {
     expect(await findAccounts({ archived: "yes" })).toEqual(
-      inTheDatabase(`deactivated_at IS NOT NULL AND ${NOT_SOMEONE_ELSES_CONTACT}`)
+      inTheDatabase(`deactivated_at IS NOT NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
     )
     expect(await findAccounts({ archived: "no" })).toEqual(
-      inTheDatabase(`deactivated_at IS NULL AND ${NOT_SOMEONE_ELSES_CONTACT}`)
+      inTheDatabase(`deactivated_at IS NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
     )
   })
 
@@ -121,9 +126,13 @@ describe("an accounts filter narrows the rows AND the count", () => {
     // I'm looking at" cannot mean something else. Proved on `archived`, as
     // search-literal.test.ts proves it for `q`. It used to be proved on `status`,
     // which 0042 retired — the sentence this test makes is about the SEAM, so it
-    // holds on whichever filter is asked through it.
+    // holds on whichever filter is asked through it. UNTYPED, so the type
+    // partition applies here too — the export is companies only, exactly like
+    // the list above it.
     const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { archived: "yes" })
-    expect(rows.map((r) => r.id).sort()).toEqual(inTheDatabase("deactivated_at IS NOT NULL"))
+    expect(rows.map((r) => r.id).sort()).toEqual(
+      inTheDatabase(`deactivated_at IS NOT NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
+    )
   })
 })
 

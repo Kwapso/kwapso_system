@@ -191,10 +191,12 @@ describe("the gallery's tiles are contact entities (R35/R65/R86)", () => {
     // THE ACCOUNT — a plain chip above the title (R65), never a filled status
     // colour (R86: only the STATUS field may colour a chip).
     expect(screen.getByText("Bergman S.A.")).toBeTruthy()
-    // TOMAS HAS NO COMPANY LINKED — the same em dash the table draws for the
-    // identical absence, never blank and never "None".
+    // TOMAS HAS NO COMPANY LINKED — no chip at all for the absence (R95: no
+    // em dash, and no placeholder character stands in for it either), so the
+    // card carries exactly one badge, its own status dot, never a second one
+    // for the missing company.
     const tomasCard = screen.getByText(/Tomas Roig/).closest('[data-slot="card"]')
-    expect(tomasCard?.textContent).toContain("—")
+    expect(tomasCard?.querySelectorAll('[data-slot="badge"]').length, "no chip for the missing company").toBe(1)
     // THE STATUS DOT — Marta is live, Tomas is archived (R86/D17: "contact
     // live green"), the SAME badge shape the table's own Status column draws.
     const martaCard = screen.getByText("Marta Bergman").closest('[data-slot="card"]')

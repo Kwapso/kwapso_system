@@ -69,9 +69,9 @@ beforeEach(() => {
   history.value = null as unknown as TicketStageHistory
 })
 
-function renderLadder(status: HelpStatus, h: TicketStageHistory) {
+function renderLadder(status: HelpStatus, h: TicketStageHistory, createdAt = "2025-03-03T08:00:00.000Z") {
   history.value = h
-  return render(<TicketStages ticketId="help-1" status={status} />)
+  return render(<TicketStages ticketId="help-1" status={status} createdAt={createdAt} />)
 }
 
 describe("the ladder shrink, 17 Sep 2026 — one date line, a smaller mark, no title (the stage word itself returned 19 Sep 2026, proved in ticket-stages-word-returns.test.tsx)", () => {

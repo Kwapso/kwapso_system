@@ -167,7 +167,7 @@ export function WaveFormDialog({
         <DialogDescription>
           {editing
             ? t("Rename it, or say more about what the package covers.")
-            : t("A package of sprints an account bought. You'll plan the sprints inside it next.")}
+            : t("A package of phases an account bought. You'll plan the phases inside it next.")}
         </DialogDescription>
       }
       submit={{ busy: busy, disabled: !ready }}

@@ -270,7 +270,7 @@ export function RelationshipMap({
           // SAID, NEVER SILENT. A map that draws forty of three hundred and does
           // not say so is a map that has answered a different question.
           <span className="text-muted-foreground text-xs">
-            {t("Showing the closest few — there are more.")}
+            {t("Showing the closest few. There are more.")}
           </span>
         )}
         <div className="ms-auto flex items-center gap-1">

@@ -404,7 +404,7 @@ export function RecordAttachments<R extends AttachmentRow>({
                           onClick={() =>
                             askRemove({
                               title: removeTitle(a.label),
-                              body: t("There's no way to bring it back from here — attach it again if you need it."),
+                              body: t("There's no way to bring it back from here. Attach it again if you need it."),
                               action: t("Take it off"),
                               run: () => run(() => remove(a.id), t("Taken off.")),
                             })

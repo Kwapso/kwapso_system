@@ -472,9 +472,11 @@ describe("a sprint is the block of work sold", () => {
     const sprint = db().prepare(`SELECT * FROM sprints LIMIT 1`).get() as Record<string, string | number>
     expect(sprint.sold_price_cents).toBe(450_000)
     // 2026-08-31: team-wide, no account-code prefix, and sprint's own letter
-    // is now `S` (its old three-letter `SPR` is gone — `S` moved here from
-    // story, which is now `B`).
-    expect(sprint.ref).toBe("S0001")
+    // was `S` (its old three-letter `SPR` was gone — `S` moved here from
+    // story, which is now `B`). Aurora's 20 Sep 2026 ruling ("rename 'sprint'
+    // to 'phase.' Also change the id to P0000") moves the letter again, `S`
+    // -> `P` (team migration 0107, `shared/workers/refs.ts`).
+    expect(sprint.ref).toBe("P0001")
 
     const open = await addStory({ title: "In the sprint", sprintId: sprint.id as string })
     await addStory({ title: "Also in it", sprintId: sprint.id as string, changesNoStep: true })

@@ -459,13 +459,13 @@ function CompanyHubScreen({
   if (process.env.NODE_ENV !== "production") {
     if (figures.length > COMPANY_FIGURE_COUNT) {
       console.warn(
-        `CompanyHubScreen: CH27.43 names four figures — modules, open records, retainer used, people. Got ${String(figures.length)}.`,
+        `CompanyHubScreen: CH27.43 names four figures: modules, open records, retainer used, people. Got ${String(figures.length)}.`,
       );
     }
     const money = figures.find((figure) => figure.id === retainerFigure);
     if (money !== undefined && money.visible === false) {
       console.warn(
-        "CompanyHubScreen: CH27.43 — retainer is the figure the conversation is about and is never the one that gets cut.",
+        "CompanyHubScreen: CH27.43, retainer is the figure the conversation is about and is never the one that gets cut.",
       );
     }
   }

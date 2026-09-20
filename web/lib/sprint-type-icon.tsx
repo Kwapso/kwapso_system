@@ -21,13 +21,7 @@
 
 import * as React from "react"
 
-import { Circle, MagnifyingGlass, Compass, Hammer, CheckCircle, Sliders, TrendUp } from "@shared/ui/foundations/icons"
-
-import { sprintTypeIcon } from "@shared/sprint-types"
-
-/** Every icon a sprint type pill can draw, keyed by `SprintTypeArt.icon`'s
- * own string, verified by hand against the kit's generated art, 16 Sep 2026. */
-const SPRINT_TYPE_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+import {
   Circle,
   MagnifyingGlass,
   Compass,
@@ -35,6 +29,29 @@ const SPRINT_TYPE_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: n
   CheckCircle,
   Sliders,
   TrendUp,
+  Rocket,
+  Heartbeat,
+} from "@shared/ui/foundations/icons"
+
+import { phaseTypeIcon } from "@shared/sprint-types"
+
+/** Every icon a phase type pill can draw, keyed by `PhaseTypeArt.icon`'s own
+ * string. `Circle`/`TrendUp` are kept even though "Not started"/"Enhancement"
+ * dropped out of `PHASE_TYPES` (Aurora's 20 Sep 2026 Wave-lifecycle reorder,
+ * `shared/sprint-types.ts`) — a pre-existing phase can still carry either
+ * word (deactivate, never delete, the 0094 pattern), and this map's only job
+ * is to draw a glyph for whatever string it is handed. `Rocket`/`Heartbeat`
+ * are the two new words, Deploy and Hypercare. */
+const PHASE_TYPE_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  Circle,
+  MagnifyingGlass,
+  Compass,
+  Hammer,
+  CheckCircle,
+  Sliders,
+  TrendUp,
+  Rocket,
+  Heartbeat,
 }
 
 /** WHETHER `SprintTypeGlyph` WOULD DRAW ANYTHING — a call site that hands the
@@ -45,13 +62,15 @@ const SPRINT_TYPE_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: n
  * pay the leading-mark gap for an empty slot. This is the same emptiness
  * `SprintTypeGlyph` itself checks, exported so a caller can ask first. */
 export function sprintTypeHasGlyph(type: string | null | undefined): boolean {
-  return sprintTypeIcon(type) in SPRINT_TYPE_ICON_COMPONENTS
+  return phaseTypeIcon(type) in PHASE_TYPE_ICON_COMPONENTS
 }
 
-/** The sprint type pill's icon, drawn — `null` for a type the code has never
- * met (a team's own word, or one migration 0098 retired), the same
- * "reads as itself, draws no glyph" answer every retired-word lookup in this
- * app gives. */
+/** The phase type pill's icon, drawn — `null` for a type the code has never
+ * met (a team's own word, or one migration retired), the same "reads as
+ * itself, draws no glyph" answer every retired-word lookup in this app
+ * gives. Named `SprintTypeGlyph` still — routes/permission keys/component
+ * names stay as they are unless a person reads them (Aurora's own ruling)
+ * and every call site already imports this name. */
 export function SprintTypeGlyph({
   type,
   size = 14,
@@ -61,6 +80,6 @@ export function SprintTypeGlyph({
   size?: number
   className?: string
 }): React.ReactElement | null {
-  const Icon = SPRINT_TYPE_ICON_COMPONENTS[sprintTypeIcon(type)]
+  const Icon = PHASE_TYPE_ICON_COMPONENTS[phaseTypeIcon(type)]
   return Icon ? <Icon size={size} className={className} /> : null
 }

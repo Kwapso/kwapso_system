@@ -827,6 +827,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "chip-order",
     status: "enforced",
   },
+  {
+    id: "R95",
+    dimension: "ui",
+    law: "NO EM DASH, ANYWHERE A PERSON READS. Aurora, verbatim, 20 Sep 2026: \"no em dahses - ABOSLUTLEY NOWHERE. In the ui, in the e-mai,s, in the glossary. They are strictly forbidden. make it law.\" Three surfaces, three censuses, no exemptions table. THE UI: every entry of `shared/i18n-strings.json` and `shared/i18n-seed.ts` (every language a seed entry names), every JSX text node, JSX child expression, `label`-shaped property, `field(...)` label, `toast.*(...)` argument and `t(...)` argument reachable from `web/` or `web-portal/` (`appFiles()`, the same import-closure derivation R28 already uses for \"what a person reads\"), plus `shared/web/` censused a second time, directly off disk, for the file R28's own UNWALKED_OK gap could drop from that closure. THE E-MAILS: `shared/workers/email-template.ts` (the one HTML+text builder every send renders through) and every SEND SITE, derived rather than hand-listed, any `workers/*/src` file that calls `sendBrandedEmail(`/`brandedEmail(`. THE GLOSSARY: `shared/glossary.ts`'s own `term`/`def` fields. U+2013 (en dash) is held to the same standard as U+2014 (em dash) in prose, her \"no em dahses\" read together with the character she typed it next to. Code comments, `documents/*.md` prose and test names are NOT user-facing and carry no obligation here (CLAUDE.md's own working agreement): every scan strips comments with the one tokeniser every law in this repo trusts (`stripComments`, `shared/rules/strip-comments.mjs`) before the dash regex ever runs, or, for the two AST-walked censuses, reads only the seven positions `visitStrings` reports rather than a file's whole text, so a non-UI string sitting in a file the front doors happen to import (`shared/workers/limits.ts`'s own scale-registry prose, found live the day this law shipped) cannot be mistaken for something a person reads. CHECKED, `web/test/no-em-dash.test.ts`: six censuses (the catalogue, the seed, the front doors' import closure, `shared/web/` direct, the email template plus every derived send site, and the glossary), each with its own tripwire so a walk that quietly found nothing cannot pass for the wrong reason.",
+    why: "A DENY-LIST WOULD BE A PLACE TO HIDE FROM \"ABSOLUTELY NOWHERE,\" so this law carries none, unlike almost every other census in this file. That forces every fix to happen at the source rather than being filed away, and it is why the workers half of the census is SCOPED to derived send sites and the one template rather than every string in every worker: a blind scan of `workers/*/src` hits the agent's own system prompt (`workers/data-ops/src/lib/agent.ts`), tool descriptions (R27's own subject, machine-facing) and internal `recordWorkerError`/`console.error` diagnostics that are never returned to a caller, real prose, deliberately carrying a dash, that a no-exemptions law cannot be pointed at without either breaking those doors' own house style for no user-facing reason or growing exactly the list this law refuses to have. Two positions were fixed anyway, by hand, the same day this law shipped, past the census's own boundary: every ACTIVITY LOG `description` a door writes (shown verbatim in the Activity Rail, R2/R18's own subject) and every GuardError/`fail()` message an HTTP door returns (shown as a toast), both real UI text sitting in worker source, both outside what a send-site derivation or an email-template read could reach, and both left for a human review pass rather than a new automated clause, because distinguishing a GuardError's user-facing THIRD argument from its internal-only fourth (`shared/workers/gating.ts`'s own documented split) needs more than a dash regex to do without inventing false positives.",
+    checkId: "no-em-dash",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -2064,6 +2072,11 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["property", "field-label"],
     via: ["t(tab.label)", "translateFields"],
     why: "TWO TABLES, the identical shape as stories-screen.tsx above — the two screens share the \"mine\" tab strip pattern (this file's own header: \"three tabs, plus a fourth for whoever may see everyone's\"). `TASK_TABS` is read through `t(tab.label)`; `TASK_COLUMNS`/`EVERYONE_COLUMNS` are translated through `translateFields(columns, t)` on the way to each view's own recipe.",
+  },
+  "shared/sprint-types.ts": {
+    kinds: ["property"],
+    via: ["t(typeDescription)"],
+    why: "PHASE_TYPES' seven one-line definitions (Aurora's 20 Sep 2026 ruling) are a copy TABLE, module-level like every other one here, keyed by the type's `name` and `icon` — neither of which is prose — so the sentence cannot be split off into a `t(...)` at the declaration without splitting the row that holds it, and `t` is a hook a module-level table could not call anyway. `phaseTypeDescription(name)` (shared/sprint-types.ts) is the one read: `sprint-form-dialog.tsx`'s phase-type field looks it up for whichever type is actually chosen and reads it through `t(typeDescription)` on the way to the screen, the same \"declare the English, translate on the way to the screen\" ruling every other pin in this table already stands on.",
   },
 }
 /** R34 — WORDS THE APP MAY NOT SAY, and the glossary term each one competes with.
@@ -3362,6 +3375,14 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
     fence: "accountScope",
     why: "appends to a ticket named by a caller-supplied id — so the fence decides whose ticket it is BEFORE a word is appended, and answers 404 rather than 403 so 'not yours' never confirms the ticket exists. A reply cannot be un-appended.",
   },
+  "POST /api/content/help/reply/update": {
+    fence: "callerScope",
+    why: "changes a reply named by a caller-supplied id — callerScope resolves whose ticket it rides on before a word changes, the same call the attachments doors above make. That is only the FIRST half: assertMayChangeReply (workers/content/src/lib/help.ts) then decides whether THIS caller may touch THIS particular reply — the author always may, and a client login is refused outright the moment it is not theirs, never granted the ticket edit right a staff role can hold.",
+  },
+  "POST /api/content/help/reply/delete": {
+    fence: "callerScope",
+    why: "the same door in reverse, and the same two-part decision (callerScope, then assertMayChangeReply). Deactivate-never-delete: the row keeps its audit block and stays in the activity feed, so taking a reply back out is reversible in the only sense that matters — nothing is destroyed. A client login may only ever remove its own reply.",
+  },
 
   "POST /api/content/help/update": {
     fence: "accountScope",
@@ -3413,6 +3434,10 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   help: {
     fence: null,
     why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id. STILL null after the 11 Aug 2026 widening: a contact now sees their whole company's TICKETS, which is a decision about the rows; their HISTORY is a different question, and its answer is the one SCOPE ch.06 gives — the portal never says which staff member is doing the work.",
+  },
+  help_threads: {
+    fence: null,
+    why: "a reply's history, one table along from help. Team migration 0108 gave a reply its own edit and delete audit trail, and both write a sentence naming the STAFF MEMBER who changed it: Ana edited a reply, Ana removed a reply. The conversation itself is fenced and readable (a client sees their own ticket's thread), so this is the same split help already draws: the ROWS are theirs, the HISTORY names who on our side touched them, and SCOPE ch.06 withholds that name the same way listReplies already redacts a staff author's id and name from a portal reader. process_comments states the identical reasoning for the process map's own conversation table.",
   },
   knowledge_sources: {
     fence: null,
@@ -3568,6 +3593,12 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // a table nothing writes is a line the census would call rot. Their history
   // rows survive in `activity`; the tables they name do not.
   help: "help",
+  // A REPLY IS READ BY WHOEVER MAY READ THE TICKET IT RIDES ON — team migration
+  // 0108, Aurora's 20 Sep 2026 chat-edit-pencil ruling. "Ana edited a reply on
+  // T0412" / "Ana removed a reply on T0412" are sentences about the SAME ticket
+  // the `help` row above already gates the feed on, one table along, not a
+  // second population a role could hold separately.
+  help_threads: "help",
   selectable_data: "selectable_data",
   member_roles: "member_roles",
   users: "team_members",

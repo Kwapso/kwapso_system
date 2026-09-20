@@ -541,7 +541,7 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // matrix still list it), only its stand-alone collection screen is gone; see
   // `web/components/work/sprints-screen.tsx`'s own header for what stayed and
   // what a future lane may delete outright once nothing else needs it.
-  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "contextual", countCacheKey: "sprints" },
+  { key: "sprints", title: "Phases", module: "work", segment: "sprints", placement: "contextual", countCacheKey: "sprints" },
   // APPS → STORIES, the two Build destinations the client's 31 Aug 2026 list
   // still names in this order ("build: Apps, sprints, stories" minus the
   // now-gone middle word). Each is a section AND a tab on the record above it,

@@ -1035,7 +1035,7 @@ describe("c-hijack (A3): a fragile narrow that finds nothing retries unnarrowed 
     // THE RECEIPT — a person must be able to read that a guess was made, that
     // it paid nothing, and that the search widened because of it.
     expect(answer.reason).toBe(
-      "The question names Lumen, so I first searched Lumen's material — found nothing there, so I searched the whole knowledge base instead."
+      "The question names Lumen, so I first searched Lumen's material. Found nothing there, so I searched the whole knowledge base instead."
     )
     expect(answer.compartments).toEqual([])
     expect(answer.found).toBe(true)
@@ -1090,7 +1090,7 @@ describe("c-hijack (A3): a fragile narrow that finds nothing retries unnarrowed 
     // nothing and the search widened past it.
     expect(answer.found).toBe(true)
     expect(titles(answer)).toContain("Lighting spec sheet")
-    expect(answer.reason).toContain("found nothing there")
+    expect(answer.reason).toContain("Found nothing there")
   })
 
   // THE QUESTION THE HUB ASKED ME TO PROVE, NOT REASON ABOUT (11 Sep 2026):

@@ -5503,6 +5503,7 @@ describe("RULES — the laws of the base", () => {
       "main-excludes-secondary", // R92: web/test/main-excludes-secondary.test.ts — every main (Select/RecordPicker/single-mode StaffPillPicker) + secondary (mode="multi" StaffPillPicker) picker pair in one file drawing from the same source array, checked for withoutMain()/an exclusion filter, or named in MAIN_EXCLUDES_SECONDARY_EXEMPT
       "visual-accompanies-text", // R93: web/test/visual-accompanies-text.test.ts — every <Select>/<RecordPicker> choosing over a module-named source array carries the module's own icon (icon= / icon:), or is named in VISUAL_ACCOMPANIES_TEXT_EXEMPT
       "chip-order", // R94: web/test/chip-order.test.ts — orderChips()'s own unit tests, plus a census over every id+status chip row (<RecordRef + variant="status"/ticketStatusCell() within one window) built through orderChips(), or named in CHIP_ORDER_EXEMPT
+      "no-em-dash", // R95: web/test/no-em-dash.test.ts — six censuses (i18n-strings.json, i18n-seed.ts every language, the front doors' own appFiles() import closure read at visitStrings()'s seven positions, shared/web/ read the same way directly off disk, shared/workers/email-template.ts plus every derived sendBrandedEmail(/brandedEmail( send site, and shared/glossary.ts), each stripped of comments first and each with its own tripwire, no exemptions table
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

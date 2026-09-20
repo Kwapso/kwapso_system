@@ -362,7 +362,7 @@ describe("the text a kind produces is knowledge, not a business card", () => {
     for (const fact of [
       "Shipping and logistics", // their industry
       "family shipping firm in Bilbao", // what somebody wrote about them
-      "Marta Ruiz — Operations manager (the main contact)", // who we deal with
+      "Marta Ruiz, Operations manager (the main contact)", // who we deal with
       "Bergman dispatch", // what we built
       "March invoice run (Implementation), completed", // what we sold
       "Bergman invoice approval (done by their bookkeeper)", // what we mapped
@@ -1048,13 +1048,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // `!about` — an account with real rollup content (contacts, apps, sprints,
   // processes, tickets, todos) is chunked even with no free-text `about`.
   // See the reader's own comment for the measured incident.
-  account: { version: 4, digest: "b2df6bd2fe1badfc" },
+  account: { version: 5, digest: "5cd975a7786f1500" },
   contact: { version: 1, digest: "83d7be3dfb3fd58b" },
   // v2 (BUILD-5 §H, 18 Sep 2026): same change as account — `generatedOnly`
   // now also looks at `url`/`stage`/`stakeholders`/`processes`, not only the
   // four free-text paragraphs.
   app: { version: 2, digest: "99b2e40eb034b375" },
-  process: { version: 1, digest: "908921c603bedcd9" },
+  process: { version: 2, digest: "2d1e918ddbfe3303" },
   sprint: { version: 1, digest: "d583d89b784d61ed" },
   story: { version: 1, digest: "234755039c3242c1" },
   // v2: the summary says "already happened" / "still to come" from the start
@@ -1082,7 +1082,7 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // 465 sources to rewrite none of them. What moved is which PARENT the row
   // carries, which is a column and not a word.
   meeting: { version: 5, digest: "ea4451ecac7c35d3" },
-  todo: { version: 1, digest: "bb89254e6f041dc8" },
+  todo: { version: 2, digest: "9c76858afd0914a8" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
   // the file and its digest covered every helper below the table. Bounding the
@@ -1152,7 +1152,7 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // gave every kind a `generatedOnly` flag, which is metadata about the row and
   // not one word of what a person reads. v2 above is still the last change to
   // the TEXT, so the cursor must not walk the corpus again for this.
-  dropdown: { version: 2, digest: "635adabd4e4c63af" },
+  dropdown: { version: 3, digest: "9b0c4a58bafbd1b7" },
   // Same merge, same reason as `dropdown` above: `generatedOnly` moved the hash
   // and not the sentence, so the version holds at 1.
   portal_login: { version: 1, digest: "8fa96a5eebfff039" },

@@ -97,12 +97,47 @@ function importsToneFn(source: string, fn: string, module: string): boolean {
   return re.test(source)
 }
 
+/** A FILE THAT IMPORTS A TONE MAP FOR SOMETHING ELSE, NOT ITS ROW PICKER —
+ * the census below matches at FILE granularity ("imports a tone map" +
+ * "draws a row/pill picker somewhere"), which is right the day a file's only
+ * reason to import the map IS a status/stage picker (the App stage picker
+ * this suite is named for) and wrong the day a file legitimately does both,
+ * unrelated: draws its OWN status chip with `Badge variant="status"
+ * dot={toneFn(...)}` (a JSX prop, never `dot:`) AND, separately, a
+ * `layout="row"` picker over a completely different vocabulary.
+ *
+ * `help-detail.tsx` is exactly that from 20 Sep 2026: Aurora's ruling ("when
+ * ticket is in status triage, also in main screen the visible buttons
+ * should change: same as in queue") added a `RecordPicker layout="row"` for
+ * WHO PICKS UP THE TICKET (`PickablePerson`, off `assignableMembers`/
+ * `staffedOn` — `shared/web/color-*` never touches it), sitting in a file
+ * that already reads `helpStatusDotTone` for the ticket's own status chip a
+ * few hundred lines away. Two unrelated facts, one file — never wired with
+ * `dot:` because a person is not a status and has no tone to draw.
+ *
+ * ROT-CHECKED BOTH WAYS, below: an entry stays only while it would really be
+ * an offender without it (so a fix that adds a real dot, or removes the row
+ * picker, turns the build red until the line is deleted) and only while the
+ * file still imports the tone map the way it does today (so a refactor that
+ * drops the import turns the build red too — the list can only shrink). */
+const STATUS_UNRELATED_ROW_PICKER_EXEMPT: { file: string; reason: string }[] = [
+  {
+    // Relative to `web/` — `sourceFiles`' own `.rel`, computed against
+    // whichever of the two search roots (`web/`, `shared/web/`) matched.
+    file: "components/tickets/help-detail.tsx",
+    reason:
+      "imports helpStatusDotTone for its own status chip (dot={...} prop); the row picker added 20 Sep 2026 is a people picker (assignableMembers/staffedOn), not a status/stage one",
+  },
+]
+
 describe("status/stage tone dot — CENSUS (any row/pill picker fed a status or stage list must dot it)", () => {
-  it("every file that imports a status/stage tone map AND draws a RecordPicker row or an AppearancePillGroup wires `dot:`", () => {
+  it("every file that imports a status/stage tone map AND draws a RecordPicker row or an AppearancePillGroup wires `dot:`, minus reasoned exceptions", () => {
     const files = sourceFiles([join(ROOT, "web"), join(ROOT, "shared/web")], {
       extensions: [".tsx"],
       skipTests: true,
     }).filter((f) => f.path !== RECORD_PICKER && f.path !== APPEARANCE_PILL_GROUP)
+
+    const exempt = new Set(STATUS_UNRELATED_ROW_PICKER_EXEMPT.map((e) => e.file))
 
     const offenders: string[] = []
     for (const f of files) {
@@ -112,13 +147,33 @@ describe("status/stage tone dot — CENSUS (any row/pill picker fed a status or 
       const usesToneMap = STATUS_STAGE_TONE_MAPS.some(({ fn, module }) => importsToneFn(f.source, fn, module))
       if (!usesToneMap) continue
 
-      if (!/\bdot:/.test(f.source)) offenders.push(f.rel)
+      if (!/\bdot:/.test(f.source) && !exempt.has(f.rel)) offenders.push(f.rel)
     }
 
     expect(
       offenders,
       `status/stage row picker(s) reading a tone map with no \`dot:\` wired: ${offenders.join(", ")}`
     ).toEqual([])
+  })
+
+  it("the exemption list has not rotted — every entry would really be an offender without it", () => {
+    const files = sourceFiles([join(ROOT, "web"), join(ROOT, "shared/web")], {
+      extensions: [".tsx"],
+      skipTests: true,
+    }).filter((f) => f.path !== RECORD_PICKER && f.path !== APPEARANCE_PILL_GROUP)
+
+    for (const { file } of STATUS_UNRELATED_ROW_PICKER_EXEMPT) {
+      const f = files.find((x) => x.rel === file)
+      expect(f, `${file} not found by the census walk — the exemption names a file that is gone`).toBeTruthy()
+      const drawsRowOrPill = /layout="row"/.test(f!.source) || /<AppearancePillGroup/.test(f!.source)
+      expect(drawsRowOrPill, `${file} no longer draws a row/pill picker — drop this exemption`).toBe(true)
+      const usesToneMap = STATUS_STAGE_TONE_MAPS.some(({ fn, module }) => importsToneFn(f!.source, fn, module))
+      expect(usesToneMap, `${file} no longer imports a status/stage tone map — drop this exemption`).toBe(true)
+      expect(
+        /\bdot:/.test(f!.source),
+        `${file} now wires a real \`dot:\` — drop this exemption, it is no longer needed`
+      ).toBe(false)
+    }
   })
 
   it("is not vacuous — app-form-dialog.tsx is a real positive case the census must see", () => {

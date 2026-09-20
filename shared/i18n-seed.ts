@@ -49,8 +49,6 @@ export const SEED: Catalogue = {
   Ticket: { de: "Ticket", es: "Ticket", ca: "Ticket" },
   Stories: { de: "Aufgaben", es: "Historias", ca: "Històries" },
   Story: { de: "Aufgabe", es: "Historia", ca: "Història" },
-  Sprints: { de: "Sprints", es: "Sprints", ca: "Sprints" },
-  Sprint: { de: "Sprint", es: "Sprint", ca: "Sprint" },
   Tasks: { de: "To-dos", es: "Tareas", ca: "Tasques" },
   Task: { de: "To-do", es: "Tarea", ca: "Tasca" },
   Apps: { de: "Apps", es: "Apps", ca: "Apps" },
@@ -125,7 +123,7 @@ export const SEED: Catalogue = {
    * tab: Halloway"), so the verb itself has to say "tab" rather than leave the
    * join to carry that word alone — see `app-shell.tsx`'s `closeLabel` prop. */
   "Close tab": { de: "Tab schließen", es: "Cerrar pestaña", ca: "Tancar pestanya" },
-  /* THE CONTENT STRIP'S OWN "+" (17 Sep 2026) — the pinned, icon-only tab
+  /* THE CONTENT STRIP'S OWN "+" (17 Sep 2026): the pinned, icon-only tab
    * `app-shell.tsx` adds after the last open one, mirroring the assistant
    * strip's own History/"+" pair (`agent-tab-strip.tsx`). Its `sr-only` label
    * IS the tab's `label` too (`workspace-tabs.ts`'s `openNewTab`), so one
@@ -1039,6 +1037,7 @@ export const SEED: Catalogue = {
   "Add to the knowledge base": { de: "Zur Wissensdatenbank hinzufügen", es: "Añadir a la base de conocimiento", ca: "Afegir a la base de coneixement"},
   "Already answered.": { de: "Bereits beantwortet.", es: "Ya respondido.", ca: "Ja respost."},
   "Answered, and they've been told.": { de: "Beantwortet, und sie wurden informiert.", es: "Respondido, y se les ha avisado.", ca: "Respost, i se'ls ha avisat."},
+  "Anything you ask us, a question, a problem, a change, lives on this page.": { de: "Alles, das Sie uns fragen, eine Frage, ein Problem, eine Änderung, wird auf dieser Seite verwaltet." },
   "Anything you put here is something the assistant may use to answer questions, and it will name this source when it does.": { de: "Alles, was Sie hier ablegen, darf der Assistent zum Beantworten von Fragen verwenden, und er nennt dabei diese Quelle.", es: "Todo lo que pongas aquí lo puede usar el asistente para responder preguntas, y nombrará esta fuente cuando lo haga.", ca: "Tot el que hi posis ho pot fer servir l'assistent per respondre preguntes, i anomenarà aquesta font quan ho faci."},
   "App archived.": { de: "App archiviert.", es: "App archivada.", ca: "App arxivada."},
   "App restored.": { de: "App wiederhergestellt.", es: "App restaurada.", ca: "App restaurada."},
@@ -1070,7 +1069,6 @@ export const SEED: Catalogue = {
   "Couldn't add them to the ticket.": { de: "Sie konnten dem Ticket nicht hinzugefügt werden.", es: "No se pudo añadirles al ticket.", ca: "No s'ha pogut afegir-los al ticket."},
   "Couldn't arrange that.": { de: "Das konnte nicht vereinbart werden.", es: "No se pudo concertar eso.", ca: "No s'ha pogut concertar."},
   "Couldn't ask for that.": { de: "Danach konnte nicht gefragt werden.", es: "No se pudo pedir eso.", ca: "No s'ha pogut demanar."},
-  "Couldn't change that sprint.": { de: "Der Sprint konnte nicht geändert werden.", es: "No se pudo cambiar ese sprint.", ca: "No s'ha pogut canviar aquest sprint."},
   "Couldn't change that task.": { de: "Das To-do konnte nicht geändert werden.", es: "No se pudo cambiar esa tarea.", ca: "No s'ha pogut canviar aquesta tasca."},
   "Couldn't change that.": { de: "Das konnte nicht geändert werden.", es: "No se pudo cambiar eso.", ca: "No s'ha pogut canviar."},
   "Couldn't change the role.": { de: "Die Rolle konnte nicht geändert werden.", es: "No se pudo cambiar el rol.", ca: "No s'ha pogut canviar el rol."},
@@ -1101,7 +1099,6 @@ export const SEED: Catalogue = {
   "Couldn't save the profile.": { de: "Das Profil konnte nicht gespeichert werden.", es: "No se pudo guardar el perfil.", ca: "No s'ha pogut desar el perfil."},
   "Couldn't save the role.": { de: "Die Rolle konnte nicht gespeichert werden.", es: "No se pudo guardar el rol.", ca: "No s'ha pogut desar el rol."},
   "Couldn't save the source.": { de: "Die Quelle konnte nicht gespeichert werden.", es: "No se pudo guardar la fuente.", ca: "No s'ha pogut desar la font."},
-  "Couldn't save the sprint.": { de: "Der Sprint konnte nicht gespeichert werden.", es: "No se pudo guardar el sprint.", ca: "No s'ha pogut desar el sprint."},
   "Couldn't save the step.": { de: "Der Schritt konnte nicht gespeichert werden.", es: "No se pudo guardar el paso.", ca: "No s'ha pogut desar el pas."},
   "Couldn't save the story.": { de: "Die Aufgabe konnte nicht gespeichert werden.", es: "No se pudo guardar la historia.", ca: "No s'ha pogut desar la història."},
   "Couldn't save the team.": { de: "Das Team konnte nicht gespeichert werden.", es: "No se pudo guardar el equipo.", ca: "No s'ha pogut desar l'equip."},
@@ -1114,7 +1111,6 @@ export const SEED: Catalogue = {
   "Couldn't send the invite, please try again.": { de: "Die Einladung konnte nicht gesendet werden. Bitte versuchen Sie es erneut.", es: "No se pudo enviar la invitación, inténtalo de nuevo.", ca: "No s'ha pogut enviar la invitació, torna-ho a provar."},
   "Couldn't set that.": { de: "Das konnte nicht gesetzt werden.", es: "No se pudo establecer eso.", ca: "No s'ha pogut establir."},
   "Couldn't start that timer.": { de: "Die Zeit konnte nicht gestartet werden.", es: "No se pudo iniciar ese temporizador.", ca: "No s'ha pogut iniciar aquest temporitzador."},
-  "Couldn't start the sprint.": { de: "Der Sprint konnte nicht gestartet werden.", es: "No se pudo iniciar el sprint.", ca: "No s'ha pogut iniciar el sprint."},
   "Couldn't start the timer.": { de: "Die Zeit konnte nicht gestartet werden.", es: "No se pudo iniciar el temporizador.", ca: "No s'ha pogut iniciar el temporitzador."},
   "Couldn't stop sharing that.": { de: "Die Freigabe konnte nicht beendet werden.", es: "No se pudo dejar de compartir eso.", ca: "No s'ha pogut deixar de compartir."},
   "Couldn't stop that timer.": { de: "Die Zeit konnte nicht gestoppt werden.", es: "No se pudo detener ese temporizador.", ca: "No s'ha pogut aturar aquest temporitzador."},
@@ -1151,7 +1147,6 @@ export const SEED: Catalogue = {
   "Edit this deliverable": { de: "Dieses Ergebnis bearbeiten", es: "Editar este entregable", ca: "Editar aquest lliurable"},
   "Edit this meeting": { de: "Diesen Termin bearbeiten", es: "Editar esta reunión", ca: "Editar aquesta reunió"},
   "Edit this role": { de: "Diese Rolle bearbeiten", es: "Editar este rol", ca: "Editar aquest rol"},
-  "Edit this sprint": { de: "Diesen Sprint bearbeiten", es: "Editar este sprint", ca: "Editar aquest sprint"},
   "Edit this ticket": { de: "Dieses Ticket bearbeiten", es: "Editar este ticket", ca: "Editar aquest ticket"},
   "Entries": { de: "Einträge", es: "Entradas", ca: "Entrades"},
   "Every entry here is the same kind of work.": { de: "Jeder Eintrag hier ist dieselbe Art von Arbeit.", es: "Cada entrada aquí es el mismo tipo de trabajo.", ca: "Cada entrada d'aquí és el mateix tipus de feina."},
@@ -1189,7 +1184,6 @@ export const SEED: Catalogue = {
   "No date": { de: "Kein Datum", es: "Sin fecha", ca: "Sense data"},
   "No date on it": { de: "Kein Datum daran", es: "No tiene fecha", ca: "No té data"},
   "No role matched.": { de: "Keine Rolle gefunden.", es: "Ningún rol coincide.", ca: "Cap rol coincideix."},
-  "No sprints start this month.": { de: "In diesem Monat beginnt kein Sprint.", es: "Ningún sprint empieza este mes.", ca: "Aquest mes no comença cap sprint."},
   "No steps yet. Add the first one and say how long it takes and how often it happens, that is what a saving is measured from.": { de: "Noch keine Schritte. Fügen Sie den ersten hinzu und sagen Sie, wie lange er dauert und wie oft er vorkommt, daran wird die Ersparnis gemessen.", es: "Aún no hay pasos. Añade el primero y di cuánto tarda y cada cuánto ocurre, de ahí se mide el ahorro.", ca: "Encara no hi ha passos. Afegeix el primer i digues quant dura i cada quant passa, d'aquí es mesura l'estalvi."},
   "No ticket": { de: "Kein Ticket", es: "Sin ticket", ca: "Sense ticket"},
   "No ticket matched.": { de: "Kein Ticket gefunden.", es: "Ningún ticket coincide.", ca: "Cap ticket coincideix."},
@@ -1260,7 +1254,6 @@ export const SEED: Catalogue = {
   "Search departments…": { de: "Abteilungen durchsuchen…", es: "Buscar departamentos…", ca: "Cercar departaments…"},
   "Search reasons…": { de: "Gründe durchsuchen…", es: "Buscar motivos…", ca: "Cercar motius…"},
   "Search roles…": { de: "Rollen durchsuchen…", es: "Buscar roles…", ca: "Cercar rols…"},
-  "Search sprints…": { de: "Sprints durchsuchen…", es: "Buscar sprints…", ca: "Cercar sprints…"},
   "Search types…": { de: "Typen durchsuchen…", es: "Buscar tipos…", ca: "Cercar tipus…"},
   "Search versions…": { de: "Versionen durchsuchen…", es: "Buscar versiones…", ca: "Cercar versions…"},
   "Search what we handed over…": { de: "Übergebenes durchsuchen…", es: "Buscar lo que entregamos…", ca: "Cercar el que hem lliurat…"},
@@ -1277,8 +1270,6 @@ export const SEED: Catalogue = {
   "Someone with a login": { de: "Jemand mit einem Zugang", es: "Alguien con acceso", ca: "Algú amb accés"},
   "Something we handed over on this app: a doc, a recording, an SOP.": { de: "Etwas, das wir bei dieser App übergeben haben: ein Dokument, eine Aufzeichnung, eine Arbeitsanweisung.", es: "Algo que entregamos en esta app: un documento, una grabación, un procedimiento.", ca: "Alguna cosa que hem lliurat en aquesta app: un document, un enregistrament, un procediment."},
   "Something went wrong. Try again.": { de: "Etwas ist schiefgelaufen. Bitte erneut versuchen.", es: "Algo ha salido mal. Inténtalo de nuevo.", ca: "Alguna cosa ha anat malament. Torna-ho a provar."},
-  "Sprint completed.": { de: "Sprint abgeschlossen.", es: "Sprint completado.", ca: "Sprint completat."},
-  "Sprint reopened.": { de: "Sprint wieder geöffnet.", es: "Sprint reabierto.", ca: "Sprint reobert."},
   "Step added.": { de: "Schritt hinzugefügt.", es: "Paso añadido.", ca: "Pas afegit."},
   "Step recorded as no longer done.": { de: "Schritt als nicht mehr erledigt vermerkt.", es: "Paso registrado como ya no hecho.", ca: "Pas registrat com que ja no es fa."},
   "Step updated.": { de: "Schritt aktualisiert.", es: "Paso actualizado.", ca: "Pas actualitzat."},
@@ -1406,7 +1397,7 @@ export const SEED: Catalogue = {
   "1 source matches": { de: "1 Quelle passt", es: "1 fuente coincide", ca: "1 font coincideix"},
   "1 story matches": { de: "1 Story passt", es: "1 historia coincide", ca: "1 història coincideix"},
   "1 ticket matches": { de: "1 Ticket passt", es: "1 ticket coincide", ca: "1 tiquet coincideix"},
-  "A conversation, with what you mean to cover. It is kept here — {brand} reads your calendar and never writes to it.": { de: "Ein Gespräch mit dem, was Sie besprechen wollen. Es wird hier festgehalten – {brand} liest Ihren Kalender und schreibt nie hinein.", es: "Una conversación, con lo que quieres tratar. Se guarda aquí: {brand} lee tu calendario y nunca escribe en él.", ca: "Una conversa, amb allò que vols tractar. Es desa aquí: {brand} llegeix el teu calendari i mai no hi escriu."},
+  "A conversation, with what you mean to cover. It is kept here. {brand} reads your calendar and never writes to it.": { de: "Ein Gespräch mit dem, was Sie besprechen wollen. Es wird hier festgehalten: {brand} liest Ihren Kalender und schreibt nie hinein.", es: "Una conversación, con lo que quieres tratar. Se guarda aquí: {brand} lee tu calendario y nunca escribe en él.", ca: "Una conversa, amb allò que vols tractar. Es desa aquí: {brand} llegeix el teu calendari i mai no hi escriu."},
   "A section of this app, like Settings or Documents. Tickets say which one they are about.": { de: "Ein Bereich dieser App, etwa Einstellungen oder Dokumente. Tickets nennen den Bereich, um den es geht.", es: "Una sección de esta aplicación, como Ajustes o Documentos. Los tickets indican a cuál se refieren.", ca: "Una secció d'aquesta aplicació, com Configuració o Documents. Els tiquets indiquen a quina es refereixen."},
   "Activate profile": { de: "Profil aktivieren", es: "Activar perfil", ca: "Activa el perfil"},
   "Add": { de: "Hinzufügen", es: "Añadir", ca: "Afegir"},
@@ -1419,7 +1410,7 @@ export const SEED: Catalogue = {
   "Choose a part of your system": { de: "Wählen Sie einen Teil Ihres Systems", es: "Elige una parte de tu sistema", ca: "Tria una part del teu sistema"},
   "Choose an app first": { de: "Wählen Sie zuerst eine App", es: "Elige primero una aplicación", ca: "Tria primer una aplicació"},
   "Choose an app first.": { de: "Wählen Sie zuerst eine App.", es: "Elige primero una aplicación.", ca: "Tria primer una aplicació."},
-  /* The ticket form's "Raised by" row, when no client has been named yet — the
+  /* The ticket form's "Raised by" row, when no client has been named yet: the
    * exact sibling of the line above it, one field further down the same form,
    * so it is deliberately the same sentence with one noun changed. Written by
    * hand rather than sent to the model for that reason: the two have to match. */
@@ -1436,7 +1427,7 @@ export const SEED: Catalogue = {
   // left to the generator because R44's ceiling is exact and may only fall —
   // two new English strings with no answer would have pushed it up.
   "Connect to Google": { de: "Google verbinden", es: "Conectar con Google", ca: "Connecta amb Google"},
-  "Drive, Gmail, Calendar and Chat in one approval, on your own Google account — {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.": { de: "Drive, Gmail, Kalender und Chat mit einer einzigen Freigabe, auf Ihrem eigenen Google-Konto – {brand} nutzt nie das von jemand anderem, und der Assistent, der für Sie arbeitet, sieht genau das, was Sie sehen können. Google speichert nur eine Freigabe pro App: Wenn Sie die Dienste einzeln verbinden, schalten Sie die anderen damit ab.", es: "Drive, Gmail, Calendario y Chat con una sola autorización, en tu propia cuenta de Google: {brand} nunca usa la de otra persona, y el asistente que trabaja para ti ve exactamente lo que tú puedes ver. Google guarda una sola autorización por aplicación, así que conectarlos de uno en uno apaga los demás.", ca: "Drive, Gmail, Calendari i Chat amb una sola autorització, al teu propi compte de Google: {brand} mai no fa servir el d'una altra persona, i l'assistent que treballa per a tu veu exactament el que tu pots veure. Google desa una sola autorització per aplicació, així que connectar-los d'un en un apaga els altres."},
+  "Drive, Gmail, Calendar and Chat in one approval, on your own Google account. {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.": { de: "Drive, Gmail, Kalender und Chat mit einer einzigen Freigabe, auf Ihrem eigenen Google-Konto: {brand} nutzt nie das von jemand anderem, und der Assistent, der für Sie arbeitet, sieht genau das, was Sie sehen können. Google speichert nur eine Freigabe pro App: Wenn Sie die Dienste einzeln verbinden, schalten Sie die anderen damit ab.", es: "Drive, Gmail, Calendario y Chat con una sola autorización, en tu propia cuenta de Google: {brand} nunca usa la de otra persona, y el asistente que trabaja para ti ve exactamente lo que tú puedes ver. Google guarda una sola autorización por aplicación, así que conectarlos de uno en uno apaga los demás.", ca: "Drive, Gmail, Calendari i Chat amb una sola autorització, al teu propi compte de Google: {brand} mai no fa servir el d'una altra persona, i l'assistent que treballa per a tu veu exactament el que tu pots veure. Google desa una sola autorització per aplicació, així que connectar-los d'un en un apaga els altres."},
   "Couldn't accept the invite.": { de: "Einladung konnte nicht angenommen werden.", es: "No se pudo aceptar la invitación.", ca: "No s'ha pogut acceptar la invitació."},
   "Couldn't attach that.": { de: "Das konnte nicht angehängt werden.", es: "No se pudo adjuntar eso.", ca: "No s'ha pogut adjuntar això."},
   "Couldn't load your invites.": { de: "Ihre Einladungen konnten nicht geladen werden.", es: "No se pudieron cargar tus invitaciones.", ca: "No s'han pogut carregar les teves invitacions."},
@@ -1478,10 +1469,10 @@ export const SEED: Catalogue = {
   "Not in the knowledge base yet": { de: "Noch nicht in der Wissensdatenbank", es: "Aún no está en la base de conocimiento", ca: "Encara no és a la base de coneixement"},
   "Not in this version": { de: "Nicht in dieser Version", es: "No está en esta versión", ca: "No és en aquesta versió"},
   "Nothing attached yet.": { de: "Noch nichts angehängt.", es: "Aún no hay nada adjunto.", ca: "Encara no hi ha res adjunt."},
-  "Nothing shared yet — {scope}": { de: "Noch nichts freigegeben – {scope}", es: "Aún no se ha compartido nada — {scope}", ca: "Encara no s'ha compartit res — {scope}"},
-  "Nothing — just show this one": { de: "Nichts – nur diese anzeigen", es: "Nada, solo mostrar esta", ca: "Res, mostra només aquesta"},
+  "Nothing shared yet: {scope}": { de: "Noch nichts freigegeben, {scope}", es: "Aún no se ha compartido nada, {scope}", ca: "Encara no s'ha compartit res, {scope}"},
+  "Nothing: just show this one": { de: "Nichts: nur diese anzeigen", es: "Nada, solo mostrar esta", ca: "Res, mostra només aquesta"},
   "Only the ones you pick. Nothing else in the folder they sit in.": { de: "Nur die von Ihnen ausgewählten. Nichts anderes aus dem Ordner, in dem sie liegen.", es: "Solo los que elijas. Nada más de la carpeta en la que están.", ca: "Només els que triïs. Res més de la carpeta on són."},
-  "Only you, and the assistant when it is answering you.": { de: "Nur Sie – und der Assistent, wenn er Ihnen antwortet.", es: "Solo tú, y el asistente cuando te responde.", ca: "Només tu, i l'assistent quan et respon."},
+  "Only you, and the assistant when it is answering you.": { de: "Nur Sie: und der Assistent, wenn er Ihnen antwortet.", es: "Solo tú, y el asistente cuando te responde.", ca: "Només tu, i l'assistent quan et respon."},
   "Or paste a link": { de: "Oder Link einfügen", es: "O pega un enlace", ca: "O enganxa un enllaç"},
   "Profile activated.": { de: "Profil aktiviert.", es: "Perfil activado.", ca: "Perfil activat."},
   "Profile deactivated.": { de: "Profil deaktiviert.", es: "Perfil desactivado.", ca: "Perfil desactivat."},
@@ -1536,7 +1527,7 @@ export const SEED: Catalogue = {
      THE VOCABULARY FOLLOWS THE GERMAN THE AGENCY ALREADY USES with its German
      clients, per this file's own rule about lifting rather than translating:
      a ticket stays "Ticket", a stage word stays plain and short, and "Board"
-     is the word German product teams say for a Kanban board — "Tafel" would be
+     is the word German product teams say for a Kanban board: "Tafel" would be
      a blackboard.
 
      "Ready" AND "Waiting" ARE STAGES, NOT ADJECTIVES, which is why they are
@@ -1546,7 +1537,7 @@ export const SEED: Catalogue = {
      ("Wartet auf Kunde" is the sentence; the tab has room for "Wartend" only,
      and the icon beside it carries the rest). Aurora's Spanish and Catalan
      follow the same register: short, sentence case, one word per tab. */
-  /* "Ready" AND "Scheduled" ARE NOT REPEATED HERE — both were already seeded in
+  /* "Ready" AND "Scheduled" ARE NOT REPEATED HERE: both were already seeded in
      the Statuses block near the top of this file ("Fertig", "Geplant"), which is
      where a ticket's own stage words belong, and a second entry would be a
      second answer waiting to disagree. The tab and the Kanban column read those.
@@ -1566,14 +1557,14 @@ export const SEED: Catalogue = {
     es: "Nada en esta fase.",
     ca: "Res en aquesta fase.",
   },
-  /* THE BOARD'S TWO FOOTNOTES, REWORDED 2026-09-07 — and reseeded in the same
+  /* THE BOARD'S TWO FOOTNOTES, REWORDED 2026-09-07: and reseeded in the same
      edit, which is the whole point of doing it here. The client asked for a
      fifth column ("in open, include status ready and waiting"), and Waiting is
      a PREDICATE rather than a stage, so its cards are repeats of cards in the
      four columns beside it. Both sentences now say so. A reader who adds five
      columns up would otherwise get a number larger than the tab's own badge,
-     and the alternative — hiding a waiting ticket from the stage it is really
-     in — would make the four stage columns lie about the work.
+     and the alternative: hiding a waiting ticket from the stage it is really
+     in: would make the four stage columns lie about the work.
      The two sentences these replace were seeded, so the ceiling does not move:
      `TRANSLATION_CEILING` counts strings with NO answer, and each of these has
      three. Rewording seeded copy costs nothing but the rewording. */
@@ -1582,13 +1573,13 @@ export const SEED: Catalogue = {
     es: "Las tarjetas son los tickets que coinciden, hasta donde se han cargado. En espera repite tarjetas de las fases anteriores. Haz clic en una tarjeta para abrir el ticket.",
     ca: "Les targetes són els tiquets que coincideixen, fins on s'han carregat. En espera repeteix targetes de les fases anteriors. Fes clic en una targeta per obrir el tiquet.",
   },
-  "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets — the ones where a client owes us an answer — so the columns don't add up to the total. Click a card to open the ticket.": {
-    de: "Jede der ersten vier Spalten zählt alle offenen Tickets in dieser Phase. Wartend wiederholt dieselben Tickets — die, bei denen ein Kunde uns eine Antwort schuldet — deshalb ergeben die Spalten zusammen nicht die Gesamtzahl. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
-    es: "Cada una de las primeras cuatro columnas cuenta todos los tickets abiertos en esa fase. En espera repite esos mismos tickets — aquellos en los que un cliente nos debe una respuesta — así que las columnas no suman el total. Haz clic en una tarjeta para abrir el ticket.",
-    ca: "Cadascuna de les quatre primeres columnes compta tots els tiquets oberts en aquesta fase. En espera repeteix aquests mateixos tiquets — aquells en què un client ens deu una resposta — així que les columnes no sumen el total. Fes clic en una targeta per obrir el tiquet.",
+  "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets, the ones where a client owes us an answer, so the columns don't add up to the total. Click a card to open the ticket.": {
+    de: "Jede der ersten vier Spalten zählt alle offenen Tickets in dieser Phase. Wartend wiederholt dieselben Tickets, die, bei denen ein Kunde uns eine Antwort schuldet, deshalb ergeben die Spalten zusammen nicht die Gesamtzahl. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada una de las primeras cuatro columnas cuenta todos los tickets abiertos en esa fase. En espera repite esos mismos tickets, aquellos en los que un cliente nos debe una respuesta, así que las columnas no suman el total. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cadascuna de les quatre primeres columnes compta tots els tiquets oberts en aquesta fase. En espera repeteix aquests mateixos tiquets, aquells en què un client ens deu una resposta, així que les columnes no sumen el total. Fes clic en una targeta per obrir el tiquet.",
   },
   /* THE FIFTH COLUMN'S EMPTY LINE. Not "Nothing at this stage." above, because
-     waiting is not a stage — the honest empty sentence here is that no client
+     waiting is not a stage: the honest empty sentence here is that no client
      owes us an answer, which is good news rather than an absence of rows. */
   "Nothing is waiting on a client.": {
     de: "Es wartet nichts auf einen Kunden.",
@@ -1610,7 +1601,7 @@ export const SEED: Catalogue = {
   /* ── The screen engine + notes editor, moved app-side by the design-kit swap
      (2026-08-24). These sentences lived in the old library, exempt from the
      walk; moving the code moved the words into R28's territory, and these are
-     their translations — hand-written here so no generator run (and no API
+     their translations: hand-written here so no generator run (and no API
      spend) stands between the swap and a German reader. Register per the note
      above: plain, short, sentence case. */
   "Bold": { de: "Fett", es: "Negrita", ca: "Negreta" },
@@ -1633,18 +1624,12 @@ export const SEED: Catalogue = {
   // The waves toolbar and the theme control, hand-written for the same reason
   // everything else here is: the machine translator spends the owner's own key.
   "Appearance": { de: "Darstellung", es: "Apariencia", ca: "Aparença" },
-  "Plan a sprint": { de: "Sprint planen", es: "Planificar un sprint", ca: "Planificar un sprint" },
   "Search waves…": { de: "Wellen durchsuchen…", es: "Buscar waves…", ca: "Cercar waves…" },
   "Sort by": { de: "Sortieren nach", es: "Ordenar por", ca: "Ordenar per" },
   "Start": { de: "Start", es: "Inicio", ca: "Inici" },
   // THE WAVES TABLE'S OWN "End" COLUMN, beside "Start" one line up — a wave's
   // end date, the same header pair task/sprint date ranges already carry.
   "End": { de: "Ende", es: "Fin", ca: "Fi" },
-  "Sprint planned, and it is in this wave.": {
-    de: "Sprint geplant und in dieser Welle.",
-    es: "Sprint planificado y dentro de esta wave.",
-    ca: "Sprint planificat i dins d'aquesta wave.",
-  },
   "When it runs": { de: "Wann sie läuft", es: "Cuándo se ejecuta", ca: "Quan s'executa" },
   // Where a new step lands. "Beside" is the whole gesture that draws a fork, so
   // it is a sentence with a hole rather than a word beside a name — the hole is
@@ -1701,26 +1686,20 @@ export const SEED: Catalogue = {
    * over the ai/run REST door), grounded in shared/glossary.ts, and spot-checked
    * by hand. See the commit body for the neuron spend and the spot check. */
   "1 role": { de: "1 Rolle", es: "1 rol", ca: "1 rol" },
-  "1 sprint": { de: "1 Sprint", es: "1 sprint", ca: "1 sprint" },
   "A job in their company. Leave the cost empty if nobody knows it yet.": {
     de: "Ein Auftrag in ihrem Unternehmen. Lassen Sie die Kosten leer, falls niemand den Betrag kennt.",
     es: "Un trabajo en su empresa. Deja el costo vacío si nadie lo sabe todavía.",
     ca: "Una feina a la seva empresa. Deixa el preu buit si ningú el coneix encara.",
   },
-  "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go.": {
-    de: "Ein Link allein liefert dem Assistenten nichts zum Lesen — wir öffnen die Seite nicht für Sie. Fügen Sie ein, was oben steht, oder schreiben Sie es, dann ist diese Quelle fertig.",
-    es: "Un enlace por sí solo no le da nada al asistente para leer — no abrimos la página por ti. Pega o escribe lo que dice arriba y esta fuente queda lista.",
-    ca: "Un enllaç per si sol no dóna res a l'assistent per llegir — no obrim la pàgina per a tu. Enganxa o escriu el que diu a dalt i aquesta font queda llesta.",
+  "A link on its own gives the assistant nothing to read. We don't open the page for you. Paste or write what it says above and this source is good to go.": {
+    de: "Ein Link allein liefert dem Assistenten nichts zum Lesen: wir öffnen die Seite nicht für Sie. Fügen Sie ein, was oben steht, oder schreiben Sie es, dann ist diese Quelle fertig.",
+    es: "Un enlace por sí solo no le da nada al asistente para leer: no abrimos la página por ti. Pega o escribe lo que dice arriba y esta fuente queda lista.",
+    ca: "Un enllaç per si sol no dóna res a l'assistent per llegir: no obrim la pàgina per a tu. Enganxa o escriu el que diu a dalt i aquesta font queda llesta.",
   },
   "A meeting we already hold": {
     de: "Ein Termin, den wir bereits halten",
     es: "Una reunión que ya tenemos",
     ca: "Una reunió que ja tenim",
-  },
-  "A package of sprints an account bought. You'll plan the sprints inside it next.": {
-    de: "Ein Paket aus Sprints, das ein Kunde gekauft hat. Sie planen als Nächstes die Sprints darin.",
-    es: "Un paquete de sprints que una cuenta compró. A continuación planearás los sprints dentro de él.",
-    ca: "Un paquet de sprints que un compte ha comprat. A continuació planificaràs els sprints dins d'ell.",
   },
   "A part of their company, like Operations or Finance.": {
     de: "Ein Teil ihres Unternehmens, zum Beispiel Operations oder Finanzen.",
@@ -1793,10 +1772,10 @@ export const SEED: Catalogue = {
     es: "También en un departamento que ha sido desactivado.",
     ca: "També en un departament que s'ha desactivat.",
   },
-  "An admin can invite you back — ask them to send a new invite to this email address.": {
-    de: "Ein Administrator kann Sie erneut einladen — bitten Sie ihn, eine neue Einladung an diese E‑Mail‑Adresse zu senden.",
-    es: "Un administrador puede invitarte de nuevo — pídele que envíe una nueva invitación a esta dirección de correo.",
-    ca: "Un administrador pot tornar a convidar-te — demana-li que enviï una nova invitació a aquesta adreça de correu.",
+  "An admin can invite you back. Ask them to send a new invite to this email address.": {
+    de: "Ein Administrator kann Sie erneut einladen: bitten Sie ihn, eine neue Einladung an diese E‑Mail‑Adresse zu senden.",
+    es: "Un administrador puede invitarte de nuevo: pídele que envíe una nueva invitación a esta dirección de correo.",
+    ca: "Un administrador pot tornar a convidar-te: demana-li que enviï una nova invitació a aquesta adreça de correu.",
   },
   "Anything a step uses. Set what it costs afterwards, from the day that price started.": {
     de: "Alles, was ein Schritt verwendet. Legen Sie anschließend fest, was es kostet, ab dem Tag, an dem der Preis begann.",
@@ -1815,7 +1794,7 @@ export const SEED: Catalogue = {
   },
   "As it is today": { de: "Wie es heute ist", es: "Como es hoy", ca: "Com és avui" },
   "As it was on": { de: "Wie es war am", es: "Como era el", ca: "Com era el" },
-  /* B0296/T3659, 16 Sep 2026 — the knowledge screen's own search bar is gone
+  /* B0296/T3659, 16 Sep 2026: the knowledge screen's own search bar is gone
    * (TOOLBAR_EXEMPT["knowledge.list"]), so this question box is now the one
    * place a question goes on that screen. Reworded from "Ask about this
    * record…"/"Ask the knowledge base" to say "question" plainly, so it never
@@ -2088,20 +2067,15 @@ export const SEED: Catalogue = {
     es: "Entrega su trabajo a",
     ca: "Passa la seva feina a",
   },
-  "It has paused for a moment to catch up. Give it a minute and ask again — nothing you did caused this and nothing was lost.": {
-    de: "Es hat kurz pausiert, um aufzuholen. Geben Sie ihm eine Minute und fragen Sie erneut – nichts, was Sie getan haben, hat das verursacht, und es ging nichts verloren.",
-    es: "Se ha detenido un momento para ponerse al día. Déle un minuto y pregunte de nuevo — nada de lo que hiciste causó esto y no se perdió nada.",
-    ca: "S'ha aturat un moment per posar-se al dia. Dona-li un minut i torna a preguntar — res del que vas fer va causar això i no s'ha perdut res.",
+  "It has paused for a moment to catch up. Give it a minute and ask again. Nothing you did caused this and nothing was lost.": {
+    de: "Es hat kurz pausiert, um aufzuholen. Geben Sie ihm eine Minute und fragen Sie erneut: nichts, was Sie getan haben, hat das verursacht, und es ging nichts verloren.",
+    es: "Se ha detenido un momento para ponerse al día. Déle un minuto y pregunte de nuevo: nada de lo que hiciste causó esto y no se perdió nada.",
+    ca: "S'ha aturat un moment per posar-se al dia. Dona-li un minut i torna a preguntar: res del que vas fer va causar això i no s'ha perdut res.",
   },
   "It is one side of a split": {
     de: "Es ist eine Seite einer Teilung",
     es: "Es un lado de una división",
     ca: "És un costat d'una divisió",
-  },
-  "It stops being offered when a sprint is filed, and stays on the record with everything already in it. You can bring it back.": {
-    de: "Es wird nicht mehr angeboten, wenn ein Sprint archiviert wird, und bleibt im Datensatz mit allen bereits enthaltenen Informationen. Sie können es zurückholen.",
-    es: "Deja de estar disponible cuando se archiva un sprint, y permanece en el registro con todo lo que ya contiene. Puedes recuperarlo.",
-    ca: "Deixa d'estar disponible quan s'arxiva un sprint i queda al registre amb tot el que ja conté. Pots tornar-lo a recuperar.",
   },
   "It stops being offered, and nothing that already refers to it changes. You can bring it back.": {
     de: "Es wird nicht mehr angeboten, und nichts, das bereits darauf verweist, ändert sich. Sie können es zurückholen.",
@@ -2183,25 +2157,15 @@ export const SEED: Catalogue = {
     es: "No hay ninguna etiqueta nombrada, así que no se lee ningún correo.",
     ca: "No hi ha cap etiqueta anomenada, així que no es llegeix cap correu.",
   },
-  "No money yet — none of these steps says what an hour of the person doing it costs.": {
-    de: "Noch kein Geld — keiner dieser Schritte sagt, was eine Stunde der ausführenden Person kostet.",
-    es: "Aún no hay dinero — ninguno de estos pasos indica cuánto cuesta una hora de la persona que lo hace.",
-    ca: "Encara no hi ha diners — cap d’aquests passos indica quant costa una hora de la persona que l’executa.",
+  "No money yet. None of these steps says what an hour of the person doing it costs.": {
+    de: "Noch kein Geld: keiner dieser Schritte sagt, was eine Stunde der ausführenden Person kostet.",
+    es: "Aún no hay dinero: ninguno de estos pasos indica cuánto cuesta una hora de la persona que lo hace.",
+    ca: "Encara no hi ha diners: cap d’aquests passos indica quant costa una hora de la persona que l’executa.",
   },
   "No price set yet": {
     de: "Noch kein Preis festgelegt",
     es: "Aún no hay precio",
     ca: "Encara no hi ha preu",
-  },
-  "No sprint matched.": {
-    de: "Kein Sprint gefunden.",
-    es: "No se ha encontrado ningún sprint.",
-    ca: "No s'ha trobat cap sprint.",
-  },
-  "No sprints planned yet": {
-    de: "Noch keine Sprints geplant",
-    es: "Aún no hay sprints planificados",
-    ca: "Encara no hi ha sprints planificats",
   },
   "No time agreed": {
     de: "Keine Zeit vereinbart",
@@ -2217,11 +2181,6 @@ export const SEED: Catalogue = {
     de: "Noch keine Waves.",
     es: "Aún no hay waves.",
     ca: "Encara no hi ha waves.",
-  },
-  "A wave is a package of sprints an account bought: sell it first, plan the sprints inside it afterwards.": {
-    de: "Eine Wave ist ein Paket von Sprints, das ein Kunde gekauft hat: zuerst verkaufen, die Sprints darin danach planen.",
-    es: "Una wave es un paquete de sprints que una cuenta ha comprado: véndela primero, planifica los sprints dentro de ella después.",
-    ca: "Una wave és un paquet de sprints que un compte ha comprat: ven-la primer, planifica els sprints dins d'ella després.",
   },
   "Nobody named yet": {
     de: "Noch niemand benannt",
@@ -2263,10 +2222,10 @@ export const SEED: Catalogue = {
     es: "Nada se escribe en el mapa. Obtienes una propuesta para revisar, y solo lo que guardas se guarda.",
     ca: "Res s’escriu al mapa. Obteniu una proposta per revisar-la, i només el que guardeu es desa.",
   },
-  "Nothing is wrong with your team — this copy of the app hasn't been connected to the assistant yet. Whoever set it up can finish that, and everything else here keeps working in the meantime.": {
-    de: "Nichts ist falsch an Ihrem Team — diese Kopie der App wurde noch nicht mit dem Assistant verbunden. Wer sie eingerichtet hat, kann das noch abschließen, und alles andere hier funktioniert in der Zwischenzeit weiter.",
-    es: "No hay nada malo con tu team — esta copia de la App aún no está conectada al assistant. Quien la configuró puede terminarlo, y todo lo demás aquí sigue funcionando mientras tanto.",
-    ca: "No hi ha res de malament amb el teu team — aquesta còpia de la App encara no s’ha connectat al assistant. Qui la va configurar pot acabar-ho, i tot el que hi ha aquí continua funcionant mentrestant.",
+  "Nothing is wrong with your team. This copy of the app hasn't been connected to the assistant yet. Whoever set it up can finish that, and everything else here keeps working in the meantime.": {
+    de: "Nichts ist falsch an Ihrem Team: diese Kopie der App wurde noch nicht mit dem Assistant verbunden. Wer sie eingerichtet hat, kann das noch abschließen, und alles andere hier funktioniert in der Zwischenzeit weiter.",
+    es: "No hay nada malo con tu team: esta copia de la App aún no está conectada al assistant. Quien la configuró puede terminarlo, y todo lo demás aquí sigue funcionando mientras tanto.",
+    ca: "No hi ha res de malament amb el teu team: aquesta còpia de la App encara no s’ha connectat al assistant. Qui la va configurar pot acabar-ho, i tot el que hi ha aquí continua funcionant mentrestant.",
   },
   "Nothing named yet": {
     de: "Noch nichts benannt",
@@ -2274,10 +2233,10 @@ export const SEED: Catalogue = {
     ca: "Res anomenat encara",
   },
   "Notice": { de: "Hinweis", es: "Aviso", ca: "Avís" },
-  "Nowhere — it carries on": {
-    de: "Nirgendwo — es geht weiter",
-    es: "En ninguna parte — sigue adelante",
-    ca: "Enlloc — continua",
+  "Nowhere: it carries on": {
+    de: "Nirgendwo: es geht weiter",
+    es: "En ninguna parte: sigue adelante",
+    ca: "Enlloc: continua",
   },
   "Older versions stay exactly as they were agreed.": {
     de: "Ältere Versionen bleiben genau wie vereinbart.",
@@ -2343,11 +2302,6 @@ export const SEED: Catalogue = {
     ca: "Tria almenys un tipus, o desactiva tota la connexió en el seu lloc.",
   },
   "Price": { de: "Preis", es: "Precio", ca: "Preu" },
-  "Put a sprint in this wave": {
-    de: "Fügen Sie einen Sprint in diese Wave ein",
-    es: "Añade un sprint a esta wave",
-    ca: "Afegeix un sprint a aquesta wave",
-  },
   "Read a call": { de: "Lesen Sie einen Anruf", es: "Lee una llamada", ca: "Llegeix una trucada" },
   "Read a call into this map": {
     de: "Lesen Sie einen Anruf in diese Karte ein",
@@ -2360,15 +2314,10 @@ export const SEED: Catalogue = {
     ca: "Canvia el nom, o indica més sobre què cobreix el paquet.",
   },
   "Roles": { de: "Rollen", es: "Roles", ca: "Rols" },
-  "Saved. Two sprints in this wave run over each other.": {
-    de: "Gespeichert. Zwei Sprints in dieser Wave überschneiden sich.",
-    es: "Guardado. Dos sprints en esta wave se superponen.",
-    ca: "Desat. Dos sprints en aquesta wave es superposen.",
-  },
-  "Saved. {count} sources let go — the assistant will read them again from the start.": {
-    de: "Gespeichert. {count} Quellen freigegeben — der Assistent wird sie erneut von Anfang an lesen.",
-    es: "Guardado. {count} fuentes liberadas — el asistente las volverá a leer desde el principio.",
-    ca: "Desat. {count} fonts alliberades — l’assistent les tornarà a llegir des del principi.",
+  "Saved. {count} sources let go. The assistant will read them again from the start.": {
+    de: "Gespeichert. {count} Quellen freigegeben: der Assistent wird sie erneut von Anfang an lesen.",
+    es: "Guardado. {count} fuentes liberadas: el asistente las volverá a leer desde el principio.",
+    ca: "Desat. {count} fonts alliberades: l’assistent les tornarà a llegir des del principi.",
   },
   "Search accounts…": { de: "Kunden durchsuchen…", es: "Buscar cuentas…", ca: "Cerca comptes…" },
   "Sections": { de: "Abschnitte", es: "Secciones", ca: "Seccions" },
@@ -2394,7 +2343,6 @@ export const SEED: Catalogue = {
     es: "Algo se interpuso justo ahora. Inténtalo de nuevo en un momento y avisa a un administrador si sigue ocurriendo.",
     ca: "Alguna cosa s'ha interposat just ara. Torna-ho a provar d'aquí a un moment i avisa a un administrador si continua passant.",
   },
-  "Sprints inside it": { de: "Sprints darin", es: "Sprints dentro", ca: "Sprints dins" },
   "Step deleted.": { de: "Schritt gelöscht.", es: "Paso eliminado.", ca: "Pas eliminat." },
   "Steps side by side are branches of one decision.": {
     de: "Schritte nebeneinander sind Zweige einer Entscheidung.",
@@ -2411,11 +2359,6 @@ export const SEED: Catalogue = {
   "Take it out": { de: "Nehmen Sie es heraus", es: "Sácalo", ca: "Treu‑lo" },
   "Take out": { de: "Entfernen", es: "Sacar", ca: "Treure" },
   "Taken out.": { de: "Entfernt.", es: "Sacado.", ca: "Treure." },
-  "That can be right — it is saved either way. Change a sprint's dates if it is not.": {
-    de: "Das kann richtig sein — es wird in jedem Fall gespeichert. Ändern Sie die Daten des Sprints, wenn das nicht der Fall ist.",
-    es: "Eso puede estar bien — se guarda de cualquier manera. Cambia las fechas del sprint si no lo está.",
-    ca: "Això pot estar bé — es guarda de totes maneres. Canvia les dates del sprint si no ho està.",
-  },
   "That didn't load. Refresh the page, and tell us if it keeps happening.": {
     de: "Das hat nicht geladen. Aktualisieren Sie die Seite und sagen Sie uns, ob es weiterhin passiert.",
     es: "No se cargó. Actualiza la página y dinos si sigue ocurriendo.",
@@ -2451,10 +2394,10 @@ export const SEED: Catalogue = {
     es: "El asistente no está activado aquí",
     ca: "L'assistent no està activat aquí",
   },
-  "The assistant opens with your question, answers from the knowledge base, and marks each claim with the source it came from — press a mark's source to read the passage itself. Each question uses one of the team's assistant credits.": {
-    de: "Der Assistent öffnet mit Ihrer Frage, antwortet aus der Wissensdatenbank und markiert jede Aussage mit der Quelle, aus der sie stammt — klicken Sie auf die Quelle einer Markierung, um den jeweiligen Abschnitt zu lesen. Jede Frage verwendet einen der Assistent‑Credits Ihres Teams.",
-    es: "El asistente se abre con tu pregunta, responde desde la base de conocimiento y marca cada afirmación con la fuente de la que proviene — pulsa la fuente de una marca para leer el pasaje completo. Cada pregunta usa uno de los créditos del asistente del equipo.",
-    ca: "L'assistent s'obre amb la teva pregunta, respon des de la base de coneixement i marca cada afirmació amb la font d'on prové — prem la font d'una marca per llegir el fragment. Cada pregunta utilitza un dels crèdits de l'assistent de l'equip.",
+  "The assistant opens with your question, answers from the knowledge base, and marks each claim with the source it came from. Press a mark's source to read the passage itself. Each question uses one of the team's assistant credits.": {
+    de: "Der Assistent öffnet mit Ihrer Frage, antwortet aus der Wissensdatenbank und markiert jede Aussage mit der Quelle, aus der sie stammt: klicken Sie auf die Quelle einer Markierung, um den jeweiligen Abschnitt zu lesen. Jede Frage verwendet einen der Assistent‑Credits Ihres Teams.",
+    es: "El asistente se abre con tu pregunta, responde desde la base de conocimiento y marca cada afirmación con la fuente de la que proviene: pulsa la fuente de una marca para leer el pasaje completo. Cada pregunta usa uno de los créditos del asistente del equipo.",
+    ca: "L'assistent s'obre amb la teva pregunta, respon des de la base de coneixement i marca cada afirmació amb la font d'on prové: prem la font d'una marca per llegir el fragment. Cada pregunta utilitza un dels crèdits de l'assistent de l'equip.",
   },
   "The assistant stops answering from any calendar entry it has already read, and reads your calendar again from the start under the new answer. That takes a while and it costs some of the team's AI allowance.": {
     de: "Der Assistent hört auf, aus bereits gelesenen Kalendereinträgen zu antworten, und liest Ihren Kalender erneut von Anfang an unter der neuen Antwort. Das dauert eine Weile und verbraucht einen Teil des KI‑Kontingents Ihres Teams.",
@@ -2501,10 +2444,10 @@ export const SEED: Catalogue = {
     es: "El trabajo y lo que les cuesta por hora. Deja el coste vacío si nadie lo conoce aún.",
     ca: "La feina i el que els costa per hora. Deixa el cost buit si ningú el coneix encara.",
   },
-  "The money covers {priced} of {total} steps — the rest have no hourly cost yet.": {
-    de: "Das Geld deckt {priced} von {total} Schritten ab — der Rest hat noch keinen Stundenpreis.",
-    es: "El dinero cubre {priced} de {total} pasos — el resto aún no tiene costo por hora.",
-    ca: "Els diners cobreixen {priced} de {total} passos — la resta encara no té cost horari.",
+  "The money covers {priced} of {total} steps. The rest have no hourly cost yet.": {
+    de: "Das Geld deckt {priced} von {total} Schritten ab: der Rest hat noch keinen Stundenpreis.",
+    es: "El dinero cubre {priced} de {total} pasos: el resto aún no tiene costo por hora.",
+    ca: "Els diners cobreixen {priced} de {total} passos: la resta encara no té cost horari.",
   },
   "The steps of this process, in order": {
     de: "Die Schritte dieses Prozesses, in der richtigen Reihenfolge",
@@ -2521,10 +2464,10 @@ export const SEED: Catalogue = {
     es: "Esto puede ADD calendarios que {brand} no puede ver hoy, además de excluir tu principal. No nombres ninguno y no se leerá ningún calendario.",
     ca: "Això pot ADD calendaris que {brand} no pot veure avui, a més d’excloure el teu principal. No en nomenis cap i no es llegirà cap calendari.",
   },
-  "This isn't your team's assistant credits — those are untouched. The account the assistant itself runs on needs topping up before it can answer again.": {
-    de: "Dies sind nicht die Assistant-Guthaben Ihres Teams — diese bleiben unverändert. Der Kunde, auf dem der Assistant selbst läuft, muss aufgeladen werden, bevor er wieder antworten kann.",
-    es: "Estos no son los créditos del assistant de tu equipo — están intactos. La cuenta en la que funciona el assistant necesita recargarse antes de que pueda responder de nuevo.",
-    ca: "Aquests no són els crèdits de l’assistant del teu equip — estan intactes. El compte en què funciona l’assistant necessita ser recarregat abans que pugui respondre de nou.",
+  "This isn't your team's assistant credits: those are untouched. The account the assistant itself runs on needs topping up before it can answer again.": {
+    de: "Dies sind nicht die Assistant-Guthaben Ihres Teams: diese bleiben unverändert. Der Kunde, auf dem der Assistant selbst läuft, muss aufgeladen werden, bevor er wieder antworten kann.",
+    es: "Estos no son los créditos del assistant de tu equipo: están intactos. La cuenta en la que funciona el assistant necesita recargarse antes de que pueda responder de nuevo.",
+    ca: "Aquests no són els crèdits de l’assistant del teu equip: estan intactes. El compte en què funciona l’assistant necessita ser recarregat abans que pugui respondre de nou.",
   },
   "This map changed on": {
     de: "Diese Karte wurde geändert am",
@@ -2575,11 +2518,6 @@ export const SEED: Catalogue = {
   "Tool": { de: "Tool", es: "Tool", ca: "Tool" },
   "Total": { de: "Gesamt", es: "Total", ca: "Total" },
   "Try asking": { de: "Versuchen Sie zu fragen", es: "Intenta preguntar", ca: "Intenta preguntar" },
-  "Two sprints in this wave run over each other.": {
-    de: "Zwei Sprints in dieser Wave laufen übereinander.",
-    es: "Dos sprints en esta wave se solapan.",
-    ca: "Dos sprints en aquesta wave es superposen.",
-  },
   "Use the address your account is registered to.": {
     de: "Verwenden Sie die Adresse, unter der Ihr Kunde registriert ist.",
     es: "Usa la dirección a la que está registrada tu cuenta.",
@@ -2717,10 +2655,10 @@ export const SEED: Catalogue = {
     es: "Tu calendario principal, solo lectura. {brand} nunca añade, cambia o cancela nada en él. Nombra otros calendarios abajo para incluirlos también.",
     ca: "El teu calendari principal, només de lectura. {brand} mai afegeix, canvia o cancel·la res dins. Nomena altres calendaris a continuació per incloure'ls també.",
   },
-  "Your role can read the knowledge base — every source is here, and so is the record behind it — but asking it a question goes through the assistant, which your role can't use. A team admin can turn that on for your role.": {
-    de: "Ihre Rolle kann die Wissensdatenbank lesen — jede Quelle ist hier, ebenso der dahinterstehende Datensatz —, aber das Stellen einer Frage erfolgt über den Assistenten, den Ihre Rolle nicht nutzen kann. Ein Team-Administrator kann das für Ihre Rolle aktivieren.",
-    es: "Tu rol puede leer la base de conocimiento — cada fuente está aquí, al igual que el registro detrás de ella —, pero hacerle una pregunta pasa por el asistente, que tu rol no puede usar. Un administrador del equipo puede activarlo para tu rol.",
-    ca: "El teu rol pot llegir la base de coneixement — cada font és aquí, i també el registre que hi ha darrere —, però fer‑li una pregunta passa per l'assistent, que el teu rol no pot utilitzar. Un administrador de l'equip pot activar‑ho per al teu rol.",
+  "Your role can read the knowledge base. Every source is here, and so is the record behind it. But asking it a question goes through the assistant, which your role can't use. A team admin can turn that on for your role.": {
+    de: "Ihre Rolle kann die Wissensdatenbank lesen, jede Quelle ist hier, ebenso der dahinterstehende Datensatz, aber das Stellen einer Frage erfolgt über den Assistenten, den Ihre Rolle nicht nutzen kann. Ein Team-Administrator kann das für Ihre Rolle aktivieren.",
+    es: "Tu rol puede leer la base de conocimiento, cada fuente está aquí, al igual que el registro detrás de ella, pero hacerle una pregunta pasa por el asistente, que tu rol no puede usar. Un administrador del equipo puede activarlo para tu rol.",
+    ca: "El teu rol pot llegir la base de coneixement, cada font és aquí, i també el registre que hi ha darrere, però fer‑li una pregunta passa per l'assistent, que el teu rol no pot utilitzar. Un administrador de l'equip pot activar‑ho per al teu rol.",
   },
   "a year": { de: "ein Jahr", es: "un año", ca: "un any" },
   "done {date}": { de: "erledigt {date}", es: "hecho {date}", ca: "fet {date}" },
@@ -2769,7 +2707,6 @@ export const SEED: Catalogue = {
   "only when": { de: "nur wenn", es: "solo cuando", ca: "només quan" },
   "otherwise": { de: "ansonsten", es: "de lo contrario", ca: "altrament" },
   "roles": { de: "Rollen", es: "roles", ca: "rols" },
-  "sprints": { de: "Sprints", es: "Sprints", ca: "Sprints" },
   "that record says “{status}” right now": {
     de: "Dieser Datensatz sagt gerade “{status}”",
     es: "Ese registro dice “{status}” ahora mismo",
@@ -2865,8 +2802,8 @@ export const SEED: Catalogue = {
     es: "Se omitirán {skipped} de {total} fila(s)",
     ca: "S'ometran {skipped} de {total} fila(es)",
   },
-  "And {count} more — download the list above.": {
-    de: "Und {count} weitere — laden Sie die Liste oben herunter.",
+  "And {count} more: download the list above.": {
+    de: "Und {count} weitere: laden Sie die Liste oben herunter.",
     es: "Y {count} más: descarga la lista de arriba.",
     ca: "I {count} més: descarrega la llista de dalt.",
   },
@@ -2885,7 +2822,7 @@ export const SEED: Catalogue = {
     es: "No se pudo leer ese archivo.",
     ca: "No s'ha pogut llegir aquest fitxer.",
   },
-  /* The run step's error register. No full stop on the eyebrow or the title —
+  /* The run step's error register. No full stop on the eyebrow or the title: 
    * they are labels, not sentences, and the kit draws them as such. The sibling
    * entry "The import didn't finish." (with a full stop) is the toast, and both
    * are live: this one heads the register, that one is said in passing. */
@@ -2901,7 +2838,7 @@ export const SEED: Catalogue = {
   },
   "Back to the plan": { de: "Zurück zum Plan", es: "Volver al plan", ca: "Torna al pla" },
 
-  /* THE RAIL'S TWO NEW SECTION HEADINGS (client feedback, 31 Aug 2026 —
+  /* THE RAIL'S TWO NEW SECTION HEADINGS (client feedback, 31 Aug 2026: 
    * lib/pages.ts, NAV_GROUP_LABELS). "Accounts" already had a seed entry;
    * these two are the rest of the three named sections. */
 
@@ -2987,8 +2924,8 @@ export const SEED: Catalogue = {
     es: "{count} conectados",
     ca: "{count} connectats",
   },
-  "Showing the closest few — there are more.": {
-    de: "Es werden nur die nächsten gezeigt — es gibt mehr.",
+  "Showing the closest few. There are more.": {
+    de: "Es werden nur die nächsten gezeigt: es gibt mehr.",
     es: "Se muestran solo los más cercanos: hay más.",
     ca: "Només es mostren els més propers: n'hi ha més.",
   },
@@ -3022,7 +2959,7 @@ export const SEED: Catalogue = {
     es: "Un mapa de toda la base de conocimiento, agrupada por cuenta",
     ca: "Un mapa de tota la base de coneixement, agrupada per compte",
   },
-  /* The cap, said out loud — and the second sentence is the load-bearing one:
+  /* The cap, said out loud: and the second sentence is the load-bearing one:
    * the dots are a sample and the sizes are not. */
   "Drawing the {drawn} most recently touched. Every group is sized by its full count.": {
     de: "Es werden die {drawn} zuletzt bearbeiteten gezeigt. Jede Gruppe ist nach ihrer vollen Anzahl bemessen.",
@@ -3041,7 +2978,7 @@ export const SEED: Catalogue = {
     es: "Todavía no hay nada en la base de conocimiento.",
     ca: "Encara no hi ha res a la base de coneixement.",
   },
-  /* THE KNOWLEDGE SCREEN'S OWN CARD GRID LABEL — the eyebrow over the source
+  /* THE KNOWLEDGE SCREEN'S OWN CARD GRID LABEL: the eyebrow over the source
    * cards (files and notes) once there is at least one, beside the empty
    * state seeded above it. */
   "Sources": { de: "Quellen", es: "Fuentes", ca: "Fonts" },
@@ -3073,13 +3010,13 @@ export const SEED: Catalogue = {
     es: "Todavía no hay nada archivado bajo una cuenta.",
     ca: "Encara no hi ha res arxivat sota un compte.",
   },
-  /* Read aloud, never drawn — the picture's own name. */
+  /* Read aloud, never drawn: the picture's own name. */
   "A map of what this record is connected to": {
     de: "Eine Karte davon, womit dieser Eintrag verbunden ist",
     es: "Un mapa de con qué está conectado este registro",
     ca: "Un mapa d'amb què està connectat aquest registre",
   },
-  /* THE TAB'S OWN FAILURE (8 Sep 2026) — the map's read can fail like any
+  /* THE TAB'S OWN FAILURE (8 Sep 2026): the map's read can fail like any
    * other, and this is the sentence that says so instead of leaving the
    * loading skeleton on screen forever. Written here, beside the rest of the
    * map's words, for the same "{count} connected" / "Nothing is linked to
@@ -3089,7 +3026,7 @@ export const SEED: Catalogue = {
     es: "No se pudieron cargar las conexiones de este registro.",
     ca: "No s'han pogut carregar les connexions d'aquest registre.",
   },
-  /* The group's accessible name — read aloud, never drawn. */
+  /* The group's accessible name: read aloud, never drawn. */
   "Which sources the assistant reads": {
     de: "Welche Quellen der Assistent liest",
     es: "Qué fuentes lee el asistente",
@@ -3097,7 +3034,7 @@ export const SEED: Catalogue = {
   },
   /* PICKING UP AN IMPORT THAT DIED (6 Sep 2026). Written here rather than left
      to accumulate as ceiling debt because these three sentences are the only
-     thing standing between a person and importing their file twice — an English
+     thing standing between a person and importing their file twice: an English
      sentence on a German screen is a sentence they may not act on, and the
      action it is asking for is the one that prevents duplicate rows. */
   "Carry on from where it stopped": {
@@ -3105,13 +3042,13 @@ export const SEED: Catalogue = {
     es: "Continuar donde se detuvo",
     ca: "Continuar on s'ha aturat",
   },
-  "It got part of the way through. Carry on from where it stopped — sending the file again would add everything it already wrote a second time.":
+  "It got part of the way through. Carry on from where it stopped. Sending the file again would add everything it already wrote a second time.":
     {
-      de: "Es ist ein Stück weit gekommen. Machen Sie dort weiter, wo es aufgehört hat — die Datei erneut zu senden würde alles bereits Geschriebene ein zweites Mal hinzufügen.",
+      de: "Es ist ein Stück weit gekommen. Machen Sie dort weiter, wo es aufgehört hat: die Datei erneut zu senden würde alles bereits Geschriebene ein zweites Mal hinzufügen.",
       es: "Avanzó una parte. Continúe donde se detuvo: volver a enviar el archivo añadiría por segunda vez todo lo que ya escribió.",
       ca: "Ha avançat una part. Continueu on s'ha aturat: tornar a enviar el fitxer afegiria per segona vegada tot el que ja havia escrit.",
     },
-  /* The placeholders are the contract — {done} and {count} must survive intact. */
+  /* The placeholders are the contract: {done} and {count} must survive intact. */
   "{done} of {count} row(s) written. Each one is checked exactly as if you typed it in yourself.": {
     de: "{done} von {count} Zeile(n) geschrieben. Jede wird genau so geprüft, als hätten Sie sie selbst eingegeben.",
     es: "{done} de {count} fila(s) escritas. Cada una se comprueba exactamente como si la hubiera escrito usted.",
@@ -3129,10 +3066,10 @@ export const SEED: Catalogue = {
    * "aktualisiert sich gerade nicht" says that in the plain register the rest
    * of this file uses. Same choice in Spanish and Catalan: describe what has
    * stopped happening, rather than borrow an English adjective for it. */
-  "Not updating live right now — you may not be seeing the latest changes.": {
-    de: "Aktualisiert sich gerade nicht — du siehst möglicherweise nicht die neuesten Änderungen.",
-    es: "Ahora mismo no se actualiza solo — puede que no estés viendo los últimos cambios.",
-    ca: "Ara mateix no s'actualitza sol — potser no estàs veient els darrers canvis.",
+  "Not updating live right now. You may not be seeing the latest changes.": {
+    de: "Aktualisiert sich gerade nicht: du siehst möglicherweise nicht die neuesten Änderungen.",
+    es: "Ahora mismo no se actualiza solo: puede que no estés viendo los últimos cambios.",
+    ca: "Ara mateix no s'actualitza sol: potser no estàs veient els darrers canvis.",
   },
   "Refresh": {
     de: "Aktualisieren",
@@ -3142,7 +3079,7 @@ export const SEED: Catalogue = {
   /* ── THE TICKETS DASHBOARD (6 Sep 2026) ──────────────────────────────────
      Written here rather than left to accumulate as ceiling debt (R44), and for
      a reason particular to this screen: a dashboard is read at a glance and
-     never re-read. A list in the wrong language is still a list — the rows are
+     never re-read. A list in the wrong language is still a list: the rows are
      names and dates, and a reader recognises them. A CHART in the wrong
      language is a picture with a caption somebody skips, and the captions here
      are the half that says what the picture may NOT be used for: which months
@@ -3151,7 +3088,7 @@ export const SEED: Catalogue = {
      being misread, so they are the last ones that should ship in English to
      somebody who chose German.
 
-     THE HOLES ARE THE CONTRACT — {count}, {moved}, {counted}, {median}, {low},
+     THE HOLES ARE THE CONTRACT: {count}, {moved}, {counted}, {median}, {low},
      {high} and {max} must survive intact and keep their names. */
   "The open work": {
     de: "Die offene Arbeit",
@@ -3195,24 +3132,24 @@ export const SEED: Catalogue = {
   },
   /* THE TREND IS A PANEL OF ITS OWN NOW, so its heading is a heading (client,
      6 Sep 2026: "same style as How long a ticket takes to close put text above
-     the mountain graph 'Tendency'"). One word, and it is a NOUN in all three —
+     the mountain graph 'Tendency'"). One word, and it is a NOUN in all three: 
      the thing the line shows, not a direction it is going. */
   "Tendency": {
     de: "Tendenz",
     es: "Tendencia",
     ca: "Tendència",
   },
-  /* 7A — WHO ASKED, RANKED (client, 17 Sep 2026: "put the faces"). A panel
+  /* 7A: WHO ASKED, RANKED (client, 17 Sep 2026: "put the faces"). A panel
      title, the same shape as "Tendency" above: a noun naming the picture. */
   "Raised by": {
     de: "Gemeldet von",
     es: "Solicitado por",
     ca: "Sol·licitat per",
   },
-  /* THE RANKING'S OWN FOOTER — the two whole-population numbers the top five
+  /* THE RANKING'S OWN FOOTER: the two whole-population numbers the top five
      rows above cannot say on their own (this file's own `TicketDashboard`
      comment: "the footer names the full ranking, not the five drawn"). */
-  /* FOUR PANEL SUBTITLES AND TWO SUB-HEADINGS WERE RETIRED HERE, 6 Sep 2026 —
+  /* FOUR PANEL SUBTITLES AND TWO SUB-HEADINGS WERE RETIRED HERE, 6 Sep 2026: 
      client: "rmoeve all subtitles: Every open ticket, as one pipeline per kind
      down a shared set of stages. Open tickets against the thing you built. Open
      work by client, for the kinds that wait for a client to confirm. What your
@@ -3221,21 +3158,21 @@ export const SEED: Catalogue = {
      entries went with them for the same reason the caption below did: a
      sentence the app no longer says is a sentence being translated on every
      build for a screen nobody can read it on. "And {count} more systems." went
-     the same day and for a different reason — the panel stopped dropping rows
+     the same day and for a different reason: the panel stopped dropping rows
      at all, so there is nothing left for it to confess. */
-  /* THE "WORKING DAYS ONLY" CAPTION WAS RETIRED HERE, 6 Sep 2026 — client:
+  /* THE "WORKING DAYS ONLY" CAPTION WAS RETIRED HERE, 6 Sep 2026: client:
      "remove the subtitle 'working days only.' It's not needed. We already know
      it." The SENTENCE is gone; the arithmetic it described has not moved an
      inch (`shared/business-days.ts` is still under both reads on that panel).
      Its seed entry goes with it rather than being left behind to be translated
-     on every build for a screen that no longer says it — R28's ORPHAN clause,
+     on every build for a screen that no longer says it: R28's ORPHAN clause,
      applied on this side of the pipeline. */
   "{count} closed": {
     de: "{count} abgeschlossen",
     es: "{count} cerrados",
     ca: "{count} tancats",
   },
-  /* ONE MONTH OF THE TREND, said twice from one string — inside the hover card
+  /* ONE MONTH OF THE TREND, said twice from one string: inside the hover card
      the client asked for ("when I hover over the graphic on a specific day, it
      has a little modal that gives me the info for this date") and, joined with
      the month and the kind, as the accessible NAME of the hit area that opens
@@ -3258,7 +3195,7 @@ export const SEED: Catalogue = {
      2026: "for this how long, only consider the latest 6 months"). The days
      version was retired rather than left behind: it named a window that no
      longer exists, and an entry nothing says is translated on every build for a
-     screen that cannot show it — R28's ORPHAN clause, applied on this side of
+     screen that cannot show it: R28's ORPHAN clause, applied on this side of
      the pipeline. {count} is `CLOSURE_WINDOW_MONTHS` and must keep its name. */
   "Nothing has closed in the last {count} months.": {
     de: "In den letzten {count} Monaten wurde nichts abgeschlossen.",
@@ -3270,29 +3207,29 @@ export const SEED: Catalogue = {
     es: "El ticket central, mes a mes",
     ca: "El tiquet central, mes a mes",
   },
-  /* THE FLOOR'S TWO SENTENCES WERE RETIRED HERE, 7 Sep 2026 — client: "Only
+  /* THE FLOOR'S TWO SENTENCES WERE RETIRED HERE, 7 Sep 2026: client: "Only
      months with at least 8 of a kind are thrown. No, even if it's only 1, it
      should appear there."
 
-     They were "Only a month where at least {count} of a kind closed is drawn —
+     They were "Only a month where at least {count} of a kind closed is drawn: 
      a middle ticket out of six is one ticket wearing a statistic." and "No kind
      has closed at least {count} tickets in two of the last months, so there is
      no trend to draw yet." The first explained a subtraction the door no longer
      makes; the second named the floor as the reason a young team has no trend,
      when the real reason is that a line needs two points. Both went with the
      rule rather than being left behind to be translated on every build for a
-     screen that no longer says them — R28's ORPHAN clause, applied on this side
+     screen that no longer says them: R28's ORPHAN clause, applied on this side
      of the pipeline, and the same disposal the "working days only" caption got
      one block up. The reasoning the first one carried is not lost: it is kept in
      full where `CLOSURE_TREND_MIN_CLOSURES` used to be defined, in
      `shared/types.ts`. Both were seeded in all three languages, so retiring them
      moves no ceiling (R44). */
   "Nothing has closed in two different months yet, so there is no trend to draw.": {
-    de: "In zwei verschiedenen Monaten wurde noch nichts abgeschlossen — es gibt also noch keinen Verlauf zu zeichnen.",
+    de: "In zwei verschiedenen Monaten wurde noch nichts abgeschlossen: es gibt also noch keinen Verlauf zu zeichnen.",
     es: "Todavía no se ha cerrado nada en dos meses distintos, así que aún no hay tendencia que dibujar.",
     ca: "Encara no s'ha tancat res en dos mesos diferents, així que encara no hi ha tendència a dibuixar.",
   },
-  /* ONE ROW OF A RANKED CHART, said twice from one string — inside the hover
+  /* ONE ROW OF A RANKED CHART, said twice from one string: inside the hover
      card the client asked for ("i want that when i hover on client i see the
      details of the numbers of tickets") and, joined with the row's name and its
      kind, as the accessible NAME of the bar that opens it. Both ranked panels
@@ -3300,7 +3237,7 @@ export const SEED: Catalogue = {
      gesture. Seeded in all three in the same change that adds it, so R44's
      ceiling does not move: this screen has no rows on it, so its sentences are
      the whole of what a reader gets. {count} is what is still open and {total}
-     is everything ever raised — both names must survive intact, and the order
+     is everything ever raised: both names must survive intact, and the order
      matters to the sentence in every language here. */
   "{count} open of {total}": {
     de: "{count} von {total} offen",
@@ -3313,7 +3250,7 @@ export const SEED: Catalogue = {
     ca: "No s'ha pogut carregar el tauler.",
   },
   /* A CORRECTION, NOT A NEW STRING. The generated catalogue answered "Type"
-     with "Eingeben" — the VERB, "to type on a keyboard" — which is what a
+     with "Eingeben", the VERB, "to type on a keyboard", which is what a
      machine does with a one-word English string that is two different words.
      It is the label on the ticket dashboard's second filter and on the ticket
      list's own, so a German reader was being offered a chip that said "Enter".
@@ -3323,16 +3260,16 @@ export const SEED: Catalogue = {
 
   /* ── The ticket composer's one send, and the five seconds before it happens
      (client ruling, 6 Sep 2026; B0294/T3657, 16 Sep 2026, retired the second
-     "Send and close" send — "too easy to hit by accident … the close button
+     "Send and close" send: "too easy to hit by accident … the close button
      needs to move to the top") ─────────────────────────────────────────────
      Six sentences, written here in all three languages in the same change
      that adds them, so R44's ceiling does not move: an untranslated string is
      debt, and this feature is not the place to take any on. Two of the six
-     are the accessible NAME of the wordless send — the tooltip and the
+     are the accessible NAME of the wordless send: the tooltip and the
      aria-label say the same two words on purpose (label-in-name), so they are
      one entry read twice and a translator must keep them one.
      ("Send and close" and "Sending and closing" are gone from here with
-     B0294/T3657 — pruned by `npm run lang`, since neither `t(...)` call site
+     B0294/T3657: pruned by `npm run lang`, since neither `t(...)` call site
      survives in the app.) */
   "Send reply": { de: "Antwort senden", es: "Enviar respuesta", ca: "Enviar resposta" },
   "Sending your reply": {
@@ -3467,8 +3404,8 @@ export const SEED: Catalogue = {
    * Seeded in all three rather than left to the generator so the ceiling in
    * TRANSLATION_CEILING does not have to rise for it (R44 — the pin falls and
    * never rises). */
-  "Cleared the {what} filter — it doesn't fit the {parent} you picked.": { de: "Filter {what} geleert — er passt nicht zur Auswahl unter {parent}.", es: "Se ha borrado el filtro {what}: no encaja con {parent} que has elegido.", ca: "S'ha esborrat el filtre {what}: no encaixa amb {parent} que has triat."},
-  /* ── R44 CEILING PASS — 2026-09-09 ─────────────────────────────────────────
+  "Cleared the {what} filter. It doesn't fit the {parent} you picked.": { de: "Filter {what} geleert: er passt nicht zur Auswahl unter {parent}.", es: "Se ha borrado el filtro {what}: no encaja con {parent} que has elegido.", ca: "S'ha esborrat el filtre {what}: no encaixa amb {parent} que has triat."},
+  /* ── R44 CEILING PASS: 2026-09-09 ─────────────────────────────────────────
    * The 244 strings TRANSLATION_CEILING pinned as untranslated in each of
    * de/es/ca, answered by hand per the owner's 8 Sep 2026 ruling that
    * translation is the builder's own job and never spends his key. Register
@@ -3526,7 +3463,6 @@ export const SEED: Catalogue = {
   // "story" keeps the vocabulary this file already settled on above
   // (`Aufgabe` / `historia` / `història`).
   "Backlog": { de: "Backlog", es: "Backlog", ca: "Backlog" },
-  "No sprint": { de: "Kein Sprint", es: "Sin sprint", ca: "Sense sprint" },
   "No stories with a due date yet.": { de: "Noch keine Aufgaben mit Fälligkeitsdatum.", es: "Aún no hay historias con fecha de vencimiento.", ca: "Encara no hi ha històries amb data de venciment." },
   "Nothing on this list yet.": { de: "Noch nichts auf dieser Liste.", es: "Aún no hay nada en esta lista.", ca: "Encara no hi ha res en aquesta llista." },
   "Now": { de: "Jetzt", es: "Ahora", ca: "Ara" },
@@ -3590,7 +3526,7 @@ export const SEED: Catalogue = {
   "Mango": { de: "Mango", es: "Mango", ca: "Mango" },
   /* The Meetings strip's middle tab (client ruling, 2026-09-09: "tabs for
      meetings: this week, mine, all"). It means THE ONES I WAS IN THE ROOM FOR,
-     so it agrees in gender and number with the collection it narrows —
+     so it agrees in gender and number with the collection it narrows: 
      `Termine` / `Reuniones` / `Reunions`. */
   Mine: { de: "Meine", es: "Mías", ca: "Meves" },
   "No contacts match": { de: "Keine Kontakte passen", es: "No hay contactos que coincidan", ca: "Cap contacte coincideix" },
@@ -3600,7 +3536,6 @@ export const SEED: Catalogue = {
   "No new tickets to sort. Nobody is on triage this week.": { de: "Keine neuen Tickets zu sichten. Diese Woche macht niemand die Triage.", es: "No hay tickets nuevos que clasificar. Esta semana nadie está de triaje.", ca: "No hi ha tiquets nous per classificar. Aquesta setmana ningú fa el triatge." },
   "No new tickets to sort. {name} is on triage this week.": { de: "Keine neuen Tickets zu sichten. {name} macht diese Woche die Triage.", es: "No hay tickets nuevos que clasificar. {name} está de triaje esta semana.", ca: "No hi ha tiquets nous per classificar. {name} fa el triatge aquesta setmana." },
   "No roles yet.": { de: "Noch keine Rollen.", es: "Aún no hay roles.", ca: "Encara no hi ha rols." },
-  "No sprints in this wave yet.": { de: "Noch keine Sprints in dieser Wave.", es: "Aún no hay sprints en esta wave.", ca: "Encara no hi ha sprints en aquesta wave." },
   "No tasks match your search.": { de: "Keine To-dos passen zu Ihrer Suche.", es: "Ninguna tarea coincide con tu búsqueda.", ca: "Cap tasca coincideix amb la teva cerca." },
   "No tasks with a deadline yet.": { de: "Noch keine To-dos mit einer Frist.", es: "Aún no hay tareas con fecha límite.", ca: "Encara no hi ha tasques amb data límit." },
   "No time matches": { de: "Keine Zeit passt", es: "No hay tiempo que coincida", ca: "Cap temps coincideix" },
@@ -3608,7 +3543,6 @@ export const SEED: Catalogue = {
   "No waves have both a start and an end in this window yet.": { de: "Noch keine Wave mit Start und Ende in diesem Zeitraum.", es: "Aún ninguna wave tiene inicio y fin en este período.", ca: "Encara cap wave té inici i final en aquest període." },
   "No waves match that in this window.": { de: "Keine Wave passt dazu in diesem Zeitraum.", es: "Ninguna wave coincide con eso en este período.", ca: "Cap wave hi coincideix en aquest període." },
   "No waves match that.": { de: "Keine Wave passt dazu.", es: "Ninguna wave coincide con eso.", ca: "Cap wave hi coincideix." },
-  "No waves or sprints have a start date yet.": { de: "Noch keine Wave oder kein Sprint mit einem Startdatum.", es: "Aún ninguna wave o sprint tiene fecha de inicio.", ca: "Encara cap wave o sprint té data d'inici." },
   "Nobody here can sign in yet.": { de: "Niemand kann sich hier noch anmelden.", es: "Nadie aquí puede iniciar sesión todavía.", ca: "Ningú aquí pot accedir encara." },
   "Nobody on our side matches that.": { de: "Niemand von uns passt dazu.", es: "Nadie de nuestro lado coincide con eso.", ca: "Ningú del nostre costat hi coincideix." },
   "Nobody on the client's side matches that.": { de: "Niemand auf Seiten des Kunden passt dazu.", es: "Nadie del lado del cliente coincide con eso.", ca: "Ningú del costat del client hi coincideix." },
@@ -3618,7 +3552,7 @@ export const SEED: Catalogue = {
   "Nothing built for {account} yet.": { de: "Für {account} wurde noch nichts gebaut.", es: "Aún no se ha construido nada para {account}.", ca: "Encara no s'ha construït res per a {account}." },
   "Nothing in Meetings this week.": { de: "Diese Woche nichts in Terminen.", es: "Nada en Reuniones esta semana.", ca: "Res a Reunions aquesta setmana." },
   "Nothing in Meetings yet.": { de: "Noch nichts in Terminen.", es: "Aún nada en Reuniones.", ca: "Encara res a Reunions." },
-  /* The Mine tab's empty state — it says the RULE the tab uses (attendance),
+  /* The Mine tab's empty state: it says the RULE the tab uses (attendance),
      because a person who sees an empty Mine beside a full All will otherwise
      assume the tab is broken rather than that they were in no meetings. */
   "Nothing in Meetings you were in.": {
@@ -3647,7 +3581,7 @@ export const SEED: Catalogue = {
   "Search companies": { de: "Unternehmen durchsuchen", es: "Buscar empresas", ca: "Cercar empreses" },
   "Search contacts": { de: "Kontakte durchsuchen", es: "Buscar contactos", ca: "Cercar contactes" },
   "Search inputs…": { de: "Angaben durchsuchen…", es: "Buscar aportaciones…", ca: "Cercar aportacions…" },
-  /* ── THE INPUTS SCREEN (Task C, 15 Sep 2026) — seeded rather than left to
+  /* ── THE INPUTS SCREEN (Task C, 15 Sep 2026): seeded rather than left to
    * the generator so TRANSLATION_CEILING does not have to rise for them
    * (R44 — the pin falls and never rises). Terminology follows the
    * established R44-pass choice for the glossary's Input word — "Angabe" /
@@ -3671,8 +3605,6 @@ export const SEED: Catalogue = {
   "Search modules": { de: "Module durchsuchen", es: "Buscar módulos", ca: "Cercar mòduls" },
   "Search people on this": { de: "Beteiligte durchsuchen", es: "Buscar personas implicadas", ca: "Cercar persones implicades" },
   "Search people on this…": { de: "Beteiligte durchsuchen…", es: "Buscar personas implicadas…", ca: "Cercar persones implicades…" },
-  "Search sprints in this wave": { de: "Sprints in dieser Wave durchsuchen", es: "Buscar sprints en esta wave", ca: "Cercar sprints en aquesta wave" },
-  "Search sprints in this wave…": { de: "Sprints in dieser Wave durchsuchen…", es: "Buscar sprints en esta wave…", ca: "Cercar sprints en aquesta wave…" },
   "Search stories…": { de: "Aufgaben durchsuchen…", es: "Buscar historias…", ca: "Cercar històries…" },
   "Search tasks…": { de: "To-dos durchsuchen…", es: "Buscar tareas…", ca: "Cercar tasques…" },
   "Search the triage queue…": { de: "Sichtungswarteschlange durchsuchen…", es: "Buscar en la cola de clasificación…", ca: "Cercar a la cua de classificació…" },
@@ -3687,7 +3619,6 @@ export const SEED: Catalogue = {
   "Start here": { de: "Hier starten", es: "Empieza aquí", ca: "Comença aquí" },
   "Still waiting": { de: "Wartet noch", es: "Aún en espera", ca: "Encara en espera" },
   "Stop using this source?": { de: "Diese Quelle nicht mehr verwenden?", es: "¿Dejar de usar esta fuente?", ca: "Vols deixar d'utilitzar aquesta font?" },
-  "Store": { de: "Zurückstellen", es: "Aparcar", ca: "Aparcar" },
   "System": { de: "System", es: "Sistema", ca: "Sistema" },
   "Take {label} off this story?": { de: "„{label}“ von dieser Aufgabe entfernen?", es: "¿Quitar «{label}» de esta historia?", ca: "Vols treure «{label}» d'aquesta història?" },
   "Take {label} off this ticket?": { de: "„{label}“ von diesem Ticket entfernen?", es: "¿Quitar «{label}» de este ticket?", ca: "Vols treure «{label}» d'aquest tiquet?" },
@@ -3696,9 +3627,8 @@ export const SEED: Catalogue = {
   "That file is too big. The limit is {limit}.": { de: "Diese Datei ist zu groß. Das Limit liegt bei {limit}.", es: "Ese archivo es demasiado grande. El límite es {limit}.", ca: "Aquest fitxer és massa gran. El límit és {limit}." },
   "That's the first {n}. Search or filter to find what you're after.": { de: "Das sind die ersten {n}. Suchen oder filtern Sie, um zu finden, wonach Sie suchen.", es: "Estos son los primeros {n}. Busca o filtra para encontrar lo que buscas.", ca: "Aquests són els primers {n}. Cerca o filtra per trobar el que busques." },
   "That's the queue cleared.": { de: "Die Warteschlange ist geleert.", es: "La cola está despejada.", ca: "La cua està buida." },
-  "The assistant stops reading it right away. Nothing is deleted, and the sweep won't put it back — you can turn it on again here any time.": { de: "Der Assistent liest sie ab sofort nicht mehr. Es wird nichts gelöscht, und der automatische Durchlauf bringt sie nicht zurück — Sie können sie hier jederzeit wieder aktivieren.", es: "El asistente deja de leerla de inmediato. No se elimina nada, y el barrido automático no la volverá a añadir — puedes reactivarla aquí cuando quieras.", ca: "L'assistent deixa de llegir-la immediatament. No s'elimina res, i l'escombratge automàtic no la tornarà a afegir — la pots reactivar aquí quan vulguis." },
-  "The wave is sold first; the sprints inside it are planned afterwards.": { de: "Die Wave wird zuerst verkauft; die Sprints darin werden anschließend geplant.", es: "La wave se vende primero; los sprints dentro de ella se planifican después.", ca: "La wave es ven primer; els sprints dins d'ella es planifiquen després." },
-  "There's no way to bring it back from here — attach it again if you need it.": { de: "Von hier aus gibt es keine Möglichkeit, sie zurückzuholen — hängen Sie sie bei Bedarf erneut an.", es: "No hay forma de recuperarlo desde aquí — adjúntalo de nuevo si lo necesitas.", ca: "No hi ha manera de recuperar-ho des d'aquí — adjunta-ho de nou si ho necessites." },
+  "The assistant stops reading it right away. Nothing is deleted, and the sweep won't put it back. You can turn it on again here any time.": { de: "Der Assistent liest sie ab sofort nicht mehr. Es wird nichts gelöscht, und der automatische Durchlauf bringt sie nicht zurück, Sie können sie hier jederzeit wieder aktivieren.", es: "El asistente deja de leerla de inmediato. No se elimina nada, y el barrido automático no la volverá a añadir, puedes reactivarla aquí cuando quieras.", ca: "L'assistent deixa de llegir-la immediatament. No s'elimina res, i l'escombratge automàtic no la tornarà a afegir, la pots reactivar aquí quan vulguis." },
+  "There's no way to bring it back from here. Attach it again if you need it.": { de: "Von hier aus gibt es keine Möglichkeit, sie zurückzuholen, hängen Sie sie bei Bedarf erneut an.", es: "No hay forma de recuperarlo desde aquí, adjúntalo de nuevo si lo necesitas.", ca: "No hi ha manera de recuperar-ho des d'aquí, adjunta-ho de nou si ho necessites." },
   "There's nothing here you can import into yet. You can import once you're allowed to create Accounts, Roles or Choices.": { de: "Hier gibt es noch nichts, wohin Sie importieren können. Sie können importieren, sobald Sie Kunden, Rollen oder Optionen erstellen dürfen.", es: "Aquí todavía no hay nada en lo que puedas importar. Podrás importar en cuanto puedas crear Cuentas, Roles u Opciones.", ca: "Aquí encara no hi ha res on puguis importar. Podràs importar quan puguis crear Comptes, Rols o Opcions." },
   "They stay in your accounts, with everything they're attached to. You're only saying they're no longer a contact here.": { de: "Sie bleiben in Ihren Kunden, mit allem, woran sie hängen. Sie sagen nur, dass sie hier kein Kontakt mehr sind.", es: "Se quedan en tus cuentas, con todo a lo que están vinculados. Solo estás diciendo que aquí ya no son un contacto.", ca: "Es queden als teus comptes, amb tot allò a què estan vinculats. Només estàs dient que aquí ja no són un contacte." },
   "They won't be able to sign in any more. Everything they're attached to, their records, their history, stays exactly where it is, and you can switch it back on later.": { de: "Sie können sich nicht mehr anmelden. Alles, woran sie hängen, ihre Einträge, ihr Verlauf, bleibt genau dort, wo es ist, und Sie können es später wieder aktivieren.", es: "Ya no podrán iniciar sesión. Todo a lo que están vinculados, sus registros, su historial, se queda exactamente donde está, y puedes reactivarlo más tarde.", ca: "Ja no podran iniciar sessió. Tot allò a què estan vinculats, els seus registres, el seu historial, es queda exactament on és, i ho pots reactivar més tard." },
@@ -3743,7 +3673,7 @@ export const SEED: Catalogue = {
   "Your team has no ticket types set up yet.": { de: "Ihr Team hat noch keine Tickettypen eingerichtet.", es: "Tu equipo aún no tiene tipos de ticket configurados.", ca: "El teu equip encara no té tipus de tiquet configurats." },
   "next": { de: "weiter", es: "siguiente", ca: "següent" },
   "raised {date}": { de: "erstellt am {date}", es: "creado el {date}", ca: "creat el {date}" },
-  /* THE "RAISED ON" FACT ROW — client ruling, 17 Sep 2026, verbatim: "Remove
+  /* THE "RAISED ON" FACT ROW: client ruling, 17 Sep 2026, verbatim: "Remove
    * the 'Raised On' chip from the QE view, but also from the detail page in
    * the QE view. Add it under 'Raised By' as 'Raised On' and put the date
    * and, in brackets, how many days ago." One label ("Raised on", mirroring
@@ -3837,7 +3767,7 @@ export const SEED: Catalogue = {
   "Deactivated": { de: "Deaktiviert", es: "Desactivados", ca: "Desactivats" },
   "Locked by policy": { de: "Durch Richtlinie gesperrt", es: "Bloqueado por política", ca: "Bloquejat per política" },
   "nothing": { de: "nichts", es: "nada", ca: "res" },
-  /* THE ROLES TOOLBAR, 2026-09-14 — "Deactivated" moved from a quiet label at
+  /* THE ROLES TOOLBAR, 2026-09-14: "Deactivated" moved from a quiet label at
    * the foot of the grid into a toolbar button, the same shape Members'
    * "Invites" already is, opening an in-place disclosure. Seeded in all
    * three so TRANSLATION_CEILING does not move (R44 — the pin falls and
@@ -3851,7 +3781,7 @@ export const SEED: Catalogue = {
   "Deactivated roles": { de: "Deaktivierte Rollen", es: "Roles desactivados", ca: "Rols desactivats" },
   "No deactivated roles.": { de: "Keine deaktivierten Rollen.", es: "No hay roles desactivados.", ca: "No hi ha rols desactivats." },
   "No modules match your search.": { de: "Keine Module passen zu Ihrer Suche.", es: "Ningún módulo coincide con tu búsqueda.", ca: "Cap mòdul coincideix amb la teva cerca." },
-  /* THE ROLES TOOLBAR, AMENDED 17 SEP 2026 — "Deactivated" moves again, from
+  /* THE ROLES TOOLBAR, AMENDED 17 SEP 2026: "Deactivated" moves again, from
    * the actions-slot button above into a real filter facet ("roles' status:
    * Active/Deactivated" — see roles-matrix.tsx's own header), and the row
    * gains a Module name sort. Two more strings, seeded in all three so
@@ -3949,8 +3879,6 @@ export const SEED: Catalogue = {
    * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
    * falls and never rises). */
   "Story types": { de: "Aufgaben-Typen", es: "Tipos de historia", ca: "Tipus d'història" },
-  "Sprint type": { de: "Sprintart", es: "Tipo de sprint", ca: "Tipus de sprint" },
-  "Sprint types": { de: "Sprint-Typen", es: "Tipos de sprint", ca: "Tipus de sprint" },
   "Stages and deliverable kinds": { de: "Phasen und Ergebnisarten", es: "Etapas y tipos de entregable", ca: "Etapes i tipus de lliurable" },
   "Industries and countries": { de: "Branchen und Länder", es: "Sectores y países", ca: "Sectors i països" },
   "Asset categories": { de: "Asset-Kategorien", es: "Categorías de activos", ca: "Categories de recursos" },
@@ -4045,15 +3973,13 @@ export const SEED: Catalogue = {
   "On Mondays, the morning digest names anybody who logged nothing.": { de: "Montags nennt die Morgenübersicht alle, die nichts erfasst haben.", es: "Los lunes, el resumen matinal nombra a quien no registró nada.", ca: "Els dilluns, el resum matinal anomena qui no va registrar res." },
   "Stop my other timers": { de: "Meine anderen Zeitmessungen stoppen", es: "Parar mis otros cronómetros", ca: "Aturar els meus altres cronòmetres" },
   "Starting a timer stops the ones you already had running.": { de: "Eine neue Zeitmessung stoppt die, die bereits laufen.", es: "Iniciar un cronómetro para los que ya tenías en marcha.", ca: "Iniciar un cronòmetre atura els que ja tenies en marxa." },
-  "Each person decides this for themselves — it is stored against your own account and not the team's. Today the only way to set it is to ask the assistant, which is a gap rather than a design.": { de: "Das entscheidet jede Person für sich — es hängt an Ihrem eigenen Konto, nicht am Team. Heute lässt es sich nur über den Assistenten einstellen, und das ist eine Lücke, keine Absicht.", es: "Cada persona lo decide por sí misma: se guarda en tu propia cuenta y no en la del equipo. Hoy la única forma de configurarlo es pedírselo al asistente, y eso es una carencia, no un diseño.", ca: "Cada persona ho decideix per si mateixa: es desa al teu propi compte i no al de l'equip. Avui l'única manera de configurar-ho és demanar-ho a l'assistent, i això és una mancança, no un disseny." },
   "Flag a runaway timer": { de: "Weiterlaufende Zeitmessung melden", es: "Avisar de un cronómetro desbocado", ca: "Avisar d'un cronòmetre desbocat" },
   "A timer still running after eight hours is flagged for you to settle.": { de: "Eine Zeitmessung, die nach acht Stunden noch läuft, wird Ihnen zur Klärung gemeldet.", es: "Un cronómetro que sigue en marcha tras ocho horas se te señala para que lo resuelvas.", ca: "Un cronòmetre que continua en marxa després de vuit hores se't assenyala perquè el resolguis." },
-  "Nothing happens on its own here — the timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.": { de: "Hier geschieht nichts von selbst — die Messung wird nicht gestoppt und keine Zeit geschrieben. Es ist eine Frage, die die App Ihnen stellt, und Sie beantworten sie auf drei Arten.", es: "Aquí no ocurre nada solo: el cronómetro no se para y no se escribe ningún tiempo. Es una pregunta que la aplicación te hace y que respondes de tres maneras.", ca: "Aquí no passa res sol: el cronòmetre no s'atura i no s'escriu cap temps. És una pregunta que l'aplicació et fa i que respons de tres maneres." },
   "Capture meeting transcripts": { de: "Terminmitschriften abholen", es: "Recoger transcripciones de reuniones", ca: "Recollir transcripcions de reunions" },
   "Every quarter of an hour we collect transcripts from connected accounts.": { de: "Alle Viertelstunde holen wir Mitschriften aus verbundenen Konten.", es: "Cada cuarto de hora recogemos transcripciones de las cuentas conectadas.", ca: "Cada quart d'hora recollim transcripcions dels comptes connectats." },
   "Billable time from a meeting": { de: "Abrechenbare Zeit aus einem Termin", es: "Tiempo facturable de una reunión", ca: "Temps facturable d'una reunió" },
   "A captured meeting writes one billable work log for each member who attended.": { de: "Ein abgeholter Termin schreibt je einen abrechenbaren Zeiteintrag für jedes teilnehmende Mitglied.", es: "Una reunión recogida escribe un registro de tiempo facturable por cada miembro que asistió.", ca: "Una reunió recollida escriu un registre de temps facturable per a cada membre que hi va assistir." },
-  "It is the second half of the capture above and is written by the same statement. Switching it off alone would record the meeting and lose the hours it took, which is a half-finished record rather than a preference.": { de: "Es ist die zweite Hälfte der Abholung oben und wird von derselben Anweisung geschrieben. Einzeln abgeschaltet wäre der Termin festgehalten und die dafür aufgewendeten Stunden verloren — ein halb fertiger Datensatz, keine Einstellungssache.", es: "Es la segunda mitad de la recogida de arriba y la escribe la misma instrucción. Desactivarla por separado dejaría la reunión registrada y perdería las horas que costó, lo que es un registro a medias y no una preferencia.", ca: "És la segona meitat de la recollida de dalt i l'escriu la mateixa instrucció. Desactivar-la per separat deixaria la reunió registrada i perdria les hores que va costar, cosa que és un registre a mitges i no una preferència." },
+  "It is the second half of the capture above and is written by the same statement. Switching it off alone would record the meeting and lose the hours it took, which is a half-finished record rather than a preference.": { de: "Es ist die zweite Hälfte der Abholung oben und wird von derselben Anweisung geschrieben. Einzeln abgeschaltet wäre der Termin festgehalten und die dafür aufgewendeten Stunden verloren: ein halb fertiger Datensatz, keine Einstellungssache.", es: "Es la segunda mitad de la recogida de arriba y la escribe la misma instrucción. Desactivarla por separado dejaría la reunión registrada y perdería las horas que costó, lo que es un registro a medias y no una preferencia.", ca: "És la segona meitat de la recollida de dalt i l'escriu la mateixa instrucció. Desactivar-la per separat deixaria la reunió registrada i perdria les hores que va costar, cosa que és un registre a mitges i no una preferència." },
   "Keep the knowledge base in step": { de: "Wissensdatenbank aktuell halten", es: "Mantener al día la base de conocimiento", ca: "Mantenir al dia la base de coneixement" },
   "Every quarter of an hour, the team's own records are re-read into it.": { de: "Alle Viertelstunde werden die eigenen Datensätze des Teams neu eingelesen.", es: "Cada cuarto de hora se vuelven a leer en ella los registros del propio equipo.", ca: "Cada quart d'hora s'hi tornen a llegir els registres del mateix equip." },
   "Read connected Google accounts": { de: "Verbundene Google-Konten lesen", es: "Leer las cuentas de Google conectadas", ca: "Llegir els comptes de Google connectats" },
@@ -4097,13 +4023,12 @@ export const SEED: Catalogue = {
   "The same answer as the nightly clear-out: it watches the whole installation, not this team. A team that could switch it off would be a team nobody is watching.": { de: "Dieselbe Antwort wie beim nächtlichen Aufräumen: Es beobachtet die gesamte Installation, nicht dieses Team. Ein Team, das es abschalten könnte, wäre ein Team, das niemand beobachtet.", es: "La misma respuesta que la limpieza nocturna: vigila toda la instalación, no este equipo. Un equipo que pudiera desactivarlo sería un equipo al que nadie vigila.", ca: "La mateixa resposta que la neteja nocturna: vigila tota la instal·lació, no aquest equip. Un equip que ho pogués desactivar seria un equip que ningú no vigila." },
   "Nightly fault report": { de: "Nächtlicher Fehlerbericht", es: "Informe nocturno de fallos", ca: "Informe nocturn d'errors" },
   "New and worsening faults are gathered every night.": { de: "Neue und sich verschlechternde Fehler werden jede Nacht zusammengetragen.", es: "Cada noche se reúnen los fallos nuevos y los que empeoran.", ca: "Cada nit es reuneixen els errors nous i els que empitjoren." },
-  "The gathering cannot be switched off — it is what the fault record is made of. The email already is: it is addressed to nobody on purpose, and the faults are read here instead.": { de: "Das Zusammentragen lässt sich nicht abschalten — daraus besteht die Fehlerakte. Die E-Mail ist es bereits: Sie ist absichtlich an niemanden adressiert, und die Fehler werden stattdessen hier gelesen.", es: "La recopilación no puede desactivarse: es de lo que está hecho el registro de fallos. El correo ya lo está: va dirigido a nadie a propósito, y los fallos se leen aquí en su lugar.", ca: "La recopilació no es pot desactivar: és d'això que està fet el registre d'errors. El correu ja ho està: va adreçat a ningú a propòsit, i els errors es llegeixen aquí en comptes d'això." },
   "Watch the schedules": { de: "Die Zeitpläne überwachen", es: "Vigilar las tareas programadas", ca: "Vigilar les tasques programades" },
   "Each unattended job checks that the others are still running.": { de: "Jeder unbeaufsichtigte Auftrag prüft, ob die anderen noch laufen.", es: "Cada tarea desatendida comprueba que las demás siguen funcionando.", ca: "Cada tasca desatesa comprova que les altres continuen funcionant." },
   "It is the thing that notices when everything above has stopped. Switching it off would make a silent failure look exactly like a quiet night.": { de: "Es ist das, was bemerkt, wenn alles darüber stehen geblieben ist. Abgeschaltet sähe ein stiller Ausfall genauso aus wie eine ruhige Nacht.", es: "Es lo que se da cuenta cuando todo lo anterior se ha parado. Al desactivarlo, un fallo silencioso se vería igual que una noche tranquila.", ca: "És el que s'adona quan tot el que hi ha a sobre s'ha aturat. En desactivar-ho, una fallada silenciosa es veuria igual que una nit tranquil·la." },
 
   /* ── The Automations toolbar, 14 Sep 2026 (search, sort by name, filter by
-     status) — and the Settings › Automations tab's own module filter beside
+     status): and the Settings › Automations tab's own module filter beside
      it, same round. Reworked the same day into a `RecordTable` (the client's
      ruling: "the list component exactly the same as we have in tickets"),
      which is why the empty-state sentence below now matches the Choices
@@ -4116,7 +4041,7 @@ export const SEED: Catalogue = {
     ca: "Cap automatització coincideix amb el que busques.",
   },
 
-  /* ── The choices module (new/create button + form), 14 Sep 2026 — moved from
+  /* ── The choices module (new/create button + form), 14 Sep 2026: moved from
      catalogue to seed because these two strings were hand-written directly in
      the catalogue by another lane on 14 Sep 2026 and must live here instead. */
   "New choice": { de: "Neue Option", es: "Nueva opción", ca: "Nova opció" },
@@ -4136,20 +4061,20 @@ export const SEED: Catalogue = {
   "Send email": { de: "E-Mail senden", es: "Enviar correo", ca: "Enviar correu" },
   "Call": { de: "Anrufen", es: "Llamar", ca: "Trucar" },
 
-  /* ── The system-wide Choices tab (Settings), 14 Sep 2026 — a table over
+  /* ── The system-wide Choices tab (Settings), 14 Sep 2026: a table over
      every choice value this reader's own visible modules own. */
   "Search choices…": { de: "Optionen suchen…", es: "Buscar opciones…", ca: "Cerca opcions…" },
   "No choices match what you're looking for.": { de: "Keine Optionen passen zu Ihrer Suche.", es: "Ninguna opción coincide con lo que buscas.", ca: "Cap opció coincideix amb el que busques." },
   "Couldn't load the choices.": { de: "Optionen konnten nicht geladen werden.", es: "No se pudieron cargar las opciones.", ca: "No s'han pogut carregar les opcions." },
 
-  /* ── THE DETAILS COLUMN, 16 Sep 2026 evening — the client's ruling on
+  /* ── THE DETAILS COLUMN, 16 Sep 2026 evening: the client's ruling on
      `settings-choices-panel.tsx`'s own header, "THE DETAILS COLUMN": an
      in-between column showing what a choice's own type carries beyond its
      word (a sprint type's icon + duration, an app stage's dot). */
   "Details": { de: "Details", es: "Detalles", ca: "Detalls" },
   "{days} days": { de: "{days} Tage", es: "{days} días", ca: "{days} dies" },
 
-  /* ── THE MEETING-TYPES ADAPTER (Task C, 15 Sep 2026) — new strings
+  /* ── THE MEETING-TYPES ADAPTER (Task C, 15 Sep 2026): new strings
      `MeetingTypesPanel`/`MeetingTypeFormDialog` say (web/components/team/
      internal-screens.tsx), hand-seeded rather than left for the generator.
      "Meeting type(s)"/"New meeting type" are already seeded above (the
@@ -4169,7 +4094,7 @@ export const SEED: Catalogue = {
   "No meeting types yet.": { de: "Noch keine Termintypen.", es: "Aún no hay tipos de reunión.", ca: "Encara no hi ha tipus de reunió." },
   "Added \"{name}\".": { de: "„{name}“ hinzugefügt.", es: "«{name}» añadido.", ca: "«{name}» afegit." },
 
-  /* ── ROW ACTIONS ON `SettingsChoicesPanel`, 15 Sep 2026 — the rename/protect/
+  /* ── ROW ACTIONS ON `SettingsChoicesPanel`, 15 Sep 2026: the rename/protect/
      deactivate door back behind a control (Task B's own fix to R "doors-have-
      controls"; see that file's header, "EDITING AN EXISTING VALUE"). Same
      strings `selectable-screen.tsx` always said, hand-seeded now because that
@@ -4185,14 +4110,14 @@ export const SEED: Catalogue = {
   "Deactivated \"{value}\".": { de: "„{value}“ deaktiviert.", es: "«{value}» desactivado.", ca: "«{value}» desactivat." },
   "Activated \"{value}\".": { de: "„{value}“ aktiviert.", es: "«{value}» activado.", ca: "«{value}» activat." },
 
-  /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026 — the 45 strings the
+  /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026: the 45 strings the
      ceiling check found with no seed entry for de/es/ca (a full lane round's
      worth of new knowledge-base, task-view and meeting-type copy, landed
      faster than it was translated). Hand-translated here, never in the
-     generated catalogue — the file's own header says why. Vocabulary kept
+     generated catalogue: the file's own header says why. Vocabulary kept
      consistent with what is already seeded above: Account → Kunde/cuenta/
      compte, source → Quelle/fuente/font, passage → Abschnitt/pasaje/fragment.
-     "Padelbase, Asekurans" is a placeholder of two proper nouns — company
+     "Padelbase, Asekurans" is a placeholder of two proper nouns: company
      names, which do not translate, so the same value is the correct answer
      in every language, same as the German seed's own treatment of "Sprint"
      and "Ticket" above. */
@@ -4214,15 +4139,15 @@ export const SEED: Catalogue = {
   "Padelbase, Asekurans": { de: "Padelbase, Asekurans", es: "Padelbase, Asekurans", ca: "Padelbase, Asekurans" },
   "Reached us through one person": { de: "Über eine Person zu uns gelangt", es: "Nos llegó a través de una persona", ca: "Ens va arribar a través d'una persona" },
   "Reached us through {count} people": { de: "Über {count} Personen zu uns gelangt", es: "Nos llegó a través de {count} personas", ca: "Ens va arribar a través de {count} persones" },
-  "Read 1 word of {kind} from {provider}.": { de: "1 Wort gelesen — {kind} von {provider}.", es: "Leída 1 palabra de {kind} en {provider}.", ca: "Llegida 1 paraula de {kind} a {provider}." },
-  "Read {words} words of {kind} from {provider}.": { de: "{words} Wörter gelesen — {kind} von {provider}.", es: "Leídas {words} palabras de {kind} en {provider}.", ca: "Llegides {words} paraules de {kind} a {provider}." },
+  "Read 1 word of {kind} from {provider}.": { de: "1 Wort gelesen: {kind} von {provider}.", es: "Leída 1 palabra de {kind} en {provider}.", ca: "Llegida 1 paraula de {kind} a {provider}." },
+  "Read {words} words of {kind} from {provider}.": { de: "{words} Wörter gelesen: {kind} von {provider}.", es: "Leídas {words} palabras de {kind} en {provider}.", ca: "Llegides {words} paraules de {kind} a {provider}." },
   "Reading the link…": { de: "Link wird gelesen…", es: "Leyendo el enlace…", ca: "Llegint l'enllaç…" },
   "Renamed.": { de: "Umbenannt.", es: "Renombrado.", ca: "Reanomenat." },
   "Rough notes, not the answer.": { de: "Grobe Notizen, nicht die Antwort.", es: "Notas preliminares, no la respuesta.", ca: "Notes preliminars, no la resposta." },
-  "Saved, but we didn't read anything from the link — the assistant won't know what this video says yet.": { de: "Gespeichert, aber wir haben nichts vom Link gelesen — der Assistent weiß noch nicht, was in diesem Video gesagt wird.", es: "Guardado, pero no hemos leído nada del enlace — el asistente aún no sabrá qué dice este vídeo.", ca: "Desat, però no hem llegit res de l'enllaç — l'assistent encara no sabrà què diu aquest vídeo." },
+  "Saved, but we didn't read anything from the link. The assistant won't know what this video says yet.": { de: "Gespeichert, aber wir haben nichts vom Link gelesen, der Assistent weiß noch nicht, was in diesem Video gesagt wird.", es: "Guardado, pero no hemos leído nada del enlace, el asistente aún no sabrá qué dice este vídeo.", ca: "Desat, però no hem llegit res de l'enllaç, l'assistent encara no sabrà què diu aquest vídeo." },
   "Apps by stage": { de: "Apps nach Phase", es: "Apps por etapa", ca: "Apps per etapa" },
   "Tasks by priority": { de: "To-dos nach Priorität", es: "Tareas por prioridad", ca: "Tasques per prioritat" },
-  "That is the end of what this screen shows, not the end of the material —": { de: "Das ist das Ende dessen, was dieser Bildschirm zeigt, nicht das Ende des Materials —", es: "Eso es el final de lo que muestra esta pantalla, no el final del material —", ca: "Això és el final del que mostra aquesta pantalla, no el final del material —" },
+  "That is the end of what this screen shows, not the end of the material:": { de: "Das ist das Ende dessen, was dieser Bildschirm zeigt, nicht das Ende des Materials:", es: "Eso es el final de lo que muestra esta pantalla, no el final del material:", ca: "Això és el final del que mostra aquesta pantalla, no el final del material:" },
   "Then I re-read the strongest passages before answering.": { de: "Dann habe ich die stärksten Abschnitte noch einmal gelesen, bevor ich geantwortet habe.", es: "Después releí los pasajes más relevantes antes de responder.", ca: "Després vaig rellegir els fragments més rellevants abans de respondre." },
   "These words were read out of the file, so they are corrected by adding the file again rather than typed over here. You can still rename it, change where it is filed and who can use it.": { de: "Dieser Text wurde aus der Datei ausgelesen und wird daher korrigiert, indem Sie die Datei erneut hinzufügen, statt ihn hier zu überschreiben. Sie können sie weiterhin umbenennen, ihre Ablage ändern und festlegen, wer sie nutzen darf.", es: "Este texto se leyó del archivo, así que se corrige añadiendo el archivo de nuevo, no escribiéndolo aquí encima. Aún puedes renombrarlo, cambiar dónde está archivado y quién puede usarlo.", ca: "Aquest text es va llegir del fitxer, així que es corregeix afegint el fitxer de nou, no escrivint-hi a sobre aquí. Encara el pots reanomenar, canviar on està arxivat i qui el pot fer servir." },
   "This is taking longer than it should.": { de: "Das dauert länger, als es sollte.", es: "Esto está tardando más de lo que debería.", ca: "Això està trigant més del que hauria." },
@@ -4233,12 +4158,12 @@ export const SEED: Catalogue = {
   "transcript": { de: "Transkript", es: "transcripción", ca: "transcripció" },
   "{title} (not in use)": { de: "{title} (nicht in Gebrauch)", es: "{title} (sin usar)", ca: "{title} (sense ús)" },
 
-  /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026, SAME DAY, LATER — the
+  /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026, SAME DAY, LATER: the
      seven strings the ceiling check found with no seed entry for de/es/ca:
-     Tasks' own "Closed on"/"Week" (this pass's items 5 and 7 —
+     Tasks' own "Closed on"/"Week" (this pass's items 5 and 7: 
      web/components/work/tasks-screen.tsx) plus the week lane's own
      `RecordWeek` navigation words (web/components/records/record-week.tsx).
-     Hand-translated here, never in the generated catalogue — the file's own
+     Hand-translated here, never in the generated catalogue: the file's own
      header says why. */
   "Closed on": { de: "Abgeschlossen am", es: "Cerrado el", ca: "Tancat el" },
   "Week": { de: "Woche", es: "Semana", ca: "Setmana" },
@@ -4272,13 +4197,13 @@ export const SEED: Catalogue = {
   "Ok": { de: "Ok", es: "Ok", ca: "Ok" },
   "Refused": { de: "Verweigert", es: "Rechazada", ca: "Rebutjada" },
 
-  /* ── 17 Sep 2026, the SAME panel's toolbar search box (R48) — two more
+  /* ── 17 Sep 2026, the SAME panel's toolbar search box (R48): two more
      strings the R48 fix added, hand-translated for the same reason as the
      seven above. */
   "Search calls": { de: "Aufrufe durchsuchen", es: "Buscar llamadas", ca: "Cerca trucades" },
   "Search calls…": { de: "Aufrufe durchsuchen…", es: "Buscar llamadas…", ca: "Cerca trucades…" },
 
-  /* ── 17 Sep 2026, cross-lane hygiene pass — the eleven strings the ceiling
+  /* ── 17 Sep 2026, cross-lane hygiene pass: the eleven strings the ceiling
      check found with no seed entry for de/es/ca, landed by the eight lanes
      that shipped uncommitted the same day: the tickets board/queue/ID/
      resolved columns (web/components/tickets/tickets-collection.tsx,
@@ -4299,10 +4224,10 @@ export const SEED: Catalogue = {
     es: "Aún no hay nada archivado bajo esta app.",
     ca: "Encara no hi ha res arxivat sota aquesta app.",
   },
-  "Everything the assistant knows about this app will show up here — its tickets, process maps and meetings, and anything filed against it by hand.": {
-    de: "Alles, was der Assistent über diese App weiß, erscheint hier — ihre Tickets, Prozesskarten und Termine sowie alles, was von Hand dafür abgelegt wurde.",
-    es: "Todo lo que el asistente sabe sobre esta app aparecerá aquí — sus tickets, mapas de proceso y reuniones, y todo lo archivado bajo ella a mano.",
-    ca: "Tot el que l'assistent sap sobre aquesta app apareixerà aquí — els seus tiquets, mapes de procés i reunions, i tot el que s'hi ha arxivat a mà.",
+  "Everything the assistant knows about this app will show up here: its tickets, process maps and meetings, and anything filed against it by hand.": {
+    de: "Alles, was der Assistent über diese App weiß, erscheint hier: ihre Tickets, Prozesskarten und Termine sowie alles, was von Hand dafür abgelegt wurde.",
+    es: "Todo lo que el asistente sabe sobre esta app aparecerá aquí: sus tickets, mapas de proceso y reuniones, y todo lo archivado bajo ella a mano.",
+    ca: "Tot el que l'assistent sap sobre aquesta app apareixerà aquí: els seus tiquets, mapes de procés i reunions, i tot el que s'hi ha arxivat a mà.",
   },
   "Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.": {
     de: "Die Karten sind die passenden Tickets, soweit sie geladen wurden. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
@@ -4314,16 +4239,16 @@ export const SEED: Catalogue = {
     es: "Las tarjetas son los tickets propios de esta app, hasta donde se han cargado. Haz clic en una tarjeta para abrir el ticket.",
     ca: "Les targetes són els tiquets propis d'aquesta app, fins on s'han carregat. Fes clic en una targeta per obrir el tiquet.",
   },
-  "Each column counts every ticket at that stage — every ticket is in exactly one. Click a card to open the ticket.": {
-    de: "Jede Spalte zählt jedes Ticket in dieser Phase — jedes Ticket steht in genau einer. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
-    es: "Cada columna cuenta todos los tickets en esa etapa — cada ticket está en exactamente una. Haz clic en una tarjeta para abrir el ticket.",
-    ca: "Cada columna compta tots els tiquets en aquesta etapa — cada tiquet és exactament en una. Fes clic en una targeta per obrir el tiquet.",
+  "Each column counts every ticket at that stage. Every ticket is in exactly one. Click a card to open the ticket.": {
+    de: "Jede Spalte zählt jedes Ticket in dieser Phase: jedes Ticket steht in genau einer. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada columna cuenta todos los tickets en esa etapa: cada ticket está en exactamente una. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cada columna compta tots els tiquets en aquesta etapa: cada tiquet és exactament en una. Fes clic en una targeta per obrir el tiquet.",
   },
 
-  /* ── 17 Sep 2026, R44 payday for the round-15 lanes' own uncommitted work —
+  /* ── 17 Sep 2026, R44 payday for the round-15 lanes' own uncommitted work: 
      three strings `npm run lang` found with no seed entry for de/es/ca.
      "Live" is the account/contact status chip's word (contact-detail.tsx,
-     shape.tsx), her ruling that session verbatim: "contact live green" —
+     shape.tsx), her ruling that session verbatim: "contact live green": 
      paired with "Archived" (already seeded in the generated catalogue as
      Archiviert/Archivado/Arxivat), so this is the same active/archived
      dichotomy "Active" already answers elsewhere in the catalogue
@@ -4331,12 +4256,12 @@ export const SEED: Catalogue = {
      the English adjective, the same posture the live-connection strip's own
      seed entry above took for a different sense of "live". "Logs" is R85's
      one-word rail substitute for "Work logs" (web/lib/pages.ts, her verbatim
-     pick: "The word for work logs is logs") — "Work logs" itself keeps its
+     pick: "The word for work logs is logs"): "Work logs" itself keeps its
      existing seed entry (Zeiterfassung/Registros de tiempo/Registres de
      temps) everywhere else, so this is the bare, one-word noun the rail
      needs, built off the same root the Spanish/Catalan phrase already uses.
      "Who to keep in the loop" is the stakeholders picker's field label
-     (help-form-dialog.tsx's `loopField`) — R81 leaves the label as the whole
+     (help-form-dialog.tsx's `loopField`): R81 leaves the label as the whole
      instruction, so it carries the idiom rather than a literal word-for-word
      translation. */
   "Live": { de: "Aktiv", es: "Activo", ca: "Actiu" },
@@ -4347,35 +4272,35 @@ export const SEED: Catalogue = {
     ca: "A qui mantenir informat",
   },
 
-  /* 18 Sep 2026 — two more strings `npm run lang` found with no seed entry
+  /* 18 Sep 2026: two more strings `npm run lang` found with no seed entry
      for de/es/ca. "Attach a file" is reply-composer.tsx's paperclip
-     button (aria-label and tooltip both, same string) — the same verb the
+     button (aria-label and tooltip both, same string): the same verb the
      app already uses everywhere else an attachment is discussed
      (anhängen/adjuntar/adjuntar, "What they attached" and
      "Couldn't attach that." above). "On the loop" is
      help-stakeholders.tsx's chip label for a stakeholder who is NOT the
-     raiser — the origin toggle's other half, next to "Raised by"
-     (Gemeldet von/Solicitado por/Sol·licitat per, seeded above) — and reuses
+     raiser: the origin toggle's other half, next to "Raised by"
+     (Gemeldet von/Solicitado por/Sol·licitat per, seeded above): and reuses
      the exact root "Who to keep in the loop" already settled two lines up
      (auf dem Laufenden / informado / informat) rather than a literal
      word-for-word "loop". */
   "Attach a file": { de: "Datei anhängen", es: "Adjuntar un archivo", ca: "Adjuntar un fitxer" },
   "On the loop": { de: "Auf dem Laufenden", es: "Informado", ca: "Informat" },
 
-  /* 18 Sep 2026 — four more strings `npm run lang` found with no seed entry
+  /* 18 Sep 2026: four more strings `npm run lang` found with no seed entry
      for de/es/ca, all from the assistant's file-attachment lane
      (web/lib/use-agent-chat.tsx, web/components/assistant/agent-scope-picker.tsx,
      agent-panel.tsx). "Everything" is the scope picker's own label, now that
      the parenthetical "(today's default)" is gone from it (that seed row was
-     an orphan this same `npm run lang` run pruned) — it reuses the bare
+     an orphan this same `npm run lang` run pruned): it reuses the bare
      "Todo"/"Alles"/"Tot" root already settled for "Everything in it,
      including whatever you put there later." and "Everything else" above,
      rather than a fresh word for the same sense. The other three are the
      three refusals `addAttachments` raises for a picked file: over the count
      cap, an unreadable kind, and over the size cap. They reuse the existing
      attach/hang verb this file already settled two blocks up ("Attach a
-     file", "Couldn't attach that.", "What they attached") — anhängen/
-     adjuntar/adjuntar — rather than inventing a second one for the same
+     file", "Couldn't attach that.", "What they attached"): anhängen/
+     adjuntar/adjuntar: rather than inventing a second one for the same
      action, and "images, PDFs, or plain text" names the same three kinds
      `AGENT_ATTACH_MIME` actually accepts, in the order the door checks them. */
   "Everything": { de: "Alles", es: "Todo", ca: "Tot" },
@@ -4384,10 +4309,10 @@ export const SEED: Catalogue = {
     es: "Puedes adjuntar hasta {count} archivos.",
     ca: "Pots adjuntar fins a {count} fitxers.",
   },
-  "{name} isn't a kind of file the assistant can read here — images, PDFs, or plain text.": {
-    de: "„{name}“ ist hier keine Dateiart, die der Assistent lesen kann — Bilder, PDFs oder reinen Text.",
-    es: "«{name}» no es un tipo de archivo que el asistente pueda leer aquí — imágenes, PDF o texto sin formato.",
-    ca: "«{name}» no és un tipus de fitxer que l'assistent pugui llegir aquí — imatges, PDF o text sense format.",
+  "{name} isn't a kind of file the assistant can read here: images, PDFs, or plain text.": {
+    de: "„{name}“ ist hier keine Dateiart, die der Assistent lesen kann: Bilder, PDFs oder reinen Text.",
+    es: "«{name}» no es un tipo de archivo que el asistente pueda leer aquí: imágenes, PDF o texto sin formato.",
+    ca: "«{name}» no és un tipus de fitxer que l'assistent pugui llegir aquí: imatges, PDF o text sense format.",
   },
   "{name} is too large. Attach a file up to {size} MB.": {
     de: "„{name}“ ist zu groß. Hängen Sie eine Datei bis zu {size} MB an.",
@@ -4395,15 +4320,15 @@ export const SEED: Catalogue = {
     ca: "«{name}» és massa gran. Adjunta un fitxer de fins a {size} MB.",
   },
 
-  /* 19 Sep 2026 (Round 23) — three more strings `npm run lang` found with no
+  /* 19 Sep 2026 (Round 23): three more strings `npm run lang` found with no
      seed entry for de/es/ca. "Waiting on you" is ticket-stages.tsx's own
-     label for the one stage that used to render with no name at all (K53) —
+     label for the one stage that used to render with no name at all (K53): 
      closed-without-resolution, the stage the app is waiting on the raiser's
      own reply for; it reuses the existing stage-name register "Waiting"/
      "Wartend"/"En espera" already seeded above, made specific to the
      addressee the way F11/K53's own ruling reads it. "Add someone new to
      your accounts and choose the company they work for." is the Contacts
-     screen's own new create-dialog copy (B23) — the exact sibling of
+     screen's own new create-dialog copy (B23): the exact sibling of
      "Add someone new to your accounts and make them a contact of {name}."
      seeded above, minus the pre-chosen company: the same opening clause,
      unchanged, with the ending swapped for choosing the account rather than
@@ -4428,14 +4353,14 @@ export const SEED: Catalogue = {
     ca: "Tria un compte",
   },
 
-  /* 20 Sep 2026 (Round 28, stories model) — eight strings `npm run lang`
+  /* 20 Sep 2026 (Round 28, stories model): eight strings `npm run lang`
      found with no seed entry for de/es/ca, the acceptance-criteria field,
      the reviews tab and the two folded-header columns (tickets triage's
      "Closed by" and stories' own "Completed by"/"Completed on") the round's
      data-model change added. "Closed by" reuses the existing "von"/"por"/
      "per" attribution register "Raised by"/"Resolved by" already carry, on
      the SAME word "Closed on" already seeds ("Abgeschlossen am"/"Cerrado
-     el"/"Tancat el") — client ruling, 20 Sep 2026: "on tickets tab 'Closed,'
+     el"/"Tancat el"): client ruling, 20 Sep 2026: "on tickets tab 'Closed,'
      before 'Closed on' add 'Closed by.'" "Completed by"/"Completed on" are
      the identical fold for a story reaching Done, off the existing "Done"
      seed word (`stories-screen.tsx`'s reviews-queue chip row). "Done on" is
@@ -4456,4 +4381,83 @@ export const SEED: Catalogue = {
     es: "Qué tiene que cumplirse para que esto cuente como hecho.",
     ca: "Què s'ha de complir perquè això compti com a fet.",
   },
+
+  /* ── Phase (renamed from Sprint), and other strings the 20 Sep 2026 round
+   * introduced — round 28/29, added by the i18n-extract.mjs re-run once the
+   * sprint→phase rename and the wave-lifecycle words landed in code. "Phase"
+   * (billing/delivery block, née Sprint) is kept distinct in Spanish/Catalan
+   * from "stage" (etapa) — this file already uses etapa/Phase for a ticket's
+   * workflow stage, so the new entity takes Fase/Fase instead of colliding
+   * with that existing word. ─────────────────────────────────────────── */
+  Phase: { de: "Phase", es: "Fase", ca: "Fase" },
+  Phases: { de: "Phasen", es: "Fases", ca: "Fases" },
+  "1 phase": { de: "1 Phase", es: "1 fase", ca: "1 fase" },
+  "A package of phases an account bought. You'll plan the phases inside it next.": { de: "Ein Paket aus Phasen, das ein Kunde gekauft hat. Sie planen als Nächstes die Phasen darin.", es: "Un paquete de fases que una cuenta compró. A continuación planearás las fases dentro de él.", ca: "Un paquet de fases que un compte ha comprat. A continuació planificaràs les fases dins d'ell." },
+  "A wave is a package of phases an account bought: sell it first, plan the phases inside it afterwards.": { de: "Eine Wave ist ein Paket aus Phasen, das ein Kunde gekauft hat: zuerst verkaufen, dann die Phasen darin planen.", es: "Una wave es un paquete de fases que una cuenta compró: véndela primero, planifica las fases dentro después.", ca: "Una wave és un paquet de fases que un compte ha comprat: ven-la primer, planifica les fases dins després." },
+  "All phases": { de: "Alle Phasen", es: "Todas las fases", ca: "Totes les fases" },
+  "Completing this phase cuts a new version of every process inside its app, so the savings can be measured from what changed.": { de: "Das Abschließen dieser Phase erstellt eine neue Version jedes Prozesses in ihrer App, damit die Einsparungen anhand der Änderungen gemessen werden können.", es: "Completar esta fase crea una nueva versión de cada proceso dentro de su app, para que los ahorros puedan medirse a partir de lo que cambió.", ca: "Completar aquesta fase crea una versió nova de cada procés dins la seva app, perquè els estalvis es puguin mesurar a partir del que ha canviat." },
+  "Couldn't change that phase.": { de: "Diese Phase konnte nicht geändert werden.", es: "No se pudo cambiar esa fase.", ca: "No s'ha pogut canviar aquesta fase." },
+  "Couldn't load the phase.": { de: "Die Phase konnte nicht geladen werden.", es: "No se pudo cargar la fase.", ca: "No s'ha pogut carregar la fase." },
+  "Couldn't load the phases.": { de: "Die Phasen konnten nicht geladen werden.", es: "No se pudieron cargar las fases.", ca: "No s'han pogut carregar les fases." },
+  "Couldn't save the phase.": { de: "Die Phase konnte nicht gespeichert werden.", es: "No se pudo guardar la fase.", ca: "No s'ha pogut desar la fase." },
+  "Couldn't start the phase.": { de: "Die Phase konnte nicht gestartet werden.", es: "No se pudo iniciar la fase.", ca: "No s'ha pogut iniciar la fase." },
+  "Edit this phase": { de: "Diese Phase bearbeiten", es: "Editar esta fase", ca: "Editar aquesta fase" },
+  "It stops being offered when a phase is filed, and stays on the record with everything already in it. You can bring it back.": { de: "Es wird nicht mehr angeboten, sobald eine Phase abgelegt ist, und bleibt mit allem, was bereits darin steht, im Datensatz. Sie können es wieder zurückholen.", es: "Deja de ofrecerse cuando una fase se archiva, y permanece en el registro con todo lo que ya contiene. Puedes traerlo de vuelta.", ca: "Deixa d'oferir-se quan una fase s'arxiva, i es manté al registre amb tot el que ja hi ha. El pots tornar a recuperar." },
+  "No phase matched.": { de: "Keine Phase gefunden.", es: "Ninguna fase coincide.", ca: "Cap fase coincideix." },
+  "No phase": { de: "Keine Phase", es: "Sin fase", ca: "Sense fase" },
+  "No phases in this wave yet.": { de: "Noch keine Phasen in dieser Wave.", es: "Aún no hay fases en esta wave.", ca: "Encara no hi ha fases en aquesta wave." },
+  "No phases planned yet": { de: "Noch keine Phasen geplant", es: "Aún no hay fases planificadas", ca: "Encara no hi ha fases planificades" },
+  "No phases start this month.": { de: "Diesen Monat beginnt keine Phase.", es: "Ninguna fase empieza este mes.", ca: "Cap fase comença aquest mes." },
+  "No phases yet.": { de: "Noch keine Phasen.", es: "Aún no hay fases.", ca: "Encara no hi ha fases." },
+  "No waves or phases have a start date yet.": { de: "Noch keine Wave oder Phase mit Startdatum.", es: "Aún ninguna wave o fase tiene fecha de inicio.", ca: "Encara cap wave o fase té data d'inici." },
+  "No work in this phase yet.": { de: "Noch keine Arbeit in dieser Phase.", es: "Aún no hay trabajo en esta fase.", ca: "Encara no hi ha feina en aquesta fase." },
+  "Phase completed.": { de: "Phase abgeschlossen.", es: "Fase completada.", ca: "Fase completada." },
+  "Phase name": { de: "Phasenname", es: "Nombre de la fase", ca: "Nom de la fase" },
+  "Phase planned, and it is in this wave.": { de: "Phase geplant, und sie ist in dieser Wave.", es: "Fase planificada, y está en esta wave.", ca: "Fase planificada, i és en aquesta wave." },
+  "Phase reopened.": { de: "Phase wieder geöffnet.", es: "Fase reabierta.", ca: "Fase reoberta." },
+  "Phase review": { de: "Phasenüberprüfung", es: "Revisión de la fase", ca: "Revisió de la fase" },
+  "Phase started.": { de: "Phase gestartet.", es: "Fase iniciada.", ca: "Fase iniciada." },
+  "Phase type": { de: "Phasentyp", es: "Tipo de fase", ca: "Tipus de fase" },
+  "Phase types": { de: "Phasentypen", es: "Tipos de fase", ca: "Tipus de fases" },
+  "Phase updated.": { de: "Phase aktualisiert.", es: "Fase actualizada.", ca: "Fase actualitzada." },
+  "Phases inside it": { de: "Phasen darin", es: "Fases dentro de él", ca: "Fases dins d'ell" },
+  "Plan a phase": { de: "Eine Phase planen", es: "Planificar una fase", ca: "Planificar una fase" },
+  "Put a phase in this wave": { de: "Eine Phase in diese Wave einfügen", es: "Poner una fase en esta wave", ca: "Posar una fase en aquesta wave" },
+  "Saved. Two phases in this wave run over each other.": { de: "Gespeichert. Zwei Phasen in dieser Wave überschneiden sich.", es: "Guardado. Dos fases en esta wave se solapan.", ca: "Desat. Dues fases en aquesta wave se superposen." },
+  "Search phases in this wave": { de: "Phasen in dieser Wave durchsuchen", es: "Buscar fases en esta wave", ca: "Cercar fases en aquesta wave" },
+  "Search phases in this wave…": { de: "Phasen in dieser Wave durchsuchen…", es: "Buscar fases en esta wave…", ca: "Cercar fases en aquesta wave…" },
+  "Search phases…": { de: "Phasen durchsuchen…", es: "Buscar fases…", ca: "Cercar fases…" },
+  "Start a phase": { de: "Eine Phase starten", es: "Iniciar una fase", ca: "Iniciar una fase" },
+  "That phase no longer exists.": { de: "Diese Phase gibt es nicht mehr.", es: "Esa fase ya no existe.", ca: "Aquesta fase ja no existeix." },
+  "The wave is sold first; the phases inside it are planned afterwards.": { de: "Die Wave wird zuerst verkauft; die Phasen darin werden danach geplant.", es: "La wave se vende primero; las fases dentro de ella se planifican después.", ca: "La wave es ven primer; les fases dins seu es planifiquen després." },
+  "Two phases in this wave run over each other.": { de: "Zwei Phasen in dieser Wave überschneiden sich.", es: "Dos fases en esta wave se solapan.", ca: "Dues fases en aquesta wave se superposen." },
+  "Work inside the running phases": { de: "Arbeit in den laufenden Phasen", es: "Trabajo dentro de las fases en curso", ca: "Feina dins les fases en curs" },
+  "e.g. Dispatch, phase 4": { de: "z. B. Dispatch, Phase 4", es: "p. ej. Dispatch, fase 4", ca: "p. ex. Dispatch, fase 4" },
+  "phases": { de: "Phasen", es: "fases", ca: "fases" },
+  "Contributes to the phase's goal": { de: "Trägt zum Ziel der Phase bei", es: "Contribuye al objetivo de la fase", ca: "Contribueix a l'objectiu de la fase" },
+  "Phase goal": { de: "Phasenziel", es: "Objetivo de la fase", ca: "Objectiu de la fase" },
+  "Goal": { de: "Ziel", es: "Objetivo", ca: "Objectiu" },
+  "The one outcome this phase is organized around.": { de: "Das eine Ergebnis, um das diese Phase organisiert ist.", es: "El único resultado alrededor del cual se organiza esta fase.", ca: "L'únic resultat al voltant del qual s'organitza aquesta fase." },
+  "Assess the current state and gather requirements before work is scoped.": { de: "Den aktuellen Stand bewerten und Anforderungen sammeln, bevor die Arbeit abgegrenzt wird.", es: "Evaluar el estado actual y recoger los requisitos antes de acotar el trabajo.", ca: "Avaluar l'estat actual i recollir els requisits abans d'acotar la feina." },
+  "Scope, prioritize, and schedule the stories for the wave.": { de: "Die Aufgaben für die Wave abgrenzen, priorisieren und einplanen.", es: "Acotar, priorizar y programar las historias de la wave.", ca: "Acotar, prioritzar i programar les històries de la wave." },
+  "Implement the stories.": { de: "Die Aufgaben umsetzen.", es: "Implementar las historias.", ca: "Implementar les històries." },
+  "The period where the account uses the app and confirms it meets their needs and signs off, before full release.": { de: "Der Zeitraum, in dem der Kunde die App nutzt, bestätigt, dass sie seinen Anforderungen entspricht, und freigibt, bevor die volle Freigabe erfolgt.", es: "El período en el que la cuenta usa la app y confirma que cumple sus necesidades y da el visto bueno, antes del lanzamiento completo.", ca: "El període en què el compte utilitza l'app i confirma que compleix les seves necessitats i hi dona el vistiplau, abans del llançament complet." },
+  "Implement changes and adjustments requested by the account after they have used the release.": { de: "Änderungen und Anpassungen umsetzen, die der Kunde nach der Nutzung der Freigabe angefordert hat.", es: "Implementar los cambios y ajustes que la cuenta pidió después de usar el lanzamiento.", ca: "Implementar els canvis i ajustos que el compte ha demanat després d'utilitzar el llançament." },
+  "Release the accepted work to production, includes the release checklist, smoke tests, rollout (phased/canary if needed), release notes, and a rollback plan.": { de: "Die akzeptierte Arbeit in Produktion bringen, einschließlich Freigabe-Checkliste, Smoke-Tests, Rollout (phasenweise/Canary bei Bedarf), Release Notes und einem Rollback-Plan.", es: "Publicar el trabajo aceptado en producción, incluye la checklist de lanzamiento, pruebas de humo, despliegue (por fases/canary si hace falta), notas de la versión y un plan de reversión.", ca: "Publicar la feina acceptada a producció, inclou la checklist de llançament, proves de fum, desplegament (per fases/canary si cal), notes de la versió i un pla de reversió." },
+  "A short, intensive support window immediately after deploy where the team closely monitors the release, fixes urgent issues fast, and supports the account during adoption.": { de: "Ein kurzes, intensives Support-Fenster direkt nach dem Deploy, in dem das Team die Freigabe genau beobachtet, dringende Probleme schnell behebt und den Kunden bei der Einführung unterstützt.", es: "Una ventana de soporte breve e intensa justo después del deploy, en la que el equipo vigila de cerca el lanzamiento, corrige rápido los problemas urgentes y apoya a la cuenta durante la adopción.", ca: "Una finestra de suport breu i intensa just després del deploy, en què l'equip vigila de prop el llançament, corregeix ràpid els problemes urgents i dona suport al compte durant l'adopció." },
+  "Couldn't change that story.": { de: "Diese Aufgabe konnte nicht geändert werden.", es: "No se pudo cambiar esa historia.", ca: "No s'ha pogut canviar aquesta història." },
+  "Each person decides this for themselves. It is stored against your own account and not the team's. Today the only way to set it is to ask the assistant, which is a gap rather than a design.": { de: "Jede Person entscheidet das für sich selbst. Es wird gegen Ihr eigenes Konto gespeichert und nicht das des Teams. Heute ist der einzige Weg, es einzustellen, den Assistenten zu fragen, was eine Lücke ist und keine Absicht.", es: "Cada persona decide esto por sí misma. Se guarda contra tu propia cuenta y no la del equipo. Hoy la única forma de configurarlo es pedírselo al asistente, lo cual es un vacío y no un diseño.", ca: "Cada persona decideix això per si mateixa. Es desa contra el teu propi compte i no el de l'equip. Avui l'única manera de configurar-ho és demanar-ho a l'assistent, cosa que és un buit i no un disseny." },
+  "Nothing happens on its own here. The timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.": { de: "Hier passiert nichts von selbst. Der Timer wird nicht gestoppt und keine Zeit wird geschrieben. Es ist eine Frage, die die App Ihnen stellt, und Sie beantworten sie auf drei Arten.", es: "Aquí nada ocurre por sí solo. El cronómetro no se detiene y no se registra ningún tiempo. Es una pregunta que la app te hace, y la respondes de tres formas.", ca: "Aquí no passa res per si sol. El cronòmetre no s'atura i no es registra cap temps. És una pregunta que l'app et fa, i la respons de tres maneres." },
+  "That can be right. It is saved either way. Change a phase's dates if it is not.": { de: "Das kann stimmen. Es wird so oder so gespeichert. Ändern Sie die Daten einer Phase, wenn nicht.", es: "Eso puede ser correcto. Se guarda de todos modos. Cambia las fechas de una fase si no lo es.", ca: "Això pot ser correcte. Es desa de totes maneres. Canvia les dates d'una fase si no ho és." },
+  "The gathering cannot be switched off. It is what the fault record is made of. The email already is: it is addressed to nobody on purpose, and the faults are read here instead.": { de: "Das Sammeln lässt sich nicht abschalten. Daraus besteht der Fehlerdatensatz. Die E-Mail ist es bereits: Sie ist absichtlich an niemanden adressiert, und die Fehler werden stattdessen hier gelesen.", es: "La recopilación no se puede desactivar. Es de lo que está hecho el registro de fallos. El correo ya lo es: está dirigido a nadie a propósito, y los fallos se leen aquí en su lugar.", ca: "La recopilació no es pot desactivar. Això és de què està fet el registre de fallades. El correu ja ho és: està adreçat a ningú expressament, i les fallades es llegeixen aquí en lloc d'això." },
+
+  /* ── The message-delete strings the reply-actions menu (kit v1.2.139) needs
+   * on this app's own side — picked up by a later extract re-run in this same
+   * session; the app source's own English carries an em dash on one of them
+   * (R95 flags it separately, see this pass's own report). ─────────────── */
+  "Couldn't remove that reply.": { de: "Diese Antwort konnte nicht entfernt werden.", es: "No se pudo eliminar esa respuesta.", ca: "No s'ha pogut eliminar aquesta resposta." },
+  "Couldn't update that reply.": { de: "Diese Antwort konnte nicht aktualisiert werden.", es: "No se pudo actualizar esa respuesta.", ca: "No s'ha pogut actualitzar aquesta resposta." },
+  "Delete this reply?": { de: "Diese Antwort löschen?", es: "¿Eliminar esta respuesta?", ca: "Vols eliminar aquesta resposta?" },
+  "It stops showing in this conversation. Nothing is deleted: the reply and its history stay exactly as they are.": { de: "Es verschwindet nur aus dieser Unterhaltung. Nichts wird gelöscht, die Antwort und ihr Verlauf bleiben genau so erhalten.", es: "Deja de mostrarse en esta conversación. No se elimina nada, la respuesta y su historial se mantienen tal cual.", ca: "Deixa de mostrar-se en aquesta conversa. No s'elimina res, la resposta i el seu historial es mantenen tal com estan." },
+  "Removed.": { de: "Entfernt.", es: "Eliminado.", ca: "Eliminat." },
 }

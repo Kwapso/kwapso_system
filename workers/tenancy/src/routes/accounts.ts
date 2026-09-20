@@ -469,7 +469,7 @@ async function declaredAltNames(
       throw new GuardError(
         400,
         "invalid_input",
-        `"${spelling}" is more than one word — a declared spelling names one word of this account's own name, the way its reference code does.`
+        `"${spelling}" is more than one word: a declared spelling names one word of this account's own name, the way its reference code does.`
       )
   }
   if (!clean.length) return clean
@@ -485,7 +485,7 @@ async function declaredAltNames(
         throw new GuardError(
           400,
           "common_word",
-          `"${spelling}" is too common a word to declare as a spelling without also setting "may narrow alone" for this account — declared, it would match on its own, everywhere, with no rarity check at all.`
+          `"${spelling}" is too common a word to declare as a spelling without also setting "may narrow alone" for this account: declared, it would match on its own, everywhere, with no rarity check at all.`
         )
   return clean
 }
@@ -752,7 +752,7 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
     return fail(
       400,
       "no_client_role",
-      "Make a role for clients first, then give access — a login is a role on your team, and this one has no role called Client."
+      "Make a role for clients first, then give access. A login is a role on your team, and this one has no role called Client."
     )
   // The same ceiling the invite door opens with: nobody may hand out rights they
   // do not hold themselves. It also proves the role exists in THIS team.

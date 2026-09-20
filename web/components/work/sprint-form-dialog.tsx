@@ -43,15 +43,19 @@ import { dateFromYMD, ymdFromDate } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { SelectableValue } from "@shared/types"
-import { TITLE_MAX_CHARS } from "@shared/types"
+import { PHASE_GOAL_MAX_CHARS, TITLE_MAX_CHARS } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
-import { SPRINT_TYPES } from "@shared/sprint-types"
+import { PHASE_TYPE_GROUP, PHASE_TYPES, phaseTypeDescription } from "@shared/sprint-types"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
 
 export type SprintFormValues = {
   name: string
   goal: string
+  /** THE PHASE GOAL (Aurora's ruling, 20 Sep 2026) — one sentence, capped at
+   * `PHASE_GOAL_MAX_CHARS`. A separate field from `goal` above; see
+   * `Sprint.goalSummary`'s own doc (shared/types.ts). */
+  goalSummary: string
   sprintType: string
   accountId: string
   /** THE SYSTEM IT COVERS. A sprint covers ONE app (the owner's ruling), which is
@@ -71,7 +75,7 @@ const NONE = "__none__"
  * own vocabulary has loaded (or a team has retired the lot), so a cold cache
  * never draws an empty pill row. The client's ruling, 16 Sep 2026: "not
  * started, audit, plan, build, validation, refinements, enhancement." */
-const FALLBACK_SPRINT_TYPES = SPRINT_TYPES.map((s) => s.name)
+const FALLBACK_SPRINT_TYPES = PHASE_TYPES.map((s) => s.name)
 
 /** ONE SPRINT TYPE, as the app reads it — the word, the mark somebody
  * recognises it by, the label a German client reads, and how long a block of
@@ -100,7 +104,7 @@ export function useSprintTypes(teamId: string | null): SprintTypeOption[] {
     tenancy.selectable().then((r) => r.values)
   )
   const rows = (q.data ?? [])
-    .filter((v) => v.active && v.type === "Sprint type")
+    .filter((v) => v.active && v.type === PHASE_TYPE_GROUP)
     .map((v) => ({ value: v.value, mark: v.mark, nameDe: v.nameDe, standardDays: v.standardDays }))
   return rows.length
     ? rows
@@ -135,7 +139,7 @@ export function sprintTypeLabel(option: SprintTypeOption, lang: string): string 
 // what "too long" means.
 const nameField = {
   ...defaultFieldConfig,
-  label: "Sprint name",
+  label: "Phase name",
   required: true,
   validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
 }
@@ -147,6 +151,15 @@ const appField = {
   required: false,
 }
 const goalField = { ...defaultFieldConfig, label: "What it's for", required: false }
+// THE PHASE GOAL (Aurora's ruling, 20 Sep 2026) — a SEPARATE, short field from
+// `goalField` above: "a single sentence describing the main outcome the cycle
+// is organized around," R87-style hard cap + live counter (`PHASE_GOAL_MAX_CHARS`).
+const goalSummaryField = {
+  ...defaultFieldConfig,
+  label: "Phase goal",
+  required: false,
+  validation: { ...defaultFieldConfig.validation, maxLength: PHASE_GOAL_MAX_CHARS },
+}
 const startField = { ...defaultFieldConfig, label: "Starts", required: false }
 const endField = { ...defaultFieldConfig, label: "Ends", required: false }
 const priceField = {
@@ -162,6 +175,7 @@ const priceField = {
 export type SprintFormInitial = {
   name: string
   goal: string | null
+  goalSummary: string | null
   sprintType: string | null
   accountName: string | null
   appName: string | null
@@ -209,6 +223,7 @@ export function SprintFormDialog({
     {
       name: initial?.name ?? "",
       goal: initial?.goal ?? "",
+      goalSummary: initial?.goalSummary ?? "",
       sprintType: initial?.sprintType ?? "",
       accountId: "",
       appId: "",
@@ -237,6 +252,7 @@ export function SprintFormDialog({
       await onSubmit({
         name: values.name.trim(),
         goal: richTextValue(values.goal),
+        goalSummary: values.goalSummary.trim(),
         sprintType: values.sprintType,
         accountId: fixedAccount ? fixedAccount.id : values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId,
@@ -252,8 +268,8 @@ export function SprintFormDialog({
         err instanceof ApiFailure
           ? err.message
           : isEdit
-            ? t("Couldn't save the sprint.")
-            : t("Couldn't start the sprint.")
+            ? t("Couldn't save the phase.")
+            : t("Couldn't start the phase.")
       )
     } finally {
       setBusy(false)
@@ -267,7 +283,7 @@ export function SprintFormDialog({
       onOpenChange={onOpenChange}
       busy={busy}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? t("Edit this sprint") : t("Start a sprint")}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Edit this phase") : t("Start a phase")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {isEdit
@@ -291,7 +307,7 @@ export function SprintFormDialog({
           id="sprint-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder={t("e.g. Dispatch, sprint 4")}
+          placeholder={t("e.g. Dispatch, phase 4")}
           maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
@@ -324,6 +340,19 @@ export function SprintFormDialog({
           ariaLabel={t(typeField.label)}
           disabled={busy}
         />
+        {/* AURORA'S OWN ONE-LINE DEFINITION, under the row — the client
+            picks a phase type by its word alone today; this is what it means,
+            read for the ONE PHASE TYPE actually chosen (`shared/sprint-
+            types.ts`'s own copy table, `phaseTypeDescription`), so choosing
+            "Pilot" says more than a bare word can. Absent for "Not said" and
+            for a team's own added/retired value, neither of which this
+            vocabulary carries a sentence for. */}
+        {(() => {
+          const typeDescription = phaseTypeDescription(values.sprintType || null)
+          return typeDescription ? (
+            <p className="text-muted-foreground text-caption">{t(typeDescription)}</p>
+          ) : null
+        })()}
       </Field>
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
         {initial || fixedAccount ? (
@@ -373,6 +402,22 @@ export function SprintFormDialog({
             emptyText={t("No app matched.")}
           />
         )}
+      </Field>
+      <Field
+        config={goalSummaryField}
+        htmlFor="sprint-goal-summary"
+        className={fieldSpacing}
+        count={values.goalSummary.length}
+        countMax={PHASE_GOAL_MAX_CHARS}
+      >
+        <Input
+          id="sprint-goal-summary"
+          value={values.goalSummary}
+          onChange={(e) => setValues((s) => ({ ...s, goalSummary: e.target.value }))}
+          placeholder={t("The one outcome this phase is organized around.")}
+          maxLength={PHASE_GOAL_MAX_CHARS}
+          disabled={busy}
+        />
       </Field>
       <Field config={goalField} htmlFor="sprint-goal" className={fieldSpacing}>
         <Notes

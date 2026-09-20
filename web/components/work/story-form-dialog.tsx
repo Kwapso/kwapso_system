@@ -42,7 +42,9 @@ import * as React from "react"
 import { LinkSimple, X } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Label } from "@shared/ui/components/label/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui/components/select/select"
 import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
@@ -102,6 +104,10 @@ export type StoryFormValues = {
    * an empty string means "not set", the same convention every other
    * optional pick on this form already reads. */
   moscow: string
+  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
+   * 2026, paired with the phase's own `goalSummary`.) Only meaningful once a
+   * phase is chosen — the field below hides itself when `sprintId` is blank. */
+  contributesToGoal: boolean
 }
 
 /** "Nothing chosen" as a real Select value: an empty string is not selectable in
@@ -172,9 +178,12 @@ const acceptanceCriteriaField = { ...defaultFieldConfig, label: "Acceptance crit
 const moscowField = { ...defaultFieldConfig, label: "Priority", required: false }
 const sprintField = {
   ...defaultFieldConfig,
-  label: "Sprint",
+  label: "Phase",
   required: false,
 }
+// CONTRIBUTES TO THE GOAL (Aurora's ruling, 20 Sep 2026) — a plain checkbox,
+// never required; only shown once a phase is chosen (render site, below).
+const contributesToGoalField = { ...defaultFieldConfig, label: "Goal", required: false }
 const ticketField = {
   ...defaultFieldConfig,
   label: "Tickets",
@@ -362,6 +371,7 @@ export function StoryFormDialog({
           changesNoStep: false,
           acceptanceCriteria: "",
           moscow: "",
+          contributesToGoal: false,
         },
     open
   )
@@ -566,6 +576,7 @@ export function StoryFormDialog({
         changesNoStep: values.changesNoStep,
         acceptanceCriteria: richTextValue(values.acceptanceCriteria),
         moscow: values.moscow,
+        contributesToGoal: values.contributesToGoal,
       })
       // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `storyId` on an
       // edit, the id the create door just handed back otherwise.
@@ -787,8 +798,8 @@ export function StoryFormDialog({
         {picker(
           "story-sprint",
           values.sprintId,
-          "No sprint yet",
-          t("Search sprints…"),
+          "No phase yet",
+          t("Search phases…"),
           // THE MARK RIDES THE LABEL (CHECKLIST 6.3). A person picking a sprint is
           // choosing between "the one running now" and "the one starting in
           // October", and the two are otherwise two names.
@@ -796,6 +807,25 @@ export function StoryFormDialog({
           (v) => setValues((s) => ({ ...s, sprintId: v }))
         )}
       </Field>
+      {/* CONTRIBUTES TO THE GOAL (Aurora's ruling, 20 Sep 2026), only offered
+          once a phase is actually chosen — the flag means nothing against no
+          phase at all, and unchecked-and-hidden is the honest default for a
+          story with no phase rather than a control nobody can read. */}
+      {values.sprintId && (
+        <Field config={contributesToGoalField} shape="group" htmlFor="story-contributes-to-goal" className={fieldSpacing}>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="story-contributes-to-goal"
+              checked={values.contributesToGoal}
+              onCheckedChange={(c) => setValues((s) => ({ ...s, contributesToGoal: c === true }))}
+              disabled={busy}
+            />
+            <Label htmlFor="story-contributes-to-goal" className="text-sm font-normal">
+              {t("Contributes to the phase's goal")}
+            </Label>
+          </div>
+        </Field>
+      )}
       {/* REQUIRED WHEN THE ORIGIN IS ENABLER (Aurora's ruling, 20 Sep 2026) —
           `enablerTicketField`'s own doc says why this reads `values.category`
           rather than a static config. */}

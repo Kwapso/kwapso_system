@@ -76,7 +76,17 @@ import type { MemberGuard } from "./gating"
 export const TEAM_REF_KINDS = {
   ticket: "T",
   story: "B",
-  sprint: "S",
+  // "S" -> "P", Aurora's ruling, 20 Sep 2026: "Rename 'sprint' to 'phase.'
+  // Also change the id to P0000." The kind KEY stays `sprint` (this map's own
+  // property name is never displayed — TEAM_REF_TABLES/refs.ts's own callers
+  // read it by property, never by string), and the letter is the only thing a
+  // person ever reads. Team migration 0107 rewrites every already-minted
+  // "S…" reference to "P…" (the same 0068 shape: alias the old string in
+  // `ref_aliases` first, so a client who already quotes "S0012" still finds
+  // the record), and raises `team_ref_counters`' own row from kind "S" to
+  // kind "P" so the very next mint continues the same sequence rather than
+  // restarting at 1.
+  sprint: "P",
   meeting: "M",
   app: "A",
   wave: "W",

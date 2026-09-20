@@ -298,7 +298,7 @@ export function StepsPanel({
               options={versions
                 .filter((v) => v.id !== shownVersion?.id)
                 .map((v) => ({ value: v.id, label: versionLabel(v) }))}
-              placeholder={t("Nothing — just show this one")}
+              placeholder={t("Nothing: just show this one")}
               searchPlaceholder={t("Search versions…")}
               emptyText={t("Nothing matched.")}
               className="w-[19rem] max-w-full"
@@ -571,8 +571,8 @@ export function StepsPanel({
           {saving.pricedSteps < saving.totalSteps && (
             <p className="text-muted-foreground mt-2 text-xs">
               {saving.pricedSteps === 0
-                ? t("No money yet — none of these steps says what an hour of the person doing it costs.")
-                : t("The money covers {priced} of {total} steps — the rest have no hourly cost yet.", {
+                ? t("No money yet. None of these steps says what an hour of the person doing it costs.")
+                : t("The money covers {priced} of {total} steps. The rest have no hourly cost yet.", {
                     priced: saving.pricedSteps,
                     total: saving.totalSteps,
                   })}

@@ -762,7 +762,7 @@ export function RolesMatrix({
             <button
               type="button"
               onClick={() => setOpenRole(role)}
-              aria-label={`${role.title} — ${t("Overview")}`}
+              aria-label={`${role.title}: ${t("Overview")}`}
               className="cursor-pointer text-start text-micro font-[var(--font-weight-medium)] text-ink-tertiary"
             >
               {/* THE HOVER IS THE KIT'S LINK HOVER AND NOTHING ELSE — `.kw-link`
@@ -1062,7 +1062,7 @@ export function RolesMatrix({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={`${t("Activate")} — ${role.title}`}
+                      aria-label={`${t("Activate")}: ${role.title}`}
                       disabled={busyActive}
                       onClick={() => void setActive(role, true)}
                     >

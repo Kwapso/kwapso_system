@@ -229,11 +229,19 @@ describe("an app's Tickets tab draws the list as a table", () => {
 
   it("still draws a pill for a ticket with no type, and no chip for one with no number", () => {
     show()
-    const second = within(screen.getAllByRole("row")[2])
-    // H2 is untyped AND unresolved, so TWO cells now draw the same em dash
-    // (Type, Resolved by) — Resolved date is no longer a column of its own
-    // (18 Sep 2026), so an unresolved ticket says "not yet" once, not twice.
-    expect(second.getAllByText("—")).toHaveLength(2)
+    const secondRow = screen.getAllByRole("row")[2]
+    const second = within(secondRow)
+    // H2 is untyped AND unresolved. Neither cell invents a placeholder
+    // character for the absence (R95: no em dash anywhere) — Resolved date
+    // is no longer a column of its own (18 Sep 2026), so an unresolved
+    // ticket's Resolved-by cell is simply blank, and the Type cell still
+    // draws its own pill (an icon-only badge, saying nothing rather than
+    // showing a dash).
+    expect(second.queryAllByText("—")).toHaveLength(0)
+    expect(
+      secondRow.querySelectorAll('[data-slot="badge"]').length,
+      "the untyped ticket still draws a type pill, empty rather than dashed"
+    ).toBeGreaterThan(0)
     expect(
       second.queryByText("BERG-T0412"),
       "the second ticket borrowed the first one's reference"

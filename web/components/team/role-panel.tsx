@@ -172,7 +172,7 @@ export function RolePanel({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={`${t("Edit this role")} — ${role.title}`}
+                      aria-label={`${t("Edit this role")}: ${role.title}`}
                       onClick={() => onEdit(role)}
                     >
                       <PencilSimple className="size-4" />
@@ -187,7 +187,7 @@ export function RolePanel({
                       size="icon"
                       aria-label={`${
                         role.active ? t("Deactivate") : t("Activate")
-                      } — ${role.title}`}
+                      }: ${role.title}`}
                       onClick={() => onToggleActive(role)}
                     >
                       <Power className="size-4" />

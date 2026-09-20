@@ -1251,7 +1251,7 @@ export function HelpFormDialog({
           // own name glued to the same words the picker's placeholder already
           // uses, never a bare explanatory sentence on its own.
           <p className="text-muted-foreground text-sm" id="help-account">
-            {fixedApp?.name} — {t("Ours, no account")}
+            {fixedApp?.name}: {t("Ours, no account")}
           </p>
         ) : (
           <RecordPicker
@@ -1673,7 +1673,7 @@ export function HelpFormDialog({
                 preselection. */}
             {sortedOptions(contactOptions, lang, (c) => c.label).map((c) => (
               <SelectItem key={c.value} value={c.value} face={{ src: c.picture ?? undefined, name: c.label }}>
-                {c.hint ? `${c.label} — ${c.hint}` : c.label}
+                {c.hint ? `${c.label}: ${c.hint}` : c.label}
               </SelectItem>
             ))}
           </SelectContent>

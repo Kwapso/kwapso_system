@@ -136,7 +136,7 @@ export type TableColumn = {
   searchKey?: string
   /** CUSTOM RENDER for the cell. Called with the raw row value; return
    * `undefined` to render the value as-is. Useful for showing a placeholder
-   * when the value is empty (null/"—"). */
+   * when the value is empty (null/"-"). */
   render?: (value: unknown) => React.ReactNode | undefined
 }
 
@@ -197,11 +197,11 @@ export type SortType = "text" | "number" | "date"
 
 /** Blanks go LAST, whichever way the column is pointing.
  *
- * Every cell here is a shaped string and an absent value is rendered "—", so
+ * Every cell here is a shaped string and an absent value is rendered "-", so
  * without this a descending sort on a column that is mostly empty opens with a
  * screen of em-dashes — the sort worked and the answer is useless. Sorting is
  * for finding the extremes of what you HAVE. */
-const isBlank = (v: unknown) => v == null || v === "" || v === "—"
+const isBlank = (v: unknown) => v == null || v === "" || v === "-"
 
 /** A date column's comparison value, as a number of milliseconds — `null` when
  * there is nothing there to compare.

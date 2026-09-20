@@ -386,7 +386,7 @@ export function ProcessDetailScreen({
 
   const overviewItems = [
     { label: t("App"), value: process.appName },
-    { label: t("Current version"), value: current ? versionLabel(current) : "—" },
+    { label: t("Current version"), value: current ? versionLabel(current) : "" },
     { label: t("Baseline"), value: baseline ? versionLabel(baseline) : "Version 1" },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]

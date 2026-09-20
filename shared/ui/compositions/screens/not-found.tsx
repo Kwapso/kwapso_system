@@ -167,9 +167,9 @@ const SYSTEM_LABELS: NotFoundLabels = {
 
   deletedTitle: "This record was deleted.",
   deletedBody:
-    "Member name deleted 4182 on 14 August. Deleting is permanent, so there is nothing to restore — but the activity log still holds what happened to it.",
+    "Member name deleted 4182 on 14 August. Deleting is permanent, so there is nothing to restore, but the activity log still holds what happened to it.",
   deletedBodyNarrow:
-    "Member name deleted it on 14 August. Deleting is permanent — the log still holds what happened.",
+    "Member name deleted it on 14 August. Deleting is permanent: the log still holds what happened.",
 
   movedTitle: "4182 now lives in Collection B",
   movedBody: "It was moved on 14 August. Everything on it moved with it.",

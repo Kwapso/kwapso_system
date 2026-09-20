@@ -265,7 +265,7 @@ const PulseBand = React.forwardRef<HTMLDivElement, PulseBandProps>(
     const describe =
       dayLabel ??
       (({ week, dayName, level }: { week: PulseWeek; dayName: string; level: HeatLevel }) =>
-        `${typeof week.label === "string" ? week.label : ""} ${dayName} — ${
+        `${typeof week.label === "string" ? week.label : ""} ${dayName}, ${
           levelLabels[level]
         }`.trim());
 

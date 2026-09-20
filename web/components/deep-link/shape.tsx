@@ -44,7 +44,7 @@ import { REF_LEADS_NAME } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
 import type { MeetingTypeIcon } from "@shared/meeting-icons"
 import { translator, type Language } from "@shared/i18n"
-import { sprintTypeIcon } from "@shared/sprint-types"
+import { phaseTypeIcon, PHASE_TYPE_GROUP } from "@shared/sprint-types"
 import { storyTypeIconName } from "@shared/story-types"
 import { TICKET_TYPE_GROUP, ticketTypeIconName, type TicketTypeIconName } from "@shared/ticket-types"
 import { appStageDotTone } from "@shared/app-stages"
@@ -354,7 +354,7 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   contact: "Contacts",
   app: "Apps",
   process: "Processes",
-  sprint: "Sprints",
+  sprint: "Phases",
   story: "Stories",
   meeting: "Meetings",
   todo: "Inputs",
@@ -462,7 +462,7 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       nameText: m.active ? title : `${title} (cancelled)`,
       // K1: when, and who with. The purpose is a column on the "all" view, which
       // is where a person compares meetings on it (K2).
-      detail: [formatDate(m.startsAt, lang), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
+      detail: [formatDate(m.startsAt, lang), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "",
       // TABLE COLUMNS, not facets. `client` and `state` are two of the six the
       // "All" view draws, and the meetings list's filters are the DOOR's now
       // (web/lib/collection-filters.ts) — so these are read by the table and by
@@ -528,9 +528,9 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // The bare day the calendar view keys entries on — it wants a date, not a
       // moment, and formatting it for the grid is the grid's job.
       startsOn: m.startsAt.slice(0, 10),
-      app: m.appName ?? "—",
-      where: m.location ?? "—",
-      written: m.notes ? "Yes" : "—",
+      app: m.appName ?? "",
+      where: m.location ?? "",
+      written: m.notes ? "Yes" : "",
       // WHO IS COMING, AS FACES — the table's own Attendees column. Rooms are
       // not stakeholders (`meeting-detail.tsx`'s own split, "a room shown as
       // a stakeholder is a stakeholder nobody can ring"), so they are
@@ -563,7 +563,7 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
         .map((g) => g.name || g.email)
         .join(", "),
       // THE NUMBER, FOR THE CHIP IN FRONT OF THE NAME (the recipe's own
-      // `reference` column, screens.ts). It was `reference: m.ref ?? "—"` and
+      // `reference` column, screens.ts). It was `reference: m.ref ?? "-"` and
       // had no reader at all after the All table's Reference COLUMN was cut —
       // a row key rendering an em dash into nothing. Raw and nullable now,
       // because `RecordRef` decides what an absent one looks like, and what it
@@ -598,7 +598,7 @@ export function shapeAccountsList(
   /** 0091 — who each row's account manager is, resolved off the SAME cached
    * members list every picker in the app already reads (R56: no second
    * fetch for this column). `[]` costs nothing: every row's `manager` is
-   * then "—", exactly what an account with nobody assigned already shows.
+   * then "-", exactly what an account with nobody assigned already shows.
    * DRAWN NOW — the gallery card wall and the table's own column
    * (`web/components/accounts/accounts-screen.tsx`, client ruling 14 Sep
    * 2026), the view this field was declared ahead of. */
@@ -676,7 +676,7 @@ export function shapeAccountsList(
         // honest thing for a fact that is true of almost every row. It had been
         // a free-text column that drifted into four spellings of two ideas, and
         // every one of 106 contacts read "Active".
-        detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "—",
+        detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "",
         // 0091 — the account manager's face (R35), or null for nobody
         // assigned yet. `a.accountManagerId` is `null` for a client login
         // (`toAccount`'s own withholding) as well as for "nobody assigned",
@@ -698,7 +698,7 @@ export function shapeAccountsList(
         // for the table's Country column — client ruling 14 Sep 2026. Plain
         // data, not app copy, so it is never a `t()` call (R28 covers what the
         // app SAYS, not a value somebody picked from the Country dropdown).
-        country: a.country ?? "—",
+        country: a.country ?? "",
         // THE ARCHIVE FLAG, SAID AS A WORD (0042's own finding, read the other
         // way round): there is no `status` COLUMN on an account — one was
         // removed for drifting into four spellings of the same fact
@@ -758,13 +758,13 @@ export function shapeAccountsList(
  *
  * 22 of this team's 110 contacts sit under no company and 45 carry no role, and
  * NEITHER is an error: nobody has said yet. The app already has a word for that
- * and it is a dash — the tickets list draws `—` for a ticket with no app, and
+ * and it is a dash — the tickets list draws `-` for a ticket with no app, and
  * `shapeAccountsList` above draws it for an empty summary line. A dash is quiet
  * enough to scan past, which is what an ordinary absence should be; "None" reads
  * like an answer somebody gave, and "Not set" reads like a fault.
  *
  * Also what `record-table.tsx` sorts LAST in both directions (`isBlank` names
- * `"—"` outright), so a table ordered by a mostly-empty column opens on the rows
+ * `"-"` outright), so a table ordered by a mostly-empty column opens on the rows
  * that have something in it.
  *
  * ── THE FOURTH COLUMN, PORTAL (client ruling, 16 Sep 2026) ───────────────────
@@ -826,7 +826,7 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
       // would be searching `[object Object]`. It is also what a browser-side
       // sort would compare if this column ever gained one.
       name: a.active ? a.name : `${a.name} (archived)`,
-      account: a.companyName ?? "—",
+      account: a.companyName ?? "",
       // THE ACCOUNT, WEARING ITS OWN FACE (R35, client ruling 2026-09-15:
       // "add the logos to account and app … identify everywhere else where
       // it makes sense") — this table's own "Account" column. A SEPARATE key
@@ -856,10 +856,8 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
           <RecordMark picture={a.companyLogoUrl ?? null} name={a.companyName} size="choice" />
           <span className="min-w-0 truncate">{a.companyName}</span>
         </span>
-      ) : (
-        "—"
-      ),
-      role: a.relationship ?? "—",
+      ) : null,
+      role: a.relationship ?? "",
       // THE STATUS COLUMN, 17 Sep 2026 — her ruling that session: "contact
       // live green." A live/archived dot, the same `variant="status"` +
       // `shipped`/`archived` pair the Portal column right below already
@@ -908,10 +906,10 @@ export function shapeInviteDetail(
       status: INVITE_STATUS[invite.status],
       // R54: whoever sent the invite is one of ours by definition — an invite
       // door is not on the portal's surface.
-      invitedBy: staffNameFromSnapshot(audit?.inviterName) || audit?.inviterEmail || "—",
+      invitedBy: staffNameFromSnapshot(audit?.inviterName) || audit?.inviterEmail || "",
       invited: formatDate(invite.createdAt, lang),
       expires: formatDate(invite.expiresAt, lang),
-      accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt, lang) : "—",
+      accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt, lang) : "",
     },
     sets: { activity: shapeActivity(activity, lang) },
   }
@@ -942,8 +940,8 @@ export function shapeBrandList(items: BrandAsset[]): ScreenData {
       // leading slot (UI-GAPS #16)"; #16 shipped, and the sentence outlived the
       // fact — which is precisely the rot that gap's own check exists to catch,
       // one level below where it was looking.
-      detail: a.colorHex || a.category || a.description || "—",
-      category: a.category || "—",
+      detail: a.colorHex || a.category || a.description || "",
+      category: a.category || "",
       state: a.active ? "Live" : "Archived",
       // The gallery display's own slot (`recipe.image`) — a plain URL
       // string, not the `mark` node above. A colour asset has no file (0043:
@@ -961,14 +959,14 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[], la
       id: asset.id,
       name: asset.name,
       detail: asset.category || "No type said",
-      category: asset.category || "—",
-      description: asset.description || "—",
+      category: asset.category || "",
+      description: asset.description || "",
       // A COLOUR IS THE ASSET, not a file of it (0043). The two are exclusive by
       // construction: the migration cleared `file_url` on every row it converted.
       file: asset.colorHex || asset.fileUrl || "No file yet",
       created: formatDateTime(asset.createdAt, lang),
-      createdBy: staffNameFromSnapshot(asset.creatorName) || "—", // R54
-      updated: asset.updatedAt ? formatDateTime(asset.updatedAt, lang) : "—",
+      createdBy: staffNameFromSnapshot(asset.creatorName) || "", // R54
+      updated: asset.updatedAt ? formatDateTime(asset.updatedAt, lang) : "",
     },
     sets: { activity: shapeActivity(activity, lang) },
   }
@@ -980,8 +978,8 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
       id: p.id,
       mark: <RecordMark name={p.name} />,
       name: p.active ? p.name : `${p.name} (archived)`,
-      detail: p.department || p.description || "—",
-      department: p.department || "—",
+      detail: p.department || p.description || "",
+      department: p.department || "",
       state: p.active ? "Live" : "Archived",
     })),
   }
@@ -993,11 +991,11 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
       id: purpose.id,
       name: purpose.name,
       detail: purpose.department || "No department",
-      department: purpose.department || "—",
-      description: purpose.description || "—",
+      department: purpose.department || "",
+      description: purpose.description || "",
       created: formatDateTime(purpose.createdAt, lang),
-      createdBy: staffNameFromSnapshot(purpose.creatorName) || "—", // R54
-      updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "—",
+      createdBy: staffNameFromSnapshot(purpose.creatorName) || "", // R54
+      updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "",
     },
     sets: { activity: shapeActivity(activity, lang) },
   }
@@ -1145,8 +1143,8 @@ export type ChoiceGroupHome = {
  *     nothing beyond its word — an honest empty cell, no dash, no hint
  *     (R81's own rule, read here for a table cell rather than a form). */
 function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>): React.ReactNode {
-  if (v.type === "Sprint type") {
-    const hasIcon = sprintTypeIcon(v.value) !== ""
+  if (v.type === PHASE_TYPE_GROUP) {
+    const hasIcon = phaseTypeIcon(v.value) !== ""
     const days = v.standardDays
     if (!hasIcon && days === null) return null
     return (

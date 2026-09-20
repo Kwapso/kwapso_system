@@ -38,10 +38,10 @@ export type AuditMeta = {
  * a contact can author is drawn through this. */
 export function auditItems(a: AuditMeta, t: Translate, lang: Language): { label: string; value: string }[] {
   return [
-    { label: t("Created by"), value: staffNameFromSnapshot(a.createdByName) || "—" },
-    { label: t("Created"), value: a.createdAt ? formatRelative(a.createdAt, t, lang) : "—" },
-    { label: t("Last edited by"), value: staffNameFromSnapshot(a.editedByName) || "—" },
-    { label: t("Last edited"), value: a.updatedAt ? formatRelative(a.updatedAt, t, lang) : "—" },
+    { label: t("Created by"), value: staffNameFromSnapshot(a.createdByName) || "" },
+    { label: t("Created"), value: a.createdAt ? formatRelative(a.createdAt, t, lang) : "" },
+    { label: t("Last edited by"), value: staffNameFromSnapshot(a.editedByName) || "" },
+    { label: t("Last edited"), value: a.updatedAt ? formatRelative(a.updatedAt, t, lang) : "" },
     { label: t("Status"), value: a.status },
   ]
 }

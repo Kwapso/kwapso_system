@@ -28,7 +28,7 @@ afterEach(cleanup)
 describe("a collection screen says what it is", () => {
   it("shows its name AND its count when nothing else counts", () => {
     render(<CollectionHeading sectionKey="sprints" total={110} />)
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Sprints")
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Phases")
     expect(screen.getByText("110")).toBeTruthy()
   })
 
@@ -42,7 +42,7 @@ describe("a collection screen says what it is", () => {
     )
     const h1 = screen.queryByRole("heading", { level: 1 })
     expect(h1, "a tabbed screen is still a page and a page has a name").not.toBeNull()
-    expect(h1?.textContent).toContain("Sprints")
+    expect(h1?.textContent).toContain("Phases")
   })
 
   it("…and gives the count up, so it is still said exactly once (R16)", () => {

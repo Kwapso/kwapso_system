@@ -153,7 +153,12 @@ const closeButton = () => screen.findByRole("button", { name: "Close" })
 const queryCloseButton = () => screen.queryByRole("button", { name: "Close" })
 
 describe("the top close action, at every status the bottom composer used to cover", () => {
-  it.each(["new", "triaged", "scheduled", "in_progress", "ready"] as HelpStatus[])(
+  // "new" DROPPED FROM THIS LIST, 20 Sep 2026 — Aurora's ruling: "when
+  // ticket is in status triage, also in main screen the visible buttons
+  // should change: same as in queue." A ticket at `new` is still IN triage,
+  // so Close/the timer are replaced there (see the describe block below)
+  // rather than drawn-and-disabled the way every later status still is.
+  it.each(["triaged", "scheduled", "in_progress", "ready"] as HelpStatus[])(
     "is drawn at status %s even with no messages yet (visible always; the gate below decides clickable)",
     async (status) => {
       openTicket(status, [])
@@ -262,5 +267,48 @@ describe("the top close action, at every status the bottom composer used to cove
     expect(edit.className).not.toContain("--btn-primary-fill")
     // JUST THE PEN — an icon-only control, no visible label text beside it.
     expect(edit.textContent?.trim()).toBe("")
+  })
+})
+
+// THE TRIAGE STAGE'S OWN ACTIONS, ON THE HEAD — Aurora's ruling, 20 Sep
+// 2026, verbatim: "when ticket is in status triage, also in main screen the
+// visible buttons shoudl change: same as in queue." A ticket at `new` is the
+// triage queue's own set (`status === "new"` IS the pre-triage state,
+// triage-queue.tsx's own undo comment); this proves Close and the timer are
+// replaced there by the same decision `triageAct` gives a row in the Triage
+// tab's own list, and that Edit is untouched.
+describe("the triage stage's own actions replace Close/the timer on the head (Aurora, 20 Sep 2026)", () => {
+  it("draws no Close button at status new", async () => {
+    openTicket("new", [])
+    await screen.findByRole("heading", { level: 1 })
+    expect(queryCloseButton()).toBeNull()
+  })
+
+  it("draws no Start timer button at status new either", async () => {
+    openTicket("new", [])
+    await screen.findByRole("heading", { level: 1 })
+    expect(screen.queryByRole("button", { name: "Start timer" })).toBeNull()
+  })
+
+  // BASE_TICKET carries `helpType: "Bug"`, which falls to `triageAct`'s
+  // default case — the SAME word and non-assigning act a Question or an
+  // Extra gets in the queue (tickets-collection.tsx's `triageAct`), since
+  // the Store button an Extra used to wear was removed the same session.
+  it("draws the triage queue's own decision word in Close's place, for a type that needs nobody", async () => {
+    openTicket("new", [])
+    const region = titleRegion()
+    expect(await within(region).findByRole("button", { name: "Accept" })).toBeTruthy()
+  })
+
+  it("still draws the standalone Edit pen at status new", async () => {
+    openTicket("new", [])
+    const region = titleRegion()
+    expect(await within(region).findByRole("button", { name: "Edit" })).toBeTruthy()
+  })
+
+  it("keeps Close/the timer at every OTHER status — only the triage stage swaps them out", async () => {
+    openTicket("triaged", [])
+    expect(await closeButton()).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull()
   })
 })

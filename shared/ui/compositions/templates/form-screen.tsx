@@ -282,9 +282,9 @@ const COUNT_WORDS = [
 
 function defaultFormatMissing(names: readonly string[]): string {
   if (names.length === 0) return "";
-  if (names.length === 1) return `One required field is empty — ${names[0]}`;
+  if (names.length === 1) return `One required field is empty: ${names[0]}`;
   const count = COUNT_WORDS[names.length] ?? String(names.length);
-  return `${count} required fields are empty — ${names.join(", ")}`;
+  return `${count} required fields are empty: ${names.join(", ")}`;
 }
 
 /* ch27.35's card writes its count as a word too: "Two fields need

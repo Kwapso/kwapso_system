@@ -183,13 +183,13 @@ function renderSprints(sprints: Sprint[], canCreate = true) {
 describe("Sprints — the tab a new team lands on, and the calendar beside it", () => {
   it("Overview names the first act on a team with no sprints", async () => {
     renderSprints([])
-    expect(await screen.findByText("No sprints yet.")).toBeTruthy()
+    expect(await screen.findByText("No phases yet.")).toBeTruthy()
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
   })
 
   it("Overview draws no button for a role that cannot start one (TEN STATES #10)", async () => {
     renderSprints([], false)
-    expect(await screen.findByText("No sprints yet.")).toBeTruthy()
+    expect(await screen.findByText("No phases yet.")).toBeTruthy()
     expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
   })
 
@@ -197,20 +197,20 @@ describe("Sprints — the tab a new team lands on, and the calendar beside it", 
     renderSprints([])
     await screen.findByRole("tab", { name: /Calendar/ })
     pickTab(/Calendar/)
-    expect(await screen.findByText("No sprints yet.")).toBeTruthy()
+    expect(await screen.findByText("No phases yet.")).toBeTruthy()
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
-    expect(screen.queryByText("No sprints start this month.")).toBeNull()
+    expect(screen.queryByText("No phases start this month.")).toBeNull()
   })
 
   it("CANARY: one sprint draws that sprint on both tabs and no empty register", async () => {
     renderSprints([ONE_SPRINT])
     expect(await screen.findByText(/Launch the portal/)).toBeTruthy()
-    expect(screen.queryByText("No sprints yet.")).toBeNull()
+    expect(screen.queryByText("No phases yet.")).toBeNull()
     expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
     pickTab(/Calendar/)
     // The grid, with its own month navigation, not the register.
     expect(await screen.findByRole("button", { name: /next month/i })).toBeTruthy()
-    expect(screen.queryByText("No sprints yet.")).toBeNull()
+    expect(screen.queryByText("No phases yet.")).toBeNull()
     expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
   })
 })
@@ -474,6 +474,7 @@ const ONE_STORY = {
   category: "Client-requested",
   acceptanceCriteria: null,
   moscow: null,
+  contributesToGoal: false,
   reviewNote: null,
   reviewFileUrl: null,
   reviewFileName: null,

@@ -2,6 +2,293 @@
 
 ## Unreleased
 
+### Fixed - TicketThread's inline edit field no longer suppresses the shared focus ring - v1.2.142
+
+The app's focus-ring law (ruling 24: the ring is one rule in `styles.css` and
+nothing focusable may suppress it) failed on this file: the per-message
+inline editor Textarea, added in v1.2.139's edit/copy/delete menu, carried
+`focus-visible:ring-0`, silencing the ring on the one control that field
+gains on `autoFocus`. Removed - the Textarea now takes the shared ring like
+every other focusable control in the kit. `outline-none`/`focus:outline-none`
+were also searched for on this file and none were found. No existing
+`check-*.mjs` pinned the suppressed class, so none needed updating to pin
+its absence instead.
+
+### Added - the permission matrix's un-offered slot carries a stable data-slot hook, so a test never has to find it by its own glyph - v1.2.141
+
+v1.2.140 changed `permission-matrix.tsx`'s `NO_VALUE` from the em dash
+(U+2014) to an empty string (an empty cell, not a hyphen standing in for
+the dash it replaced), which quietly removed the only hook
+`kwapso_system`'s own `web/test/roles-matrix-boxes.test.tsx` had for
+finding an un-offered slot: a text match against a glyph that is no
+longer there cannot find an element with no text. Both render sites
+- the legend's own example run and the real grid - now carry
+`data-slot="permission-matrix-unoffered"` on the span `NO_VALUE` renders
+into, a hook stable regardless of what `NO_VALUE` is spelled as. Nothing
+else about the mark changes: still an empty cell, still `aria-hidden` on
+the real grid (the fact already lives once in the cell's own accessible
+name), still the same `SLOT_SHAPE`.
+
+Pinned in the new `components/permission-matrix/check-permission-matrix.mjs`,
+wired into `npm run check`: both render sites carry the attribute, on the
+same span `{NO_VALUE}` renders on, and exactly two sites exist in the file
+(catching a third un-offered slot added without the hook, rather than
+passing beside it). Proved live: the hook was dropped from one render
+site with a script, the check failed naming the exact line, then the file
+was restored from a `cp` taken before the sabotage and the check went
+green again.
+
+### Fixed - the kit's own user-facing copy carried the em dash and en dash Aurora's law forbids everywhere else; a check now holds the line - v1.2.140
+
+**HER RULING, VERBATIM, 20 Sep 2026.** "no em dahses - ABOSLUTLEY NOWHERE. In
+the ui, in the e-mai,s, in the glossary. They are strictly forbidden. make it
+law."
+
+**THE CENSUS.** The app already enforces this over its own strings (R95); the
+kit did not. A line scan of every U+2014 (em dash) and U+2013 (en dash)
+across `components/` and `compositions/` found 9,694 occurrences: 9,647 sat
+inside the kit's own explanatory comments (left alone - Aurora's law names
+the UI, the emails and the glossary, not the source's own margin notes), and
+47 sat in user-facing copy, separators, aria-labels and placeholder or sample
+text, across `file-upload.tsx`, `filter-bar.tsx`, `gantt.tsx`,
+`heatmap.tsx`, `notifications.tsx`, `permission-matrix.tsx`,
+`portal-conversation.tsx`, `pulse-band.tsx`, `queue.tsx`, and the
+`access-denied`, `bulk-edit`, `delete-confirmation`, `import`,
+`import-proposal`, `brand`, `company-hub`, `home`, `not-found`, `onboarding`,
+`new-empty-record`, `form-screen`, `multi-step-form`, `portal-home`,
+`record-chrome`, `record-route`, `search-results` and `stat-strip`
+compositions.
+
+**THE REWRITE, EVERY STRING'S MEANING KEPT.** A separator prop
+(`filter-bar.tsx`'s `RangeFacet` `separator`, `gantt.tsx`'s `rangeSeparator`)
+now defaults to the kit's own middle dot, "·", the same mark
+`record-route.tsx`'s sprint fact already spent - the prop itself is
+untouched, so a caller that wants the old glyph back still can. A literal
+range ("Mon to Fri" in spirit; here "W31 to W34", "18 Aug to 29 Aug", "1 to 8
+of 214") now spells "to" instead of a dash. A sentence dash became whichever
+of a comma, a colon or a period the clause actually needed. `title` in both
+`delete-confirmation.tsx` dialogs - "Delete 4182, Northgale Studio?" in
+shape - now separates the number from the record title with the same middle
+dot. `permission-matrix.tsx`'s `NO_VALUE`, the kit's own mark for a
+capability not on offer, no longer renders a dash standing in for the value
+that is not there - it renders nothing, an empty cell, and the two sample
+rows in `import.tsx`/`import-proposal.tsx` that used a dash the same way do
+the same now.
+
+**THE CHECK.** `scripts/check-no-em-dash.mjs`, wired into `npm run check`,
+walks every `.ts`/`.tsx`/`.js`/`.jsx` file under `components/` and
+`compositions/` and fails on any U+2014/U+2013 sitting outside a `//` line
+comment or a `/* */` block comment (a JSX comment is the same block comment,
+just inside braces) - a string literal, a template literal and JSX text are
+all in scope regardless of whether they render, throw as a dev-only warning,
+or sit in sample data, since the census found real hits in all three shapes.
+Proved live: a sabotaged default prop value (`"k" -> "k - sabotage"` in
+`badge.tsx`) turned the check red with the exact file, line and column, then
+the file was restored from a `cp` taken before the sabotage, matching HEAD
+byte for byte, and the check went green again.
+
+### Added - `CardContent` takes an `inset` prop, `"default"` or `"compact"`, so a dense card body is a declared shape - v1.2.140
+
+`CardContent` always spent one fixed vertical rhythm, `py-6
+lg:py-[var(--space-7)]`, with no escape hatch - a caller that wanted a
+compact card body had exactly one move, a `className` override fighting
+that default on specificity, a shape nowhere declared and nowhere checkable.
+`inset="compact"` makes it a first-class shape instead: flat at
+`--space-3` on every breakpoint, the same step `CARD_CONTENT_INSET_X`
+already spends on the horizontal axis (the 17 Sep 2026 evening ruling), so
+a compact card's body is that one step on every side, not a horizontal
+exception paired with a vertical override. `inset` defaults to `"default"`,
+so every existing call site renders exactly as it did before this prop
+existed. Pinned in the new `components/card/check-card.mjs`, wired into
+`npm run check`; `check-screen-shell.mjs`'s own Ruling 2 content-inset check
+was updated alongside it to read the default rhythm through the new
+`CARD_CONTENT_INSET_Y_DEFAULT` identifier rather than an inlined literal.
+
+### Added - a per-message edit/copy/delete menu on TicketThread, beside the bubble, hidden until hover - v1.2.139
+
+**HER RULING, VERBATIM, 20 Sep 2026, on the chat-edit-pencil page.** "for chat
+edit pencil: i like from p1 that its besides and appears when hover, but
+make it like p4 wth the 3 options menu (edit, copy/delete)." Two earlier
+drawings, merged: p1's PLACEMENT and p4's CONTENTS.
+
+**THE CONSTRUCTION.** `ticket-thread.tsx` exports a new `ThreadMessageActions`
+type (`onEdit?: (id, newBody) => void`, `onCopy?: (id) => void`, `onDelete?:
+(id) => void`), settable on `TicketThreadProps.actions` (the whole thread's
+default) or on one `ThreadMessage.actions` (overriding it for that row) -
+`effectiveActions = message.actions ?? actions`, resolved once per message.
+Undefined at both levels draws nothing at all: a caller that never passes
+`actions` gets the exact plain, unwrapped `<div data-slot="thread-bubble">`
+this file always rendered, byte-identical to before this change.
+
+A message WITH actions wraps its bubble beside a small round secondary icon
+button (DotsThree, "..."), at the bubble's own outer corner (right of a
+"theirs" bubble, left of a "mine" bubble - the side away from the avatar in
+both cases, since the outer flex row is already mirrored for "mine").
+`buttonVariants({ variant: "secondary", size: "icon" })` is the exact same
+construction kwapso_system's own `EditPenButton` spends, so the two controls
+share one size step and one skin. Hidden until the row is hovered or holds
+focus (`group-hover/actions:opacity-100`, `group-focus-within/actions:
+opacity-100`, both scoped `@media (hover: hover)` by Tailwind itself), and
+always visible on a coarse pointer (`pointer-coarse:opacity-100`) - a touch
+reader has no hover state to reveal it with.
+
+The trigger opens a `DropdownMenu`: Edit (gated on `onEdit`), Copy (never
+gated - it calls `navigator.clipboard.writeText` unconditionally, `onCopy` is
+a told-you rather than a permission), Delete (gated on `onDelete`, `danger`).
+Edit replaces the bubble with an inline `Textarea` seeded from the message's
+own body (a plain-string body only; a rich-node one opens empty, since there
+is no text form to invent for it), Save/Cancel beneath it; Save calls
+`onEdit(id, draft)`. Confirming a delete is the caller's own job - no dialog
+here.
+
+**MEASURED LIVE**, a real Playwright browser against the mounted harness
+(`verify/ticket-thread-below`, both `page.tsx`'s new actions pane and the
+new `check-actions.mjs` driver - real `page.mouse` clicks throughout, not
+`element.click()`, because Radix's own trigger opens on pointer-down and a
+synthetic click never fires one, the identical gap `check-pointer.mjs`
+already documented for this kit's tab strip): a message with no `actions`
+renders no trigger and no wrapper; a copy-only message opens a menu with
+exactly one item; a full-actions message opens Edit/Copy/Delete in order,
+Delete carries `data-danger=""`, Edit seeds the field with the message's own
+body, Save closes the editor and calls `onEdit` with the new text, Copy
+calls both the clipboard and `onCopy`, Delete calls `onDelete` - all with the
+message's own id. Pinned statically in `check-ticket-thread.mjs`'s new
+section 5 (types, gating, the plain-branch fallback, the trigger's
+construction and visibility gates, the harness/driver staying on disk).
+
+Incidentally fixed: `verify/ticket-thread-below/vite.config.ts`'s own
+comment embedded a glob path whose own comment-closing characters ended
+that block comment early, breaking the file's own dev server the first
+time this session actually started it (the file had never been run that
+way before). Reworded only, no behaviour change.
+
+`npm run check`: exit 0.
+
+### Fixed - the assistant strip's inactive tabs paint behind the panel card again, and the shut assistant opener matches the rail's own handle size - v1.2.138
+
+**RULING A, HER CROP OF THE ASSISTANT STRIP, VERBATIM, 20 Sep 2026.** "loos
+at screenshot. i see the bottom of th eincactive tabs for the assistant but
+they shoudl be behind the shape!" The strip rides `--folder-tab-overlap`
+onto the panel card by design: an inactive tab's lower ~17px sits over the
+panel's own top ~17px, and whichever of the two paints on top in that band
+is what the reader sees. It was the tab.
+
+**MEASURED LIVE, before the fix**, `agency-staging.kwapso.app` at 1440x900,
+the assistant open, `document.elementFromPoint` at a point inside a rest
+tab's own overlap band: returned the tab's own `<a data-slot="breadcrumb-
+link">`, on every rest tab, never the panel. A point in the tab's upper
+body (above the overlap band) correctly returned the tab.
+
+**THE CAUSE.** `breadcrumb-folders.tsx`'s `STRIP_SHRINK_SCROLL`/
+`STRIP_SHRINK_PINNED` carry `isolation: isolate` (v1.2.126, still load
+bearing, still what keeps a rest tab's own negative `z-index` clickable at
+all - unchanged here). `isolation: isolate` on a `position: static`
+element still creates a new stacking context, and a browser paints a
+context created that way at the same step as an ordinary `z-index: 0`
+POSITIONED sibling, one step above plain non-positioned, in-flow, DOM-order
+content (CSS 2.1 Appendix E, steps 4 vs 7). The panel this strip rides onto
+(`screen-shell.tsx`'s `screen-shell-aside-body`) had no `position` and no
+`z-index` of its own: step 4. The isolated `<ol>` was step 7 by
+construction, whether or not anyone asked it to be, so it always won,
+tab-versus-panel, regardless of DOM order. The content column's own
+workspace trail never showed this defect because its own panel (`CARD`)
+already reads `relative z-[2]` - an explicit, numbered stacking
+participant that outranks the isolated strip's own implicit step-7
+promotion the same way it always outranked plain DOM-order content.
+
+**THE FIX, BY CONSTRUCTION.** `screen-shell.tsx`'s `ASIDE_BODY` now reads
+`relative z-[2]` too, the same token `CARD` spends for the identical job.
+Nothing in `breadcrumb-folders.tsx` changed: the strip's own `isolate`
+stays exactly as v1.2.126 left it, still the reason a rest tab is
+clickable at all. **MEASURED after**: the same `elementFromPoint` probe,
+same overlap-band point, now returns a descendant of the panel on every
+rest tab; the tab's own upper body still returns the tab; a real
+`page.mouse.click` at each tab's own visible centre still reaches it
+(`verify/agent-tab-strip-fit/check-pointer.mjs`, unaffected, still green).
+The active tab's own overlap band is covered by the identical
+construction, which costs nothing to look at: the live tab's paper IS the
+panel's own (`--surface-raised` both sides), so covering it there changes
+no pixel.
+
+`verify/agent-tab-strip-fit/page.tsx` gains a mock panel
+(`data-slot="agent-tab-strip-fit-panel"`, the same `relative z-[2]`
+construction) and `measureLayering()`, exposed as
+`window.__agentTabStripLayeringProbe`: for every tab in every case (1, 3,
+5, 8 open conversations), a point in the tab's own upper body must resolve
+to the tab, and a point in its own overlap band must resolve to the panel,
+never the tab. Run live against the harness: every case passes. Pinned in
+`components/breadcrumbs/check-breadcrumb-folders.mjs`, alongside the
+existing v1.2.126 pointer-click proof, which stays green unmodified.
+
+**RULING B, VERBATIM.** "make the open assistant mango button same size as
+the one on the sidebar to compress/open the sidebar."
+
+**MEASURED LIVE, before the fix**, same page: the rail's own collapse/
+expand handle (`[data-slot="screen-shell-handle"][data-edge="rail"]`) is
+40x40px (`--control-height-button`, `HANDLE_HIT`'s own default, unchanged).
+The shut assistant opener (`edge="aside"`) was 30.47x30.47px
+(`--folder-lip`) - two 18 Sep rulings had sized that ONE branch to fit its
+own 16px-to-card-top band exactly, an override that won the class merge
+against `HANDLE_HIT`'s own default every time.
+
+**THE FIX.** That override is deleted outright, not swapped for a third
+value: `HANDLE_HIT` already sizes every edge handle to
+`--control-height-button` by default, so removing the aside branch's own
+`size-[...]` override is "unify on one constant" literally, both handles
+now read their size off the identical class in the identical shared
+component. **MEASURED after**: both 40x40. This knowingly reopens the
+9.52px band overlap the first 18 Sep ruling had fixed (the shut handle's
+bottom edge now runs past the content card's own top edge again) - a later,
+more specific ruling from the same client on the same control supersedes
+the earlier one, by this repo's own standing law. Pinned in
+`compositions/templates/check-screen-shell.mjs` (rewritten, not extended -
+the two pins, fit-the-band and match-the-rail, cannot both hold at once).
+
+### Verified — the assistant strip's inactive/"+"/History tiles already share the workspace trail's own tab classes; a class-list parity harness proves it going forward — v1.2.137
+
+**HER REPORT, VERBATIM, 20 Sep 2026.** *"whats going on with the assistant
+tabs? shape of 'not active (and + and log)' is still wrong"* — against her
+standing law that the assistant dock strip must "100% replicate what
+happens with main content tabs": same component, same classes, same
+measurements as the workspace trail's own inactive tab and "+" tab, for the
+assistant's inactive tab, its "+" tab and its History tab.
+
+**MEASURED LIVE ON STAGING FIRST**, `agency-staging.kwapso.app` at 1440×900,
+with the assistant open and two conversations, against the workspace
+trail's own inactive tab and "+" tab and the assistant strip's inactive
+tab, "+" and History (`tabshape-compare.mjs`, a throwaway proof script, not
+kept in this repo): rects, computed background, border-radius per corner,
+the `FolderShape` SVG's own box, font size/weight, ink colour and the full
+class list, for every kind. **No divergence found.** The inactive tab's and
+the "+" tab's class lists read BYTE-IDENTICAL between the two strips
+(differing only in rendered width, which tracks the label text itself —
+"Tasks" vs "Conversation" — not a shape difference), and the screenshots of
+both strips at 3× zoom draw the identical folder silhouette, fill and
+shoulder. `breadcrumb-folders.tsx` already renders every one of `fit=
+"natural"`'s and `fit="shrink"`'s three `<BreadcrumbList>` sites (natural,
+shrink-scroll, shrink-pinned) through one shared `renderCrumb` function and
+one shared set of `TAB`/`TAB_REST`/`TAB_LIVE`/`TAB_ICON_ONLY` constants —
+the v1.2.125 split this report suspected never forked a second definition
+of any of them, and nothing in this construction needed to change.
+
+**THE DURABLE PROOF, SO THE NEXT REGRESSION CANNOT SHIP SILENTLY.**
+`verify/agent-tab-strip-fit/page.tsx` gains a `fit="natural"` reference
+strip (`NATURAL_REFERENCE_ITEMS`, rest · active · rest · a trailing
+`closable: false` icon-only tab — `tabstrip-parity`'s own content-strip
+shape, copied rather than cross-imported) and `measureClassParity()`,
+exposed as `window.__agentTabStripClassParityProbe`: the pinned "+" tile's
+class list must read byte-identical between the two modes (nothing about it
+ever shrinks), and the inactive/active scrolling tiles' class lists must
+match once `TAB_SHRINK_TAB`'s own documented substitution — `shrink-0` +
+`min-w-[var(--folder-tab-min-width)]` for `shrink` + `min-w-0` — is undone.
+Run live against the harness: `{"pinned":{"matches":true},"rest":{"matches":
+true},"active":{"matches":true},"passes":true}`. Pinned in
+`components/breadcrumbs/check-breadcrumb-folders.mjs`, alongside a
+confirmation that `verify/agent-tab-strip-fit/check-pointer.mjs` — the
+real-`PointerEvent` hit-test proof from v1.2.126 — still exists on disk;
+`npm run check` now fails if either proof is ever quietly dropped from the
+harness.
+
 ### Fixed — a run's earlier chat bubbles keep their face even with no byline, and the doc that told a caller otherwise is corrected — v1.2.136
 
 **THE RULINGS, VERBATIM, 20 Sep 2026.** Aurora:

@@ -65,7 +65,7 @@ export function LiveStatus() {
     >
       <CloudSlash className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1">
-        {t("Not updating live right now — you may not be seeing the latest changes.")}
+        {t("Not updating live right now. You may not be seeing the latest changes.")}
       </span>
       <Button
         type="button"

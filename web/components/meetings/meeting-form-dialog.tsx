@@ -188,7 +188,7 @@ export function MeetingFormDialog({
                  that promises an action the app refuses to take is worse than a
                  form that says nothing, so it now says what actually happens. */
               t(
-                "A conversation, with what you mean to cover. It is kept here — {brand} reads your calendar and never writes to it.",
+                "A conversation, with what you mean to cover. It is kept here. {brand} reads your calendar and never writes to it.",
                 BRAND
               )}
         </DialogDescription>

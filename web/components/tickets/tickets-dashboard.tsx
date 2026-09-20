@@ -561,7 +561,7 @@ function OpenWork({
                   title={`${type} · ${t(HELP_STATUS[status])}`}
                 />
                 <span className="w-6 shrink-0 text-right tabular-nums">
-                  {at(type, status) || "–"}
+                  {at(type, status) || ""}
                 </span>
               </div>
             ))}

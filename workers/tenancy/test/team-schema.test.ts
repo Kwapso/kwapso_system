@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 
 import { sqlString } from "@shared/workers/d1-rest"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
-import { SPRINT_TYPES } from "@shared/sprint-types"
+import { SPRINT_TYPES, PHASE_TYPES } from "@shared/sprint-types"
 import {
   buildTeamSeed,
   SPRINT_TYPE_CATALOGUE,
@@ -458,11 +458,18 @@ describe("0025 — the purge, and the one thing it refused to throw away", () =>
     // coverage moves to the "0098" describe block below, which asserts what
     // 0098 itself promises rather than what 0025's fold happened to leave
     // behind under a word 0098 later renamed.
-    const renamed = new Set(["Assessment", "Implementation", "Refinement"])
+    // "Validation" joins the excluded set 20 Sep 2026: team migration 0107
+    // renames it to "Pilot" (Aurora's ruling), the identical fault this same
+    // exclusion already exists to work around for the three 0098 renames.
+    const renamed = new Set(["Assessment", "Implementation", "Refinement", "Validation"])
     for (const entry of SPRINT_TYPE_CATALOGUE) {
       if (renamed.has(entry.value)) continue
+      // "Sprint type" -> "Phase type": team migration 0107 (Aurora's 20 Sep
+      // 2026 ruling) renames the GROUP itself, later in the same full-ledger
+      // replay this suite runs — so by the time this query runs, every row
+      // (renamed or not) has already moved under the new group name.
       const row = db
-        .prepare("SELECT mark, name_de, description, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
+        .prepare("SELECT mark, name_de, description, standard_days FROM selectable_data WHERE type = 'Phase type' AND value = ?")
         .get(entry.value) as
         | { mark: string | null; name_de: string | null; description: string | null; standard_days: number | null }
         | undefined
@@ -487,8 +494,10 @@ describe("0025 — the purge, and the one thing it refused to throw away", () =>
     // it to "Plan" (asserted in the "0098" block below) — but Iteration is
     // not one of 0098's seven canonical words either, so it is simply
     // deactivated in place, keeping its bare mark.
+    // Group renamed under it by team migration 0107 — see the comment on the
+    // query above this one.
     const row = db
-      .prepare("SELECT mark, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
+      .prepare("SELECT mark, standard_days FROM selectable_data WHERE type = 'Phase type' AND value = ?")
       .get("Iteration") as { mark: string | null; standard_days: number | null } | undefined
     expect(row, "Iteration must still be a sprint type").toBeDefined()
     expect(row?.mark ?? null).toBeNull()
@@ -518,24 +527,40 @@ describe("0098 — Sprint type becomes the seven, Diagnostic's conditional inclu
   for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
   db.exec(buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z").script)
 
+  // "Sprint type" -> "Phase type": team migration 0107 (Aurora's 20 Sep 2026
+  // ruling) renames the group itself, later in this same full-ledger replay —
+  // see the identical note on the "0025" describe block above, whose own
+  // renamed-catalogue-words exclusion is the precedent this block follows.
   function sprintTypeRow(value: string) {
     return db
       .prepare(
-        "SELECT mark, position, is_default, deactivated_at FROM selectable_data WHERE type = 'Sprint type' AND value = ?"
+        "SELECT mark, position, is_default, deactivated_at FROM selectable_data WHERE type = 'Phase type' AND value = ?"
       )
       .get(value) as
       | { mark: string | null; position: number | null; is_default: number; deactivated_at: string | null }
       | undefined
   }
 
-  it("all seven canonical words are live, protected, and in position 1..7", () => {
-    SPRINT_TYPES.forEach((s, i) => {
+  it("three of the seven canonical words survive 0107 unrenamed, live and protected", () => {
+    // FOUR OF THE SEVEN ARE EXCLUDED, MOVED BY A LATER MIGRATION: this database
+    // replays the WHOLE ledger, not 0098 in isolation, and team migration 0107
+    // (Aurora's 20 Sep 2026 ruling) renames Validation -> Pilot and
+    // Refinements -> Revision, and deactivates "Not started"/"Enhancement"
+    // outright (the Wave-lifecycle reorder drops both from the ordered seven).
+    // Their post-0107 state is asserted in the "0107" describe block below,
+    // the same split the "0025" describe block above already takes for its
+    // own three renamed catalogue words. POSITION is asserted there too, and
+    // only there: 0107 re-positions every one of the seven — Audit/Plan/Build
+    // shift down a slot once "Not started" no longer precedes them — so
+    // "0098's own position" is not a fact this full-ledger replay can still
+    // observe.
+    for (const s of SPRINT_TYPES) {
+      if (["Not started", "Validation", "Refinements", "Enhancement"].includes(s.name)) continue
       const row = sprintTypeRow(s.name)
-      expect(row, `${s.name} must be a live Sprint type`).toBeDefined()
+      expect(row, `${s.name} must be a live Phase type`).toBeDefined()
       expect(row?.deactivated_at ?? null, `${s.name} must be active`).toBeNull()
       expect(row?.is_default, `${s.name} must be protected`).toBe(1)
-      expect(row?.position, `${s.name}'s position`).toBe(i + 1)
-    })
+    }
   })
 
   it("the four plain renames landed: their OLD words no longer name a live row", () => {
@@ -552,7 +577,7 @@ describe("0098 — Sprint type becomes the seven, Diagnostic's conditional inclu
     // And "Audit" resolves to exactly the one row Assessment's own rename
     // produced — never a second, duplicate "Audit" row from Diagnostic too.
     expect(
-      db.prepare("SELECT COUNT(*) AS n FROM selectable_data WHERE type = 'Sprint type' AND value = 'Audit'").get()
+      db.prepare("SELECT COUNT(*) AS n FROM selectable_data WHERE type = 'Phase type' AND value = 'Audit'").get()
     ).toEqual({ n: 1 })
   })
 
@@ -579,6 +604,78 @@ describe("0098 — Sprint type becomes the seven, Diagnostic's conditional inclu
     expect(sql).toContain("UPDATE sprints SET sprint_type = 'Build' WHERE sprint_type IN ('Implementation')")
     expect(sql).toContain("UPDATE sprints SET sprint_type = 'Audit' WHERE sprint_type IN ('Assessment')")
     expect(sql).toContain("UPDATE sprints SET sprint_type = 'Refinements' WHERE sprint_type IN ('Refinement')")
+  })
+})
+
+// TEAM MIGRATION 0107 — Aurora's 20 Sep 2026 ruling: "sprint" becomes "phase"
+// (the vocabulary group's own name moves too), "Refinement"/"Refinements" ->
+// "Revision", "Validation" -> "Pilot", and the Wave-lifecycle reorder — Audit,
+// Plan, Build, Pilot, Revision, Deploy, Hypercare, "Not started" and
+// "Enhancement" dropped from the ordered seven. Against a real SQLite
+// database replaying the WHOLE ledger, the same discipline every suite above
+// holds itself to.
+describe("0107 — Sprint type becomes Phase type, and the Wave lifecycle reorders", () => {
+  const db = new DatabaseSync(":memory:")
+  for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
+  db.exec(buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z").script)
+
+  function phaseTypeRow(value: string) {
+    return db
+      .prepare(
+        "SELECT mark, position, is_default, deactivated_at FROM selectable_data WHERE type = 'Phase type' AND value = ?"
+      )
+      .get(value) as
+      | { mark: string | null; position: number | null; is_default: number; deactivated_at: string | null }
+      | undefined
+  }
+
+  it("all seven current canonical words are live, protected, and in position 1..7", () => {
+    PHASE_TYPES.forEach((p, i) => {
+      const row = phaseTypeRow(p.name)
+      expect(row, `${p.name} must be a live Phase type`).toBeDefined()
+      expect(row?.deactivated_at ?? null, `${p.name} must be active`).toBeNull()
+      expect(row?.is_default, `${p.name} must be protected`).toBe(1)
+      expect(row?.position, `${p.name}'s position`).toBe(i + 1)
+    })
+  })
+
+  it("Validation and Refinements no longer name a live row — they were renamed, not duplicated", () => {
+    for (const old of ["Validation", "Refinements", "Refinement"]) {
+      const row = phaseTypeRow(old)
+      expect(row, `${old} must not exist under its old spelling`).toBeUndefined()
+    }
+    expect(db.prepare("SELECT COUNT(*) AS n FROM selectable_data WHERE type = 'Phase type' AND value = 'Pilot'").get()).toEqual({ n: 1 })
+    expect(db.prepare("SELECT COUNT(*) AS n FROM selectable_data WHERE type = 'Phase type' AND value = 'Revision'").get()).toEqual({ n: 1 })
+  })
+
+  it("Not started and Enhancement fold out of the ordered seven — deactivated, never deleted", () => {
+    for (const v of ["Not started", "Enhancement"]) {
+      const row = phaseTypeRow(v)
+      expect(row, `${v} must still exist, under its own name`).toBeDefined()
+      expect(row?.deactivated_at ?? null, `${v} must be deactivated`).not.toBeNull()
+    }
+  })
+
+  it("a sprint already storing Validation or Refinements has its own column rewritten to match", () => {
+    const sql = TEAM_MIGRATIONS.find((m) => m.version === "0107_sprint_becomes_phase_goal_and_wave_lifecycle")!.sql
+    expect(sql).toContain("UPDATE sprints SET sprint_type = 'Pilot' WHERE sprint_type IN ('Validation')")
+    expect(sql).toMatch(/UPDATE sprints SET sprint_type = 'Revision' WHERE sprint_type IN \('Refinements', 'Refinement'\)/)
+  })
+
+  it("the phase type dropdown group is named Phase type, not Sprint type, on a fresh replay", () => {
+    const stale = db.prepare("SELECT COUNT(*) AS n FROM selectable_data WHERE type = 'Sprint type'").get()
+    expect(stale).toEqual({ n: 0 })
+  })
+
+  it("sprints.goal_summary and stories.contributes_to_goal exist", () => {
+    const sprintCols = (db.prepare("SELECT name FROM pragma_table_info('sprints')").all() as { name: string }[]).map(
+      (c) => c.name
+    )
+    expect(sprintCols).toContain("goal_summary")
+    const storyCols = (db.prepare("SELECT name FROM pragma_table_info('stories')").all() as { name: string }[]).map(
+      (c) => c.name
+    )
+    expect(storyCols).toContain("contributes_to_goal")
   })
 })
 

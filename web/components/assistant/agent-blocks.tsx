@@ -63,18 +63,12 @@ function BlockFrame({ title, children }: { title?: string; children: React.React
  * screen — the breakpoint sees the window, not the panel. Two survives both hosts:
  * one column on a phone, two side by side anywhere else. */
 function MetricBlock({ block }: { block: Extract<AgentBlock, { kind: "metric" }> }) {
-  // The delta line is all-or-nothing across the grid (StatGrid's own config), so it
-  // only appears when the model actually said something changed about at least one
-  // card — otherwise every card grows an empty row with a lone arrow in it.
-  const showDelta = block.items.some((m) => m.delta)
   const items = block.items.map((m, i) => ({
     id: String(i),
     label: m.label,
     value: m.value,
-    // A card with nothing said about it, in a grid where others DO have a delta,
-    // gets an em dash rather than an orphaned icon — the dashboard convention for
-    // "nothing to report", and it invents no claim the model didn't make.
-    delta: m.delta ?? (showDelta ? "—" : ""),
+    // A card with nothing said about it gets no delta text at all.
+    delta: m.delta ?? "",
     trend: m.trend ?? ("flat" as const),
   }))
   return (

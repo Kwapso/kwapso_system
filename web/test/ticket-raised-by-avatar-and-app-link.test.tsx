@@ -172,55 +172,43 @@ describe("the top-level ticket list draws a staff raiser's own face (client ruli
   })
 })
 
-describe("the triage queue's list stacks the raised date under Raised by (client ruling, 20 Sep 2026)", () => {
-  it("draws a muted second line with the raised date when raisedByShowsDate is set", () => {
+describe("the triage list view never repeats the raised date under Raised by (client ruling, 20 Sep 2026)", () => {
+  // A SECOND LINE UNDER THE RAISER'S NAME, CARRYING THE RAISED DATE, LIVED
+  // HERE FOR TWO DAYS (`raisedByShowsDate`, added 20 Sep 2026 morning). Her
+  // ruling the same day, afternoon: "on tickets triage list view remove the
+  // dabe from under the raised by person (we have an own coumn for that!)" —
+  // the `created` column beside `raisedBy` already carries the same date, so
+  // this proves the one line stays gone rather than proving a prop off by
+  // default, which is no longer part of `TicketRowsTable`'s own shape.
+  it("draws the raiser's name with no date beneath it, even when Created rides beside it", () => {
     render(
       <TicketRowsTable
         rows={[STAFF_ROW]}
         onOpen={() => {}}
         label="Triage queue"
         teamId="team1"
-        columns={["raisedBy"]}
+        columns={["raisedBy", "created"]}
         members={MEMBERS}
-        raisedByShowsDate
       />
     )
     screen.getByText("Alex")
-    // STAFF_ROW.createdAt is "2026-08-18T09:00:00.000Z" — matched loosely on
-    // the day, the same tolerance `app-tickets-are-a-table.test.tsx` uses for
-    // an identical `formatDate` cell, so this stays green across timezones.
-    screen.getByText(/18/)
+    // Exactly one "18" on the row — the `created` column's own date — never a
+    // second copy folded into `raisedBy`.
+    expect(screen.getAllByText(/18/)).toHaveLength(1)
   })
 
-  it("a client contact's Raised by cell gets the identical second line", () => {
+  it("a client contact's Raised by cell carries no date line either", () => {
     render(
       <TicketRowsTable
         rows={[CLIENT_ROW]}
         onOpen={() => {}}
         label="Triage queue"
         teamId="team1"
-        columns={["raisedBy"]}
-        members={MEMBERS}
-        raisedByShowsDate
-      />
-    )
-    screen.getByText("Petra Ostwald")
-    screen.getByText(/18/)
-  })
-
-  it("stays off by default — the 18 Sep 2026 by/date split is untouched on every other tab", () => {
-    render(
-      <TicketRowsTable
-        rows={[STAFF_ROW]}
-        onOpen={() => {}}
-        label="Tickets"
-        teamId="team1"
         columns={["raisedBy", "created"]}
         members={MEMBERS}
       />
     )
-    // Exactly one "18" on the row — the `created` column's own date — rather
-    // than a second copy folded into `raisedBy`.
+    screen.getByText("Petra Ostwald")
     expect(screen.getAllByText(/18/)).toHaveLength(1)
   })
 })
@@ -277,7 +265,7 @@ describe("the Closed tab folds Closed by above Closed on (client ruling, 20 Sep 
     screen.getByText(/12/)
   })
 
-  it("draws an em dash for a ticket that has never been closed", () => {
+  it("draws a blank cell for a ticket that has never been closed", () => {
     render(
       <TicketRowsTable
         rows={[STAFF_ROW]}
@@ -288,7 +276,7 @@ describe("the Closed tab folds Closed by above Closed on (client ruling, 20 Sep 
         members={MEMBERS}
       />
     )
-    screen.getByText("—")
+    expect(screen.queryByText("—")).toBeNull()
   })
 })
 

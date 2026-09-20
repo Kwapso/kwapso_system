@@ -303,7 +303,7 @@ function StatStrip({
 
   if (process.env.NODE_ENV !== "production" && figures.length > maxFigures) {
     console.warn(
-      `StatStrip: ${figures.length} figures. ch27.1 puts three or four here — a fifth number belongs on the dashboard.`,
+      `StatStrip: ${figures.length} figures. ch27.1 puts three or four here: a fifth number belongs on the dashboard.`,
     );
   }
 

@@ -37,10 +37,10 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L37)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L38)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
 - [4. Collections](#4-collections) (K1 to K55)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B27)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B30)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1567,6 +1567,12 @@ breakpoint reads the ticket screen's own width, not the assistant's.
 
 **Status: ruled, in build, 19 Sep 2026.**
 
+**VALIDATED 20 Sep 2026 (Round 29).** Aurora's own words, reviewing the round-13 list this row's
+single-page-scroll fix belongs to, verbatim: *"tickets single page scroll: validated."* The
+19 Sep round 27 fix stands, confirmed live.
+
+**Status: validated, 20 Sep 2026.**
+
 ---
 
 ### L32: any choice over a person, a contact, an account or an app shows the same face the lists show
@@ -1661,6 +1667,16 @@ carries no `face=`.
 **Status: ruled and in build, 20 Sep 2026.**
 
 **Law.** [R94](../RULES.md) (`chip-order`) — `orderChips()`'s own unit tests prove the resolved order; a source census, `web/test/chip-order.test.ts`, over every chip row carrying both an id chip (`<RecordRef`) and a status chip (`variant="status"`/`ticketStatusCell(`) within one reading window, requiring an `orderChips(` call, or a name in `CHIP_ORDER_EXEMPT`.
+
+---
+
+### L38: no em dash, anywhere a person reads
+
+**The rule (R95 `no-em-dash`).** Aurora's ruling, 20 Sep 2026, verbatim: *"no em dahses - ABOSLUTLEY NOWHERE. In the ui, in the e-mai,s, in the glossary. They are strictly forbidden. make it law."* No exemptions table — every failure this law finds is fixed at the source. Three surfaces: the translation catalogue and hand-written seed (every language), every JSX text node/`t(...)` argument/visible property reachable from either front door plus `shared/web/`, and every email a worker sends (`shared/workers/email-template.ts` and every derived `sendBrandedEmail(`/`brandedEmail(` site) — and the glossary's own words. En dash (U+2013) is held to the same standard as em dash (U+2014) in prose; a range like "Mon–Fri" is written "Mon to Fri" instead, a numeric range like "10–16" as "10 to 16", and an aside that used to ride a dash takes a comma, a colon or a period, whichever the sentence asks for. Code comments and doc prose carry no obligation.
+
+**Status: ruled and in build, 20 Sep 2026.**
+
+**Law.** [R95](../RULES.md) (`no-em-dash`) — a source census, `web/test/no-em-dash.test.ts`, six censuses (the catalogue, the seed, the front doors' own import closure read at `visitStrings()`'s seven positions, `shared/web/` read the same way directly off disk, the email template plus every derived send site, and the glossary), each stripped of comments first with `stripComments` and each carrying its own tripwire.
 
 ---
 
@@ -5570,6 +5586,19 @@ exclusion does not apply, named rather than silently inconsistent.
 
 **Status: ruled, in build, 19 Sep 2026.**
 
+**Amendment, 20 Sep 2026 (Round 28): the residual above is gone too. Accounts lists
+companies only, no exception.** Aurora's review of the fix above, verbatim: *"no, i still see
+contacts udner accounts! f.e. Jonathan Sargent Alexander Kaulich"* A standalone individual
+(no `account_links` row to any company) was still reaching the Accounts door through the
+`type: "individual"` read the link dialog's own roster needed. That narrowing moves off the
+screen and into the door itself: `accountsWhere` (`workers/tenancy/src/lib/accounts.ts`) now
+resolves an untyped read to `account_type = 'entity'`, so every one of the Accounts screen's
+three tabs (Active, Inactive, All) shows companies only, linked or standalone. Every person,
+Jonathan Sargent Alexander Kaulich included, lives on Contacts and nowhere else. The link
+dialog keeps its own separate, explicitly-typed read of individuals, unaffected.
+
+**Status: amended, in build, 20 Sep 2026.**
+
 **Law.** None registered.
 
 ### B23: Contacts gets a Gallery/List toggle and its own add door
@@ -5652,6 +5681,19 @@ literally before "Closed on".
 
 **Status: ruled, in build, 20 Sep 2026.**
 
+**Amendment, 20 Sep 2026 afternoon (Round 29): the Triage date under Raised by is gone
+again.** Aurora's ruling, verbatim: *"on tickets triage list view remove the dabe from under
+the raised by person (we have an own coumn for that!)"* The `raisedByShowsDate` line this rule
+added that same morning lasted a matter of hours: the `created` column beside `raisedBy`
+already carries the identical date, so the second line
+was the exact duplicate she is naming. `TicketRowsTable` no longer carries the prop at all,
+never a caller passed `false`, the shape does not exist to turn off. Proved by
+`web/test/ticket-raised-by-avatar-and-app-link.test.tsx`'s own "the triage list view never
+repeats the raised date under Raised by" block: exactly one date on a row carrying both
+`raisedBy` and `created`.
+
+**Status: amended, in build, 20 Sep 2026.**
+
 **Law.** None registered.
 
 ### B27: the stories model round — statuses, tabs, kanban, new fields and icons (12 rulings, one round)
@@ -5701,6 +5743,135 @@ Verbatim, item by item:
 **Status: ruled, mostly in build, 20 Sep 2026 — item 12 (effort → time log) still open.**
 
 **Law.** None new beyond R86/R94, both already registered.
+
+### B28: the Phase rename round, the P0000 id, a Sprint Goal field, and the wave lifecycle order (four rulings, one round)
+
+**The rule.** Aurora's 20 Sep 2026 batch, four rulings read together as one vocabulary move
+(`shared/sprint-types.ts`'s own header keeps the identical reading). Verbatim, item by item:
+
+1. *"Rename 'sprint' to 'phase.' Also change the id to P0000."* Every user-facing word moves:
+   the nav section, the record's own name, every screen that said "Sprint"/"Sprints" now says
+   "Phase"/"Phases" (`shared/i18n-strings.json`, `shared/i18n-seed.ts`), and the record's
+   reference prefix moves from S0000 to P0000 (team migration 0107, `shared/workers/refs.ts`).
+   The glossary's `sprint` key stays, nothing reads the object key as a word, only its `term`
+   changes, to "Phase" (`shared/glossary.ts`). Routes, the permission module and the underlying
+   `sprints` table are untouched: none of them is a word a person reads.
+2. *"Add a 'Sprint Goal' field to each sprint/cycle, a single sentence describing the main
+   outcome the cycle is organized around. A Sprint Goal is the 'why' behind a cycle; every
+   story in that cycle should support it, and anything that doesn't probably shouldn't be
+   included. Display the goal at the top of the sprint board and let users flag which stories
+   contribute to it."* (rendered here without the em dash her own message carried, since every
+   new row this book adds carries none, R95.) A Phase Goal field, one sentence, shown at the top
+   of the phase's board, and a per-story flag for whether it contributes to that goal
+   ("Contributes to the phase's goal").
+3. *"Rename the sprint type 'Refinement' to 'Revision.'"* and *"Rename the phase 'Validation'
+   to 'Pilot.'"* Two of the seven Phase type words move (`shared/sprint-types.ts`'s
+   `PHASE_TYPES`).
+4. *"Update the Wave lifecycle stages and set the full order as: Audit → Plan → Build → Pilot →
+   Revision → Deploy → Hypercare. Audit: assess the current state and gather requirements
+   before work is scoped. Plan: scope, prioritize, and schedule the stories for the wave.
+   Build: implement the stories. Pilot: the period where the customer uses the app and
+   confirms it meets their needs and signs off, before full release. Revision: implement
+   changes and adjustments requested by the customer after they have used the release. Deploy:
+   release the accepted work to production — includes the release checklist, smoke tests,
+   rollout (phased/canary if needed), release notes, and a rollback plan. Hypercare: a short,
+   intensive support window immediately after deploy where the team closely monitors the
+   release, fixes urgent issues fast, and supports users during adoption."* Her word "customer"
+   and "users" are rendered "account"/"the account" wherever they name the party the work is
+   for or the people using the release, R34's own glossary-in-copy law reading this help text
+   same as any other user-facing sentence. This reorders and narrows the same Phase type
+   vocabulary, read from the wave's own side: "Not started" and "Enhancement" drop out of the
+   ordered lifecycle (a phase that has not begun yet is simply absent from a wave's board),
+   "Deploy" and "Hypercare" are new. The seven definitions are stored as this vocabulary's own
+   help text (`shared/sprint-types.ts`'s `PHASE_TYPES[].description`), shown wherever a phase
+   type pill's tooltip draws.
+
+**DECIDE, the wave's own stages ARE the Phase type vocabulary; there is no separate "wave
+stage" column.** A wave's screen shows each phase inside it through this exact seven (now
+narrowed to five ordered plus two retired) words, `shared/waves.ts`'s `WaveSprint.sprintType`:
+reading the ruling's item 4 as the SAME vocabulary from the wave's own side rather than as a
+second, independent schema column nothing anywhere else defines.
+
+**DECIDE, proposed colours, not yet a ruling: Deploy black, Hypercare grey.** The vocabulary
+stays icon-only at every existing pill (`shared/sprint-types.ts`'s own original 16 Sep 2026
+header: "they will not have colors, but icons," the client's own words) until Aurora rules on
+colour for it directly. Read strictly against her separate 20 Sep 2026 colour statement over
+the OLD five words ("audit orange, plan+build black, validation purple, refinements blue"),
+this file's own header proposes the two new words she had not yet seen: Deploy takes the same
+black (`building`) tone Plan and Build already share, an active, in-progress release rather
+than the green "shipped/done" tone that would misread it as finished; Hypercare takes a
+deliberately neutral, winding-down grey (`archived`). NOT WIRED IN: R86 and this vocabulary's
+own two live call sites (`sprints-screen.tsx`'s status-only chip, `sprint-detail.tsx`'s
+uncoloured type pill) both stand on the icons-never-colour ruling today, so the proposed
+mapping was never turned into a `PHASE_TYPE_DOT_TONE` export with no reader — a dead export is
+worse than no table, and re-deciding the mapping later costs nothing this draft wouldn't also
+cost now.
+
+**Status: ruled, in build, 20 Sep 2026. The colour DECIDE above is still open for her pick.**
+
+**Law.** None registered.
+
+### B29: the Store button is gone, the triage-stage head offers the queue's own decision, and the Triaged rung shows a plain date when no span was recorded
+
+**The rule.** Three of Aurora's rulings, 20 Sep 2026, verbatim: *"on tickets triage list view
+rmeove the store button"*; *"when ticket is in status triage, also in main screen the visible
+buttons shoudl change: same as in queue"*; and *"pls the vokumne at triage makes me crazy. if
+a ticket is closed already (al except 15) of course it went through triage (back in the day,
+we dont have the date)."*
+
+**The shape.** The Store button an Extra used to wear filed the ticket and did nothing else,
+which "Accept" already says honestly, so it is deleted rather than kept as a second word for
+the identical action; an Extra now takes the same Accept path every other triage decision
+takes (`triageAct`, `web/components/tickets/tickets-collection.tsx`). A ticket's own detail
+head, while its status is `new` (the pre-triage state the Triage queue itself holds), now
+offers the identical decision a row in that queue offers for its type, Accept/Assign/Plan,
+built off the same `triageAct` function and the same `staffedOn` narrowing the queue's own
+`peopleFor` applies, so the two surfaces cannot say different things about one ticket
+(`inTriageStage`, `web/components/tickets/help-detail.tsx`). And the Triaged rung on a ticket's
+own stage rail, when its CURRENT status is `resolved` and no `triaged` span was ever recorded
+(stage recording began with team migration 0066, so an older or single-step ticket has none),
+now reads the ticket's plain creation date instead of a blank second line that read as "never
+triaged" on a ticket that plainly was, since nothing reaches `resolved` without passing
+through it (`triagedRungMoment`, `web/components/tickets/ticket-stages.tsx`). Scoped to exactly
+the one rung and the one status she named: an open ticket missing an earlier span is a
+different, unasked question, and a reopened ticket is too.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
+
+### B30: two kit fixes read together, the assistant strip and the chat message menu (v1.2.138/v1.2.139)
+
+**The rule.** Three of Aurora's rulings, 20 Sep 2026, verbatim: *"loos at screenshot. i see the
+bottom of th eincactive tabs for the assistant but they shoudl be behind the shape!"*; *"make
+the open assistant mango button same size as the one on the sidebar to compress/oen the
+sidebar"*; and, on a separate chat-edit-pencil page, *"for chat edit pencil: i like from p1
+that its besides and appears when hover, but make it like p4 wth the 3 options menu (edit,
+copy/delete)."* All three ship in `shared/ui/`, the kit's own CHANGELOG carries the full
+account (`shared/ui/CHANGELOG.md`, v1.2.138/v1.2.139); this row is the pointer, not a second
+copy of it.
+
+**v1.2.138, two rulings.** The assistant strip's inactive/"+"/History tabs were painting their
+lower ~17px, the folder-tab overlap band, ON TOP of the panel card instead of behind it: an
+`isolation: isolate` stacking context on the strip (v1.2.126, still load-bearing for a rest
+tab's own click target) always outranked a plain, unpositioned panel, regardless of DOM order.
+Fixed by giving the panel the same `relative z-[2]` its main-content counterpart already reads,
+nothing in the strip itself touched. Separately, the shut assistant opener (30.47×30.47px, two
+18 Sep rulings had fit it to its own band) is unified on the rail's own handle size,
+`--control-height-button`, 40×40px, one constant for both controls, knowingly reopening the
+band overlap the 18 Sep fit had closed, because a later, more specific ruling on the same
+control supersedes the earlier one.
+
+**v1.2.139, the message menu.** `TicketThread` gains a per-message actions menu, drawn only
+when a caller passes `actions`: a small round secondary icon button at the bubble's own outer
+corner (P1's placement, hidden until hover or focus, always visible on a coarse pointer), whose
+trigger opens Edit/Copy/Delete in that order (P4's contents). Edit swaps the bubble for an
+inline field seeded from its own text, Copy always fires (a told-you, not a gated action),
+Delete is gated and gets no confirmation of its own, that is the caller's job.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
 
 ---
 
@@ -8055,15 +8226,15 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**232 rules.**
+**236 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L37 (37) |
+| 2. Page layout and width | L1 to L38 (38) |
 | 3. Detail screens | D1 to D23 (23) |
 | 4. Collections | K1 to K55 (55) |
-| 5. Buttons and actions | B1 to B27 (27) |
+| 5. Buttons and actions | B1 to B30 (30) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |
@@ -8110,7 +8281,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R88 | [D22](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-) | R89 | [L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width) |
 | R90 | [L32](#l32-any-choice-over-a-person-a-contact-an-account-or-an-app-shows-the-same-face-the-lists-show) | R91 | [L34](#l34-never-need-to-scroll-to-see-all-content) |
 | R92 | [L35](#l35-when-a-main-person-is-chosen-they-disappear-from-the-secondary-picker-over-the-same-pool) | R93 | [L36](#l36-every-avatar-icon-or-colour-rides-beside-its-text--filters-views-and-select-components-alike) |
-| R94 | [L37](#l37-a-records-chips-draw-in-one-fixed-order--id-status-type-main-parent-secondary-parent) | | |
+| R94 | [L37](#l37-a-records-chips-draw-in-one-fixed-order--id-status-type-main-parent-secondary-parent) | R95 | [L38](#l38-no-em-dash-anywhere-a-person-reads) |
 
 ### The seven files that carry most of it
 

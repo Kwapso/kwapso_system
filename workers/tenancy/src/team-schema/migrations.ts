@@ -39,7 +39,7 @@ import {
 } from "@shared/workers/refs"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
-import { SPRINT_TYPES } from "@shared/sprint-types"
+import { SPRINT_TYPES, PHASE_TYPES, PHASE_TYPE_GROUP } from "@shared/sprint-types"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { storedWordColumns } from "@shared/selectable-homes"
 import { TICKET_TYPE_GROUP, TICKET_TYPES, ticketTypeKey } from "@shared/ticket-types"
@@ -342,6 +342,22 @@ const SPRINT_TYPE_OLD_NAMES: Record<string, string[]> = {
  * canonical name always included, the same contract `appStageCandidates`
  * keeps above. */
 const sprintTypeCandidates = (name: string): string[] => [name, ...(SPRINT_TYPE_OLD_NAMES[name] ?? [])]
+
+/** THE PHASE TYPE WORDS THAT MOVE, 20 SEP 2026 (team migration 0107) — one
+ * rename step further along the same chain `SPRINT_TYPE_OLD_NAMES` starts:
+ * Audit/Plan/Build/Deploy/Hypercare keep the word they already have (Deploy
+ * and Hypercare are new and have no prior spelling at all), Pilot was
+ * "Validation" and Revision was "Refinements" (Aurora's own word for the
+ * rename was "Refinement," singular — both spellings are candidates so
+ * either one carries). `PHASE_TYPES` itself (`shared/sprint-types.ts`) is
+ * never edited to add an "also matches" field the way this map is, because
+ * that array is ALSO what the live app reads for its current display name —
+ * mixing historical spellings into it would put an old word back on screen. */
+const PHASE_TYPE_OLD_NAMES: Record<string, string[]> = {
+  Pilot: ["Validation"],
+  Revision: ["Refinements", "Refinement"],
+}
+const phaseTypeCandidates = (name: string): string[] => [name, ...(PHASE_TYPE_OLD_NAMES[name] ?? [])]
 
 /** THE WORD "REQUEST" FOLDS INTO, 15 Sep 2026 (migration 0093). Not spelled out
  * again here: `TICKET_TYPES` (shared/ticket-types.ts) is where the four words
@@ -7601,6 +7617,228 @@ UPDATE selectable_data
    SET value = ${sqlString("Backlog")}, updated_at = datetime('now')
  WHERE type = ${sqlString("Story status")} AND value = ${sqlString("Open")}
    AND NOT EXISTS (SELECT 1 FROM selectable_data sd2 WHERE sd2.type = ${sqlString("Story status")} AND sd2.value = ${sqlString("Backlog")});
+`,
+  },
+  {
+    // AURORA'S "SPRINT" → "PHASE" RULING, 20 SEP 2026 — verbatim: "Rename
+    // 'sprint' to 'phase.' Also change the id to P0000." Read together with
+    // her Sprint Goal, vocabulary-rename and Wave-lifecycle rulings the same
+    // session (all filed here, one migration, because every one of them
+    // touches `sprints`/`stories`/`selectable_data` and none touches a
+    // second table beyond those three plus `team_ref_counters`/
+    // `ref_aliases`, which the reference rewrite below already owns).
+    //
+    // FIVE MOVES:
+    //
+    //   1. TWO NEW COLUMNS, BOTH NULLABLE, NEITHER BACKFILLED — the
+    //      `story_type`/0028 precedent this file already leans on twice
+    //      above (0094, 0106): nobody can honestly say what a pre-existing
+    //      phase's one-sentence goal WAS, or which of its stories were
+    //      meant to serve it.
+    //        • `sprints.goal_summary` — Aurora's ruling, verbatim: "Add a
+    //          'Sprint Goal' field to each sprint/cycle — a single sentence
+    //          describing the main outcome the cycle is organized around."
+    //          `PHASE_GOAL_MAX_CHARS` (`shared/types.ts`, 160) caps it at
+    //          the door, R87-style. A DELIBERATELY SEPARATE COLUMN from the
+    //          pre-existing `sprints.goal` ("What it's for", a free rich-text
+    //          field that predates this ruling by months) — the ruling
+    //          names a column called `goal`, and that name is already taken
+    //          by something this ruling does not mean; reusing it would have
+    //          silently changed what every existing phase's `goal` means.
+    //          `Sprint.goalSummary` (shared/types.ts) carries the full
+    //          account.
+    //        • `stories.contributes_to_goal` — Aurora's ruling, same
+    //          session: "let users flag which stories contribute to it."
+    //          `INTEGER NOT NULL DEFAULT 0`, never a `selectable_data` group
+    //          (it is a plain flag, not a vocabulary) — the same shape
+    //          `changes_no_step` already takes on this table.
+    //
+    //   2. THE VOCABULARY GROUP ITSELF RENAMES — "Sprint type" →
+    //      "Phase type", "Sprint status" → "Phase status". Neither stores a
+    //      word on a RECORD (a group's own name never does — only its
+    //      VALUES do, `shared/selectable-homes.ts`'s own header says so in
+    //      full), so this is a plain `selectable_data.type` rewrite with no
+    //      matching `storedWordColumns` step. `shared/selectable-homes.ts`
+    //      keeps BOTH the old and the new key for "Phase type"/"Sprint
+    //      type" (and their "status" siblings) — its own comment says why:
+    //      migration 0098's generated SQL, a few hundred lines up in this
+    //      same file, reads `VOCABULARY_HOMES` LIVE, at module load, so
+    //      deleting the old key would silently rewrite 0098's own already-
+    //      shipped statements for every team that has not run it yet
+    //      (including a newborn team, which replays the whole ledger).
+    //
+    //   3. TWO WORDS INSIDE THAT VOCABULARY RENAME — Aurora, verbatim:
+    //      "Rename the sprint type 'Refinement' to 'Revision.'" / "Rename
+    //      the phase 'Validation' to 'Pilot.'" Colours are UNCHANGED by
+    //      this move (Validation's purple stays Pilot's purple) — the
+    //      client's own instruction, read literally: a word moved, a
+    //      meaning did not.
+    //
+    //   4. THE WHOLE VOCABULARY REORDERS AND GROWS — Aurora's Wave-
+    //      lifecycle ruling, the same session, verbatim: "Update the Wave
+    //      lifecycle stages and set the full order as: Audit → Plan →
+    //      Build → Pilot → Revision → Deploy → Hypercare." THIS IS THE
+    //      IDENTICAL VOCABULARY READ FROM THE WAVE'S OWN SIDE, not a second
+    //      column anywhere — a wave has no stage of its own; its own
+    //      screen shows each phase inside it through this exact word list
+    //      (`shared/waves.ts`'s `WaveSprint.sprintType`), which is why
+    //      `shared/sprint-types.ts`'s own header argues the point at
+    //      length before this migration ever runs. "Not started" and
+    //      "Enhancement" fall OUT of the ordered seven (0098's own "folds
+    //      into nothing" shape, below — deactivated, never deleted, so a
+    //      phase already wearing either word keeps it exactly as it is);
+    //      "Deploy" and "Hypercare" are wholly new, protected the same way
+    //      0106's "Spike" story type is (`is_default = 1`, never a rename
+    //      target). `PHASE_TYPES` (`shared/sprint-types.ts`) is the one
+    //      array this migration's SQL is generated from, so the seven
+    //      words, their order and their one-line definitions can never
+    //      drift from what the running app itself reads.
+    //
+    //   5. THE RECORD ID PREFIX — Aurora's ruling, verbatim: "Also change
+    //      the id to P0000." `shared/workers/refs.ts`'s `TEAM_REF_KINDS.
+    //      sprint` moves from `"S"` to `"P"`; every already-minted `S0000`
+    //      reference carries to `P0000` (`refBackfillSql`, this file,
+    //      immediately below TEAM_MIGRATIONS — the EXACT function migration
+    //      0068 wrote for the account-coded-shape removal, called again
+    //      here for the reason its own header names: "adding an eighth
+    //      kind... is where its own backfill would belong," read one
+    //      letter along rather than one kind along). Every OLD "S…" string
+    //      is preserved in `ref_aliases` so a client who already quotes
+    //      "S0012" in an email still finds the record (the same search
+    //      path `refAliasesColumnSql`/`refAliasMatchSql` already give every
+    //      other renumbered kind), and `team_ref_counters`' own row moves
+    //      from kind `"S"` to kind `"P"` so the very next phase continues
+    //      the same sequence instead of restarting at 1. The other six
+    //      kinds' letters are unchanged, so `refBackfillSql` is a no-op for
+    //      all of them — their own rows are already canonical, `stale` is
+    //      empty, and nothing is rewritten.
+    //
+    // WHAT THIS RULING DELIBERATELY DOES NOT TOUCH, and why, because the
+    // ruling itself says so: routes/URL segments (`/sprints` stays) and the
+    // permission module key (`work` already covers it; nothing is keyed
+    // literally `sprint`) stay exactly as they are — neither is a word a
+    // person reads. The `sprints`/`sprint_type`/`sprint_id` TABLE and COLUMN
+    // names stay too, for the identical reason. Kanban/MCP TOOL NAMES keep
+    // the word `sprint` for backward compatibility (`shared/workers/
+    // tool-catalog.ts`'s own header says which ones and why, beside this
+    // migration's own report).
+    //
+    // NUMBERED 0107 — read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0106 is the highest version on both the
+    // local tree and `origin/main` as of 20 Sep 2026, so 0107 is the next
+    // free number.
+    version: "0107_sprint_becomes_phase_goal_and_wave_lifecycle",
+    sql: `
+-- 1 · TWO NEW COLUMNS.
+ALTER TABLE sprints ADD COLUMN goal_summary TEXT;
+ALTER TABLE stories ADD COLUMN contributes_to_goal INTEGER NOT NULL DEFAULT 0;
+
+-- 2 · THE GROUP ITSELF RENAMES. Neither group stores a word on a record (see
+-- this migration's own header), so there is no matching \`storedWordColumns\`
+-- step — only the dropdown rows themselves move.
+UPDATE selectable_data SET type = ${sqlString(PHASE_TYPE_GROUP)}, updated_at = datetime('now')
+ WHERE type = ${sqlString(SPRINT_TYPE_GROUP)};
+UPDATE selectable_data SET type = ${sqlString("Phase status")}, updated_at = datetime('now')
+ WHERE type = ${sqlString("Sprint status")};
+
+-- 3 · THE STORED WORD ON \`sprints.sprint_type\` MOVES FIRST, same order
+-- 0094/0098/0106 already take: the record's own history reads the CURRENT
+-- spelling the moment the dropdown row beneath it moves.
+${storedWordColumns(PHASE_TYPE_GROUP)
+  .map((h) =>
+    Object.entries(PHASE_TYPE_OLD_NAMES)
+      .map(
+        ([canonical, olds]) =>
+          `\nUPDATE ${h.table} SET ${h.column} = ${sqlString(canonical)} WHERE ${h.column} IN (${olds.map((o) => sqlString(o)).join(", ")});`
+      )
+      .join("")
+  )
+  .join("")}
+
+-- 4 · THE SEVEN CANONICAL WORDS, THEIR ORDER AND THEIR MARK — generated from
+-- \`PHASE_TYPES\` (shared/sprint-types.ts), the 0098 shape read one migration
+-- along: a plain rename lands ON the row a candidate spelling already
+-- occupies (never a duplicate), a wholly new word (Deploy, Hypercare) is
+-- inserted fresh and protected the same way 0106's "Spike" is.
+${PHASE_TYPES.map((p, i) => {
+  const position = i + 1
+  const mark = APP_STAGES.find((a) => a.name === p.name)?.mark ?? null
+  const candidates = phaseTypeCandidates(p.name).map((n) => sqlString(n)).join(", ")
+  return `
+UPDATE selectable_data
+   SET value = ${sqlString(p.name)}, mark = ${sqlString(mark)}, position = ${position},
+       is_default = 1, deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
+       updated_at = datetime('now')
+ WHERE type = ${sqlString(PHASE_TYPE_GROUP)}
+   AND value IN (${candidates});
+
+INSERT INTO selectable_data (id, type, value, is_default, mark, position, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(PHASE_TYPE_GROUP)}, ${sqlString(p.name)}, 1, ${sqlString(mark)}, ${position}, datetime('now'), 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data WHERE type = ${sqlString(PHASE_TYPE_GROUP)} AND value = ${sqlString(p.name)});`
+}).join("\n")}
+
+-- "NOT STARTED" AND "ENHANCEMENT" FOLD INTO NOTHING — the Wave-lifecycle
+-- reorder drops both from the ordered seven. Deactivated, never deleted: a
+-- phase already wearing either word keeps it exactly as it is (0098's own
+-- closing statement, read one migration along).
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'), deactivator_name = 'System', updated_at = datetime('now')
+ WHERE type = ${sqlString(PHASE_TYPE_GROUP)}
+   AND deactivated_at IS NULL
+   AND value NOT IN (${PHASE_TYPES.map((p) => sqlString(p.name)).join(", ")});
+
+-- 5 · THE RECORD ID PREFIX, S0000 -> P0000. Generic over every kind
+-- (\`refBackfillSql\`, defined below TEAM_MIGRATIONS in this file) — a no-op
+-- for the six kinds whose letter did not move, and for \`sprint\` it carries
+-- every stale "S…" to "P…", aliases the old string, and raises the counter.
+${refBackfillSql("0107_sprint_becomes_phase_goal_and_wave_lifecycle")}
+`,
+  },
+  {
+    // A REPLY CAN BE EDITED OR TAKEN BACK OUT — Aurora's 20 Sep 2026 ruling on
+    // the chat edit pencil, verbatim: "for chat edit pencil: i like from p1
+    // that its besides and appears when hover, but make it like p4 wth the 3
+    // options menu (edit, copy/delete)." Kit v1.2.139 shipped the affordance
+    // itself (`TicketThread`'s `actions` prop: onEdit/onCopy/onDelete); this
+    // migration is the four columns the two new doors (workers/content
+    // routes/help.ts, `postHelpReplyUpdate`/`postHelpReplyDelete`) need to
+    // stamp before either can exist.
+    //
+    // `updated_at`/`editor_id`/`editor_name` — the SAME three-column audit
+    // block `help` itself has carried since 0004 ("like help", the brief's
+    // own words), one table along: who last touched THIS reply, and when. No
+    // `editor_email` — `help_threads` has never carried an email column for
+    // ANY actor (`creator_email` doesn't exist here either, unlike `help`'s
+    // own trio), so the editor block matches the row it lands on rather than
+    // the table it is modelled after.
+    //
+    // `deactivated_at` — soft delete, and the one column that matters most:
+    // "nothing on a ticket is ever removed" (CONVENTIONS.md, restated on
+    // every deactivate-never-delete table this schema has). A deleted reply
+    // stays in `help_threads` exactly as it was, stays in the activity log,
+    // and stays out of the thread a person reads — `listReplies`'s own WHERE
+    // (workers/content/src/lib/help.ts) is the one place that changes, gaining
+    // `AND deactivated_at IS NULL` beside the fence it already carries. No
+    // `deactivator_id`/`deactivator_name` pair the way `selectable_data`
+    // carries one for ITS deactivation: those name who put a dropdown VALUE
+    // away, a fact nothing before this reads today, where a reply's delete is
+    // already fully attributed by the `editor_*` columns landing in the SAME
+    // statement that sets `deactivated_at` — one write, one actor, no second
+    // audit trail answering a question nobody asks of this table.
+    //
+    // NUMBERED 0108 — read live off the tail of this file right before
+    // appending (CLAUDE.md, "team migration numbers are read, never
+    // recalled"): 0107 is the highest version in this tree (`git fetch
+    // origin` shows `origin/main`'s own tail stops at 0106, so 0107 was
+    // already the next free number for the lane that minted it, and 0108 is
+    // the number after that, not after origin's).
+    version: "0108_a_reply_can_be_edited_or_taken_back_out",
+    sql: `
+ALTER TABLE help_threads ADD COLUMN updated_at TEXT;
+ALTER TABLE help_threads ADD COLUMN editor_id TEXT;
+ALTER TABLE help_threads ADD COLUMN editor_name TEXT;
+ALTER TABLE help_threads ADD COLUMN deactivated_at TEXT;
 `,
   },
 ]

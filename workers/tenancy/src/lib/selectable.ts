@@ -547,7 +547,7 @@ export async function setSelectableDefault(
     // use either way) and the two hand-written `VERB_BY_PHRASE` lines these
     // replaced are gone. See shared/workers/activity-verbs.ts.
     type: isDefault ? "Dropdown value protected" : "Dropdown value no longer protected",
-    description: `${actor.name} ${isDefault ? "protected" : "took the protection off"} the "${row.value}" ${row.type} value${reactivates ? " and reactivated it — protected is always active" : ""}`,
+    description: `${actor.name} ${isDefault ? "protected" : "took the protection off"} the "${row.value}" ${row.type} value${reactivates ? ", and reactivated it: protected is always active" : ""}`,
     relatedTable: "selectable_data",
     relatedRowId: id,
   })

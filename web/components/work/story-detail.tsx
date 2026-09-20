@@ -191,6 +191,7 @@ export function StoryDetailScreen({
       changesNoStep: values.changesNoStep,
       acceptanceCriteria: values.acceptanceCriteria || undefined,
       moscow: values.moscow || undefined,
+      contributesToGoal: values.contributesToGoal,
     })
     refresh()
     toast.success(t("Story updated."))
@@ -252,8 +253,8 @@ export function StoryDetailScreen({
     // MOSCOW (Aurora's ruling, 20 Sep 2026) — the same coloured tag the
     // backlog's own rows and cards draw, or a plain dash for the 3,677
     // pre-existing stories with none set.
-    { label: t("Priority"), value: story.moscow ? <MoscowChip value={story.moscow} /> : "—" },
-    { label: t("Reference"), value: story.ref || "—" },
+    { label: t("Priority"), value: story.moscow ? <MoscowChip value={story.moscow} /> : "" },
+    { label: t("Reference"), value: story.ref || "" },
     // R54: a story is agency work, so the assignee is one of ours.
     { label: t("Who's doing it"), value: staffNameFromSnapshot(story.assigneeName) || "Nobody yet" },
     // WHO REVIEWS IT, and ONLY when somebody has named one.
@@ -272,7 +273,7 @@ export function StoryDetailScreen({
     // refused at the door (`refuseDoneByAnybodyElse`, stories.ts), and it reads
     // nothing off this row. So a reviewer named here is who is expected to
     // LOOK at the work, never who is allowed to close it — and a row printing
-    // "—" on every story would announce a concept the screens do not offer,
+    // "-" on every story would announce a concept the screens do not offer,
     // which is a second dead end pointing the other way. Zero of the 329
     // stories on staging carry a reviewer, so this row is invisible on the app
     // as it stands today and appears the moment the capability is used.
@@ -285,7 +286,7 @@ export function StoryDetailScreen({
     // due, so this is the SPRINT's end date — the story's own date field went on
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story
     // with no sprint has no deadline to show, which is the honest answer.
-    { label: t("Deadline"), value: formatDate(story.sprintEndsOn, lang) || "—" },
+    { label: t("Deadline"), value: formatDate(story.sprintEndsOn, lang) || "" },
     // The three fields somebody TYPED — the detail, what was done, and what the
     // client will be told — read through `of`, so the reader who pressed
     // Translate sees them in their own language and nobody else's row changed.
@@ -293,23 +294,23 @@ export function StoryDetailScreen({
     // first, render second, and the sanitizer runs on what comes back.
     {
       label: t("Detail"),
-      value: story.detail ? <RichText html={translation.of(story.detail)} /> : "—",
+      value: story.detail ? <RichText html={translation.of(story.detail)} /> : "",
     },
     // ACCEPTANCE CRITERIA — Aurora's ruling, 20 Sep 2026: "same design as
     // Detail." Identical treatment, one row down: translated, then rendered
     // as rich text.
     {
       label: t("Acceptance criteria"),
-      value: story.acceptanceCriteria ? <RichText html={translation.of(story.acceptanceCriteria)} /> : "—",
+      value: story.acceptanceCriteria ? <RichText html={translation.of(story.acceptanceCriteria)} /> : "",
     },
     {
       label: t("Processes it changes"),
       value: story.changesNoStep
         ? "None"
-        : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "—",
+        : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "",
     },
-    { label: t("What was done"), value: translation.of(story.reviewNote) || "—" },
-    { label: t("What we'll tell them"), value: translation.of(story.closingNote) || "—" },
+    { label: t("What was done"), value: translation.of(story.reviewNote) || "" },
+    { label: t("What we'll tell them"), value: translation.of(story.closingNote) || "" },
     // The audit rows moved to the footer at the foot of the record (D7 /
     // CHECKLIST 11.3); the status is on the header band's own line.
   ]
@@ -604,6 +605,7 @@ export function StoryDetailScreen({
           changesNoStep: story.changesNoStep,
           acceptanceCriteria: story.acceptanceCriteria ?? "",
           moscow: story.moscow ?? "",
+          contributesToGoal: story.contributesToGoal,
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}

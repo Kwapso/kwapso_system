@@ -601,7 +601,7 @@ export function RecordCalendar({
       const entry = entriesById.get(event.id)
       if (!entry) return null
       const dates = entry.endDay
-        ? `${formatDayKey(entry.day, lang)} – ${formatDayKey(entry.endDay, lang)}`
+        ? `${formatDayKey(entry.day, lang)} to ${formatDayKey(entry.endDay, lang)}`
         : formatDayKey(entry.day, lang)
       const dot = dotClass(entry)
       return (

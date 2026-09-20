@@ -300,7 +300,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
             break
           }
           if (!AGENT_ATTACH_MIME.test(file.type)) {
-            toast.error(t("{name} isn't a kind of file the assistant can read here — images, PDFs, or plain text.", { name: file.name }))
+            toast.error(t("{name} isn't a kind of file the assistant can read here: images, PDFs, or plain text.", { name: file.name }))
             continue
           }
           if (file.size > AGENT_ATTACH_MAX_BYTES) {

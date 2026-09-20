@@ -285,9 +285,9 @@ function groupedNumber(value: number): string {
   return new Intl.NumberFormat(undefined).format(value);
 }
 
-/** ch27.40's own line: "1–8 of 214". */
+/** ch27.40's own line: "1 to 8 of 214". */
 function defaultFormatRange(from: number, to: number, total: number): string {
-  return `${groupedNumber(from)}–${groupedNumber(to)} of ${groupedNumber(total)}`;
+  return `${groupedNumber(from)} to ${groupedNumber(to)} of ${groupedNumber(total)}`;
 }
 
 /**
@@ -387,7 +387,7 @@ function SearchResults({
     visibleGroups.length > SEARCH_PORTAL_KINDS
   ) {
     console.warn(
-      `SearchResults: door="portal" searches ${SEARCH_PORTAL_KINDS} kinds — its requests, its deliverables and its own messages — and got ${visibleGroups.length}.`,
+      `SearchResults: door="portal" searches ${SEARCH_PORTAL_KINDS} kinds (its requests, its deliverables and its own messages) and got ${visibleGroups.length}.`,
     );
   }
 

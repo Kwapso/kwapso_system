@@ -276,7 +276,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **269 doors, 202 with a tool, 67 with a written reason**, the
+  red build. Today: **271 doors, 204 with a tool, 67 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -318,7 +318,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 202, **178 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 204, **180 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -326,7 +326,7 @@ Today it covers:
   **Eight doors left the census on 18 August 2026**, and they are worth naming
   because they went for a product reason rather than a tidying one: the seven
   that WROTE to Google Calendar (create an event, change what it says and when,
-  its guests, its location, call it off, push a sprint's dates, push a meeting's)
+  its guests, its location, call it off, push a phase's dates, push a meeting's)
   and `POST /api/content/meetings/held`. The calendar is one-way now — kwapso
   reads a calendar and never writes one — and a meeting's own start time says
   whether it has happened, so a status somebody had to tick was a second source
@@ -435,10 +435,10 @@ Today it covers:
     `processes:*`).
   - waves, `list_waves`, `get_wave`, `create_wave`, `update_wave`,
     `set_wave_active`, `set_sprint_wave` (all need `work:*`). A WAVE is what a
-    client bought: several sprints sold together. It carries NO price — what a
+    client bought: several phases sold together. It carries NO price — what a
     wave costs is deliberately out of this module's first version — and its dates
-    are DERIVED from the sprints inside it, so `set_sprint_wave` re-dates both the
-    wave a sprint joined and the one it left. Two sprints whose dates overlap are
+    are DERIVED from the phases inside it, so `set_sprint_wave` re-dates both the
+    wave a phase joined and the one it left. Two phases whose dates overlap are
     reported and never refused: the overlap is real, and a door that said no would
     be enforcing a rule nobody agreed to. `set_audit_date` moves the day a map's savings are measured
     FROM, which changes every figure on it and on the client's own portal while
@@ -476,6 +476,7 @@ Today it covers:
   - tickets, `create_help_ticket`, `update_help_ticket`, `set_help_status`,
     `triage_help_ticket`, `resolve_help_ticket`,
     `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
+    `update_help_reply`, `delete_help_reply`,
     `add_help_stakeholder`, plus the three that carry the files and links on a
     ticket: `list_help_attachments`, `add_help_link` and
     `remove_help_attachment`. (The module is Tickets; the tool NAMES carry the old
@@ -487,10 +488,20 @@ Today it covers:
     ticket away without deleting anything; read them back with
     `list_help_tickets` and `view: 'archived'`.
 
+    **`update_help_reply` / `delete_help_reply`** (team migration 0108, Aurora's
+    20 Sep 2026 chat-edit-pencil ruling) mirror the app's own edit/copy/delete
+    menu on a reply — R22 parity with `POST /api/content/help/reply/update` and
+    `POST /api/content/help/reply/delete`. Both share ONE fence: the reply's own
+    author may always change it, and past that `help:update` — the same right
+    `resolve_help_ticket` and `archive_help_ticket` already require — reaches
+    every other member's reply too. `delete_help_reply` is a soft delete, same
+    as `archive_help_ticket`: nothing is removed, the reply and its activity
+    entry survive, it only stops showing in the thread. Neither sends email.
+
     **A STATUS IS A FACT HERE, NOT A SWITCH** (17 Aug 2026). Five of the six
     stages are reached by something HAPPENING rather than by anybody choosing
     them: `new` at birth, `scheduled` when the work on a request lands in a
-    sprint, `in_progress` when a timer starts on the ticket or on one of its
+    phase, `in_progress` when a timer starts on the ticket or on one of its
     stories, `ready` when the last story closes, and `resolved` only through
     `resolve_help_ticket`. So `set_help_status` is a CORRECTION rather than the
     ordinary path, and it **will not accept `resolved`** — nor will either bulk —
@@ -506,19 +517,23 @@ Today it covers:
     that tool, it no longer exists**; there is nothing to replace it with,
     because there is nothing left to confirm — a ticket is in the queue from the
     moment it is raised.
-  - the work engine, stories and sprints, `create_story`, `update_story`,
+  - the work engine, stories and phases, `create_story`, `update_story`,
     `set_story_status` (`work:create` / `work:update`), `create_sprint`,
-    `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat
+    `update_sprint` and `complete_sprint`. (The user-facing word is Phase; the
+    tool NAMES carry the old `sprint` spelling because they are a published
+    contract outside developers already call by name, so the prose rename here
+    deliberately stopped at them, the same reasoning DATA-MODEL.md gives for
+    the ticket/help tools.) `update_sprint` is where a phase's flat
     PRICE is set or corrected — it was the revenue half of every margin until the
     margin was retired on 10 Sep 2026, and until that door existed it could be typed
-    only in the moment the sprint was started.
-    It will not move a sprint to another client or another app: the reference the
+    only in the moment the phase was started.
+    It will not move a phase to another client or another app: the reference the
     client quotes was minted against the account, and the maps and figures
     published against the app were built where it stood, so re-pointing either
     would rewrite what an already-published figure means. (A process version is
     cut BY HAND, one door, one caller — the owner's 24 Aug 2026 ruling; migration
-    `0051` purged the never-wired automatic cut on sprint completion.)
-    A story has no ORDER to set: it sits in the sprint it was sold inside, and
+    `0051` purged the never-wired automatic cut on phase completion.)
+    A story has no ORDER to set: it sits in the phase it was sold inside, and
     that is what says when it is due. (Ranking one used to be possible and was
     retired on 17 Aug 2026 — the owner's ruling, and the door went with the
     tool.) It does carry a PRIORITY, as of 20 Sep 2026: `moscow`, one of Must /
@@ -795,7 +810,7 @@ it any more.** Six calendar tools sat in the assistant's set and a seventh,
 `add_meeting_to_calendar`, was the one write tool on THIS surface. All seven went
 on 18 August 2026 with the doors under them: kwapso reads a calendar and never writes
 one. The open question this section used to hold — whether pushing a meeting from
-a machine was right when pushing a sprint was assistant-only — is answered by
+a machine was right when pushing a phase was assistant-only — is answered by
 neither being possible. `google_calendar_events` and `google_meeting_transcript`
 remain, and both are reads, on the assistant's side.
 

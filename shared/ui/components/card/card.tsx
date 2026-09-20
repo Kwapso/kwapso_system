@@ -526,6 +526,42 @@ CardDescription.displayName = "CardDescription";
 const CARD_CONTENT_INSET_X = "px-[var(--space-3)]";
 
 /**
+ * `inset="default"`'s own two-step vertical ladder, pulled out and named for
+ * the same reason `CARD_CONTENT_INSET_X` was: `check-card.mjs` reads it by
+ * identifier, not by re-deriving the figures from the className string.
+ */
+const CARD_CONTENT_INSET_Y_DEFAULT = "py-6 lg:py-[var(--space-7)]";
+
+/**
+ * `inset="compact"` — THE DECLARED SHAPE, not an override a caller fights
+ * the default for. Before this prop existed, a compact card was every call
+ * site's own `className="py-[var(--space-3)]"` (or worse, `!py-3`) landing
+ * on top of `CARD_CONTENT_INSET_Y_DEFAULT` and winning on specificity by
+ * accident of `cn`'s own merge order — a shape nowhere declared, so nothing
+ * here could check for it and every call site had to re-derive the same
+ * figure. `--space-3` is the constant already chosen for the HORIZONTAL
+ * inset above (`CARD_CONTENT_INSET_X`) — the same 17 Sep 2026 evening
+ * ruling's own number — so a compact card's body is that one step on every
+ * side, at every width: no `lg:` bump, matching the horizontal axis that is
+ * already flat.
+ */
+const CARD_CONTENT_INSET_Y_COMPACT = "py-[var(--space-3)]";
+
+const CARD_CONTENT_INSET_Y: Record<"default" | "compact", string> = {
+  default: CARD_CONTENT_INSET_Y_DEFAULT,
+  compact: CARD_CONTENT_INSET_Y_COMPACT,
+};
+
+export interface CardContentProps extends React.ComponentPropsWithoutRef<"div"> {
+  /**
+   * `"default"` keeps the two-step ladder (24 to `lg:`, 32 above).
+   * `"compact"` is the space-3 step at every breakpoint — a declared shape
+   * for a dense card body, not a className override fighting the default.
+   */
+  inset?: "default" | "compact";
+}
+
+/**
  * The body. Inset only — no type, deliberately.
  *
  * Chapter 13 draws card body COPY at 13/secondary, but `CardContent` is a
@@ -538,16 +574,18 @@ const CARD_CONTENT_INSET_X = "px-[var(--space-3)]";
  * TEN STATES — none apply. It is an inset.
  * THREE BREAKPOINTS — horizontal is now FLAT (`CARD_CONTENT_INSET_X`, one
  * figure at every width — see that constant's own comment for the 17 Sep
- * 2026 evening ruling this answers); vertical keeps its old two-step ladder,
- * 24 to `lg:`, 32 above. See `Card` for the shell's own (unrelated) range.
+ * 2026 evening ruling this answers); vertical keeps its old two-step ladder
+ * by default, 24 to `lg:`, 32 above, or is flat at `--space-3` when `inset`
+ * is `"compact"`. See `Card` for the shell's own (unrelated) range.
  * RTL — safe. `px-*`/`py-*` are both logical.
  */
-const CardContent = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<"div">>(
-  ({ className, ...props }, ref) => (
+const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
+  ({ className, inset = "default", ...props }, ref) => (
     <div
       ref={ref}
       data-slot="card-content"
-      className={cn("min-w-0 flex-1 py-6 lg:py-[var(--space-7)]", CARD_CONTENT_INSET_X, className)}
+      data-inset={inset}
+      className={cn("min-w-0 flex-1", CARD_CONTENT_INSET_Y[inset], CARD_CONTENT_INSET_X, className)}
       {...props}
     />
   ),

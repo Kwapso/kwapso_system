@@ -326,7 +326,7 @@ function PortalConversation({
     if ((message as ThreadMessage).internal === true) {
       if (process.env.NODE_ENV !== "production") {
         console.warn(
-          `PortalConversation: message "${message.id ?? "(no id)"}" is marked internal and was dropped. ch27.10 — the portal has no internal notes.`,
+          `PortalConversation: message "${message.id ?? "(no id)"}" is marked internal and was dropped. ch27.10: the portal has no internal notes.`,
         );
       }
       continue;

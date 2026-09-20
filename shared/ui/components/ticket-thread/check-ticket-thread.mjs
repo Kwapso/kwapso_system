@@ -127,7 +127,141 @@ if (!/\{below \? byline : null\}/.test(src)) {
 }
 
 /* ============================================================================
-   5 · MOUNTED, NOT GREPPED — A, A, B, "below". Vite SSR + react-dom/server,
+   5 · THE MESSAGE-ACTIONS AFFORDANCE — 20 Sep 2026, client-ruled, verbatim:
+   "for chat edit pencil: i like from p1 that its besides and appears when
+   hover, but make it like p4 wth the 3 options menu (edit, copy/delete)."
+   `ThreadMessageActions`'s own doc comment in `ticket-thread.tsx` carries
+   the full argument; this pins the construction it describes.
+   ========================================================================= */
+if (!/export interface ThreadMessageActions \{/.test(src)) {
+  findings.push(`${rel} does not export ThreadMessageActions — the edit/copy/delete contract a caller wires.`);
+}
+if (!/onEdit\?:\s*\(id: string, newBody: string\) => void;/.test(src)) {
+  findings.push(`${rel}'s ThreadMessageActions does not declare onEdit?: (id: string, newBody: string) => void.`);
+}
+if (!/onCopy\?:\s*\(id: string\) => void;/.test(src)) {
+  findings.push(`${rel}'s ThreadMessageActions does not declare onCopy?: (id: string) => void.`);
+}
+if (!/onDelete\?:\s*\(id: string\) => void;/.test(src)) {
+  findings.push(`${rel}'s ThreadMessageActions does not declare onDelete?: (id: string) => void.`);
+}
+// Wired at BOTH levels — per message (overriding) and per thread (the
+// default) — exactly the "per message or per thread" ask.
+if (!/actions\?:\s*ThreadMessageActions;/.test(src)) {
+  findings.push(`${rel} does not declare an actions?: ThreadMessageActions field anywhere.`);
+}
+const actionsFieldCount = (src.match(/actions\?:\s*ThreadMessageActions;/g) ?? []).length;
+if (actionsFieldCount < 2) {
+  findings.push(
+    `${rel} declares actions?: ThreadMessageActions ${actionsFieldCount} time(s) — expected two: once on ` +
+      "ThreadMessage (per-message) and once on TicketThreadProps (per-thread default).",
+  );
+}
+if (!/const effectiveActions = message\.actions \?\? actions;/.test(src)) {
+  findings.push(
+    `${rel} does not resolve effectiveActions as message.actions ?? actions — the per-message value must win ` +
+      "over the thread-wide default, read once per row.",
+  );
+}
+
+// THE PLAIN BRANCH SURVIVES, UNCONDITIONALLY REACHABLE — a caller that
+// never passes actions at either level must still get the exact single
+// <div data-slot="thread-bubble"> markup this file rendered before the
+// feature existed, with no wrapping row and no trigger.
+if (!/\) : \(\s*\n\s*\/\* THE PLAIN BRANCH/.test(src)) {
+  findings.push(
+    `${rel} does not keep a plain, unwrapped thread-bubble fallback branch reachable when effectiveActions is ` +
+      "undefined — every existing no-actions caller must render byte-identical output.",
+  );
+}
+
+// THE TRIGGER — same construction EditPenButton (kwapso_system's own
+// shared/web/edit-pen-button.tsx) spends: buttonVariants({ variant:
+// "secondary", size: "icon" }), not a hand-rolled class list that could
+// drift from it.
+if (!/buttonVariants\(\{ variant: "secondary", size: "icon" \}\)/.test(src)) {
+  findings.push(
+    `${rel}'s trigger does not read buttonVariants({ variant: "secondary", size: "icon" }) — the exact ` +
+      "construction EditPenButton spends, so the two controls stay the same size and skin by derivation.",
+  );
+}
+if (!/data-slot="thread-message-actions-trigger"/.test(src)) {
+  findings.push(`${rel} does not name the trigger data-slot="thread-message-actions-trigger".`);
+}
+
+// HIDDEN UNTIL HOVER/FOCUS, ALWAYS VISIBLE ON A COARSE POINTER — the three
+// gates together, or a touch reader (no hover state to reveal it with)
+// could never reach the control at all.
+for (const gate of [
+  "group-hover/actions:opacity-100",
+  "group-focus-within/actions:opacity-100",
+  "pointer-coarse:opacity-100",
+  "pointer-coarse:pointer-events-auto",
+]) {
+  if (!src.includes(gate)) {
+    findings.push(`${rel}'s trigger does not read ${gate} — the hover/focus/coarse-pointer visibility gate is incomplete.`);
+  }
+}
+
+// EDIT AND DELETE EACH GATE ON THEIR OWN HANDLER; COPY NEVER DOES — see
+// ThreadMessageActions's own header for why Copy needs no handler to draw.
+if (!/effectiveActions\.onEdit \? \(/.test(src)) {
+  findings.push(`${rel} does not gate the Edit row on effectiveActions.onEdit being present.`);
+}
+if (!/effectiveActions\.onDelete \? \(/.test(src)) {
+  findings.push(`${rel} does not gate the Delete row on effectiveActions.onDelete being present.`);
+}
+if (!/danger\s*\n\s*icon=\{<Trash/.test(src)) {
+  findings.push(`${rel}'s Delete row does not pass the danger prop to DropdownMenuItem.`);
+}
+if (!/navigator\.clipboard\?\.writeText\(plain\)/.test(src)) {
+  findings.push(`${rel}'s Copy row does not call navigator.clipboard?.writeText — copying must work with no onCopy handler at all.`);
+}
+if (!/effectiveActions\.onCopy\?\.\(key\)/.test(src)) {
+  findings.push(`${rel}'s Copy row does not also call effectiveActions.onCopy?.(key) after writing the clipboard.`);
+}
+
+// THE INLINE EDITOR — a Textarea seeded from the message's own body,
+// Save/Cancel beneath it, Save calling onEdit with the message's own key.
+if (!/data-slot="thread-edit"/.test(src)) {
+  findings.push(`${rel} does not name the inline editor's own wrapper data-slot="thread-edit".`);
+}
+if (!/const startEdit = \(key: string, currentBody: React\.ReactNode\) => \{/.test(src)) {
+  findings.push(`${rel} does not declare startEdit(key, currentBody) to seed the editor.`);
+}
+if (!/setEditDraft\(typeof currentBody === "string" \? currentBody : ""\);/.test(src)) {
+  findings.push(`${rel}'s startEdit does not seed the draft from a string body (empty for a non-string one).`);
+}
+if (!/const saveEdit = \(key: string, onEdit: \(id: string, newBody: string\) => void\) => \{/.test(src)) {
+  findings.push(`${rel} does not declare saveEdit(key, onEdit) calling the handler with the current draft.`);
+}
+
+// THE LIVE PROOF THIS PINS — the real-browser harness must stay on disk.
+const ACTIONS_HARNESS_FILE = path.join(HERE, "..", "..", "verify", "ticket-thread-below", "page.tsx");
+const CHECK_ACTIONS_FILE = path.join(HERE, "..", "..", "verify", "ticket-thread-below", "check-actions.mjs");
+if (!fs.existsSync(ACTIONS_HARNESS_FILE)) {
+  findings.push("verify/ticket-thread-below/page.tsx is missing — the message-actions harness must exist on disk.");
+} else {
+  const harnessSrc = fs.readFileSync(ACTIONS_HARNESS_FILE, "utf8");
+  if (!/data-probe="actions"/.test(harnessSrc)) {
+    findings.push('verify/ticket-thread-below/page.tsx has no data-probe="actions" pane.');
+  }
+  if (!/window\.__ticketThreadActionsProbe = async \(\) => \{/.test(harnessSrc)) {
+    findings.push(
+      "verify/ticket-thread-below/page.tsx does not expose window.__ticketThreadActionsProbe as an async " +
+        "read-only snapshot function.",
+    );
+  }
+}
+if (!fs.existsSync(CHECK_ACTIONS_FILE)) {
+  findings.push(
+    "verify/ticket-thread-below/check-actions.mjs is missing — the real-pointer-click proof for the " +
+      "message-actions menu (Radix's own trigger opens on pointer-down, not a synthetic click) must stay on disk.",
+  );
+}
+
+/* ============================================================================
+   6 · MOUNTED, NOT GREPPED — A, A, B, "below". Vite SSR + react-dom/server,
    the same loader `check-badge.mjs`'s own section 6 uses: no new dependency,
    no jsdom, roughly a second of wall time.
    ========================================================================= */
@@ -279,10 +413,10 @@ if (!/\{below \? byline : null\}/.test(src)) {
       }
     }
     /* ==========================================================================
-       6 · THE FACE IS NOT THE BYLINE — Aurora's 20 Sep 2026 ruling, verbatim:
+       7 · THE FACE IS NOT THE BYLINE — Aurora's 20 Sep 2026 ruling, verbatim:
        "on chat, when there are multiple messages by the same person, keep
        the name and date only on the bottom one, but show the avatar for
-       each." Section 5 above already renders bubble 1 (theirs, no byline)
+       each." Section 6 above already renders bubble 1 (theirs, no byline)
        WITH `initials: "AM"`, so it already proves the avatar can render on a
        byline-less message — but only if the caller actually passes
        `initials`/`image` there. The client-observed bug was a caller
@@ -389,10 +523,14 @@ console.log(
     "today's (no data-run attribute anywhere, byline before the bubble) — \"below\" moves the same byline node to " +
     "follow the bubble/attachments, aligned to the bubble's own side — a byline-less message (an earlier message " +
     "of a run) carries data-run=\"continued\" and the column applies the tightened --space-1 gap after it via a " +
-    "[&>[data-run=continued]+*] margin rule, full --space-2h otherwise — and a mounted A, A, B \"below\" render " +
-    "confirms only bubbles 2 and 3 carry a byline, bubble 1 is marked continued, and bubble 3's byline aligns to " +
-    "its own (mine) trailing edge. Section 6 confirms the avatar is keyed on initials/image alone, independent of " +
-    "the byline: a byline-less message with a face still renders one (Aurora's 20 Sep 2026 ruling), a message with " +
-    "an image src renders an <AvatarImage>, and only a message given neither initials nor image renders no avatar " +
-    "at all.",
+    "[&>[data-run=continued]+*] margin rule, full --space-2h otherwise — Section 5 pins the message-actions " +
+    "affordance's construction (ThreadMessageActions at both the message and thread level, the plain no-actions " +
+    "fallback, the EditPenButton-matching trigger and its hover/focus/coarse-pointer gates, Edit/Delete each " +
+    "gated on their own handler, Copy needing none, the inline editor's seed/save wiring), live-proved by a real " +
+    "pointer click against a mounted harness in verify/ticket-thread-below/check-actions.mjs, pinned here as " +
+    "still on disk — and a mounted A, A, B \"below\" render confirms only bubbles 2 and 3 carry a byline, bubble " +
+    "1 is marked continued, and bubble 3's byline aligns to its own (mine) trailing edge. Section 7 confirms the " +
+    "avatar is keyed on initials/image alone, independent of the byline: a byline-less message with a face still " +
+    "renders one (Aurora's 20 Sep 2026 ruling), a message with an image src renders an <AvatarImage>, and only a " +
+    "message given neither initials nor image renders no avatar at all.",
 );

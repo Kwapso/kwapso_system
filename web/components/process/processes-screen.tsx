@@ -65,7 +65,7 @@ function shapeProcessesList(processes: ProcessSummary[]) {
           p.versionCount > 1 ? `version ${p.versionCount}` : "baseline only",
         ]
           .filter(Boolean)
-          .join(" · ") || "—",
+          .join(" · ") || "",
     })),
   }
 }

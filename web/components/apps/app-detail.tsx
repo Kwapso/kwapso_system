@@ -414,7 +414,7 @@ export function AppDetailScreen({
     // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
     // sits where an icon sits and never inside a sentence") — it already draws
     // beside the title (`mark={<AppMark app={app} .../>}` below, B1).
-    // No "—" fallback: `undefined` lets `OverviewList` filter the row out
+    // No "-" fallback: `undefined` lets `OverviewList` filter the row out
     // entirely instead (W2 — an unset fact is dropped, label and all, not
     // dashed and not left as an empty value beside its own label).
     { label: t("Stage"), value: app.stage || undefined },
@@ -435,7 +435,7 @@ export function AppDetailScreen({
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "sprints",
-        label: t("Sprints"),
+        label: t("Phases"),
         icon: CONCEPT_ICON.sprints,
         badge: formatCount(sprintsTotal),
         badgeVariant: "" as const,

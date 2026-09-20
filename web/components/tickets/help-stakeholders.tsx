@@ -159,7 +159,17 @@ export function HelpStakeholders({
           AFTER (row + py-3): 2 × 12px padding + a 36px face = 60px. */}
       {(raiser || raisedByContactId) && (
         <Card data-slot="stakeholder-card" variant="raised">
-          <CardContent className="flex flex-col gap-2 px-4 py-3">
+          {/* STILL 102px ON STAGING, NOT 60px — the kit's own `CardContent`
+              (shared/ui/components/card/card.tsx) carries
+              `py-6 lg:py-[var(--space-7)]`, and this call's `py-3` only wins
+              at the BASE breakpoint: it shares no prefix with `lg:py-…`, so
+              the kit's own `lg` padding keeps winning above that width,
+              which is exactly the 102px the live page measured. Fixed here,
+              not in the kit (kit changes are the kit repo's, never a local
+              workaround) — `lg:py-3` names the same override at the same
+              breakpoint the kit's own class does, so this one card reads
+              ≈60px at every width. */}
+          <CardContent className="flex flex-col gap-2 px-4 py-3 lg:py-3">
             <PersonCard
               orientation="horizontal"
               size="row"

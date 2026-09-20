@@ -503,7 +503,7 @@ describe("contacts", () => {
 // and on her own company's Contacts panel, never on the Accounts list beside
 // it. `q` narrows every assertion here to just this fixture's three rows, so
 // the counts are exact regardless of what else the harness seeds.
-describe("an individual linked as a contact is not a peer account (Aurora, 19 Sep 2026)", () => {
+describe("an individual linked as a contact is not a peer account (Aurora, 19 Sep 2026, amended 20 Sep 2026)", () => {
   async function seed() {
     const company = await createAccount(cfg, guard, staff, actor, {
       accountType: "entity",
@@ -525,22 +525,31 @@ describe("an individual linked as a contact is not a peer account (Aurora, 19 Se
     return { company, standalone, contact }
   }
 
-  it("the accounts list returns the company and the standalone individual, never the contact — total says 2", async () => {
+  // AMENDED 20 Sep 2026. The 19 Sep fix excluded only a LINKED individual
+  // ("PORTAL SMOKE · contact") and still counted a STANDALONE one as a peer
+  // account — exactly the shape Aurora caught the next day, verbatim: "no, i
+  // still see contacts udner accounts! f.e. Jonathan Sargent Alexander
+  // Kaulich", two standalone individuals with no `account_links` row at all.
+  // Her rule, stated twice now: a person is a contact; the Accounts screen
+  // lists COMPANIES, full stop — linked or not.
+  it("the accounts list returns the company only, never either individual — total says 1", async () => {
     const { company, standalone, contact } = await seed()
     const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { q: "Smoketest" })
-    expect(page.rows.map((r) => r.id).sort()).toEqual([company, standalone].sort())
+    expect(page.rows.map((r) => r.id)).toEqual([company])
+    expect(page.rows.some((r) => r.id === standalone)).toBe(false)
     expect(page.rows.some((r) => r.id === contact)).toBe(false)
-    expect(page.total).toBe(2)
+    expect(page.total).toBe(1)
   })
 
-  it("a standalone individual still lists beside companies with no contacts right at all", async () => {
-    // Without `contacts:read` the collection narrows to entities — but that
-    // narrowing is the RIGHT's own (`account_type = 'entity'`), a separate
-    // clause from the one this fix adds, and the two must not be confused: a
-    // blind caller sees neither the standalone person nor the contact.
-    const { standalone, contact } = await seed()
+  it("a caller with no contacts right at all sees the same company-only answer", async () => {
+    // Without `contacts:read` the collection ALSO narrows to entities — the
+    // right's own clause (`!sight.mayListPeople`) and the type partition
+    // above are two independent reasons landing on the same WHERE, and a
+    // blind caller must see neither individual either.
+    const { company, standalone, contact } = await seed()
     const blind = { mayListPeople: false, maySeeLogins: false }
     const page = await listAccounts(cfg, guard, staff, blind, { q: "Smoketest" })
+    expect(page.rows.map((r) => r.id)).toEqual([company])
     expect(page.rows.map((r) => r.id)).not.toContain(standalone)
     expect(page.rows.map((r) => r.id)).not.toContain(contact)
   })
@@ -548,21 +557,22 @@ describe("an individual linked as a contact is not a peer account (Aurora, 19 Se
   it("the CSV export is narrowed the same way as the list — one book, not two", async () => {
     const { company, standalone, contact } = await seed()
     const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { q: "Smoketest" })
-    expect(rows.map((r) => r.id).sort()).toEqual([company, standalone].sort())
+    expect(rows.map((r) => r.id)).toEqual([company])
+    expect(rows.some((r) => r.id === standalone)).toBe(false)
     expect(rows.some((r) => r.id === contact)).toBe(false)
   })
 
-  it("the contacts list (type=individual, the Contacts screen's own question) still finds her", async () => {
-    // Deliberately NOT asserting the standalone individual is absent here: the
-    // same `type: "individual"` shape also backs `ContactLinkDialog`'s search
-    // for an existing person to link (`web/components/accounts/
+  it("the contacts list (type=individual, the Contacts screen's own question) finds BOTH — standalone and linked", async () => {
+    // The same `type: "individual"` shape also backs `ContactLinkDialog`'s
+    // search for an existing person to link (`web/components/accounts/
     // contact-link-dialog.tsx` — "someone we ALREADY hold", which must still
-    // find a brand-new standalone person to link for the first time), so this
-    // fix stands the exclusion down for an explicit `type: "individual"` read
-    // rather than narrowing it to linked-only.
-    const { contact } = await seed()
+    // find a brand-new standalone person to link for the first time), so an
+    // explicit `type: "individual"` read stands the company-only partition
+    // down entirely: every person is a contact, and this is where all of
+    // them live.
+    const { standalone, contact } = await seed()
     const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { q: "Smoketest", type: "individual" })
-    expect(page.rows.map((r) => r.id)).toContain(contact)
+    expect(page.rows.map((r) => r.id).sort()).toEqual([contact, standalone].sort())
   })
 
   it("the account record's own Contacts panel still lists her — account_links is untouched", async () => {
@@ -765,17 +775,24 @@ const SEES_PEOPLE = { mayListPeople: true, maySeeLogins: true }
 
 describe("the paged list (R14/R16)", () => {
   it("returns an exact total and an opaque cursor that reaches page two", async () => {
+    // ENTITIES, not individuals: since Aurora's 20 Sep 2026 ruling ("a person
+    // is a contact; the Accounts screen lists COMPANIES"), the untyped read
+    // this test exercises (`listAccounts` with no `type`) excludes every
+    // individual — standalone or linked — so a page of PEOPLE could never
+    // page this list any more. Companies are what pages it.
     for (let i = 0; i < 60; i++)
-      await createAccount(cfg, guard, staff, actor, { accountType: "individual", name: `Person ${i}` })
+      await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: `Company ${i}` })
 
     const first = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
     expect(first.rows).toHaveLength(50)
-    // 8 seeded + 60, minus Marta and Diego — both seeded individuals are
-    // someone's LINKED contact (`account_links`), so the fix for Aurora's
-    // 19 Sep 2026 report ("why am i seeing ocntacts under accounts?") now
-    // excludes them from this list; they still answer to `type: "individual"`
-    // (the Contacts screen's own question, see the describe block above).
-    expect(first.total).toBe(66) // the exact COUNT, not the page length
+    // 4 seeded companies (Bergman S.A., Bergman Workshop, Bergman Marine,
+    // Delaval Group) + 60 new ones. None of the seeded INDIVIDUALS — Marta,
+    // Luis, Diego, Nadia, linked or standalone — count here at all, the
+    // amended fix for Aurora's 19/20 Sep 2026 reports ("why am i seeing
+    // contacts under accounts?" / "i still see contacts udner accounts!").
+    // They still answer to `type: "individual"` (the Contacts screen's own
+    // question, see the describe block above).
+    expect(first.total).toBe(64) // the exact COUNT, not the page length
     expect(first.hasMore).toBe(true)
     expect(first.nextCursor).toBeTruthy()
 
@@ -788,9 +805,9 @@ describe("the paged list (R14/R16)", () => {
   it("a pinned caller's total counts only their own world", async () => {
     const scope = await accountScope(cfg, { ...guard, userId: IDS.burglarUser })
     const page = await listAccounts(cfg, guard, scope, SEES_PEOPLE)
-    // Just Delaval now — Diego is its CONTACT, not a peer account on this
-    // list (see the "not a peer account" describe block above), and nothing
-    // of Bergman's.
+    // Just Delaval — the one COMPANY in the burglar's own world. Diego is a
+    // person, never a peer account on this list at all (see the "not a peer
+    // account" describe block above), and nothing of Bergman's.
     expect(page.total).toBe(1)
   })
 })
@@ -993,12 +1010,23 @@ describe("without the contacts right, the collection is the companies", () => {
   const BLIND = { mayListPeople: false, maySeeLogins: false }
 
   it("the list drops every person — and its total drops with them (R16)", async () => {
-    const all = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
-    const companies = await listAccounts(cfg, guard, staff, BLIND)
-    expect(all.rows.some((r) => r.accountType === "individual"), "the harness has people to withhold").toBe(true)
-    expect(companies.rows.every((r) => r.accountType === "entity")).toBe(true)
-    expect(companies.total, "the badge counts the same question the rows answer").toBe(companies.rows.length)
-    expect(companies.total).toBeLessThan(all.total)
+    // The UNTYPED read (the Accounts screen's own question) is companies for
+    // EVERY caller since Aurora's 20 Sep 2026 ruling — the type partition in
+    // `accountsWhere` excludes every individual there regardless of the
+    // contacts right, so a sighted caller and a blind one land on the same
+    // answer for this particular question.
+    const seenCompanies = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
+    const blindCompanies = await listAccounts(cfg, guard, staff, BLIND)
+    expect(seenCompanies.rows.every((r) => r.accountType === "entity")).toBe(true)
+    expect(blindCompanies.rows.every((r) => r.accountType === "entity")).toBe(true)
+    expect(blindCompanies.total, "the badge counts the same question the rows answer").toBe(
+      blindCompanies.rows.length
+    )
+    // The right's OWN narrowing shows on the question that actually asks for
+    // people: `type: "individual"` answers in full for a sighted caller and
+    // empty for a blind one (see "asking for people explicitly" below).
+    const seenPeople = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { type: "individual" })
+    expect(seenPeople.rows.length, "the harness has people to withhold").toBeGreaterThan(0)
   })
 
   it("asking for people explicitly does not get round it", async () => {
@@ -1027,18 +1055,19 @@ describe("without the contacts right, the collection is the companies", () => {
 // under it — "how many of each are there", not "how many matched" — so the two
 // numbers are computed apart and must stay apart under a filter.
 describe("the two tab badges beside the accounts list", () => {
-  it("count the collection — minus a caller's linked contacts, the Contacts question now (Aurora, 19 Sep 2026)", async () => {
+  it("count the collection — total is entityTotal now, full stop (Aurora, 19/20 Sep 2026)", async () => {
     const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
     // `entityTotal + individualTotal` no longer sums to `total` by
     // construction. `individualTotal` still answers `type: "individual"` in
     // full — the Contacts screen's own question, and `ContactLinkDialog`'s
     // search for an existing person to link, both need every individual,
-    // linked or not (see `accountsWhere`'s own comment on the fix). `total`
-    // (no `type` — the Accounts screen's own question) now excludes an
-    // individual who is someone else's contact. The gap is exactly the
-    // number of individuals carrying a live `account_links` row — 2 in this
-    // harness (Marta, Diego).
-    expect(page.entityTotal + page.individualTotal - page.total).toBe(2)
+    // standalone or linked (see `accountsWhere`'s own comment on the fix).
+    // `total` (no `type` — the Accounts screen's own question) now excludes
+    // EVERY individual, not only a linked one, so it equals `entityTotal`
+    // exactly and the gap against `individualTotal` is every person in the
+    // harness — 4 (Marta, Luis, Diego, Nadia).
+    expect(page.total).toBe(page.entityTotal)
+    expect(page.entityTotal + page.individualTotal - page.total).toBe(4)
     expect(page.individualTotal, "the harness has people to count").toBeGreaterThan(0)
   })
 

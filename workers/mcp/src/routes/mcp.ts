@@ -74,7 +74,7 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
         // guessing when nothing is found), while a plain list tool's own `q`
         // only matches a field, never a record's prose.
         instructions:
-          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota. Every tool description is one line; call describe_tool with a tool's name for its full instructions. For \"what does a record say about X\", call ask_knowledge rather than a list tool's own q filter — it searches what was actually said, and refuses honestly when nothing is found instead of guessing.",
+          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota. Every tool description is one line; call describe_tool with a tool's name for its full instructions. For \"what does a record say about X\", call ask_knowledge rather than a list tool's own q filter: it searches what was actually said, and refuses honestly when nothing is found instead of guessing.",
       })
     case "notifications/initialized":
       return new Response(null, { status: 202 })

@@ -239,7 +239,7 @@ const TITLES: Record<OnboardingStepId, string> = {
 const DESCRIPTIONS: Partial<Record<OnboardingStepId, string>> = {
   identity: "Only what the app cannot work out on its own.",
   appearance:
-    "Pick a theme, a spine and a text size — shown, not described. This is " +
+    "Pick a theme, a spine and a text size: shown, not described. This is " +
     "yours alone: it changes nothing for anyone else on the account.",
   work: "Claim the accounts you own. Anything you miss can be handed to you later.",
 };

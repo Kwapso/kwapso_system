@@ -92,12 +92,15 @@
 // this session, verbatim: "For account status, let's keep active, inactive,
 // and all." Companies · All — the ENTITY-TYPE strip the 14 Sep brief above
 // built — is retired outright and replaced by a STATUS strip: Active ·
-// Inactive · All, in that order, default tab Active. Nothing about entity
-// type is asked for any more: unlike Companies (which fixed `type: "entity"`),
-// none of the three new tabs narrows by type at all, so an individual account
-// (a sole trader) shows up on Active/Inactive/All exactly as a company does —
-// the type-vs-status distinction the old strip drew is simply gone from this
-// screen's tabs.
+// Inactive · All, in that order, default tab Active. None of the three new
+// tabs sends its own `type` — but that no longer means untyped: since her
+// 20 Sep 2026 ruling ("a person is a contact; the Accounts screen lists
+// COMPANIES"), the door itself (`accountsWhere`,
+// `workers/tenancy/src/lib/accounts.ts`) narrows an untyped read to
+// `account_type = 'entity'`, so Active/Inactive/All show companies only —
+// linked or standalone, no individual rides any of the three. The
+// type-vs-status distinction the old strip drew is gone from this screen's
+// TABS; it is answered one layer down instead, once, for every tab here.
 //
 // THE STATUS FACET GOES, THE TABS REPLACE IT — her own words, parenthetical
 // but exact: "(the status filter goes, the tabs replace it)". The "Status"
@@ -301,7 +304,6 @@ function accountTableColumns(t: Translate): TableColumn[] {
     {
       key: "manager",
       label: t("Account manager"),
-      render: (v) => v == null ? "—" : undefined
     },
     { key: "country", label: t("Country") },
   ]

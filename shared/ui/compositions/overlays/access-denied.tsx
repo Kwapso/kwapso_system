@@ -161,7 +161,7 @@ const SYSTEM_LABELS: AccessDeniedLabels = {
   title: "No access",
   lead: "This collection isn't part of your role.",
   body:
-    "You're signed in as Member name, and your role doesn't include this collection. Nothing is wrong with the link — it simply isn't yours to open.",
+    "You're signed in as Member name, and your role doesn't include this collection. Nothing is wrong with the link. It simply isn't yours to open.",
   bodyNarrow: "Your role doesn't include this collection.",
   grantorLabel: "Who can grant it",
   grantorRoleNarrow: "owner",
@@ -178,7 +178,7 @@ const PORTAL_LABELS: AccessDeniedLabels = {
   ...SYSTEM_LABELS,
   lead: "This isn't in your workspace.",
   body:
-    "It isn't one of your requests. Nothing is wrong with the link — it simply isn't yours to open.",
+    "It isn't one of your requests. Nothing is wrong with the link. It simply isn't yours to open.",
   bodyNarrow: "It isn't one of your requests.",
   back: "Back to your overview",
 };

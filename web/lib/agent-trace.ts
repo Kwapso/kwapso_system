@@ -466,6 +466,16 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "set_client_role_person",
   "update_client_tool",
   "set_client_tool_price",
+  // THE SAME SPLIT, ONE TABLE ALONG (team migration 0108, Aurora's 20 Sep 2026
+  // chat-edit-pencil ruling). `reply_help_ticket` traces to the ticket because
+  // its own input carries `helpId` — the tool says whose thread it is. These
+  // two carry only the REPLY's own row id (`id`); the door itself resolves
+  // which ticket a reply belongs to server-side (workers/content/src/lib/
+  // help.ts, `replyOrThrow`), so nothing the caller sends says which ticket to
+  // land on. Inventing a `/tickets/<replyId>` URL from the one id these tools
+  // do carry would resolve to nothing, which is worse than staying put.
+  "update_help_reply",
+  "delete_help_reply",
   // EVERY GOOGLE WRITE. All of them change something in GOOGLE — a file in a
   // Drive folder, a draft or a label in a mailbox, an event in a calendar, a message
   // in a space — and kwapso has no screen showing any of those, deliberately: a

@@ -401,7 +401,7 @@ function buildFigures(
     id: "hours",
     label: "Where did the hours go?",
     value: "142 h",
-    support: "per week · W31–W34",
+    support: "per week · W31 to W34",
     span: 2,
     spark: {
       type: "bar",

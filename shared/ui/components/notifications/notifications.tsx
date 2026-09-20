@@ -257,7 +257,7 @@ const DEFAULT_ITEMS: readonly NotificationItem[] = [
     time: "10:09",
     initials: "GP",
     actor: "Client name",
-    sentence: "Client name replied on 4182 — “no rush on the re-run”",
+    sentence: "Client name replied on 4182: “no rush on the re-run”",
     meta: "Client thread",
     unread: true,
   },
@@ -279,7 +279,7 @@ const DEFAULT_ITEMS: readonly NotificationItem[] = [
     actor: "The system",
     /* An automation is a THING, so its mark is the square (ruling 30). */
     shape: "square",
-    sentence: "The system moved 4171 to Blocked — waiting on the account",
+    sentence: "The system moved 4171 to Blocked, waiting on the account",
     meta: "Blocked",
     unread: true,
   },
@@ -497,7 +497,7 @@ function Notifications({
           )}
           <ActivityFeed
             items={rowsFor(group.rows)}
-            label={`${words.rowsLabel} — ${group.group ?? ""}`.trim()}
+            label={`${words.rowsLabel} · ${group.group ?? ""}`.trim()}
             onSelect={openHandler}
           />
         </div>

@@ -578,7 +578,12 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // a `detail` — it is one of only two account-fence writes on this surface
     // (the write changes who a client can SEE, not only where the row sits)
     // and had no detail at all to say so.
-    const DETAILED_TOOLS = 120
+    // 120 → 122 on 20 Sep 2026: `update_help_reply` and `delete_help_reply`
+    // (team migration 0108, Aurora's chat-edit-pencil ruling) both shipped
+    // with a `detail` from the start, the same as their `reply_help_ticket`
+    // sibling — a gain, not a loss, so the message above says to move the pin
+    // in the same commit.
+    const DETAILED_TOOLS = 122
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

@@ -122,6 +122,15 @@ export const TOOL_GATES: Record<string, string> = {
   remove_story_attachment: "work:update",
   remove_help_attachment: "help:update",
   reply_help_ticket: "help:read",
+  // THE CHAT EDIT PENCIL (team migration 0108, Aurora's 20 Sep 2026 ruling).
+  // Both doors OPEN on `help:read`, same as the reply door immediately above
+  // — the actual right a caller needs to touch one PARTICULAR reply is
+  // decided one level down, in `assertMayChangeReply` (workers/content/src/
+  // lib/help.ts): the author always may, and past that `help:update` reaches
+  // a colleague's. This hint states the door's own gate, not that finer
+  // fence — the same shape `reply_help_ticket`'s own hint already carries.
+  update_help_reply: "help:read",
+  delete_help_reply: "help:read",
   // Answering is a status move, so it sits on the same right every other move
   // does — and the door refuses a portal caller, because "resolved" is our word.
   resolve_help_ticket: "help:update",

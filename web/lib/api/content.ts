@@ -192,6 +192,9 @@ export type StoryWrite = {
   acceptanceCriteria?: string
   /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional. */
   moscow?: string
+  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
+   * 2026, paired with `sprints.goalSummary`.) Optional; unsaid reads as false. */
+  contributesToGoal?: boolean
 }
 
 /** The facets the work-log list door parses. */
@@ -630,6 +633,19 @@ export const content = {
       ...post({ helpId, body, taggedUserIds, attachmentIds }),
       keepalive: leaving === true,
     }),
+  /** CHANGE A REPLY ALREADY SENT — Aurora's 20 Sep 2026 ruling, the Edit half
+   * of the chat edit pencil (kit v1.2.139's `TicketThread.actions.onEdit`).
+   * The door's own fence (workers/content/src/lib/help.ts,
+   * `assertMayChangeReply`) is the one that actually decides whether this
+   * caller may touch this one reply; this is just the wire. */
+  updateHelpReply: (id: string, body: string) =>
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply/update", post({ id, body })),
+  /** TAKE A REPLY BACK OUT — the Delete half of the same ruling
+   * (`TicketThread.actions.onDelete`). Nothing is deleted server-side
+   * (deactivate-never-delete); the door's response is the thread with that
+   * one reply no longer in it. */
+  deleteHelpReply: (id: string) =>
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply/delete", post({ id })),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
@@ -713,6 +729,7 @@ export const content = {
   createSprint: (input: {
     name: string
     goal?: string
+    goalSummary?: string
     sprintType?: string
     accountId?: string
     appId?: string
@@ -727,6 +744,7 @@ export const content = {
     id: string
     name: string
     goal?: string
+    goalSummary?: string
     sprintType?: string
     startsOn?: string
     endsOn?: string

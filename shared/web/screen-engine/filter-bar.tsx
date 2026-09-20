@@ -551,7 +551,7 @@ function useFilterBar<T>({
       // English to somebody who chose German with a green build, which is
       // precisely the failure R28 exists to catch.
       toast.info(
-        t("Cleared the {what} filter — it doesn't fit the {parent} you picked.", {
+        t("Cleared the {what} filter. It doesn't fit the {parent} you picked.", {
           what: s.label,
           parent: s.parent,
         })

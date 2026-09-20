@@ -92,8 +92,11 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
 
   /* THE GRID ITSELF, rendered with the props the app builds — one role, so the
    * count below is exactly one role's band. The kit draws an unoffered slot as
-   * its own no-value em dash with no control under it; that glyph is what a
-   * reader sees where a switch used to be, so that glyph is what is counted. */
+   * an empty cell with no control under it (kit v1.2.140 dropped the old
+   * no-value em dash under Aurora's "no em dash" law), carrying
+   * `data-slot="permission-matrix-unoffered"` (kit v1.2.141) as its own stable
+   * hook; that attribute is what a reader's screen holds where a switch used
+   * to be, so that attribute is what is counted. */
   function renderOneBand(rights: (key: string) => readonly string[] | undefined) {
     const modules = TEAM_MODULES.map((key) => ({
       id: key,
@@ -118,7 +121,7 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
   /* THE WIDE GRID ONLY. The kit mounts BOTH renders and lets CSS choose — the
    * table is `hidden min-[45rem]:block` and the cards are `min-[45rem]:hidden` —
    * and jsdom applies no media query, so an unscoped count sees the wide grid,
-   * the narrow cards and the legend's own teaching dash at once. Scoping to the
+   * the narrow cards and the legend's own teaching mark at once. Scoping to the
    * table is what makes the number mean "one role's band". */
   const band = () => within(screen.getByRole("table"))
 
@@ -126,17 +129,19 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
     renderOneBand((key) => offeredRights(key).map((r) => RIGHT_TO_KIT[r]))
 
     const expected = inertBoxesPerRoleBand()
-    const dashes = band().getAllByText("—")
+    const unoffered = screen
+      .getByRole("table")
+      .querySelectorAll('[data-slot="permission-matrix-unoffered"]')
     expect(
-      dashes.length,
-      `the grid draws ${dashes.length} un-decidable boxes where MODULE_OFFERED_RIGHTS says ` +
+      unoffered.length,
+      `the grid draws ${unoffered.length} un-decidable boxes where MODULE_OFFERED_RIGHTS says ` +
         `${expected}. A slot a module does not offer must lose its control (R36) — check that ` +
         `roles-matrix.tsx still passes \`rights\` on its module rows`
     ).toBe(expected)
 
     // AND THE REST ARE REAL SWITCHES. The complement matters as much as the
-    // count: a grid that drew every box as a dash would satisfy an assertion
-    // about dashes and decide nothing at all.
+    // count: a grid that drew every box inert would satisfy an assertion
+    // about the un-offered hook and decide nothing at all.
     const live = TEAM_MODULES.length * MODULE_RIGHTS.length - expected
     expect(
       band().getAllByRole("checkbox").length,
@@ -150,10 +155,11 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
     // leave every inert box live for exactly the readers who cannot see the
     // grid at all.
     renderOneBand((key) => offeredRights(key).map((r) => RIGHT_TO_KIT[r]))
-    const narrow = within(
-      document.querySelector('[data-slot="permission-matrix-narrow"]') as HTMLElement
-    )
-    expect(narrow.getAllByText("—").length).toBe(inertBoxesPerRoleBand())
+    const narrowRoot = document.querySelector(
+      '[data-slot="permission-matrix-narrow"]'
+    ) as HTMLElement
+    const unoffered = narrowRoot.querySelectorAll('[data-slot="permission-matrix-unoffered"]')
+    expect(unoffered.length).toBe(inertBoxesPerRoleBand())
   })
 
   it("without `rights` the same grid draws eighty-eight switches — the defect, reproduced", () => {
@@ -162,7 +168,10 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
     // hand. If the kit ever stopped honouring `rights`, those go red and this
     // stays green, which tells the next reader which of the two halves moved.
     renderOneBand(() => undefined)
-    expect(band().queryAllByText("—").length).toBe(0)
+    expect(
+      screen.getByRole("table").querySelectorAll('[data-slot="permission-matrix-unoffered"]')
+        .length
+    ).toBe(0)
     expect(band().getAllByRole("checkbox").length).toBe(
       TEAM_MODULES.length * MODULE_RIGHTS.length
     )

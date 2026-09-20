@@ -235,6 +235,130 @@ if (unknownStripNames.length > 0 || stripLikeNames.length !== KNOWN_STRIP_NAMES.
   );
 }
 
+// THE CLASS-LIST PARITY PIN, 20 SEP 2026 — her fifth report on this exact
+// shape: "whats going on with the assistant tabs? shape of 'not active (and
+// + and log) is still wrong". `verify/agent-tab-strip-fit/page.tsx`'s own
+// `measureClassParity` answers it at the TILE level — a natural-mode
+// reference strip beside the fit="shrink" cases, checked per tab kind
+// (pinned "+" byte-identical, inactive/active with TAB_SHRINK_TAB's one
+// sanctioned substitution undone) — and this is the STATIC pin that proves
+// the harness keeps declaring AND reading it, the same "declared AND read"
+// standard the shrink constants above are already held to. It does not
+// re-run the browser probe (no check-*.mjs in this repo drives a headless
+// browser against a live-mounted harness page outside `check-pointer.mjs`,
+// which is its own separate, already-passing Node/Playwright script in the
+// same directory — the "pointer/hit checks from v1.2.126" this pin's own
+// report names) — it proves the SOURCE still wires the proof up rather than
+// quietly dropping it.
+const AGENT_TAB_STRIP_FIT_FILE = path.join(HERE, "..", "..", "verify", "agent-tab-strip-fit", "page.tsx");
+if (!fs.existsSync(AGENT_TAB_STRIP_FIT_FILE)) {
+  findings.push(
+    `verify/agent-tab-strip-fit/page.tsx is missing — the fit="shrink" harness this repo's own checks and ` +
+      "reports point to must exist on disk.",
+  );
+} else {
+  const fitSrc = fs.readFileSync(AGENT_TAB_STRIP_FIT_FILE, "utf8");
+  const fitRel = path.relative(process.cwd(), AGENT_TAB_STRIP_FIT_FILE);
+
+  if (!/function measureClassParity\(\)/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} has no measureClassParity() — the class-list parity assertion against the natural strip ` +
+        "(inactive, active, pinned \"+\") that answers her 20 Sep report must be declared.",
+    );
+  }
+  if (!/window\.__agentTabStripClassParityProbe = measureClassParity/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} declares measureClassParity but does not expose it as ` +
+        "window.__agentTabStripClassParityProbe — a proof nothing can call is the same as no proof.",
+    );
+  }
+  if (!/data-natural-reference="true"/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} has no fit="natural" reference strip (data-natural-reference) — measureClassParity has ` +
+        "nothing to compare the shrink-mode tiles against without one.",
+    );
+  }
+  // THE ONE SUBSTITUTION THE PROOF MAY MAKE, NAMED HERE SO A SECOND ONE
+  // CANNOT BE ADDED QUIETLY: `shrink`/`min-w-0` swapped back for `shrink-0`
+  // before a scrolling tile is compared to its natural-mode counterpart —
+  // TAB_SHRINK_TAB's own, documented difference, and the only one.
+  if (!/function shrinkAdjustedClassSet/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} has no shrinkAdjustedClassSet — the rest/active tile comparison must undo TAB_SHRINK_TAB's ` +
+        "own documented shrink-0 substitution before comparing, not compare raw class strings that were never " +
+        "going to match.",
+    );
+  }
+  if (!/["']shrink-0["']/.test(fitSrc) || !fitSrc.includes('set.delete("shrink")')) {
+    findings.push(
+      `${fitRel}'s shrinkAdjustedClassSet does not read like the documented shrink/min-w-0 -> shrink-0 swap — ` +
+        "see TAB_SHRINK_TAB's own comment in breadcrumb-folders.tsx for the substitution this must undo.",
+    );
+  }
+
+  // THE LAYERING PIN, 20 SEP 2026 — Aurora, verbatim, with her crop of the
+  // assistant strip: "loos at screenshot. i see the bottom of th eincactive
+  // tabs for the assistant but they shoudl be behind the shape!" The
+  // BEHAVIOUR this fixes lives in screen-shell.tsx's own ASIDE_BODY
+  // (relative z-[2] — see that constant's own comment for the full
+  // mechanism), not in this file: STRIP_SHRINK_SCROLL/STRIP_SHRINK_PINNED's
+  // own isolate (pinned above, unchanged, still load-bearing for real
+  // pointer clicks) is what PROMOTES the strip into the stacking bucket
+  // that made the panel's own missing z-index lose to it; the panel side of
+  // the construction is what actually decides who wins. This pin proves the
+  // HARNESS still declares and reads a live proof of the outcome — the same
+  // "declared AND read" standard the class-parity pin just above already
+  // holds `measureClassParity` to — not that today's numbers still pass
+  // (that is measureLayering's own job, run live against the mounted
+  // harness, not re-derived here in a static, no-browser check).
+  if (!/function measureLayering\(/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} has no measureLayering() — the elementFromPoint layering assertion (an inactive tab's own ` +
+        "overlap band must resolve to the panel, never the tab) that answers her 20 Sep report must be " +
+        "declared.",
+    );
+  }
+  if (!/window\.__agentTabStripLayeringProbe = measureLayering/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} declares measureLayering but does not expose it as window.__agentTabStripLayeringProbe — a ` +
+        "proof nothing can call is the same as no proof.",
+    );
+  }
+  if (!/data-slot="agent-tab-strip-fit-panel"/.test(fitSrc)) {
+    findings.push(
+      `${fitRel} has no data-slot="agent-tab-strip-fit-panel" — measureLayering has nothing standing in for ` +
+        "the real screen-shell-aside-body panel the strip rides onto without one.",
+    );
+  }
+  // THE MOCK PANEL MUST ACTUALLY PARTICIPATE IN STACKING THE SAME WAY
+  // ASIDE_BODY DOES, OR THE PROOF IS TESTING NOTHING — a panel div with no
+  // position/z-index would fail measureLayering for the SAME reason the
+  // real defect existed, which is the point, but a harness that quietly
+  // dropped the z-[2] would then "prove" the bug is fixed by testing an
+  // unfixed construction against an equally unfixed mock.
+  if (!/position:\s*"relative"/.test(fitSrc) || !/zIndex:\s*2/.test(fitSrc)) {
+    findings.push(
+      `${fitRel}'s mock panel does not read position: "relative" / zIndex: 2 — it must mirror screen-` +
+        "shell.tsx's own ASIDE_BODY construction (relative z-[2]), the real fix this proof is standing in for.",
+    );
+  }
+}
+
+// THE POINTER/HIT CHECKS FROM v1.2.126 STAY ON DISK, BESIDE THE CLASS
+// PARITY PIN ABOVE — `check-pointer.mjs` is the real-PointerEvent proof
+// that a click on a pinned or scrolling tile actually reaches its own
+// anchor; this pin only confirms the file is still there, not that it still
+// passes (that is `check-pointer.mjs`'s own job, run separately against a
+// live dev server — see its header for why it cannot run inside this
+// static, no-browser check).
+const CHECK_POINTER_FILE = path.join(HERE, "..", "..", "verify", "agent-tab-strip-fit", "check-pointer.mjs");
+if (!fs.existsSync(CHECK_POINTER_FILE)) {
+  findings.push(
+    "verify/agent-tab-strip-fit/check-pointer.mjs is missing — the v1.2.126 real-pointer-click proof for the " +
+      "shrink-mode strip's pinned and scrolling tiles must stay on disk beside this check.",
+  );
+}
+
 if (findings.length > 0) {
   console.error("FAIL breadcrumb-folders one-strip-one-gap check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -245,5 +369,7 @@ console.log(
     "shrink-pinned), each spending exactly its own named constant, all reading the identical gap-[var(--space-2)] " +
     "token, fit defaulting to \"natural\", and every fit=\"shrink\" tab-sizing constant declared AND read. Live " +
     "proof of the natural-mode outcome: verify/tabstrip-parity/page.tsx's measureNesting; live proof of the " +
-    "shrink-mode outcome: verify/agent-tab-strip-fit/page.tsx's own measurements at 1, 3, 5 and 8 tabs.",
+    "shrink-mode outcome: verify/agent-tab-strip-fit/page.tsx's own measurements at 1, 3, 5 and 8 tabs; live " +
+    "proof of class-list parity between the two modes: that same file's measureClassParity, pinned here; live " +
+    "proof of real-pointer hit-testing: check-pointer.mjs, pinned here too.",
 );

@@ -61,7 +61,7 @@ export function AssistantLimitNotice({ failure }: { failure: ModelFailure }) {
         return {
           title: t("The assistant isn't switched on here"),
           body: t(
-            "Nothing is wrong with your team — this copy of the app hasn't been connected to the assistant yet. Whoever set it up can finish that, and everything else here keeps working in the meantime."
+            "Nothing is wrong with your team. This copy of the app hasn't been connected to the assistant yet. Whoever set it up can finish that, and everything else here keeps working in the meantime."
           ),
         }
       case "refused":
@@ -75,14 +75,14 @@ export function AssistantLimitNotice({ failure }: { failure: ModelFailure }) {
         return {
           title: t("The assistant is being asked a lot at once"),
           body: t(
-            "It has paused for a moment to catch up. Give it a minute and ask again — nothing you did caused this and nothing was lost."
+            "It has paused for a moment to catch up. Give it a minute and ask again. Nothing you did caused this and nothing was lost."
           ),
         }
       case "provider_out_of_credit":
         return {
           title: t("The assistant's own account has run out"),
           body: t(
-            "This isn't your team's assistant credits — those are untouched. The account the assistant itself runs on needs topping up before it can answer again."
+            "This isn't your team's assistant credits: those are untouched. The account the assistant itself runs on needs topping up before it can answer again."
           ),
         }
       case "overloaded":

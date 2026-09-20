@@ -410,7 +410,7 @@ export function StepFormDialog({
               {sortedOptions(roles, lang, (r) => r.name).map((r) => (
                 <SelectItem key={r.id} value={r.id}>
                   {r.name}
-                  {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
+                  {r.centsPerHour === null ? `: ${t("no hourly cost yet")}` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -617,10 +617,10 @@ export function StepFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="step-loop">
-              <SelectValue placeholder={t("Nowhere — it carries on")} />
+              <SelectValue placeholder={t("Nowhere: it carries on")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>{t("Nowhere — it carries on")}</SelectItem>
+              <SelectItem value={NONE}>{t("Nowhere: it carries on")}</SelectItem>
               {peers.map((x) => (
                 <SelectItem key={x.stepKey} value={x.stepKey}>
                   {x.name}

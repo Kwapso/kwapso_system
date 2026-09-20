@@ -1222,8 +1222,21 @@ describe("an account row does not carry the agency's own view of the client", ()
   })
 
   it("nor through the detail door the portal actually calls — on EVERY row it opens", async () => {
+    // TWO READS, because a login lives on a PERSON's own account row
+    // (`account_id` on `portal_users` names the individual, never the
+    // company), and since Aurora's 20 Sep 2026 ruling ("a person is a
+    // contact; the Accounts screen lists COMPANIES") the untyped read no
+    // longer carries a single individual, linked or standalone — walking it
+    // alone would never reach a login row again. A client can reach both
+    // reads (the "not a wall" case above proves `?type=individual` still
+    // answers for a portal caller), so both are walked here, the same as a
+    // real client opening their own company AND their own colleagues.
     const { text: mine } = await call(req("GET /api/tenancy/accounts"), IDS.victimUser)
-    const visible = (JSON.parse(mine) as { accounts: { id: string; name: string }[] }).accounts
+    const { text: people } = await call(req("GET /api/tenancy/accounts", undefined, "?type=individual"), IDS.victimUser)
+    const visible = [
+      ...(JSON.parse(mine) as { accounts: { id: string; name: string }[] }).accounts,
+      ...(JSON.parse(people) as { accounts: { id: string; name: string }[] }).accounts,
+    ]
     expect(visible.length, "the client must have accounts to open, or this walks nothing").toBeGreaterThan(0)
 
     let logins = 0

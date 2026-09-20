@@ -446,13 +446,11 @@ function meetingsTableColumns(t: (english: string) => string): TableColumn[] {
       key: "purposeCell",
       label: t("Type"),
       searchKey: "purpose",
-      render: (v) => (v == null ? "—" : undefined),
     },
     {
       key: "attendeesCell",
       label: t("Attendees"),
       searchKey: "attendeesText",
-      render: (v) => (v == null ? "—" : undefined),
     },
     { key: "accountCell", label: t("Account"), searchKey: "client" },
   ]

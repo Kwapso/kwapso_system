@@ -152,9 +152,9 @@ export function SprintDetailScreen({
       await contentApi.setSprintComplete(sprintId, complete)
       invalidate(sprintsKey(teamId))
       invalidate(`activity:record:sprints:${sprintId}`)
-      toast.success(complete ? t("Sprint completed.") : t("Sprint reopened."))
+      toast.success(complete ? t("Phase completed.") : t("Phase reopened."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that sprint."))
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that phase."))
     } finally {
       setBusy(false)
     }
@@ -167,7 +167,7 @@ export function SprintDetailScreen({
       <RecordScreen
         title={<Skeleton className="h-7 w-48" />}
         state="error"
-        copy={{ errorTitle: t("Couldn't load the sprint.") }}
+        copy={{ errorTitle: t("Couldn't load the phase.") }}
         errorAction={
           <Button variant="secondary" onClick={() => invalidate(sprintsKey(teamId))}>
             {t("Try again")}
@@ -181,15 +181,15 @@ export function SprintDetailScreen({
   if (!sprint)
     return (
       <RecordScreen
-        title={t("Sprint")}
+        title={t("Phase")}
         state="empty"
-        copy={{ emptyTitle: t("That sprint no longer exists."), emptyDescription: "" }}
+        copy={{ emptyTitle: t("That phase no longer exists."), emptyDescription: "" }}
       />
     )
 
   const kindOption = sprintTypes.find((o) => o.value === sprint.sprintType)
   const kindLine = !sprint.sprintType
-    ? "—"
+    ? ""
     : kindOption
       ? `${sprintTypeLabel(kindOption, lang)}${kindOption.standardDays === null ? "" : `, normally ${kindOption.standardDays} days`}`
       : sprint.sprintType
@@ -199,12 +199,12 @@ export function SprintDetailScreen({
   // where an icon sits, it is `aria-hidden`, and the word is never further away
   // than the line above. A sprint nobody typed a kind on still gets an eyebrow —
   // "Sprint" is what it is — and simply carries no mark.
-  const kindWord = kindOption ? sprintTypeName(kindOption, lang) : sprint.sprintType || t("Sprint")
+  const kindWord = kindOption ? sprintTypeName(kindOption, lang) : sprint.sprintType || t("Phase")
   const kindMark = kindOption?.mark ?? null
 
   const done = sprint.storyCount - sprint.openStoryCount
   const overviewItems = [
-    { label: t("Reference"), value: sprint.ref || "—" },
+    { label: t("Reference"), value: sprint.ref || "" },
     // THE KIND, AND WHAT THE KIND CARRIES. A sprint type used to be a bare word;
     // since team-schema 0025 it also holds the mark somebody recognises it by,
     // the label a German client reads, and how long a block of this kind
@@ -213,8 +213,8 @@ export function SprintDetailScreen({
     // number is what to expect, said beside them.
     { label: t("Type"), value: kindLine },
     { label: t("Account"), value: sprint.accountName || "Ours, no account" },
-    { label: t("App"), value: sprint.appName || "—" },
-    // THE PACKAGE IT WAS SOLD INSIDE. A sprint can be sold on its own, so "—" is
+    { label: t("App"), value: sprint.appName || "" },
+    // THE PACKAGE IT WAS SOLD INSIDE. A sprint can be sold on its own, so "-" is
     // an ordinary answer rather than a gap. Where there IS a wave the name is a
     // way in: a reader who wants to know what else was in the package should not
     // have to go and look for it by name.
@@ -231,16 +231,16 @@ export function SprintDetailScreen({
             {sprint.waveName}
           </Button>
         ) : (
-          "—"
+          ""
         ),
     },
-    { label: t("What it's for"), value: sprint.goal ? <RichText html={sprint.goal} /> : "—" },
+    { label: t("What it's for"), value: sprint.goal ? <RichText html={sprint.goal} /> : "" },
     {
       label: t("Runs"),
       value:
         sprint.startsOn && sprint.endsOn
           ? `${formatDate(sprint.startsOn, lang)} → ${formatDate(sprint.endsOn, lang)}`
-          : (formatDate(sprint.startsOn, lang) || formatDate(sprint.endsOn, lang) || "—"),
+          : (formatDate(sprint.startsOn, lang) || formatDate(sprint.endsOn, lang) || ""),
     },
     { label: t("Price sold"), value: priceSold(sprint.soldPriceCents, sprint.currency) },
     {
@@ -413,7 +413,7 @@ export function SprintDetailScreen({
           header, because they ARE who and what. */}
       {canEdit && !sprint.completedAt && (
         <p className="text-muted-foreground bg-muted/40 rounded-[var(--radius)] p-3 text-sm">
-          {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
+          {t("Completing this phase cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
         </p>
       )}
 
@@ -425,15 +425,39 @@ export function SprintDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "stories")
             return (
-              <StoriesPanel
-                marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
-                ownerKind="sprint"
-                ownerId={sprintId}
-                filter={{ sprintId }}
-                host={host}
-                onNew={canCreate ? () => setStoryOpen(true) : undefined}
-                emptyText={t("No work in this sprint yet.")}
-              />
+              <div className="flex flex-col gap-6">
+                {/* THE PHASE GOAL (Aurora's ruling, 20 Sep 2026) — shown at the
+                    TOP of the phase board, above the stories it organizes.
+                    This "Stories" tab is the phase board this ruling names:
+                    the sprint/phase has no separate kanban screen of its own,
+                    this tab is where its work is planned and tracked. Absent
+                    entirely when no goal has been set — an empty band would
+                    say nothing a person needed to read. */}
+                {sprint.goalSummary && (
+                  // NO RAW BORDER — kit-conformance's borders law (§2.7): a
+                  // boundary is a fill, never a stroke. This file already
+                  // draws the sanctioned remedy a few lines above (the empty
+                  // state's `rounded-[var(--radius)] bg-muted/40 p-3`, no
+                  // edge) — the well, same radius, no edge, no shadow (Card
+                  // chapter 13's own spec) — so this drops the stroke to match
+                  // rather than adding an exemption for one nobody needs.
+                  <div className="rounded-[var(--radius)] bg-muted/40 p-3">
+                    <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                      {t("Phase goal")}
+                    </p>
+                    <p className="text-sm">{sprint.goalSummary}</p>
+                  </div>
+                )}
+                <StoriesPanel
+                  marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
+                  ownerKind="sprint"
+                  ownerId={sprintId}
+                  filter={{ sprintId }}
+                  host={host}
+                  onNew={canCreate ? () => setStoryOpen(true) : undefined}
+                  emptyText={t("No work in this phase yet.")}
+                />
+              </div>
             )
           return (
             <div className="flex flex-col gap-6">
@@ -496,6 +520,7 @@ export function SprintDetailScreen({
         initial={{
           name: sprint.name,
           goal: sprint.goal,
+          goalSummary: sprint.goalSummary,
           sprintType: sprint.sprintType,
           accountName: sprint.accountName,
           appName: sprint.appName,
@@ -509,6 +534,7 @@ export function SprintDetailScreen({
             id: sprintId,
             name: v.name,
             goal: v.goal || undefined,
+            goalSummary: v.goalSummary || undefined,
             sprintType: v.sprintType || undefined,
             startsOn: v.startsOn || undefined,
             endsOn: v.endsOn || undefined,
@@ -517,7 +543,7 @@ export function SprintDetailScreen({
           })
           primeCache(sprintsKey(teamId), sprints)
           invalidate(`activity:record:sprints:${sprintId}`)
-          toast.success(t("Sprint updated."))
+          toast.success(t("Phase updated."))
         }}
       />
     </RecordScreen>

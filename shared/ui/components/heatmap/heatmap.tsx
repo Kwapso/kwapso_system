@@ -296,7 +296,7 @@ const Heatmap = React.forwardRef<HTMLDivElement, HeatmapProps>(
       (({ row, column, level }: { row: HeatmapRow; column: React.ReactNode; level: HeatLevel }) =>
         `${typeof row.name === "string" ? row.name : ""} ${
           typeof column === "string" ? column : ""
-        } — ${levelLabels[level]}`.trim());
+        }, ${levelLabels[level]}`.trim());
 
     return (
       <div

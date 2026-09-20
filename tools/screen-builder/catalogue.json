@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.136",
-  "sha": "73b9ce0e7abc17262398447a863fb58faf56db25",
+  "tag": "v1.2.142",
+  "sha": "a4180f0830396c24c16cb7489b7f725c1a26ee17",
   "syncedAt": "2026-09-20"
  },
- "generatedAt": "2026-09-20T05:27:45.714Z",
+ "generatedAt": "2026-09-20T08:20:33.624Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -14,7 +14,7 @@
   "cvaSites": 54,
   "variantGroups": 81,
   "variantOptions": 269,
-  "typedEnumProps": 44,
+  "typedEnumProps": 45,
   "typedBooleanProps": 319,
   "compositions": 47,
   "icons": 1514,
@@ -1755,6 +1755,23 @@
        "optional": true,
        "kind": "boolean",
        "note": "This card's record is the chosen one. Takes `--surface-panel` — the same wash a selected `TableRow`, `List` row and `map` list row take (override 40) — and suppresses the interactive hover, because a selected card is already the marked one. Only visible on a card that sits on card paper: see the note above `CARD_SELECTED`. Emits `data-selected=\"true\"`. `aria-selected` is the CALL SITE's, because only it knows whether the card is an option in a listbox, a row in a grid, or neither."
+      }
+     ]
+    },
+    {
+     "file": "components/card/card.tsx",
+     "type": "CardContentProps",
+     "variantsFrom": [],
+     "props": [
+      {
+       "name": "inset",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "default",
+        "compact"
+       ],
+       "note": "`\"default\"` keeps the two-step ladder (24 to `lg:`, 32 above). `\"compact\"` is the space-3 step at every breakpoint — a declared shape for a dense card body, not a className override fighting the default."
       }
      ]
     }

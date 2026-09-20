@@ -125,7 +125,7 @@ export const RECORD_FACE: Record<
     list: "sprints",
     resource: "sprints",
     name: (r) => str(r, "ref") || str(r, "name"),
-    fallback: "Sprint",
+    fallback: "Phase",
   },
   stories: {
     idField: "id",

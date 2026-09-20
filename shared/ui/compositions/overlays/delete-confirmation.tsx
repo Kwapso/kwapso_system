@@ -232,7 +232,7 @@ function DeleteConfirmationDialog({
   body = (
     <>
       This removes the record, its 14 comments and its 3 attachments. Anything
-      already invoiced against it stays. There is no undo — archive it instead
+      already invoiced against it stays. There is no undo. Archive it instead
       if you only want it out of the way.
     </>
   ),
@@ -253,11 +253,11 @@ function DeleteConfirmationDialog({
   const gated = confirmWord !== null && confirmWord !== undefined;
   const armed = !gated || typed.trim().toLowerCase() === confirmWord.trim().toLowerCase();
 
-  /* The title IS the sentence: number, em-separator, record title, question
+  /* The title IS the sentence: number, middle dot, record title, question
      mark. The number keeps its tabular figures, as the artifact draws it. */
   const title = (
     <>
-      {words.verb} <span className="tabular-nums">{recordNumber}</span> — {recordTitle}?
+      {words.verb} <span className="tabular-nums">{recordNumber}</span> · {recordTitle}?
     </>
   );
 
@@ -445,7 +445,7 @@ function ArchiveConfirmationDialog({
 
   const title = (
     <>
-      {words.verb} <span className="tabular-nums">{recordNumber}</span> — {recordTitle}?
+      {words.verb} <span className="tabular-nums">{recordNumber}</span> · {recordTitle}?
     </>
   );
 

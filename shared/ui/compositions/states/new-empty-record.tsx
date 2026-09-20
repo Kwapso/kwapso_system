@@ -249,7 +249,7 @@ const DEFAULT_PANELS: readonly EmptyRecordPanel[] = [
   {
     id: "tickets",
     heading: "No tickets under it yet",
-    body: "Tickets appear here when the work is broken down — usually at the next sprint planning.",
+    body: "Tickets appear here when the work is broken down, usually at the next sprint planning.",
     actionLabel: "Link a ticket",
   },
   {
@@ -437,13 +437,13 @@ function NewEmptyRecordScreen({
        an empty feed would silently render a register instead. */
     if (log.length === 0) {
       console.warn(
-        "NewEmptyRecordScreen: CH27.39 — the log is never empty. It must hold the creation line with the actor and the time.",
+        "NewEmptyRecordScreen: CH27.39: the log is never empty. It must hold the creation line with the actor and the time.",
       );
     }
     for (const panel of panels) {
       if (panel.body.trim() === "") {
         console.warn(
-          `NewEmptyRecordScreen: CH27.39 — the empty panel "${panel.id}" must name what fills it and when.`,
+          `NewEmptyRecordScreen: CH27.39: the empty panel "${panel.id}" must name what fills it and when.`,
         );
       }
     }

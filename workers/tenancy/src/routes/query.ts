@@ -67,7 +67,7 @@ const unknownModule = (name: string | undefined) => {
     "unknown_module",
     `There is nothing here called "${name ?? ""}".` +
       (near.length === 1 ? ` Did you mean "${near[0]}"?` : "") +
-      (near.length > 1 ? ` That covers ${near.join(", ")} — ask for one of those.` : "") +
+      (near.length > 1 ? ` That covers ${near.join(", ")}, ask for one of those.` : "") +
       ` You can query: ${QUERY_MODULE_NAMES.join(", ")}.`
   )
 }

@@ -345,7 +345,7 @@ export function TicketChips({
               {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying
                   so. An absent chip here would leave a hole where the other
                   chips have a fact. */}
-              {ticket.helpType ?? "—"}
+              {ticket.helpType ?? null}
             </Badge>
           ),
         },

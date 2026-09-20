@@ -523,7 +523,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       ID,
       { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "name", column: "name", type: "text" },
-      { name: "sprintType", column: "sprint_type", type: "enum", vocabulary: "Sprint type" },
+      { name: "sprintType", column: "sprint_type", type: "enum", vocabulary: "Phase type" },
       { name: "goal", column: "goal", type: "text", bulky: true },
       { name: "startsOn", column: "starts_on", type: "date" },
       { name: "endsOn", column: "ends_on", type: "date" },

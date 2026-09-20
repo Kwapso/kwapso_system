@@ -252,7 +252,7 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
         throw new GuardError(
           400,
           "invalid_input",
-          `"${name}" isn't a kind of file the assistant can read here — images, PDFs, or plain text.`
+          `"${name}" isn't a kind of file the assistant can read here: images, PDFs, or plain text.`
         )
       // `allow` narrowed to AGENT_ATTACH_MIME rather than the default
       // INLINE_SAFE_UPLOAD: this caps at AGENT_ATTACH_MAX_BYTES, well under

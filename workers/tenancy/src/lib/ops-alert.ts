@@ -311,7 +311,7 @@ export async function sendOpsDigest(
   for (const s of d.spiking) lines.push(`UP, ${s.n}x today against about ${s.was}/day: ${s.sig}`)
   if (d.notShown)
     lines.push(
-      `…and ${d.notShown} more signature(s) not listed — this is the ${OPS_SIGNATURE_CAP}-line ceiling, not the whole night.`
+      `…and ${d.notShown} more signature(s) not listed: this is the ${OPS_SIGNATURE_CAP}-line ceiling, not the whole night.`
     )
   for (const q of d.nearQuota)
     lines.push(

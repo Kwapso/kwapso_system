@@ -588,7 +588,7 @@ export function chatThreadItem(space: GoogleSource, message: ChatMessage, userId
     service: "chat",
     sourceId: space.id,
     externalId: message.id,
-    title: `${space.name} — ${message.sender}`,
+    title: `${space.name}: ${message.sender}`,
     url: message.url,
     text: message.text,
     updatedAt: message.createdAt,
