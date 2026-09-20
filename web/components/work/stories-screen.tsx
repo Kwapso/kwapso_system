@@ -714,7 +714,28 @@ export function StoriesScreen({
   // right gates both.
   const canEditStories = usePermissions(teamId).can("work", "update")
 
-  const storiesQ = useCached<Story[]>(storiesKey(teamId, view), () => listFetch.stories(teamId, view))
+  // THE STORIES SCREEN'S OWN FACETS. Category (client's 15 Sep 2026 ruling)
+  // and, on Backlog only, Status (Aurora's ruling, 21 Sep 2026). Declared
+  // here, ABOVE `storiesQ` below, because the Status facet's value has to
+  // reach that fetch rather than sieve its rows afterwards (R14/R16), moved
+  // up from its old spot beside `query`/`sortField` for exactly that reason,
+  // no behaviour change for Category, which still narrows in the browser.
+  const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
+  // THE BACKLOG TAB'S STATUS FACET, READ BACK BEFORE THE FETCH. Narrowed
+  // THROUGH THE DOOR, never client side: a picked value changes `storiesQ`'s
+  // own cache key below, so it is a real page-one request for
+  // `OpenStoryFacetStatus`'s own words (workers/content/src/lib/stories.ts),
+  // never a filter over rows already on screen. Read only on the Backlog tab,
+  // the facet renders nowhere else (see `facets`, below), so a value left
+  // over from a visit to Backlog is inert on every other tab.
+  const statusFacet =
+    view === "backlog" ? (facetValues.status as StoryStatus | "to_do" | "backlog" | undefined) : undefined
+  const storiesKeyForView = statusFacet ? `${storiesKey(teamId, view)}:status:${statusFacet}` : storiesKey(teamId, view)
+  const storiesQ = useCached<Story[]>(storiesKeyForView, () =>
+    statusFacet
+      ? contentApi.stories({ view, status: statusFacet }).then((r) => r.stories)
+      : listFetch.stories(teamId, view)
+  )
   const options = useStoryFormOptions(teamId)
   // THE STORY TYPE'S GLYPH used to be read here (`markMap`, the team's own
   // two-letter code) — RETIRED 2026-09-16 with the row's own text mark: the
@@ -780,10 +801,6 @@ export function StoriesScreen({
   const [query, setQuery] = React.useState("")
   const [sortField, setSortField] = React.useState<"rank" | "deadline">("rank")
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
-  // THE STORIES SCREEN'S OWN FACET — Category, the client's 15 Sep 2026 ruling.
-  // One facet, in the browser, over whichever tab's page is loaded, the same
-  // shape `tasks-screen.tsx`'s own Priority/Department pair takes.
-  const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
 
   // A new story belongs in several piles and only one of them is on screen.
   function invalidateEveryStoryView() {
@@ -804,6 +821,17 @@ export function StoriesScreen({
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update that value."))
     }
+  }
+
+  // LOAD MORE, NARROWED THE SAME WAY THE FIRST PAGE WAS. A named function
+  // rather than an inline arrow on `<LoadMore>` itself, so the tag stays
+  // short enough for R14's own census (`storiesKey(` has to sit inside the
+  // SAME `<LoadMore>` tag its own 400-character window reads) while the
+  // status facet still rides every page, not just the first.
+  function loadMoreStories(cursor: string) {
+    return contentApi
+      .stories({ view, status: statusFacet, cursor })
+      .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor }))
   }
 
   const storiesLoading = storiesQ.data === undefined
@@ -832,6 +860,30 @@ export function StoriesScreen({
       control: "select",
       options: options.categories.map((c) => ({ value: c, label: c })),
     },
+    // THE BACKLOG TAB'S OWN STATUS FACET (Aurora's ruling, 21 Sep 2026,
+    // verbatim: "To Do means its scheduled in an active phase, Backlog
+    // otherwise", and the filter offers them as two choices). Narrowed
+    // through the DOOR (`statusFacet`, above), never client side: picking one
+    // of these four asks `contentApi.stories` again with the door's own word
+    // (`OpenStoryFacetStatus`, workers/content/src/lib/stories.ts). Four
+    // choices, not `work-panels.tsx`'s own StoriesPanel facet's five, this
+    // tab is the everyday backlog, never the board, so In Progress is left
+    // off exactly as Aurora's brief named it.
+    ...(view === "backlog"
+      ? [
+          {
+            field: "status",
+            label: t("Status"),
+            control: "select" as const,
+            options: [
+              { value: "backlog", label: t("Backlog") },
+              { value: "to_do", label: t("To Do") },
+              { value: "in_review", label: t(storyStatusWord("in_review", null)) },
+              { value: "done", label: t(storyStatusWord("done", null)) },
+            ],
+          },
+        ]
+      : []),
   ]
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
     facets,
@@ -1168,11 +1220,9 @@ export function StoriesScreen({
             {body}
             {!storiesLoading && !rawEmpty && filteredRows.length > 0 && (
               <LoadMore
-                listKey={storiesKey(teamId, view)}
+                listKey={statusFacet ? `${storiesKey(teamId, view)}:status:${statusFacet}` : storiesKey(teamId, view)}
                 label={t("Load more work")}
-                fetchPage={(cursor) =>
-                  contentApi.stories({ view, cursor }).then((r) => ({ rows: r.stories, nextCursor: r.nextCursor }))
-                }
+                fetchPage={loadMoreStories}
               />
             )}
           </div>

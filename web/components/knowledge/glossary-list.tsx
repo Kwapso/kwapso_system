@@ -19,6 +19,14 @@
 // `active: false` and the assistant stops reading it, through `setKnowledgeActive`,
 // the exact door the record screen's own "Stop using this" button calls.
 //
+// TAKE THIS WORD AWAY IS A DOOR, NOT A DIAL. Aurora, 20 Sep 2026, on this tab:
+// "disable the off button (only edit)." The confirm flow and the
+// `setKnowledgeActive` call below are unchanged, the same door the record
+// screen's own "Stop using this" button still calls; only the row's own
+// switch, `GLOSSARY_DEACTIVATE_ENABLED` below, is off (the same shape
+// settings-screen.tsx's own `TEAM_SCREENS_HIDDEN` uses to hide, not delete,
+// a whole section). Flip it back to draw the button again.
+//
 // THE ROW RULE IS THE KIT'S OWN SEPARATOR, never a `border-b` class: the
 // kit's borders law (shared/ui/foundations/rules/conformance.mjs) refuses a
 // bare CSS border, so the divider between two same-tone rows is the same
@@ -32,12 +40,38 @@ import { Separator } from "@shared/ui/components/separator/separator"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { useConfirm } from "@shared/web/use-confirm"
 import { useLanguage } from "@shared/web/language"
+import { looksLikeHtml, richTextPlain } from "@shared/web/rich-text"
 
 import { content } from "@/lib/api"
 import { knowledgeKey } from "@/lib/live-resources"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { invalidate } from "@shared/web/store"
 import type { KnowledgeSource } from "@shared/types"
+
+// See the header note above. Flipping this to `true` is the whole re-enable.
+const GLOSSARY_DEACTIVATE_ENABLED = false
+
+const DEFINITION_PREVIEW_MAX_CHARS = 140
+
+/** One plain-text preview line for the overview row, under the word. The
+ * Textarea this tab's own form uses never emits markup, but `body` is typed
+ * against every knowledge kind, some of which DO carry rich-text HTML, so
+ * this strips it through the one shared seam list/card previews already use
+ * (`richTextPlain`, shared/web/rich-text.ts) rather than trusting the source.
+ * Cut at the first line break or ~140 characters, whichever comes first, and
+ * (R87's own rule for a clipped title, read here for a clipped body) never
+ * silently: an ellipsis marks every cut that left something out. */
+function definitionPreview(body: string | null | undefined): string {
+  if (!body) return ""
+  const html = looksLikeHtml(body)
+  const flat = html ? richTextPlain(body) : body
+  const firstLine = (html ? flat : (flat.split(/\r?\n/)[0] ?? "")).replace(/\s+/g, " ").trim()
+  const hasMoreLines = !html && flat.split(/\r?\n/).length > 1 && firstLine.length > 0
+  if (firstLine.length > DEFINITION_PREVIEW_MAX_CHARS) {
+    return `${firstLine.slice(0, DEFINITION_PREVIEW_MAX_CHARS).trimEnd()}…`
+  }
+  return hasMoreLines ? `${firstLine}…` : firstLine
+}
 
 export function GlossaryList({
   rows,
@@ -78,9 +112,11 @@ export function GlossaryList({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <dt className="text-sm font-semibold">{source.title}</dt>
-              <dd className="text-muted-foreground mt-1 text-sm">{source.body}</dd>
+              <dd className="text-muted-foreground mt-1 truncate text-sm">
+                {definitionPreview(source.body)}
+              </dd>
             </div>
-            {(canEdit || canDelete) && (
+            {(canEdit || (GLOSSARY_DEACTIVATE_ENABLED && canDelete)) && (
               <div className="flex shrink-0 items-center gap-1">
                 {canEdit && (
                   <Button
@@ -92,7 +128,7 @@ export function GlossaryList({
                     <PencilSimple className="size-3.5" />
                   </Button>
                 )}
-                {canDelete && (
+                {GLOSSARY_DEACTIVATE_ENABLED && canDelete && (
                   <Button
                     variant="secondary"
                     size="icon"

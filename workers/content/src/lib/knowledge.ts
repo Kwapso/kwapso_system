@@ -131,6 +131,7 @@ import type {
   KnowledgeSource,
 } from "@shared/types"
 import { TITLE_MAX_CHARS } from "@shared/types"
+import { clampTitle } from "@shared/clamp-title"
 import type { Env } from "../env"
 import { contextLineFor, type ReadKind } from "./source-readers"
 import { extractLink } from "./knowledge-files"
@@ -1734,7 +1735,12 @@ export async function seedGlossaryEntries(
       skipped++
       continue
     }
-    await createGlossaryEntry(env, cfg, guard, actor, { title: entry.word, body: entry.definition })
+    // R87 I1 (RULES.md, amended 21 Sep 2026): the seed writes a word nobody
+    // typed, so it clamps on the way in exactly like every other non-form
+    // knowledge title — `createGlossaryEntry`'s own `requireText` stays a
+    // refusal for the "Add word" dialog beside it, the one caller where a
+    // person is the one who can shorten it.
+    await createGlossaryEntry(env, cfg, guard, actor, { title: clampTitle(entry.word), body: entry.definition })
     have.add(entry.word.trim().toLowerCase())
     created++
   }

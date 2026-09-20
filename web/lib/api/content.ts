@@ -33,6 +33,7 @@ import type {
   Sprint,
   Story,
   StoryBurndown,
+  StoryMetrics,
   Task,
   TaskViewName,
   TeamPulse,
@@ -196,6 +197,12 @@ export type StoryWrite = {
   /** WHAT "DONE" LOOKS LIKE (Aurora's ruling, 20 Sep 2026: "same design as
    * Detail") — optional, rich text. */
   acceptanceCriteria?: string
+  /** WHAT WAS BUILT, AND HOW (Aurora's ruling, 21 Sep 2026: "call it build
+   * notes") — optional, rich text, same storage as `detail`. Written through
+   * its own slide-in sheet on the story detail page, but sent through this
+   * same door (the door replaces every field it reads), spread from the
+   * story's own current shape alongside whichever field actually changed. */
+  buildNotes?: string
   /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional. */
   moscow?: string
   /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
@@ -567,11 +574,16 @@ export const content = {
     appId?: string
     moduleId?: string
     raisedByContactId?: string
-    /** WHO IS ON IT (Aurora, 21 Sep 2026), staff only, left out to keep
-     * whoever the ticket already carries. See `shared/types.ts`'s
-     * `assigneeId` for the redaction and `shared/effective-assignee.ts`
-     * for how the page reads the fallback when it is null. */
-    assigneeId?: string
+    /** WHO IS ON IT (Aurora, 21 Sep 2026), staff only. `undefined` (left out)
+     * keeps whoever the ticket already carries; `null` is an EXPLICIT CLEAR,
+     * the ticket's own Assigned to card's "Use the app's lead" text button
+     * (`help-stakeholders.tsx`), never a picker entry (Aurora's 16 Sep 2026
+     * ruling: a staff picker never offers Nobody). The door tells the two
+     * apart on the raw wire value (`workers/content/src/lib/help.ts`'s own
+     * `assigneeCleared`). See `shared/types.ts`'s `assigneeId` for the
+     * redaction and `shared/effective-assignee.ts` for how the page reads
+     * the fallback once it is null. */
+    assigneeId?: string | null
   }) =>
     api<{
       tickets: HelpTicket[]
@@ -788,6 +800,10 @@ export const content = {
    * start/end dates with a plain message rather than guessing a range. */
   storyBurndown: (phaseId: string) =>
     api<StoryBurndown>("/api/content/stories/burndown", post({ phaseId })),
+  /** The story detail page's own three figures — Cycle time, Effort, Flow
+   * efficiency (`StoryMetrics`, shared/types.ts). A GET-style POST, the same
+   * shape `storyBurndown` already takes and for the identical reason. */
+  storyMetrics: (id: string) => api<StoryMetrics>("/api/content/stories/metrics", post({ id })),
 
   /* -------------------- what a story shows for itself ----------------------- */
   /** The files and links on a story. A story needs at least one before it can go

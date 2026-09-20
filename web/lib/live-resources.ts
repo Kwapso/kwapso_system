@@ -1929,7 +1929,11 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.sprintOne(id),
     fetchList: (t) => listFetch.sprints(t),
     // …and the Sprints badge on whichever client or app record is open (R15).
-    deps: (_t, id) => [`activity:record:sprints:${id}`, ...recordCountDeps("sprints")],
+    // AND THE STORY'S OWN "Phase and wave" PANEL — `story-detail.tsx` reads
+    // its own phase into `sprint:one:<id>`, the same "the row patch above
+    // cannot reach a by-id cache key" gap `story:one:`'s own note names,
+    // one resource along.
+    deps: (_t, id) => [`activity:record:sprints:${id}`, `sprint:one:${id}`, ...recordCountDeps("sprints")],
     // …and the relationship map's picture of anything standing beside this
     // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
     slicePrefix: RECORD_MAP_PREFIX,

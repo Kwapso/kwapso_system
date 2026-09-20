@@ -2167,6 +2167,12 @@ export type Story = {
    * main backlog's own board card and by the record's own header chip
    * (Aurora's chip-order ruling, 20 Sep 2026). */
   appName: string | null
+  /** THE APP'S OWN LEAD (`app_staff.is_lead`), the app's answer to "who is on
+   * it" when this story carries no assignee of its own — read through
+   * `shared/effective-assignee.ts`'s `effectiveAssignee`, the identical seam
+   * `HelpTicket.appAssigneeId` already reads. Null when the story has no app,
+   * or the app has no lead named. */
+  appAssigneeId: string | null
   processId: string | null
   /** WHICH STEP OF WHICH MAP THIS WORK CHANGED — a step KEY, so it means the same
    * step across every version of that map. A story cannot close without this or
@@ -2217,6 +2223,17 @@ export type Story = {
    * TEXT_LIMITS.long at the door. Nullable and never backfilled — a story
    * written before this field existed has none to guess at. */
   acceptanceCriteria: string | null
+  /** WHAT WAS BUILT, AND HOW — Aurora's ruling, verbatim, 21 Sep 2026: "call it
+   * build notes." Rich text, the same storage `detail` already uses (team
+   * migration 0112), written through its own slide-in sheet once the story
+   * exists rather than on the create/edit form. Required before Done: her
+   * second ruling the same round, verbatim, "yes, canont be marked as don if
+   * thats not filled in, its required" — refused at the door
+   * (`refuseUndocumented`, workers/content/src/lib/stories.ts) with "Write the
+   * build notes before marking it done." Nullable and never backfilled, the
+   * same shape `acceptanceCriteria` already takes: a story finished before this
+   * field existed has none to guess at. */
+  buildNotes: string | null
   /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — a FIXED
    * four-value methodology, `MOSCOW_VALUES` below, never a team-editable
    * dropdown the way `storyType`/`category` are. Nullable and never
@@ -2262,6 +2279,31 @@ export type StoryBurndownDay = {
   remainingPoints: number | null
   /** the straight line from `startTotal` on day one to zero on the last day */
   idealCount: number
+}
+
+/** THE THREE METRICS FIGURES ON A STORY'S OWN DETAIL PAGE (Aurora's ruling,
+ * 20 Sep 2026: "Metrics moves under Effort" — see `documents/UI-RULEBOOK.md`'s
+ * B42 for the panel order this rides in). Computed in a content door
+ * (`GET`-style `POST /api/content/stories/metrics`, `getStoryMetrics`,
+ * workers/content/src/lib/stories.ts), never in the story read itself
+ * (`getStory`): every OTHER caller of that read — the backlog, the board, an
+ * edit form — pays nothing for a join across `work_logs` and
+ * `story_status_events` it never asked for, the same "the list and the detail
+ * are a different weight" split `detail`/`acceptanceCriteria`/`buildNotes`
+ * already take on `STORY_LIST_COLS`. */
+export type StoryMetrics = {
+  /** Seconds from the FIRST work log against this story to the moment it most
+   * recently reached `done` (`story_status_events`, team migration 0110), or
+   * to now while it has not reached `done` yet. `null` when no work log
+   * exists at all — the page reads that as "Not started". */
+  cycleTimeSeconds: number | null
+  /** Whole seconds logged against this story (excluding a discarded timer),
+   * the same figure `WorkLogsPanel`'s own total already reads. */
+  effortSeconds: number
+  /** Effort divided by cycle time, as a percentage (41.2, not 0.412) —
+   * `null` when either side of that division is zero, which the page reads
+   * as "No time log". */
+  flowEfficiency: number | null
 }
 
 export type StoryBurndown = {

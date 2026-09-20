@@ -132,7 +132,7 @@ Confirm the live list with `tools/list` (it's generated, so it's always current)
 Today it covers:
 
 - **Read** — 63 of the 179 tools answer on a GET (counted from the live
-  catalogue, 15 Sep 2026), and 181 of the doors in the
+  catalogue, 15 Sep 2026), and 184 of the doors in the
   census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
@@ -276,7 +276,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **275 doors, 207 with a tool, 68 with a written reason**, the
+  red build. Today: **276 doors, 208 with a tool, 68 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -567,9 +567,21 @@ Today it covers:
     `category` is Client-requested (the default) or Enabler (Kwapso-initiated
     upkeep — renamed from Internal on 20 Sep 2026); an Enabler story must also
     name `ticketId`, both `create_story` and `update_story` refuse with
-    `ticket_required` otherwise. No client login holds `work:*` and the doors
+    `ticket_required` otherwise. `update_story` also carries `buildNotes`
+    (team migration 0112, Aurora's 21 Sep 2026 ruling: "call it build notes")
+    — what was built and how, the same long-text shape as `detail`, written
+    through the story detail page's own slide-in sheet once the story
+    exists. `set_story_status` refuses to move a story to `done` while
+    `buildNotes` is empty, answering `build_notes_required` — her same-round
+    ruling, "canont be marked as don if thats not filled in, its required".
+    No client login holds `work:*` and the doors
     refuse a portal caller outright, so unlike the ticket doors the question
     "what if a contact reaches this?" has a one-word answer.
+  - `story_metrics` (`work:read`), a story's own Cycle time / Effort / Flow
+    efficiency, by `id` — the three figures the story detail page's own
+    Metrics panel draws (Aurora's ruling, 21 Sep 2026). `cycleTimeSeconds` is
+    null until a work log exists; `flowEfficiency` is null while either side
+    of the division is zero. Computed fresh on every call, never stored.
   - `story_burndown` (`work:read`), a phase's burndown series (round-28 ruling,
     team migration 0110): one row per calendar day of the phase, the count still
     remaining and the ideal straight-line count for that day, plus the phase's

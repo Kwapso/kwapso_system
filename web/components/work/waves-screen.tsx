@@ -40,7 +40,7 @@ import { Badge, type BadgeDot } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Calendar as CalendarIcon, ChartBarHorizontal, ListBullets } from "@shared/ui/foundations/icons"
+import { Calendar as CalendarIcon, CalendarDots, ChartBarHorizontal, ListBullets } from "@shared/ui/foundations/icons"
 import type { CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
@@ -82,16 +82,30 @@ import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/s
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 
-/** WHEN A PACKAGE RUNS, from the two dates the door derived — or the sentence
- * that says nobody has planned it yet, which is an ordinary state and not a gap:
- * "Alex sells the wave, sprints get planned afterwards." */
+/** WHEN A PACKAGE RUNS, from the two dates the door derived - or, when the
+ * wave itself carries neither (the door recalculates them off its sprints,
+ * `recalcWaveDates`, but a caller can still be looking at a stale read, or a
+ * phase attached the same moment), the earliest start to the latest end of
+ * its own PHASES, handed in as the optional third argument - or the sentence
+ * that says nobody has planned it yet, which is an ordinary state and not a
+ * gap: "Alex sells the wave, sprints get planned afterwards." Live defect,
+ * proved 20 Sep 2026: the head's own "Runs" line said "No phases planned
+ * yet" while a dated phase sat right there on the Phases tab. See B37's
+ * amendment, documents/UI-RULEBOOK.md. */
 export function waveDates(
   wave: { startsOn: string | null; endsOn: string | null },
   t: (s: string) => string,
-  lang: Language
+  lang: Language,
+  phases?: readonly PhaseWindow[]
 ): string {
   if (wave.startsOn && wave.endsOn) return `${formatDate(wave.startsOn, lang)} → ${formatDate(wave.endsOn, lang)}`
-  return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No phases planned yet")
+  if (wave.startsOn || wave.endsOn) return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang)
+  const starts = (phases ?? []).map((p) => p.startsOn).filter((d): d is string => d != null)
+  const ends = (phases ?? []).map((p) => p.endsOn).filter((d): d is string => d != null)
+  const earliestStart = starts.length > 0 ? starts.reduce((a, b) => (a < b ? a : b)) : null
+  const latestEnd = ends.length > 0 ? ends.reduce((a, b) => (a > b ? a : b)) : null
+  if (earliestStart && latestEnd) return `${formatDate(earliestStart, lang)} → ${formatDate(latestEnd, lang)}`
+  return formatDate(earliestStart, lang) || formatDate(latestEnd, lang) || t("No phases planned yet")
 }
 
 /** A WAVE'S OWN STAGE, DRAWN. Aurora's ruling, 21 Sep 2026, verbatim: "stage
@@ -111,7 +125,9 @@ export function WaveStageMark({
    * type pill already draws (the wave head, beside the other chips). */
   variant = "text",
 }: {
-  phases: readonly (PhaseWindow & { sprintType?: string | null })[]
+  // `name` IS REQUIRED - the fallback below reads it, and every real caller
+  // (a `Sprint` or `WaveSprint`) already carries one.
+  phases: readonly (PhaseWindow & { sprintType?: string | null; name: string })[]
   t: (s: string) => string
   className?: string
   variant?: "text" | "chip"
@@ -125,14 +141,22 @@ export function WaveStageMark({
         </Badge>
       )
     const type = stage.phase.sprintType ?? null
+    // A PHASE WITH NO TYPE YET IS STILL A PHASE - live defect, proved 20 Sep
+    // 2026: a `null` type used to draw an icon-less Badge with an EMPTY
+    // label, which read as nothing at all. The active/upcoming phase always
+    // has a NAME (a phase cannot be created without one), so the fallback is
+    // that name, under the generic phase icon - `CalendarDots`, the same
+    // glyph `CONCEPT_ICON.sprints` gives the Phases nav item
+    // (`web/lib/pages.ts`), never a blank chip. See B37's amendment,
+    // documents/UI-RULEBOOK.md.
     return (
       <Badge
         variant="secondary"
         size="pill"
         className={className}
-        icon={sprintTypeHasGlyph(type) ? <SprintTypeGlyph type={type} /> : undefined}
+        icon={type ? (sprintTypeHasGlyph(type) ? <SprintTypeGlyph type={type} /> : undefined) : <CalendarDots />}
       >
-        {type ? t(type) : ""}
+        {type ? t(type) : stage.phase.name}
       </Badge>
     )
   }
@@ -144,8 +168,12 @@ export function WaveStageMark({
   const type = stage.phase.sprintType ?? null
   return (
     <span className={cn(base, className)}>
-      {sprintTypeHasGlyph(type) && <SprintTypeGlyph type={type} size={12} className="shrink-0" />}
-      <span className="min-w-0 truncate">{type ? t(type) : ""}</span>
+      {type ? (
+        sprintTypeHasGlyph(type) && <SprintTypeGlyph type={type} size={12} className="shrink-0" />
+      ) : (
+        <CalendarDots size={12} className="shrink-0" />
+      )}
+      <span className="min-w-0 truncate">{type ? t(type) : stage.phase.name}</span>
     </span>
   )
 }

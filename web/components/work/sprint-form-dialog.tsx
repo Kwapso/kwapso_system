@@ -323,7 +323,16 @@ export function SprintFormDialog({
           what is stored, don't offer it again" shape `app-form-dialog.tsx`
           gives its own stage picker for a word migration 0098 retired. */}
       <Field config={typeField} shape="group" htmlFor="sprint-type" className={fieldSpacing}>
+        {/* THE ID ITSELF, NOT LEFT TO THE KIT'S CLONE. This `Field` holds TWO
+            children (the pill row and the type description paragraph below
+            it), so the kit `Field`'s own single-element clone that carries
+            `htmlFor` down onto an only child never fires here - an array of
+            children is never `React.isValidElement`. The label's
+            `htmlFor="sprint-type"` was pointing at an id nothing on screen
+            ever carried (live defect, proved 20 Sep 2026): given directly,
+            the same way every other field on this form is given its own id. */}
         <AppearancePillGroup
+          id="sprint-type"
           options={[
             { value: NONE, label: t("Not said") },
             ...sprintTypes.map((option) => ({

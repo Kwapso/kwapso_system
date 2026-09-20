@@ -236,8 +236,12 @@ export function WaveDetailScreen({
       value: wave.goal ? <RichText html={wave.goal} /> : "",
     },
     // DERIVED FROM THE SPRINTS, said as one line so it reads the way somebody
-    // would say it. Never typed — see the header.
-    { label: t("Runs"), value: waveDates(wave, t, lang) },
+    // would say it. Never typed - see the header. `waveDates`' own third
+    // argument is the fallback when the wave itself carries neither date
+    // (`waves-screen.tsx`'s own header): the earliest start to the latest
+    // end of its own active phases, same set `WaveStageMark` reads its
+    // stage off, rather than the empty sentence.
+    { label: t("Runs"), value: waveDates(wave, t, lang, sprints.filter((s) => s.active)) },
     {
       label: t("Phases inside it"),
       value:
@@ -349,7 +353,7 @@ export function WaveDetailScreen({
       // same way meeting-detail.tsx's subtitle duplicates its own "When" row
       // — the client's own ruling on that screen says the duplication
       // doesn't matter when the fact belongs in this exact position.
-      subtitle={waveDates(wave, t, lang)}
+      subtitle={waveDates(wave, t, lang, sprints.filter((s) => s.active))}
       actions={canEdit ? <RecordActionsMenu actions={overflow} /> : undefined}
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column.

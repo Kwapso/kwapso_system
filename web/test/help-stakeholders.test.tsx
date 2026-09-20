@@ -42,14 +42,29 @@
 // band this suite otherwise never asserted on directly (it read `PersonCard`
 // through text and structure, never through `shape=`), so nothing here
 // needed to change for that ruling on its own.
+//
+// ASSIGNED TO MOVED OUT, 21 SEP 2026, TWICE THE SAME DAY. It landed inside
+// this component first (Aurora, verbatim: "both on story detail and ticket
+// detail we need to see to whom it's assigned, normally this gets inherited
+// from the app"), then her very next ruling, reading that back, moved it
+// back out: "nono assigned to on the very top, a different card from
+// stakeholders!" `AssignedToCard` (exported from `help-stakeholders.tsx`
+// beside `HelpStakeholders`) is its own top-level `Card` now, never nested
+// inside this one, rendered as the ticket page's own FIRST side panel
+// (`ticket-detail-body.tsx`'s `assignedTo` slot). The "HelpStakeholders,
+// Assigned to, first" describe block this comment used to sit above is
+// replaced below with two things: a suite over `AssignedToCard` standing
+// alone, and a suite proving `HelpStakeholders` carries none of it any more.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import type * as React from "react"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpStakeholder } from "@shared/types"
-import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
+import { HelpStakeholders, AssignedToCard } from "@/components/tickets/help-stakeholders"
+import { TicketDetailBody, TICKET_PANEL_ANCHOR } from "@/components/tickets/ticket-detail-body"
 
 afterEach(cleanup)
 
@@ -227,37 +242,76 @@ describe("HelpStakeholders — On the loop, one horizontal row", () => {
   })
 })
 
-// ASSIGNED TO. Aurora's ruling, verbatim, 21 Sep 2026: "both on story detail
-// and ticket detail we need to see to whom it's assigned, normally this gets
-// inherited from the app." Drawn exactly like Raised by, above it, always
-// rendered, see help-stakeholders.tsx's own header for the account.
-describe("HelpStakeholders, Assigned to, first", () => {
+// HELPSTAKEHOLDERS CARRIES NONE OF IT ANY MORE. Aurora's second 21 Sep 2026
+// ruling, verbatim: "nono assigned to on the very top, a different card from
+// stakeholders!", this suite proves the row is gone from this component,
+// not merely moved and still reachable from here too.
+describe("HelpStakeholders no longer draws an Assigned to row", () => {
   const MEMBERS = [
     { id: "u-staff", name: "Alaap Kanchwala", photo: null },
     { id: "u-lead", name: "Petya Bletsova", photo: null },
   ]
 
-  it("renders before Raised by, even with no stakeholders at all", () => {
-    render(<HelpStakeholders stakeholders={[]} />)
-    const assigned = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
-    expect(assigned).toBeTruthy()
+  it("renders no 'Assigned to' text and no assignee-card, even when the old props are passed", () => {
+    // Cast through `unknown` deliberately: these props no longer exist on
+    // `HelpStakeholders`'s own type (proved positionally below), passed
+    // anyway at the RUNTIME boundary to prove a stale caller cannot smuggle
+    // the row back through them.
+    const staleProps = {
+      stakeholders: [],
+      assigneeId: "u-staff",
+      assigneeName: "Alaap Kanchwala",
+      appId: "app-1",
+      appName: "Bergman dispatch",
+      appAssigneeId: "u-lead",
+      members: MEMBERS,
+      canEditAssignee: true,
+    } as unknown as React.ComponentProps<typeof HelpStakeholders>
+    render(<HelpStakeholders {...staleProps} />)
+    expect(screen.queryByText("Assigned to")).toBeNull()
+    expect(document.querySelector('[data-slot="assignee-card"]')).toBeNull()
+    expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
+  })
+
+  it("takes no assignee props at all, HelpStakeholders/AssignedToCard is a signature census, not a render one", () => {
+    // The render test above proves a stale prop is IGNORED; this proves the
+    // TYPE no longer offers it, the same discipline this file's own "takes
+    // no LOOP-picker props" test above holds `HelpStakeholders` to.
+    const src = readFileSync(
+      join(import.meta.dirname, "..", "components", "tickets", "help-stakeholders.tsx"),
+      "utf8"
+    )
+    const at = src.indexOf("export function HelpStakeholders")
+    const signature = src.slice(at, src.indexOf("{\n  const", at))
+    for (const field of ["assigneeId", "assigneeName", "appAssigneeId", "canEditAssignee", "onChangeAssignee"])
+      expect(signature, `HelpStakeholders must not declare ${field} any more`).not.toContain(field)
+  })
+})
+
+// ASSIGNED TO, ITS OWN COMPONENT NOW, `AssignedToCard`. Aurora's ruling,
+// verbatim, 21 Sep 2026: "both on story detail and ticket detail we need to
+// see to whom it's assigned, normally this gets inherited from the app."
+// Landed inside `HelpStakeholders` first, moved out the same day by her next
+// ruling ("nono assigned to on the very top, a different card from
+// stakeholders!"). Every test below renders `AssignedToCard` alone, the same
+// way `HelpStakeholders`'s own suites above render it alone.
+describe("AssignedToCard", () => {
+  const MEMBERS = [
+    { id: "u-staff", name: "Alaap Kanchwala", photo: null },
+    { id: "u-lead", name: "Petya Bletsova", photo: null },
+  ]
+
+  it("stands on its own top-level Card, variant default (R67, it is no longer nested on raised paper)", () => {
+    render(<AssignedToCard />)
+    const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    expect(card).toBeTruthy()
+    expect(card.getAttribute("data-variant")).toBe("default")
     expect(screen.getByText("Nobody yet.")).toBeTruthy()
-    // Still first in DOM order, ahead of the empty-state sentence below it.
-    const empty = screen.getByText("Just the person who raised it and your admins so far.")
-    expect(
-      assigned.compareDocumentPosition(empty) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
   })
 
   it("shows the inherited line when the ticket has none of its own and the app does", () => {
     render(
-      <HelpStakeholders
-        stakeholders={[]}
-        appId="app-1"
-        appName="Bergman dispatch"
-        appAssigneeId="u-lead"
-        members={MEMBERS}
-      />
+      <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
     )
     const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
     expect(within(card).getByText("Petya Bletsova")).toBeTruthy()
@@ -267,8 +321,7 @@ describe("HelpStakeholders, Assigned to, first", () => {
 
   it("the ticket's own assignee wins, no inherited line", () => {
     render(
-      <HelpStakeholders
-        stakeholders={[]}
+      <AssignedToCard
         assigneeId="u-staff"
         assigneeName="Alaap Kanchwala"
         appId="app-1"
@@ -284,13 +337,7 @@ describe("HelpStakeholders, Assigned to, first", () => {
 
   it("draws no pen and no Select for a reader with no edit right", () => {
     render(
-      <HelpStakeholders
-        stakeholders={[]}
-        appId="app-1"
-        appName="Bergman dispatch"
-        appAssigneeId="u-lead"
-        members={MEMBERS}
-      />
+      <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
     )
     expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
     expect(screen.queryByRole("combobox")).toBeNull()
@@ -299,8 +346,7 @@ describe("HelpStakeholders, Assigned to, first", () => {
   it("the pen opens the kit Select (R90 faces), and picking someone calls the door", async () => {
     const onChangeAssignee = vi.fn(async () => {})
     render(
-      <HelpStakeholders
-        stakeholders={[]}
+      <AssignedToCard
         appId="app-1"
         appName="Bergman dispatch"
         appAssigneeId="u-lead"
@@ -319,5 +365,201 @@ describe("HelpStakeholders, Assigned to, first", () => {
     expect(option.querySelector("[aria-hidden]")).toBeTruthy()
     fireEvent.click(option)
     expect(onChangeAssignee).toHaveBeenCalledWith("u-staff")
+  })
+
+  // THE CLEAR ACTION IS A SEPARATE TEXT BUTTON, NEVER A "NOBODY" ROW. Aurora's
+  // 16 Sep 2026 ruling, verbatim: "Kill the 'nobody' option for staff. If we
+  // leave it empty, it's not an option. Remove it from tasks and everywhere
+  // else. This 'nobody', just kill it." A 21 Sep 2026 pass had put a
+  // "Nobody, inherit from the app" row back into this card's own `Select`;
+  // reverted 20 Sep 2026. This is the door back now.
+  describe("the clear action returns the ticket's own assignee to inherited", () => {
+    it("the Select offers no Nobody option when the app has a lead, people only", async () => {
+      const onChangeAssignee = vi.fn(async () => {})
+      render(
+        <AssignedToCard
+          assigneeId="u-staff"
+          assigneeName="Alaap Kanchwala"
+          appId="app-1"
+          appName="Bergman dispatch"
+          appAssigneeId="u-lead"
+          members={MEMBERS}
+          canEditAssignee
+          onChangeAssignee={onChangeAssignee}
+        />
+      )
+      fireEvent.click(screen.getByLabelText("Change who is assigned"))
+      fireEvent.click(document.getElementById("help-assignee") as HTMLElement)
+      const options = await screen.findAllByRole("option")
+      expect(options.length).toBe(MEMBERS.length)
+      for (const option of options) {
+        expect(option.textContent?.toLowerCase()).not.toMatch(/nobody/)
+        // R90 still applies: every remaining row carries its own face.
+        expect(option.querySelector("[aria-hidden]")).toBeTruthy()
+      }
+    })
+
+    it("the Select offers no Nobody option when the app has no lead either", async () => {
+      render(
+        <AssignedToCard
+          assigneeId="u-staff"
+          assigneeName="Alaap Kanchwala"
+          members={MEMBERS}
+          canEditAssignee
+          onChangeAssignee={vi.fn()}
+        />
+      )
+      fireEvent.click(screen.getByLabelText("Change who is assigned"))
+      fireEvent.click(document.getElementById("help-assignee") as HTMLElement)
+      const options = await screen.findAllByRole("option")
+      expect(options.length).toBe(MEMBERS.length)
+      for (const option of options) {
+        expect(option.textContent?.toLowerCase()).not.toMatch(/nobody/)
+      }
+    })
+
+    it("renders no clear action when the ticket has no assignee of its own (nothing to clear)", () => {
+      render(
+        <AssignedToCard
+          appId="app-1"
+          appName="Bergman dispatch"
+          appAssigneeId="u-lead"
+          members={MEMBERS}
+          canEditAssignee
+          onChangeAssignee={vi.fn()}
+        />
+      )
+      expect(screen.queryByText("Use the app's lead")).toBeNull()
+    })
+
+    it("renders no clear action when the app has no lead to fall back to, even with an own assignee", () => {
+      render(
+        <AssignedToCard
+          assigneeId="u-staff"
+          assigneeName="Alaap Kanchwala"
+          members={MEMBERS}
+          canEditAssignee
+          onChangeAssignee={vi.fn()}
+        />
+      )
+      expect(screen.queryByText("Use the app's lead")).toBeNull()
+    })
+
+    it("renders no clear action for a reader with no edit right, even with an own assignee and an app lead", () => {
+      render(
+        <AssignedToCard
+          assigneeId="u-staff"
+          assigneeName="Alaap Kanchwala"
+          appId="app-1"
+          appName="Bergman dispatch"
+          appAssigneeId="u-lead"
+          members={MEMBERS}
+        />
+      )
+      expect(screen.queryByText("Use the app's lead")).toBeNull()
+    })
+
+    it("renders the clear action when the ticket has its own assignee and the app has a lead, and pressing it calls the door with assigneeId null", () => {
+      const onChangeAssignee = vi.fn(async () => {})
+      render(
+        <AssignedToCard
+          assigneeId="u-staff"
+          assigneeName="Alaap Kanchwala"
+          appId="app-1"
+          appName="Bergman dispatch"
+          appAssigneeId="u-lead"
+          members={MEMBERS}
+          canEditAssignee
+          onChangeAssignee={onChangeAssignee}
+        />
+      )
+      const action = screen.getByText("Use the app's lead")
+      expect(action).toBeTruthy()
+      fireEvent.click(action)
+      expect(onChangeAssignee).toHaveBeenCalledWith(null)
+    })
+
+    it("the row returns to the inherited state once the ticket's own assignee is cleared", () => {
+      // A round trip in miniature: the parent calls the door (proven above),
+      // then re-renders with the ticket's own assigneeId now null, exactly
+      // what a real refetch hands back. The card must read the app's own
+      // lead again, the same "inherited" line `effectiveAssignee` already
+      // draws when the ticket never had one of its own.
+      const { rerender } = render(
+        <AssignedToCard
+          assigneeId="u-staff"
+          assigneeName="Alaap Kanchwala"
+          appId="app-1"
+          appName="Bergman dispatch"
+          appAssigneeId="u-lead"
+          members={MEMBERS}
+        />
+      )
+      let card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+      expect(within(card).getByText("Alaap Kanchwala")).toBeTruthy()
+
+      rerender(
+        <AssignedToCard
+          assigneeId={null}
+          assigneeName={null}
+          appId="app-1"
+          appName="Bergman dispatch"
+          appAssigneeId="u-lead"
+          members={MEMBERS}
+        />
+      )
+      card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+      expect(within(card).getByText("Petya Bletsova")).toBeTruthy()
+      expect(within(card).getByText(/Inherited from/)).toBeTruthy()
+    })
+
+    it("the row returns to empty when neither the ticket nor the app has one", () => {
+      const { rerender } = render(
+        <AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />
+      )
+      rerender(<AssignedToCard assigneeId={null} assigneeName={null} members={MEMBERS} />)
+      const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+      expect(within(card).getByText("Nobody yet.")).toBeTruthy()
+    })
+  })
+})
+
+// THE TICKET PAGE'S OWN LAYOUT, ASSIGNED TO LEADS THE SIDE COLUMN. Aurora's
+// ruling, verbatim, 21 Sep 2026: "nono assigned to on the very top, a
+// different card from stakeholders!" Rendered against the real
+// `TicketDetailBody` (never a hand-rolled stand-in), so a regression to the
+// slot order fails here rather than only in a full page-level render.
+describe("TicketDetailBody, Assigned to is the first panel in the side column", () => {
+  it("the assignedTo anchor sits before stories/time/stakeholders, in the same side column", () => {
+    render(
+      <TicketDetailBody
+        assignedTo={<div>ASSIGNED-MARK</div>}
+        thread={<div>thread</div>}
+        composer={<div>composer</div>}
+        stories={<div>STORIES-MARK</div>}
+        time={<div>TIME-MARK</div>}
+        stakeholders={<div>STAKEHOLDERS-MARK</div>}
+        footer={<div>footer</div>}
+      />
+    )
+    const assignedAnchor = document.getElementById(TICKET_PANEL_ANCHOR.assignedTo) as HTMLElement
+    const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
+    const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
+    const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
+    expect(assignedAnchor).toBeTruthy()
+    expect(within(assignedAnchor).getByText("ASSIGNED-MARK")).toBeTruthy()
+
+    // Same side column as the other three.
+    const sideColumn = storiesAnchor.parentElement as HTMLElement
+    expect(assignedAnchor.parentElement).toBe(sideColumn)
+    expect(timeAnchor.parentElement).toBe(sideColumn)
+    expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
+
+    // FIRST, ahead of Stories, Time and Stakeholders, in that order.
+    const order = Array.from(sideColumn.children)
+    expect(order.indexOf(assignedAnchor)).toBe(0)
+    expect(order.indexOf(assignedAnchor)).toBeLessThan(order.indexOf(storiesAnchor))
+    expect(order.indexOf(storiesAnchor)).toBeLessThan(order.indexOf(timeAnchor))
+    expect(order.indexOf(timeAnchor)).toBeLessThan(order.indexOf(stakeholdersAnchor))
   })
 })

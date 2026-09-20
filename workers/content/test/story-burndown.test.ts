@@ -60,6 +60,9 @@ async function addStory(body: Record<string, unknown>): Promise<string> {
   const res = await call(IDS.staffUser, "POST /api/content/stories", {
     storyType: "Feature",
     changesNoStep: true,
+    // Required before Done (Aurora's ruling, 21 Sep 2026) — several cases in
+    // this file move a story to done via `setStatus`.
+    buildNotes: "Shipped.",
     ...body,
   })
   expect(res.status, "the story door refused a plain create").toBe(200)

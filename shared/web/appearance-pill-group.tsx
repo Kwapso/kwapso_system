@@ -99,13 +99,25 @@ export interface AppearancePillOption {
 }
 
 export function AppearancePillGroup({
+  id,
   options,
   value,
   onValueChange,
   disabled = false,
   ariaLabel,
+  "aria-describedby": ariaDescribedby,
   className,
 }: {
+  /** THE FIELD'S OWN ID - never invented here. The kit `Field`
+   * (`shared/ui/components/field/field.tsx`) mints an id from its `htmlFor`
+   * prop and CLONES it onto its single child alongside `aria-describedby`;
+   * a component that does not declare the prop simply drops what was
+   * cloned onto it, which is what left a `<label htmlFor="sprint-type">`
+   * pointing at nothing (live defect, proved 20 Sep 2026, `sprint-form-
+   * dialog.tsx`'s own Type field). Landed on the row itself, the same node
+   * `role="radiogroup"` sits on - the label of an ARIA `radiogroup` is
+   * every bit as reachable through `htmlFor`/`id` as an `<input>`'s. */
+  id?: string
   options: readonly AppearancePillOption[]
   /** Which one is set. */
   value: string
@@ -113,10 +125,19 @@ export function AppearancePillGroup({
   onValueChange?: (value: string) => void
   disabled?: boolean
   ariaLabel: string
+  /** Joined in by the kit `Field` the same way - a help or error line this
+   * row's own value announces alongside its label. */
+  "aria-describedby"?: string
   className?: string
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className={cn("flex flex-wrap gap-1.5", className)}>
+    <div
+      id={id}
+      role="radiogroup"
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedby}
+      className={cn("flex flex-wrap gap-1.5", className)}
+    >
       {options.map((option) => {
         const selected = option.value === value
         const inert = disabled || option.disabled === true

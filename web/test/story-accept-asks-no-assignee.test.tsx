@@ -79,6 +79,7 @@ function story(overrides: Partial<Story>): Story {
     rank: null,
     category: "Client-requested",
     acceptanceCriteria: null,
+    buildNotes: null,
     moscow: null,
     contributesToGoal: false,
     ...overrides,
@@ -191,7 +192,9 @@ describe("a story's own decision surface asks for no assignee (Aurora, 20 Sep 20
   })
 
   it("closes a reviewed story with one click, no dialog, no person to name", async () => {
-    api.story = story({ status: "in_review", reviewNote: "Moved it.", closingNote: null })
+    // `buildNotes` set — required before Done (Aurora's ruling, 21 Sep 2026),
+    // unrelated to this file's own point (no assignee anywhere in the call).
+    api.story = story({ status: "in_review", reviewNote: "Moved it.", closingNote: null, buildNotes: "Moved it." })
     openStory()
 
     fireEvent.click(await screen.findByRole("button", { name: "Done" }))

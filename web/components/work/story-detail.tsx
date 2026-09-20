@@ -1,21 +1,33 @@
 "use client"
 
-// STORY DETAIL — one piece of work at /stories/<id>, as a tabbed record:
-// Overview / Work logs / Files and links. Its history is not a fourth tab any
-// more — it is reached from the ink footer's Latest activity column, on the
-// client's 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the
-// ruling and the argument.
+// STORY DETAIL — one piece of work at /stories/<id>, ONE PAGE, NO TABS.
+// Aurora's design review, 21 Sep 2026, over
+// /private/tmp/.../story-detail-design.html: "a story is what we do, built
+// the way the ticket already is" — the ticket's own one-page shape
+// (`ticket-detail-body.tsx`, client ruling 17 Sep 2026: "I want to see, on
+// one single screen with no tabs..."), mirrored here rather than re-decided.
+// Her two verbatim rulings this round: "call it build notes" (the third
+// left-column section — Detail, Acceptance criteria, Build notes — is named
+// exactly that, never "Solution", the design mockup's own recommended word)
+// and "yes, canont be marked as don if thats not filled in, its required"
+// (Done refuses a story with empty build notes; see the head action below
+// and `refuseUndocumented`, workers/content/src/lib/stories.ts, the door's
+// own copy of the same rule this button only mirrors).
 //
-// A story row in the backlog opened NOTHING before this: the recipe registry
-// pointed at a story-detail.tsx that had never been written, so tapping a story
-// resolved to "that screen doesn't exist". It is the record the whole work
-// engine converges on — the only place an assignee and a due date live, the
-// thing time is logged against, and the thing whose closing note becomes what a
-// client is eventually told — so it is also where the cross-links belong: up to
-// its app, its sprint and the request it answers.
+// THE SHAPE: `RecordDetailBody` (`@/components/records/record-detail-body`,
+// extracted FROM `ticket-detail-body.tsx` for exactly this page — that
+// file's own header carries the whole R89 account this page inherits by
+// construction rather than by copying nine rounds of live-injection proof a
+// second time). Left column, in order: Detail, Acceptance criteria, Build
+// notes. Right column, in order: Assigned to (`AssignedToCard`,
+// `help-stakeholders.tsx` — the ticket's own card, reused whole, not
+// reimplemented: "the story gets the same card"), Related tickets, Related
+// stories, Phase and wave, Effort, Metrics. No Stakeholders panel — a story
+// has none. The dark band (`RecordFooterBand`) is last, exactly as the
+// ticket mounts it.
 //
-// Host-composed: the status STEPPER and the time logged against it are controls
-// no engine block draws.
+// Host-composed: the head actions (timer, edit, Ready for review, Done) are
+// controls no engine block draws.
 
 import * as React from "react"
 
@@ -23,8 +35,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TabsView } from "@shared/web/screen-engine/tabs-view"
-import { useRemembered } from "@shared/web/remembered"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
 import { RecordRef } from "@shared/web/record-ref"
 import { orderChips } from "@shared/web/chip-order"
 import { Check, CheckSquare, PencilSimple } from "@shared/ui/foundations/icons"
@@ -34,35 +45,60 @@ import { ReviewDialog, type ReviewFormValues } from "@/components/work/review-di
 import { storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
 import { storyStatusDotTone } from "@shared/status-tones"
 import { storyStatusWord } from "@shared/story-status-word"
-import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
-import { StoryAttachmentsPanel } from "@/components/work/story-attachments"
+import { WorkLogsPanel } from "@/components/work/work-logs-panel"
+import { StoryBuildNotesSheet } from "@/components/work/story-build-notes-sheet"
+import { AssignedToCard } from "@/components/tickets/help-stakeholders"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
-import { OverviewList } from "@/components/records/overview-list"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { ApiFailure, content as contentApi } from "@/lib/api"
+import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
   RecordChipLink,
+  RecordFooterBand,
   RecordScreen,
-  STICKY_TABS,
-  RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { RecordDetailBody } from "@/components/records/record-detail-body"
+import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
+import { AddButton, EmptyGatedPanel } from "@/components/deep-link/screen-bits"
+import { EditPenButton } from "@shared/web/edit-pen-button"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
-import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
-import { formatDate } from "@shared/web/format"
-import { staffNameFromSnapshot } from "@shared/staff-name"
-import { storiesKey, storyAttachmentsKey } from "@/lib/live-resources"
-import { CONCEPT_ICON } from "@/lib/pages"
+import { assignableMembers } from "@/lib/members"
+import { sliceKey } from "@/components/work/work-panels"
+import { ticketStatusCell } from "@/components/deep-link/shape"
+import { ticketTitle } from "@shared/web/ticket-chips"
+import { storyAttachmentsKey } from "@/lib/live-resources"
+import { hasPreview, AttachmentPreview } from "@shared/web/attachment-preview"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
-import type { Story } from "@shared/types"
-import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import type { HelpTicket, Story, StoryAttachment, StoryMetrics } from "@shared/types"
+import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { useSessionUserId } from "@/lib/use-active-team"
+
+/** ONE FRIENDLY STRING FOR A SECONDS COUNT — "3.5h", "0h". `WorkLogsPanel`'s
+ * own Numbers stat draws the identical rounding (`round(seconds/3600*10)/10`),
+ * kept local rather than shared: two call sites is not yet a seam. */
+function hoursLabel(seconds: number): string {
+  const hours = Math.round((seconds / 3600) * 10) / 10
+  return `${hours}h`
+}
+
+/** CYCLE TIME, AS A SENTENCE A PERSON READS AT A GLANCE — "2d 3h", "6h",
+ * never a bare decimal. Days first because the design mockup itself reads
+ * that way ("2d 3h, first work log to Done"), and a story's own cycle is
+ * ordinarily measured in days, not fractions of an hour. */
+function cycleTimeLabel(seconds: number): string {
+  const totalHours = Math.round(seconds / 3600)
+  const days = Math.floor(totalHours / 24)
+  const hours = totalHours % 24
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  return `${hours}h`
+}
 
 export function StoryDetailScreen({
   teamId,
@@ -74,51 +110,20 @@ export function StoryDetailScreen({
   /** the stories list in the URL form we arrived through */
   basePath: string
 }) {
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const myUserId = useSessionUserId()
   // The backlog is PAGED, so a story reached by a deep link may sit past page
   // one — it is fetched by id and kept in its own cache key, exactly as the
   // knowledge base does for a source past its first page.
   const storyQ = useCached<Story | null>(`story:one:${storyId}`, () => contentApi.storyOne(storyId))
   const activity = useRecordActivity("stories", storyId)
-  // The exact number of entries on THIS story, for the tab badge (R16), fetched
-  // when the STORY opens rather than when the tab is clicked. It used to wait for
-  // the WorkLogsPanel below to mount, and a panel does not mount until its tab is
-  // active — so the badge was missing exactly when a reader needed it to decide
-  // whether the tab was worth opening (shared/record-counts.ts). One exported key
-  // function is still what keeps the panel's own refresh and this badge on the
-  // same string.
+  // The exact number of work-log entries on THIS story, for the Effort
+  // panel's own count (R16), fetched when the STORY opens.
   useRecordCounts("stories", storyId)
-  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("stories", storyId))
-  // R16: the Files and links tab badges the door's exact COUNT(*), answered by
-  // the counts read above when the STORY opens rather than when the tab is
-  // clicked — a badge that is blank until you open the tab reads as an empty tab,
-  // which is exactly the complaint this screen is being fixed for. `null` is the
-  // third answer beside a number and an absence (the role may not read `work`),
-  // and it renders as nothing, exactly as a zero does.
-  const attachmentsTotal = useCachedValue<number | null>(`total:${storyAttachmentsKey(storyId)}`)
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "update")
-  // The timer asks for the right its own door asks for (`work:create`), not the
-  // one that governs editing the story — a person who may log time but not
-  // rewrite the work was being offered neither.
   const canLogTime = can("work", "create")
-  /* THE TIMER, NORMALIZED — Aurora's ruling, 18 Sep 2026 ("h3, and aign the
-   * menu to the chips"): at a narrow width, Start/Stop timer moves off its
-   * own button and into the "…" menu beside Ready for review/Done/Edit.
-   * `RecordTimerButton` (below, in `actions`) still draws the wide button
-   * unchanged; this second, independent read of the SAME running-timers
-   * cache (`useRecordTimerAction`, `@/components/shell/timer-bar`) is what
-   * the fold's menu item is built from when the row is narrow — see
-   * `shared/web/head-actions.tsx`'s own header, "TWO RENDERS OF THE SAME
-   * ACTIONS, NOT ONE NODE PHYSICALLY MOVED".
-   *
-   * CALLED HERE, AHEAD OF THE THREE EARLY RETURNS BELOW — a hook cannot sit
-   * after a conditional return the way `RecordTimerButton` itself, an
-   * ordinary child component, safely can — so this reads `storyQ.data?.status`,
-   * the same `story.status === "done"` gate `RecordTimerButton` reads below,
-   * one optional-chain earlier than the guard that proves `story` non-null. */
   const timerAction = useRecordTimerAction({
     teamId,
     targetTable: "stories",
@@ -126,42 +131,90 @@ export function StoryDetailScreen({
     canLog: canLogTime,
     disabled: storyQ.data?.status === "done",
   })
-  // Precomputed with the outer `t`: `renderPanel` below names its own tab-item
-  // parameter `t`, which would otherwise shadow the translation function right
-  // where the footer's own note field needs it.
-  const notePlaceholder = t("Add a note")
 
-  // The open tab is remembered per record for as long as this document
-  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
-  // back lands on the tab she was reading, and a miss lands on "overview".
-  const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [reviewOpen, setReviewOpen] = React.useState(false)
+  const [buildNotesOpen, setBuildNotesOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  // R88 — THE EFFORT PANEL'S OWN TITLE ROW, drawn by `EmptyGatedPanel`
+  // outside `WorkLogsPanel` itself (that component's own doc says why), the
+  // identical `workLogAddRef`/`workLogsEmpty` pair `help-detail.tsx` already
+  // wires for the ticket page.
+  const workLogAddRef = React.useRef<(() => void) | null>(null)
+  const [workLogsEmpty, setWorkLogsEmpty] = React.useState(false)
   const options = useStoryFormOptions(teamId)
-    // NEST, DON'T REPLACE. This used to strip the collection segment off the path
-  // before the panels appended to it, so opening a related record from here
-  // threw away the record you opened it FROM — a story reached from a client
-  // landed on /stories/<id> with no way back to the client. The base is now this
-  // record's own address, so a related record lands INSIDE it and the trail is
-  // in the URL for the crumbs, the Back button and anybody you send it to.
+  // NEST, DON'T REPLACE — the identical note ticket-detail-body.tsx and this
+  // file's own earlier version both carry: a related record lands INSIDE
+  // this one's own address, so the trail stays in the URL.
   const host = { base: `${basePath}/${storyId}` }
+
+  const story = storyQ.data ?? null
+  const have = story !== null
+
+  // STAFF FACES, FOR THE ASSIGNED TO CARD'S OWN SELECT — agency only
+  // (`web/lib/members.ts`), the exact seam the ticket's own card reads.
+  const membersQ = useCached(have ? `members:${teamId}` : null, () => tenancy.members().then((r) => r.members))
+
+  // THE TICKET THIS STORY WAS BORN ON — the same by-id cache key
+  // `help-detail.tsx` itself reads (`help:one:<id>`), so the two pages never
+  // hold two different copies of one ticket.
+  const ticketId = story?.ticketId ?? null
+  const ticketQ = useCached<HelpTicket | null>(ticketId ? `help:one:${ticketId}` : null, () =>
+    contentApi.helpOne(ticketId as string)
+  )
+
+  // SIBLING STORIES ON THE SAME TICKET — the identical cache key
+  // `help-detail.tsx`'s own Related stories panel already reads
+  // (`sliceKey("stories-ticket", <ticketId>)`), so opening a story from the
+  // ticket page and opening its sibling from here share one list.
+  const siblingStoriesQ = useCached<Story[]>(ticketId ? sliceKey("stories-ticket", ticketId) : null, () =>
+    contentApi.stories({ ticketId: ticketId as string, view: "all" }).then((r) => r.stories)
+  )
+  const relatedStories = (siblingStoriesQ.data ?? []).filter((s) => s.id !== storyId)
+
+  // THE PHASE'S OWN WAVE — a story already carries its phase's name
+  // (`sprintName`) and dates; the WAVE it sits inside is one field further,
+  // read off the phase record itself.
+  const sprintId = story?.sprintId ?? null
+  const sprintQ = useCached(sprintId ? `sprint:one:${sprintId}` : null, () => contentApi.sprintOne(sprintId as string))
+
+  // THE THREE METRICS FIGURES — `getStoryMetrics`
+  // (workers/content/src/lib/stories.ts), a door of its own rather than a
+  // column on the story read (that function's own doc says why). Refreshed
+  // alongside everything else `refresh()` re-reads.
+  const metricsQ = useCached<StoryMetrics>(have ? `story:metrics:${storyId}` : null, () =>
+    contentApi.storyMetrics(storyId)
+  )
+
+  // THE STORY'S OWN IMAGES — the same `story_attachments` door the Build
+  // notes sheet's own picker writes through (`story-build-notes-sheet.tsx`'s
+  // header says why it is this table and not a second one), read here so
+  // the rendered panel can show whichever of them are pictures inline,
+  // under the prose.
+  const attachmentsQ = useCached<StoryAttachment[]>(have ? storyAttachmentsKey(storyId) : null, () =>
+    contentApi.storyAttachments(storyId).then((r) => r.attachments)
+  )
+  const buildNotesImages = (attachmentsQ.data ?? []).filter(
+    (a) => a.kind === "file" && hasPreview("file", a.contentType)
+  )
 
   const refresh = React.useCallback(() => {
     invalidate(`story:one:${storyId}`)
-    invalidate(storiesKey(teamId))
+    invalidate(`stories:${teamId}`)
     invalidate(`activity:record:stories:${storyId}`)
+    invalidate(`story:metrics:${storyId}`)
   }, [storyId, teamId])
 
-  // READ THIS STORY IN YOUR OWN LANGUAGE, if you ask. Everything on it somebody
-  // typed goes in one array, so one press is one call. A hook, so it sits above
-  // the three early returns below.
+  // READ THIS STORY IN YOUR OWN LANGUAGE, if you ask — every human-typed
+  // field goes in one array, buildNotes included now, so one press is one
+  // call. A hook, so it sits above the three early returns below.
   const translation = useHumanTranslation(teamId, [
-    storyQ.data?.title,
-    storyQ.data?.detail,
-    storyQ.data?.acceptanceCriteria,
-    storyQ.data?.reviewNote,
-    storyQ.data?.closingNote,
+    story?.title,
+    story?.detail,
+    story?.acceptanceCriteria,
+    story?.buildNotes,
+    story?.reviewNote,
+    story?.closingNote,
   ])
 
   /** Run a write, say plainly if it was refused, and re-read. */
@@ -194,16 +247,54 @@ export function StoryDetailScreen({
       acceptanceCriteria: values.acceptanceCriteria || undefined,
       moscow: values.moscow || undefined,
       contributesToGoal: values.contributesToGoal,
+      // THE FORM NEVER TOUCHES buildNotes — its own sheet does — so it is
+      // spread from the CURRENT record here, the same "replace every field,
+      // spread the one you did not just change" shape the build notes sheet
+      // itself takes, in the other direction.
+      buildNotes: story?.buildNotes || undefined,
     })
     refresh()
     toast.success(t("Story updated."))
   }
 
-  /** READY FOR REVIEW (CHECKLIST 6.9) — refused until every timer on this story
-   * is stopped and an explanation is written. Both refusals live at the door, so
-   * this panel only has to collect the words; the file is optional, which is
-   * Aurora's ruling over "all three always" — plenty of work has nothing to show.
-   */
+  /** THE ASSIGNED TO CARD'S OWN DOOR — spreads the story's current shape
+   * (the update door replaces every field it reads) and overrides only the
+   * assignee. `null` clears it back to inherited: `updateStory`'s own
+   * `optionalText` already treats a missing and a null `assigneeId`
+   * identically (unlike the ticket door, which needs a separate raw-wire
+   * check for exactly this — see `help-stakeholders.tsx`'s own note), so no
+   * second seam is needed here. */
+  async function changeAssignee(newAssigneeId: string | null): Promise<void> {
+    if (!story) return
+    try {
+      await contentApi.updateStory({
+        ...story,
+        detail: story.detail || undefined,
+        ticketId: story.ticketId || undefined,
+        sprintId: story.sprintId || undefined,
+        appId: story.appId || undefined,
+        processId: story.processId || undefined,
+        stepKey: story.stepKey || undefined,
+        reviewerId: story.reviewerId || undefined,
+        startsOn: story.startsOn || undefined,
+        dueOn: story.dueOn || undefined,
+        accountId: story.accountId || undefined,
+        storyType: story.storyType || "",
+        acceptanceCriteria: story.acceptanceCriteria || undefined,
+        buildNotes: story.buildNotes || undefined,
+        moscow: story.moscow || undefined,
+        contributesToGoal: story.contributesToGoal,
+        assigneeId: newAssigneeId ?? undefined,
+      })
+      refresh()
+      toast.success(t("Story updated."))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that story."))
+    }
+  }
+
+  /** READY FOR REVIEW (CHECKLIST 6.9) — refused until every timer on this
+   * story is stopped and an explanation is written. */
   async function sendToReview(values: ReviewFormValues) {
     await contentApi.setStoryStatus(storyId, "in_review", undefined, {
       reviewNote: values.reviewNote,
@@ -214,9 +305,7 @@ export function StoryDetailScreen({
     toast.success(t("Sent for review."))
   }
 
-  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — rolled out
-  // from the help-detail prototype (73414c58). Same shape: each branch below
-  // still returns before the "ready" body, so no hook order changed.
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4).
   if (storyQ.error)
     return (
       <RecordScreen
@@ -232,7 +321,6 @@ export function StoryDetailScreen({
     )
   if (storyQ.data === undefined)
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
-  const story = storyQ.data
   if (!story)
     return (
       <RecordScreen
@@ -242,120 +330,13 @@ export function StoryDetailScreen({
       />
     )
 
-  const overviewItems = [
-    {
-      label: t("Status"),
-      value: storyStatusWord(story.status, { startsOn: story.sprintStartsOn, endsOn: story.sprintEndsOn }),
-    },
-    // THE ICON JOINS THE WORD HERE TOO (client ruling, 16 Sep 2026) — the
-    // identical chip the List row and the Board card now draw
-    // (`storyTypeChip`, stories-screen.tsx), so the record's own detail
-    // screen cannot show a third idea of what a story's type looks like.
-    { label: t("Type"), value: storyTypeChip(story.storyType) },
-    // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — beside Type,
-    // the same overview list, so both halves of the ruling read together.
-    { label: t("Category"), value: story.category },
-    // THE PRIORITY ROW (MoSCoW) STOOD HERE. PARKED, 21 Sep 2026. Aurora's
-    // ruling, verbatim: "pause everything to do with moscow, but remind me
-    // at later stages." `story.moscow` is untouched; the chip that drew it
-    // moved to `moscow-chip.tsx` (`PARKED["work/moscow-chip"]`,
-    // shared/rules/registry.ts) and this row is dropped rather than shown
-    // empty. Delete this comment and restore the row the day she asks.
-    { label: t("Reference"), value: story.ref || "" },
-    // R54: a story is agency work, so the assignee is one of ours.
-    { label: t("Who's doing it"), value: staffNameFromSnapshot(story.assigneeName) || "Nobody yet" },
-    // WHO REVIEWS IT, and ONLY when somebody has named one.
-    //
-    // `stories.reviewer_id`/`reviewer_name` have been settable through
-    // `create_story` and `update_story` since the work engine shipped:
-    // `memberOrThrow` resolves the person at the door, the INSERT and the UPDATE
-    // both store them, `stories.ts` selects and maps them, `shared/types.ts`
-    // types them, and the query grammar filters on them — and no screen on
-    // either front door has ever shown the answer. Somebody could tell the
-    // assistant "make Sam the reviewer on this story", get a yes, and there was
-    // nowhere the name appeared afterwards.
-    //
-    // CONDITIONAL, WHICH IS THE DECISION HERE. CHECKLIST 6.10 is the product's
-    // one ruling on the word: the Done button belongs to the APP'S TEAM LEAD,
-    // refused at the door (`refuseDoneByAnybodyElse`, stories.ts), and it reads
-    // nothing off this row. So a reviewer named here is who is expected to
-    // LOOK at the work, never who is allowed to close it — and a row printing
-    // "-" on every story would announce a concept the screens do not offer,
-    // which is a second dead end pointing the other way. Zero of the 329
-    // stories on staging carry a reviewer, so this row is invisible on the app
-    // as it stands today and appears the moment the capability is used.
-    //
-    // NOTHING WAS REMOVED to achieve that. Whether a per-story reviewer is a
-    // concept this product wants at all is a decision for the owner, not for a
-    // review lane — the reachability fix is to show what is written.
-    ...(story.reviewerName ? [{ label: t("Who reviews it"), value: story.reviewerName }] : []),
-    // INHERITED, not typed. A story is due when the block it was sold inside is
-    // due, so this is the SPRINT's end date — the story's own date field went on
-    // 17 Aug 2026 rather than let two dates disagree about one promise. A story
-    // with no sprint has no deadline to show, which is the honest answer.
-    { label: t("Deadline"), value: formatDate(story.sprintEndsOn, lang) || "" },
-    // The three fields somebody TYPED — the detail, what was done, and what the
-    // client will be told — read through `of`, so the reader who pressed
-    // Translate sees them in their own language and nobody else's row changed.
-    // Then through RichText, because they are typed in an editor now: translate
-    // first, render second, and the sanitizer runs on what comes back.
-    {
-      label: t("Detail"),
-      value: story.detail ? <RichText html={translation.of(story.detail)} /> : "",
-    },
-    // ACCEPTANCE CRITERIA — Aurora's ruling, 20 Sep 2026: "same design as
-    // Detail." Identical treatment, one row down: translated, then rendered
-    // as rich text.
-    {
-      label: t("Acceptance criteria"),
-      value: story.acceptanceCriteria ? <RichText html={translation.of(story.acceptanceCriteria)} /> : "",
-    },
-    {
-      label: t("Processes it changes"),
-      value: story.changesNoStep
-        ? "None"
-        : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "",
-    },
-    { label: t("What was done"), value: translation.of(story.reviewNote) || "" },
-    { label: t("What we'll tell them"), value: translation.of(story.closingNote) || "" },
-    // The audit rows moved to the footer at the foot of the record (D7 /
-    // CHECKLIST 11.3); the status is on the header band's own line.
-  ]
+  // THE DONE RULE, MIRRORED — the door refuses a `done` move while
+  // `buildNotes` is empty (`refuseUndocumented`, workers/content/src/lib/
+  // stories.ts); this button only reads the same fact back, R17's own "the
+  // door decides, the button mirrors it" split.
+  const buildNotesMissing = !story.buildNotes || !story.buildNotes.trim()
+  const doneReason = buildNotesMissing ? t("Write the build notes before marking it done.") : undefined
 
-  const tabsConfig = {
-    ...RECORD_TABS_CONFIG,
-    tabs: [
-      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
-      {
-        // CHECKLIST 6.8: "a work logs tab on the story, and on every other detail
-        // screen that captures time". The tab was already here and called Time;
-        // Work logs is the word the glossary and the section both use now.
-        value: "time",
-        label: t("Effort"),
-        icon: CONCEPT_ICON.time,
-        badge: formatCount(timeTotal),
-        badgeVariant: "" as const,
-      },
-      // WHAT THE STORY SHOWS FOR ITSELF. The same words the ticket's own tab
-      // uses, because it is the same collection one record along and a second
-      // name for it would be a second thing for a reader to learn (R6/R34).
-      {
-        value: "files",
-        label: t("Files and links"),
-        icon: "paperclip",
-        badge: formatCount(attachmentsTotal),
-        badgeVariant: "" as const,
-      },
-      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a story's history is
-      // reached from the ink footer's Latest activity column now, and opens in a
-      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
-    ],
-  }
-
-  /* B1 / CHECKLIST 11.2 — one primary, one secondary, and a menu. The act that
-   * MOVES THE STORY FORWARD is the primary (ready for review, then done: only
-   * ever one is offered, because they belong to different stages), the clock is
-   * the secondary, and Edit goes into the three-dot menu. */
   const overflow: RecordAction[] = canEdit
     ? [
         {
@@ -367,12 +348,6 @@ export function StoryDetailScreen({
       ]
     : []
 
-  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
-   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
-   * the timer, Ready for review/Done and Edit all leave their standalone
-   * controls and join the ONE "…" trigger that moves into the chip row.
-   * Same order the wide row already draws them in — timer, the stage
-   * button, then edit. */
   const foldedActions: HeadActionItem[] = [
     ...(timerAction ? [timerAction] : []),
     ...(canEdit && (story.status === "open" || story.status === "in_progress")
@@ -392,7 +367,7 @@ export function StoryDetailScreen({
             key: "done",
             label: t("Done"),
             icon: <Check className="size-3.5" />,
-            disabled: busy,
+            disabled: busy || buildNotesMissing,
             onSelect: () =>
               void run(
                 () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
@@ -405,53 +380,247 @@ export function StoryDetailScreen({
     ...overflow,
   ]
 
+  // THE LEFT COLUMN — Detail, Acceptance criteria, Build notes, in that
+  // order (Aurora's design review). Each its own `TicketSidePanel` Card —
+  // that component is purely generic despite its name (a title row, room
+  // for a count/action, `role="group"` children), reused rather than a
+  // second, near-identical wrapper.
+  const detailPanel = (
+    <TicketSidePanel title={t("Detail")}>
+      {story.detail ? (
+        <RichText html={translation.of(story.detail)} />
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("Nothing written yet.")}</p>
+      )}
+    </TicketSidePanel>
+  )
+
+  const acceptancePanel = (
+    <TicketSidePanel title={t("Acceptance criteria")}>
+      {story.acceptanceCriteria ? (
+        <RichText html={translation.of(story.acceptanceCriteria)} />
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("Nothing written yet.")}</p>
+      )}
+    </TicketSidePanel>
+  )
+
+  // BUILD NOTES — R88's own single door while empty: no title row at all,
+  // `EmptyGatedPanel`'s `empty` prop drops it, and the one "Write the build
+  // notes" button is the whole panel. Once written, the pencil (not a
+  // second create button) reopens the identical sheet.
+  const buildNotesPanel = (
+    <EmptyGatedPanel
+      title={t("Build notes")}
+      empty={buildNotesMissing}
+      action={
+        !buildNotesMissing ? (
+          <EditPenButton onClick={() => setBuildNotesOpen(true)} label={t("Edit the build notes")} />
+        ) : undefined
+      }
+    >
+      {buildNotesMissing ? (
+        <CollectionEmptyState
+          title={t("What was built, and how.")}
+          description={t("Add images inline.")}
+          onCreate={canEdit ? () => setBuildNotesOpen(true) : undefined}
+          createLabel={t("Write the build notes")}
+        />
+      ) : (
+        <>
+          <RichText html={translation.of(story.buildNotes ?? "")} />
+          {buildNotesImages.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {buildNotesImages.map((a) => (
+                <AttachmentPreview key={a.id} kind="file" url={a.url} contentType={a.contentType} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </EmptyGatedPanel>
+  )
+
+  const mainColumn = (
+    <div className="flex min-w-0 flex-col gap-6">
+      {/* Above the fields it acts on, the same position the old tabbed
+          Overview gave it — a thing somebody presses while reading and
+          presses back a moment later. */}
+      <div className="flex justify-end">
+        <TranslateAction translation={translation} />
+      </div>
+      {detailPanel}
+      {acceptancePanel}
+      {buildNotesPanel}
+    </div>
+  )
+
+  // THE RIGHT COLUMN — Assigned to, Related tickets, Related stories, Phase
+  // and wave, Effort, Metrics, in that order.
+  const assignedToPanel = (
+    <AssignedToCard
+      assigneeId={story.assigneeId}
+      assigneeName={story.assigneeName}
+      appId={story.appId}
+      appName={story.appName}
+      appAssigneeId={story.appAssigneeId}
+      members={assignableMembers(membersQ.data)}
+      canEditAssignee={canEdit}
+      onChangeAssignee={changeAssignee}
+    />
+  )
+
+  const ticket = ticketQ.data
+  const relatedTicketsPanel = (
+    <TicketSidePanel title={t("Related tickets")} count={ticket ? formatCount(1) : formatCount(0)}>
+      {ticket ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm">{ticketTitle(ticket)}</span>
+          {/* R94 (chip-order): id then status, through the one shared seam,
+              even on a list row rather than a record's own head. */}
+          {orderChips([
+            { kind: "id", node: <RecordRef key="id" value={ticket.ref} /> },
+            { kind: "status", node: ticketStatusCell(ticket.status, t) },
+          ])}
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("No related tickets.")}</p>
+      )}
+    </TicketSidePanel>
+  )
+
+  const relatedStoriesPanel = (
+    <TicketSidePanel title={t("Related stories")} count={formatCount(relatedStories.length)}>
+      {relatedStories.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("No related stories.")}</p>
+      ) : (
+        relatedStories.map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm">{s.title}</span>
+            {/* R94 (chip-order): id, status, type. */}
+            {orderChips([
+              { kind: "id", node: <RecordRef key="id" value={s.ref} /> },
+              {
+                kind: "status",
+                node: (
+                  <Badge key="status" variant="status" dot={storyStatusDotTone(s.status)}>
+                    {storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn })}
+                  </Badge>
+                ),
+              },
+              { kind: "type", node: storyTypeChip(s.storyType) as React.ReactElement | null },
+            ])}
+          </div>
+        ))
+      )}
+    </TicketSidePanel>
+  )
+
+  const phaseAndWavePanel = (
+    <TicketSidePanel title={t("Phase and wave")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground text-sm">{t("Phase")}</span>
+        {story.sprintId && story.sprintName ? (
+          <RecordChipLink href={`${host.base}/sprints/${story.sprintId}`}>{story.sprintName}</RecordChipLink>
+        ) : (
+          <span className="text-muted-foreground text-sm">{t("None")}</span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground text-sm">{t("Wave")}</span>
+        <span className="text-sm">{sprintQ.data?.waveName || t("None")}</span>
+      </div>
+    </TicketSidePanel>
+  )
+
+  // EFFORT — `WorkLogsPanel` draws no title of its own (its own doc:
+  // "handed to whoever draws the title row ABOVE this panel"); the ticket
+  // page's own `EmptyGatedPanel` wrapping (`help-detail.tsx`) is the pattern
+  // reused here whole, R88's single door: empty, the header and its "+"
+  // both drop, and the panel's own `CollectionEmptyState` is the one way in.
+  const effortPanel = (
+    <EmptyGatedPanel
+      title={t("Effort")}
+      empty={workLogsEmpty}
+      action={
+        canLogTime ? (
+          <AddButton label={t("Log time")} onClick={() => workLogAddRef.current?.()} empty={workLogsEmpty} />
+        ) : undefined
+      }
+    >
+      <WorkLogsPanel
+        targetTable="stories"
+        targetId={storyId}
+        recordLabel={story.ref ? `${story.ref} · ${story.title}` : story.title}
+        canEdit={canEdit}
+        canLog={canLogTime}
+        showAddButton={false}
+        addTrigger={workLogAddRef}
+        onEmptyChange={setWorkLogsEmpty}
+        onActivityChanged={() => {
+          invalidate(`activity:record:stories:${storyId}`)
+          invalidate(`story:metrics:${storyId}`)
+        }}
+      />
+    </EmptyGatedPanel>
+  )
+
+  const metrics = metricsQ.data
+  const metricsPanel = (
+    <TicketSidePanel title={t("Metrics")}>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-xs uppercase">{t("Cycle time")}</span>
+          <span className="font-mono text-sm font-semibold">
+            {metrics && metrics.cycleTimeSeconds !== null
+              ? cycleTimeLabel(metrics.cycleTimeSeconds)
+              : t("Not started")}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-xs uppercase">{t("Effort")}</span>
+          <span className="font-mono text-sm font-semibold">{hoursLabel(metrics?.effortSeconds ?? 0)}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-xs uppercase">{t("Flow efficiency")}</span>
+          <span className="font-mono text-sm font-semibold">
+            {metrics && metrics.flowEfficiency !== null
+              ? `${Math.round(metrics.flowEfficiency)}%`
+              : t("No time log")}
+          </span>
+        </div>
+      </div>
+    </TicketSidePanel>
+  )
+
+  const sideColumn = (
+    <>
+      {assignedToPanel}
+      {relatedTicketsPanel}
+      {relatedStoriesPanel}
+      {phaseAndWavePanel}
+      {effortPanel}
+      {metricsPanel}
+    </>
+  )
+
+  // NO OUTER PANEL CARD — the same ruling `ticket-detail-body.tsx`'s own
+  // header quotes ("remove the 'overall' container, make each thing its own
+  // container"). `<RecordScreen panelVisible={false}>` draws the head only;
+  // `RecordDetail`'s own panel region never even reads `content` once
+  // `panelVisible` is false (that prop's own doc comment, record-chrome.tsx),
+  // so the body has to be a SIBLING of `<RecordScreen>`, not its children —
+  // exactly `help-detail.tsx`'s own shape for `<TicketDetailBody>`.
   return (
+    <>
     <RecordScreen
-      mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
-      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
-      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
-      // The prop this line used to pass is deleted from `RecordScreen` itself
-      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
-      // took the eyebrow out of the full header); the breadcrumb above this
-      // header is what names the record type now.
-      // NO D4 RECORD NUMBER / COLLECTION LABEL ANY MORE — Aurora's own chip-
-      // order ruling, 20 Sep 2026, verbatim: "on story detail, the chips in
-      // order: id, status, type, app (underlined), sprint (id, underlined)."
-      // The reference and the type word both MOVE into the chips row below
-      // (its first and third members) rather than living twice — once above
-      // the title through `recordNumber`/`collectionLabel`, once again as a
-      // chip — which is what drawing both at once would do.
-      //
-      // THE FIVE CHIPS, IN HER OWN ORDER:
-      //   1. id      , the story's own reference, through the ONE shared id
-      //                chip register (`RecordRef`, shared/web/record-ref.tsx)
-      //                every site draws the black chip from (R96,
-      //                id-chip-is-black). It was a hand-rolled `Badge
-      //                variant="secondary"` copying `storyLead`'s OWN
-      //                non-black badge (stories-screen.tsx), the wrong
-      //                model to copy, fixed here; that file's own two sites
-      //                are reported, not edited (a different lane owns it).
-      //   2. status  — WITH A COLOUR (client ruling, 2026-08-31: "the status
-      //                scheme is not only for tickets … map colors").
-      //   3. type    — the identical icon+word chip the backlog's own rows
-      //                and cards draw (`storyTypeChip`).
-      //   4. app     — underlined because it is a link (her own words), the
-      //                cross-link this header carried nowhere until now.
-      //   5. sprint  — underlined, the same link this header already drew
-      //                one position later; "(id)" is UNDERSTOOD as "the
-      //                nested link a story detail can carry" the way the
-      //                app one now can, not a distinct id column — Sprint's
-      //                own reference is not yet a field this record reads.
+      // NO D4 RECORD NUMBER / COLLECTION LABEL — Aurora's own chip-order
+      // ruling, 20 Sep 2026: the reference and the type word both move into
+      // the chips row instead of living twice.
       chips={
         <>
-          {/* R94 (chip-order, shared/web/chip-order.ts): id, status, type,
-              main parent, secondary parent. This row already drew them in
-              that order by hand; routing it through the shared seam makes
-              the order the seam's property rather than this JSX sequence's,
-              the same fix `help-detail.tsx`'s own story-preview row took.
-              (Surfaced by R96's own fix just above: the id chip only became
-              a `<RecordRef` the chip-order census can see once it stopped
-              being a hand-rolled `Badge`.) */}
+          {/* R94 (chip-order): id, status, type, main parent (app),
+              secondary parent (phase). */}
           {orderChips([
             { kind: "id", node: <RecordRef key="id" value={story.ref} /> },
             {
@@ -464,13 +633,6 @@ export function StoryDetailScreen({
             },
             {
               kind: "type",
-              // `storyTypeChip` is typed `React.ReactNode` (stories-screen.tsx,
-              // shared by every other caller); `orderChips` infers its own `T`
-              // from every entry in this array, and the other four already
-              // narrow to `Element | null`, so this one is narrowed to match
-              // rather than widening every sibling back to `ReactNode`,
-              // accurate either way, since the function only ever returns a
-              // `<Badge>` or `null`.
               node: storyTypeChip(story.storyType) as React.ReactElement | null,
             },
             {
@@ -492,26 +654,12 @@ export function StoryDetailScreen({
                 ) : null,
             },
           ])}
-          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
-              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
           <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
       title={translation.of(story.title)}
-      // CLIENT RULING, 2026-08-31, VERBATIM: "what is this 3rd component in
-      // the title under the chips? kill everywhere. chips is the last
-      // component of headers!" Overrides the D5 trim above, which had kept
-      // assignee/deadline here — both are already rows in the Overview tab
-      // (`overviewItems`: "Who's doing it", "Deadline"), so nothing is lost.
-      // `status` maps to `RecordChrome`'s `meta`, which the kit draws right
-      // under the chips row (`data-record-region="header"`) — exactly the
-      // region the ruling forbids.
       actions={
         <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
-          {/* START, AND STOP. It used to be a permanent "Start timer" that could
-              not see the timer already running on this very story, so pressing it
-              again asked the door a question it had to refuse. The shared control
-              reads the same running-timers cache the header bar reads. */}
           <RecordTimerButton
             teamId={teamId}
             targetTable="stories"
@@ -519,20 +667,26 @@ export function StoryDetailScreen({
             canLog={canLogTime}
             disabled={story.status === "done"}
           />
-          {/* READY FOR REVIEW (CHECKLIST 6.9). Offered only while the work is
-              actually in hand: a story nobody has started has nothing to explain,
-              and one already in review or done has been explained. The panel
-              collects the words; the door refuses if a timer is still running. */}
           {canEdit && (story.status === "open" || story.status === "in_progress") && (
             <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1">
               <CheckSquare className="size-3.5" />
               {t("Ready for review")}
             </Button>
           )}
-          {/* ONE DONE BUTTON, TOP RIGHT (CHECKLIST 6.10). It appears only on a
-              story that has been reviewed, so "done" stays downstream of somebody
-              having looked. */}
-          {canEdit && story.status === "in_review" && (
+          {canEdit && story.status === "in_review" && doneReason && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button disabled className="gap-1">
+                    <Check className="size-3.5" />
+                    {t("Done")}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{doneReason}</TooltipContent>
+            </Tooltip>
+          )}
+          {canEdit && story.status === "in_review" && !doneReason && (
             <Button
               disabled={busy}
               onClick={() =>
@@ -551,68 +705,25 @@ export function StoryDetailScreen({
           <RecordActionsMenu actions={overflow} />
         </div>
       }
-      // THE STAGE STEPPER AND THE APP/TICKET CROSS-LINKS ARE GONE — CLIENT
-      // RULING, 2026-08-31, VERBATIM: "what is this 3rd component in the
-      // title under the chips? kill everywhere. chips is the last component
-      // of headers!" `headerExtra` maps to `RecordChrome`'s `hero` prop,
-      // which the kit draws in its own `data-record-region="hero"` block —
-      // directly under the header block that carries the chips, still above
-      // the tab strip, so on the rendered page it reads as more content
-      // under the pills exactly as the ruling describes. The stepper stops
-      // being a text duplicate the moment it's a stepper, and the ruling
-      // says so anyway: "it doesn't matter whether the information is a
-      // duplicate or not." The app/ticket links are not shown anywhere else
-      // on this screen (confirmed against `overviewItems`, which has no App
-      // or Ticket row) — dropped from the header per this explicit ruling,
-      // not carried anywhere else; a reader can still reach the app from the
-      // Sprint the story links to, and the ticket from Tickets.
-      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
-      // footer's Record column.
-      audit={{
-        createdByName: story.createdByName,
-        createdAt: story.createdAt,
-        editedByName: story.editedByName,
-        updatedAt: story.updatedAt,
-      }}
-      activity={activity}
-      onAddNote={can("work", "create") ? activity.addNote : undefined}
-      notePlaceholder={notePlaceholder}
-    >
-
-      <TabsView
-        className={STICKY_TABS}
-        config={tabsConfig}
-        value={tab}
-        onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "time")
-            return (
-              <WorkLogsPanel
-                targetTable="stories"
-                targetId={storyId}
-                recordLabel={story.ref ? `${story.ref} · ${story.title}` : story.title}
-                canEdit={canEdit}
-                canLog={canLogTime}
-                onActivityChanged={() => invalidate(`activity:record:stories:${storyId}`)}
-              />
-            )
-          // `work:update`, which is what BOTH attachment doors gate on — not the
-          // read right the ticket's panel takes, and not `canLogTime`. A button
-          // drawn on a wider right is a button whose every press is a 403.
-          if (t.value === "files")
-            return <StoryAttachmentsPanel storyId={storyId} canEdit={canEdit} />
-          return (
-            <>
-              {/* Above the fields it acts on, and out of the header's one-primary
-                  -one-secondary-and-a-menu discipline — this is a thing somebody
-                  presses while reading and presses back a moment later. */}
-              <div className="flex justify-end">
-                <TranslateAction translation={translation} />
-              </div>
-              <OverviewList items={overviewItems} />
-            </>
-          )
-        }}
+      panelVisible={false}
+      footerVisible={false}
+    />
+      <RecordDetailBody
+        main={mainColumn}
+        side={sideColumn}
+        footer={
+          <RecordFooterBand
+            audit={{
+              createdByName: story.createdByName,
+              createdAt: story.createdAt,
+              editedByName: story.editedByName,
+              updatedAt: story.updatedAt,
+            }}
+            activity={activity}
+            onAddNote={can("work", "create") ? activity.addNote : undefined}
+            notePlaceholder={t("Add a note")}
+          />
+        }
       />
 
       <StoryFormDialog
@@ -628,10 +739,6 @@ export function StoryDetailScreen({
         storyTypes={options.storyTypes}
         categories={options.categories}
         storyId={story.id}
-        // THE SIGNED-IN USER — only matters when `initial.assigneeId` below is
-        // empty (an old story with no assignee on file): the form dialog falls
-        // back to this rather than opening on the one state its picker can no
-        // longer draw (16 Sep 2026 ruling killed the "Nobody" pill).
         defaultAssigneeId={myUserId ?? ""}
         initial={{
           title: story.title,
@@ -663,6 +770,15 @@ export function StoryDetailScreen({
         }}
         onSubmit={sendToReview}
       />
-    </RecordScreen>
+      <StoryBuildNotesSheet
+        open={buildNotesOpen}
+        onOpenChange={setBuildNotesOpen}
+        story={story}
+        onSaved={() => {
+          refresh()
+          invalidate(storyAttachmentsKey(storyId))
+        }}
+      />
+    </>
   )
 }

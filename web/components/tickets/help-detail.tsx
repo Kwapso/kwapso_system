@@ -149,7 +149,7 @@ import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
-import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
+import { HelpStakeholders, AssignedToCard } from "@/components/tickets/help-stakeholders"
 // THE SENDER'S PHOTO (Aurora, 20 Sep 2026: "in tickets I see the initials but
 // should see the avatar image") — the SAME seam `work-panels.tsx` already
 // reuses off this file's own `membersQ`: `members:<teamId>` lists every login
@@ -712,8 +712,11 @@ export function HelpDetailScreen({
     raisedByContactId?: string
     // WHO IS ON IT (Aurora, 21 Sep 2026), staff only, correctable the same
     // way; the door ignores it outright for a portal caller, which this
-    // screen never is.
-    assigneeId?: string
+    // screen never is. `null` is an explicit clear, "Nobody, inherit from
+    // the app" (see `help-stakeholders.tsx`'s own Select), never confused
+    // with "leave it alone" (`undefined`), the same distinction the door
+    // itself draws (`workers/content/src/lib/help.ts`'s `assigneeCleared`).
+    assigneeId?: string | null
   }) {
     const { tickets, byType, byStatus, byAccount } = await content.updateHelp({ id: helpId, ...input })
     // Merge, don't replace: priming the whole key with this first page threw
@@ -1733,6 +1736,26 @@ export function HelpDetailScreen({
       notePlaceholder={t("Add a note")}
     />
       <TicketDetailBody
+        // ASSIGNED TO, ITS OWN TOP-LEVEL CARD, FIRST. Aurora's ruling,
+        // 21 Sep 2026, verbatim: "nono assigned to on the very top, a
+        // different card from stakeholders!" `AssignedToCard`
+        // (`help-stakeholders.tsx`) reads the SAME ticket/app/member facts
+        // the Stakeholders panel's own call used to hand it, wired through
+        // the same `editTicket` courier.
+        assignedTo={
+          <AssignedToCard
+            assigneeId={ticket.assigneeId}
+            assigneeName={ticket.assigneeName}
+            appId={ticket.appId}
+            appName={ticket.appName}
+            appAssigneeId={ticket.appAssigneeId}
+            members={assignableMembers(membersQ.data)}
+            canEditAssignee={canEdit}
+            onChangeAssignee={(assigneeId) =>
+              editTicket({ description: ticket.description, assigneeId })
+            }
+          />
+        }
         // THE BAND — R89 round 24, 19 Sep 2026. The SAME data the
         // `<RecordScreen>` call above already shapes for its own (now
         // switched-off, `footerVisible={false}`) copy of the footer, built
@@ -2234,21 +2257,6 @@ export function HelpDetailScreen({
               canEditRaisedBy={canEdit}
               onChangeRaisedBy={(raisedByContactId) =>
                 editTicket({ description: ticket.description, raisedByContactId })
-              }
-              // ASSIGNED TO (Aurora, 21 Sep 2026), same edit right as the
-              // rest of the ticket (`canEdit`, above, `help:update`), the
-              // same agency-staff-only list every other picker on this
-              // screen reads (`assignableMembers(membersQ.data)`, the
-              // identical call `triageAssignOptions` above already makes).
-              assigneeId={ticket.assigneeId}
-              assigneeName={ticket.assigneeName}
-              appId={ticket.appId}
-              appName={ticket.appName}
-              appAssigneeId={ticket.appAssigneeId}
-              members={assignableMembers(membersQ.data)}
-              canEditAssignee={canEdit}
-              onChangeAssignee={(assigneeId) =>
-                editTicket({ description: ticket.description, assigneeId })
               }
             />
           </TicketSidePanel>

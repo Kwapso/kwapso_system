@@ -85,6 +85,8 @@ describe("R15 · a record's own cache key is reached by the ping about that reco
       "the per-record key spelling has changed and this check is watching nothing"
     // `help:one:` joined on 26 Aug 2026 — the ticket detail stopped looking its
     // record up in page one of a paged list (R38) and now reads it by id.
-    ).toEqual(["help:one:", "knowledge:one:", "meeting:one:", "story:one:"])
+    // `sprint:one:` joined 21 Sep 2026 — the story detail page's own "Phase
+    // and wave" panel reads the phase it belongs to the same way.
+    ).toEqual(["help:one:", "knowledge:one:", "meeting:one:", "sprint:one:", "story:one:"])
   })
 })

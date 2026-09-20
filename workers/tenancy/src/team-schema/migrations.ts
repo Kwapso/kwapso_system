@@ -8057,6 +8057,28 @@ ALTER TABLE help ADD COLUMN assignee_name TEXT;
 CREATE INDEX idx_help_assignee ON help (assignee_id);
 `,
   },
+  // 0112 — A STORY'S OWN BUILD NOTES. Aurora's ruling, verbatim, 21 Sep 2026:
+  // "call it build notes" (the story detail's third left-column section, what
+  // was built and how) and "yes, canont be marked as don if thats not filled
+  // in, its required" (the Done action refuses a story with no build notes —
+  // see `refuseUndocumented`, workers/content/src/lib/stories.ts).
+  //
+  // ONE TEXT COLUMN, THE SAME STORAGE `detail` ALREADY USES — rich text,
+  // sanitised on the way into the Notes editor, no separate column for the
+  // images: an image dropped or pasted into the sheet is uploaded through the
+  // SAME door the story's own "Files and links" mechanism already used
+  // (`story_attachments`, team migration unrelated to this one — see
+  // `workers/content/src/lib/story-attachments.ts`, "one table along" from
+  // `help_attachments`, the reply body's own mechanism) — never a second,
+  // bespoke attachment table for one field. Nullable: a story written before
+  // this field existed has none to guess at, the same shape `acceptance_
+  // criteria` (team migration 0106) already took beside `detail`.
+  {
+    version: "0112_a_story_gets_its_own_build_notes",
+    sql: `
+ALTER TABLE stories ADD COLUMN build_notes TEXT;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

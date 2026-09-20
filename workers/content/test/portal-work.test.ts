@@ -87,6 +87,9 @@ async function seedWork(): Promise<{ ticketId: string; storyId: string }> {
     ticketId: ticket,
     sprintId,
     changesNoStep: true,
+    // Required before Done (Aurora's ruling, 21 Sep 2026) — this fixture
+    // moves the story to done below.
+    buildNotes: "Shipped.",
   })
   const storyId = (
     db().prepare(`SELECT id FROM stories WHERE title = ?`).get(SECRET.storyTitle) as { id: string }

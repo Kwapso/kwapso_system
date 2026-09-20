@@ -199,3 +199,93 @@ describe("Sync — her word, everywhere the button appears (google-sync.tsx)", (
     )
   })
 })
+
+// ============================================================================
+// SYNC BUTTON SIZE — Aurora, 21 Sep 2026, verbatim: "on knowelegde, the syn
+// button its to small. unify with law." The knowledge toolbar's other two
+// actions never opt into a smaller control: the mango Ask button
+// (knowledge-screen.tsx) names no `size` at all, and the settings gear
+// (`ModuleSettingsGear`, module-settings-screen.tsx) names `size="icon"` —
+// both the kit's own `--control-height-button` (40px), through the kit's
+// `size` prop and nothing else. The Sync button used to be the one button in
+// that row naming `size="sm"` (32px, `--control-height-dense`), through the
+// kit Button prop rather than a custom class, so this is a source-scan
+// pinning the button's own height, not a render assertion (google-sync.tsx
+// needs a dozen props to mount that this suite does not carry).
+// ============================================================================
+describe("the Sync button matches its knowledge-toolbar siblings' height", () => {
+  const src = readFileSync(join(ROOT, "web", "components", "knowledge", "google-sync.tsx"), "utf8")
+
+  function syncButtonTag(source: string): string {
+    const at = source.indexOf('<Button variant="secondary" disabled={syncing}')
+    expect(at, "the Sync button's own opening tag").toBeGreaterThan(-1)
+    const end = source.indexOf(">", at)
+    return source.slice(at, end + 1)
+  }
+
+  it("names no size prop — the kit's default control height, same as the mango Ask button beside it", () => {
+    const tag = syncButtonTag(src)
+    expect(tag, "no size prop at all: the kit's default is the standing 40px height").not.toMatch(/\bsize=/)
+  })
+
+  it('never regresses to size="sm" (--control-height-dense, 32px) anywhere on this button', () => {
+    expect(src, 'her ruling: "the syn button its to small"').not.toMatch(/<Button variant="secondary" disabled=\{syncing\}[^>]*size="sm"/)
+  })
+
+  it("carries no custom height/padding class — the kit's own size prop is the whole fix", () => {
+    const tag = syncButtonTag(src)
+    expect(tag).not.toMatch(/\bh-\[/)
+    expect(tag).not.toMatch(/\bpx-\d/)
+  })
+
+  it("its icon is size-4, the same step the Ask and gear icons use", () => {
+    const iconAt = src.indexOf("<ArrowsClockwise")
+    expect(iconAt, "the sync icon").toBeGreaterThan(-1)
+    const iconTag = src.slice(iconAt, src.indexOf(">", iconAt) + 1)
+    expect(iconTag).toMatch(/className="size-4"/)
+  })
+})
+
+// ============================================================================
+// THE "NOT BROUGHT IN YET" HINT — Aurora, 21 Sep 2026, verbatim: "move the
+// hint not broght in yet." It already rendered in the control's own status
+// slot, the same one the "Last brought in …" line takes once a sync has run
+// — R72's own point, that a control's helper text belongs to the control and
+// not to a heading, is why it stays there rather than moving into
+// CollectionHeading's own title line. What read as a stray toolbar caption
+// was the size: `text-xs` beside the button's own `text-sm` label. Both the
+// pre-sync and post-sync lines of that one slot now read `text-sm`,
+// unstyled apart from that, from `text-xs` (K56, documents/UI-RULEBOOK.md).
+// ============================================================================
+describe('the "Not brought in yet" hint stays in the control\'s own status slot, restyled off text-xs', () => {
+  const src = readFileSync(join(ROOT, "web", "components", "knowledge", "google-sync.tsx"), "utf8")
+
+  it('shares one ternary with the "Last brought in" line — the slot a sync fills once it has run', () => {
+    const lastRunAt = src.indexOf(': lastRun ? (')
+    const notYetAt = src.indexOf('t("Not brought in yet")')
+    expect(lastRunAt, "the lastRun branch").toBeGreaterThan(-1)
+    expect(notYetAt, "the not-yet-synced fallback").toBeGreaterThan(lastRunAt)
+    // Nothing else sits between the two branches: one ternary, four arms
+    // (syncing / failing / lastRun / not yet), not a second element added
+    // beside the button. Two <span opens fall in this slice — the lastRun
+    // span's own opening tag, then the fallback span's opening tag (the
+    // slice ends inside it, at the text it wraps).
+    const between = src.slice(lastRunAt, notYetAt)
+    expect(between.match(/<span/g)?.length, "just the lastRun span, then the fallback span opening").toBe(2)
+  })
+
+  it("is styled like the synced line, not text-xs", () => {
+    const notYetAt = src.indexOf('t("Not brought in yet")')
+    const tagStart = src.lastIndexOf("<span", notYetAt)
+    const tag = src.slice(tagStart, src.indexOf(">", tagStart) + 1)
+    expect(tag).toMatch(/className="text-muted-foreground text-sm"/)
+    expect(tag).not.toMatch(/text-xs/)
+  })
+
+  it('the "Last brought in" line it shares the slot with reads the same step', () => {
+    const lastRunSpanAt = src.indexOf("<span", src.indexOf(': lastRun ? ('))
+    const tag = src.slice(lastRunSpanAt, src.indexOf(">", lastRunSpanAt) + 1)
+    expect(tag).toMatch(/className="text-muted-foreground text-sm"/)
+    expect(tag).not.toMatch(/text-xs/)
+  })
+})

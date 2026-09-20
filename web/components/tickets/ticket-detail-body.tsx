@@ -54,6 +54,7 @@
 import * as React from "react"
 
 import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
+import { useIsAtLeastLg } from "@/components/records/record-detail-body"
 
 /** Stable DOM anchors for the four panels a ticket's page draws, so a link
  * built before the tab strip existed — `?tab=stories`, the rail, anywhere
@@ -62,6 +63,13 @@ import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
  * deep-link effect, which is the one reader of this table. */
 export const TICKET_PANEL_ANCHOR = {
   conversation: "ticket-panel-conversation",
+  /** THE ASSIGNED TO CARD, first in the side column (Aurora's ruling, 21 Sep
+   * 2026, see `TicketDetailBody`'s own `assignedTo` prop). No deep link
+   * names this panel yet ("?tab=" only ever named stories/files, the two
+   * words the old tab strip carried), so the anchor exists for the same
+   * reason `stories`/`time`/`stakeholders` do, a stable DOM id, rather than
+   * because something scrolls to it today. */
+  assignedTo: "ticket-panel-assigned-to",
   stories: "ticket-panel-stories",
   time: "ticket-panel-time",
   stakeholders: "ticket-panel-stakeholders",
@@ -343,41 +351,20 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * proving the ticket page's band now ends exactly where every other
  * record screen's last card already does, "not special" by construction. */
 
-/** Tailwind's `lg` breakpoint (`64rem`, 1024px — confirmed against the
- * built CSS this session, `min-width:64rem`), the ONE number this
+/** Tailwind's `lg` breakpoint (`64rem`, 1024px), the ONE number this
  * component's tree-level decision has to agree with the `lg:`/`grid-cols`
- * classes drawn below. `rem` here is the INITIAL font size by spec (16px),
- * never the root element's — `use-is-phone.ts`'s own note on
- * `COLUMNS_QUERY` explains why that is what keeps a media query safe
- * against this app's own `data-scale` root-font override. Not exported: a
- * second file with its own reason to ask "are we at `lg`" gets its own
- * threshold constant, the same way `use-is-phone.ts` keeps `PHONE_QUERY`
- * and `COLUMNS_QUERY` private rather than daisy-chaining every caller onto
- * one shared number. */
-const LG_QUERY = "(min-width: 64rem)"
-
-function queryLg(): MediaQueryList | null {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null
-  return window.matchMedia(LG_QUERY)
-}
-
-function subscribeLg(onChange: () => void): () => void {
-  const mq = queryLg()
-  mq?.addEventListener("change", onChange)
-  return () => mq?.removeEventListener("change", onChange)
-}
-
-/** Is the viewport at least `lg`? `false` on the server and on the very
- * first client render (the static export has no `window`; jsdom has one
- * with no `matchMedia`) — the SAME conservative default
- * `useIsPhone`/`useShellColumns` already bank, so a person on a genuinely
- * narrow screen never sees a one-frame flash of the two-column tree before
- * it corrects. */
-function useIsAtLeastLg(): boolean {
-  return React.useSyncExternalStore(subscribeLg, () => queryLg()?.matches ?? false, () => false)
-}
+ * classes drawn below. `useIsAtLeastLg` itself now lives in the shared
+ * `record-detail-body.tsx` (round 21 UI/UX story detail lane, 21 Sep 2026 —
+ * that file's own header carries the whole account of what generalised out
+ * of this one and what stayed, and why), imported below rather than kept as
+ * a second, private copy of the identical hook — this component's own JSX
+ * stays inlined, unchanged, because `web/test/footer-on-the-edge.test.ts`
+ * (R89) reads it by exact source position, but the ONE piece with no
+ * position for a test to care about (which object a media-query listener
+ * subscribes to) is shared rather than duplicated. */
 
 export function TicketDetailBody({
+  assignedTo,
   thread,
   composer,
   stories,
@@ -385,6 +372,13 @@ export function TicketDetailBody({
   stakeholders,
   footer,
 }: {
+  /** THE FIRST PANEL IN THE SIDE COLUMN, ABOVE EVERYTHING ELSE. Aurora's
+   * ruling, 21 Sep 2026, verbatim: "nono assigned to on the very top, a
+   * different card from stakeholders!", correcting her own same-day ruling
+   * that had put the "Assigned to" row inside the Stakeholders card instead.
+   * `AssignedToCard` (`help-stakeholders.tsx`) is its own top-level `Card`,
+   * never nested inside `stakeholders` below. */
+  assignedTo: React.ReactNode
   thread: React.ReactNode
   composer: React.ReactNode
   stories: React.ReactNode
@@ -438,12 +432,27 @@ export function TicketDetailBody({
   // cell — which contributes no height of its own — to match it exactly).
   const sidePanels = (
     <>
+      {/* ASSIGNED TO, FIRST. Aurora's ruling, 21 Sep 2026, verbatim: "nono
+          assigned to on the very top, a different card from stakeholders!"
+          Above Stories/Time/Stakeholders and everything else in this column. */}
+      <div id={TICKET_PANEL_ANCHOR.assignedTo}>{assignedTo}</div>
       <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
       <div id={TICKET_PANEL_ANCHOR.time}>{time}</div>
       <div id={TICKET_PANEL_ANCHOR.stakeholders}>{stakeholders}</div>
     </>
   )
 
+  // R89'S OWN SOURCE-SCAN PROOF STAYS ON THIS FILE, LITERALLY — every one of
+  // this component's classes below is read straight off the page's own
+  // source text by `web/test/footer-on-the-edge.test.ts`, position by
+  // position, across nine rounds of live-injection debugging. A generic
+  // `RecordDetailBody` (`@/components/records/record-detail-body.tsx`) was
+  // built the same shape for the story detail page's own use, so a story
+  // never hand-copies this saga — but THIS component stays inlined rather
+  // than delegating to it, because delegating would move the very JSX that
+  // suite reads into a different file and turn a green law red for a
+  // refactor that changes no pixel. Read both files side by side if the
+  // shape ever needs to move again: they agree on purpose.
   return (
     <div
       data-slot="ticket-detail-body"

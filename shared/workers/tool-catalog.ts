@@ -1249,13 +1249,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Write down one piece of work. `title`, `storyType` and one of `processIds`/`changesNoStep` are required; `category` defaults to Client-requested.",
     detail:
-      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Enabler (Kwapso-initiated upkeep — renamed from Internal on 20 Sep 2026) — leave it off for the ordinary case. An Enabler story must also name `ticketId`, the door refuses with 'ticket_required' otherwise. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket (or the story is Enabler). `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it. `acceptanceCriteria` writes down what 'done' looks like — a long-text field, same design and limit as `detail`. `moscow` sets the MoSCoW priority, one of Must, Should, Could or Won't — optional, and (like `acceptanceCriteria`) never guessed at for a story written before either field existed. `contributesToGoal` (true/false, default false) flags this story as one of the ones serving `sprintId`'s own one-sentence goal — only meaningful once `sprintId` is set.",
+      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Enabler (Kwapso-initiated upkeep — renamed from Internal on 20 Sep 2026) — leave it off for the ordinary case. An Enabler story must also name `ticketId`, the door refuses with 'ticket_required' otherwise. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket (or the story is Enabler). `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it. `acceptanceCriteria` writes down what 'done' looks like — a long-text field, same design and limit as `detail`. `buildNotes` says what was built and how — same long-text shape, almost always left off here because it is usually written once the story already exists (update_story is where it normally lands), but the door accepts it on create too. `moscow` sets the MoSCoW priority, one of Must, Should, Could or Won't — optional, and (like `acceptanceCriteria`) never guessed at for a story written before either field existed. `contributesToGoal` (true/false, default false) flags this story as one of the ones serving `sprintId`'s own one-sentence goal — only meaningful once `sprintId` is set.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories",
     schema: obj(
       {
         title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
         processIds: { type: "array" }, storyType: S, category: S,
-        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES), contributesToGoal: B,
+        acceptanceCriteria: S, buildNotes: S, moscow: enumOf(MOSCOW_VALUES), contributesToGoal: B,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["title", "storyType"]
@@ -1275,6 +1275,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       processId: opt(i, "processId"),
       processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
       acceptanceCriteria: opt(i, "acceptanceCriteria"),
+      buildNotes: opt(i, "buildNotes"),
       moscow: opt(i, "moscow"),
       contributesToGoal: i.contributesToGoal === true ? true : undefined,
       stepKey: opt(i, "stepKey"),
@@ -1290,15 +1291,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_story",
     summary:
-      "Edit a story by `id`. Same fields as create_story; `title`, `storyType` and `category` are all required here, `processIds` replaces the set.",
+      "Edit a story by `id`. Same fields as create_story plus `buildNotes`; `title`, `storyType` and `category` are all required here, `processIds` replaces the set.",
     detail:
-      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Enabler) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. Switching to Enabler is refused here, not silently written, unless `ticketId` is also sent — the door answers 'ticket_required'. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it. `acceptanceCriteria`, `moscow` and `contributesToGoal` are optional, same shape as create_story, and are replaced whole like every other field here — leaving any of them off on an edit clears it rather than keeping the old value.",
+      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Enabler) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. Switching to Enabler is refused here, not silently written, unless `ticketId` is also sent — the door answers 'ticket_required'. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it. `acceptanceCriteria`, `buildNotes`, `moscow` and `contributesToGoal` are optional, same shape as create_story, and are replaced whole like every other field here — leaving any of them off on an edit clears it rather than keeping the old value. `buildNotes` says what was built and how (rich text, same storage as `detail`); set_story_status refuses to close a story while it is empty, answering 'build_notes_required'.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
     schema: obj(
       {
         id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
         processIds: { type: "array" }, storyType: S, category: S,
-        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES), contributesToGoal: B,
+        acceptanceCriteria: S, buildNotes: S, moscow: enumOf(MOSCOW_VALUES), contributesToGoal: B,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["id", "title", "storyType", "category"]
@@ -1315,6 +1316,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       processId: opt(i, "processId"),
       processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
       acceptanceCriteria: opt(i, "acceptanceCriteria"),
+      buildNotes: opt(i, "buildNotes"),
       moscow: opt(i, "moscow"),
       contributesToGoal: i.contributesToGoal === true ? true : undefined,
       stepKey: opt(i, "stepKey"),
@@ -1359,6 +1361,17 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ phaseId: S }, ["phaseId"]),
     buildBody: (i) => ({ phaseId: str(i, "phaseId") }),
     agent: { write: false, summarize: (i) => `Read the burndown for phase ${str(i, "phaseId")}` },
+  },
+  {
+    name: "story_metrics",
+    summary:
+      "A story's own Cycle time / Effort / Flow efficiency, by `id`. `cycleTimeSeconds` is null until a work log exists.",
+    detail:
+      "The three figures the story detail page's own Metrics panel draws, by `id`: `cycleTimeSeconds`, from the first work log against the story to the moment it most recently reached done (or to now, while it hasn't) — null when no work log exists at all, read as 'Not started'. `effortSeconds`, whole seconds logged against the story, a discarded timer never counted. `flowEfficiency`, effort divided by cycle time as a percentage — null when either side is zero, read as 'No time log'. Computed fresh on every call, never stored.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/metrics",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: false, summarize: (i) => `Read the metrics for story ${str(i, "id")}` },
   },
   {
     name: "list_sprints",

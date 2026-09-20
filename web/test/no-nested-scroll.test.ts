@@ -41,7 +41,7 @@ import { describe, expect, it } from "vitest"
 import ts from "typescript"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { NO_NESTED_SCROLL_EXEMPT } from "@shared/rules/registry"
+import { NO_NESTED_SCROLL_EXEMPT, TABLE_BOARD_SCROLL_EXEMPT } from "@shared/rules/registry"
 
 const ROOT = join(import.meta.dirname, "..", "..")
 
@@ -123,6 +123,197 @@ function findOffendersInFile(sf: ts.SourceFile, rel: string): Offender[] {
   visit(sf)
   return offenders
 }
+
+/** TABLES AND BOARDS OBEY ONE PAGE SCROLL LIKE EVERYTHING ELSE. Aurora's
+ * ruling, 21 Sep 2026, verbatim: "like everything else". Asked directly
+ * whether a table or a kanban board gets its own carve-out from R91, her
+ * answer was that they do not; the general law (page scrolls, no inner
+ * vertical scroll region) reaches them exactly as it reaches everything
+ * else. RULES.md's R91 row used to leave this open (her question 4, Round
+ * 27); it is now closed. HORIZONTAL is untouched: `overflow-x-auto` on a
+ * wide table or a board's row of columns was never this law's subject and
+ * stays exactly as it is (see `isVerticalScrollClass` and the green proof
+ * below).
+ *
+ * This second, narrower census exists beside the general one above because
+ * a table/board scroller is exactly the shape most likely to come back: a
+ * grid with more rows than fit a viewport is the oldest reason anyone reaches
+ * for `overflow-y-auto`. It walks the same two roots for a JSX element whose
+ * own tag is one of the app's table/board containers (the kit's `Table`,
+ * `DataTable`, `Kanban`, `KanbanColumn`, `DataPreviewTable`, or the app's own
+ * `RecordTable`) and fails on any vertical-scroll class anywhere in that
+ * element's own subtree, not only on the container tag itself, since a
+ * hand-rolled scroll wrapper usually sits one or two divs inside it. */
+const TABLE_BOARD_TAGS = new Set([
+  "Table",
+  "DataTable",
+  "Kanban",
+  "KanbanColumn",
+  "DataPreviewTable",
+  "RecordTable",
+])
+
+function jsxTagName(opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement): string {
+  const name = opening.tagName
+  return name.getText()
+}
+
+function findTableBoardOffendersInFile(sf: ts.SourceFile, rel: string): Offender[] {
+  const offenders: Offender[] = []
+  let tableBoardDepth = 0
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const opening = ts.isJsxElement(node) ? node.openingElement : node
+      const isContainer = TABLE_BOARD_TAGS.has(jsxTagName(opening))
+      if (isContainer) tableBoardDepth++
+
+      if (tableBoardDepth > 0) {
+        for (const lit of classNameLiterals(opening)) {
+          const cls = lit.text
+          if (!isVerticalScrollClass(cls)) continue
+          offenders.push({
+            key: `${rel}#${cls}`,
+            rel,
+            line: sf.getLineAndCharacterOfPosition(lit.getStart(sf)).line + 1,
+            cls,
+          })
+        }
+      }
+
+      ts.forEachChild(node, visit)
+      if (isContainer) tableBoardDepth--
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sf)
+  return offenders
+}
+
+function findTableBoardOffenders(): { offenders: Offender[]; fileCount: number } {
+  const files = sourceFiles(ROOTS, { extensions: [".tsx"], skipTests: true, relativeTo: ROOT })
+  const offenders: Offender[] = []
+  for (const file of files) {
+    const stripped = stripComments(file.source, { keepLength: true })
+    const sf = ts.createSourceFile(file.path, stripped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    offenders.push(...findTableBoardOffendersInFile(sf, file.rel))
+  }
+  return { offenders, fileCount: files.length }
+}
+
+describe("R91: tables and boards obey one page scroll like everything else", () => {
+  it("no vertical-scroll class inside a table or board wrapper the app owns", () => {
+    const { offenders, fileCount } = findTableBoardOffenders()
+    expect(
+      fileCount,
+      `only ${fileCount} files were walked under web/components and shared/web, a root has moved and this ` +
+        "census is looking at nothing",
+    ).toBeGreaterThan(150)
+
+    const used = new Set<string>()
+    const unexempt: string[] = []
+    for (const o of offenders) {
+      if (o.key in TABLE_BOARD_SCROLL_EXEMPT) {
+        used.add(o.key)
+        continue
+      }
+      unexempt.push(
+        `${o.rel}:${o.line}: a vertical-scroll expression inside a table/board wrapper (key: "${o.key}"). ` +
+          "Aurora's ruling: tables and boards obey one page scroll like everything else, no carve-out.",
+      )
+    }
+    expect(
+      unexempt,
+      unexempt.join("\n") +
+        "\n\nRemove the inner scroll (let the page scroll instead). A table/board gets no exception R91's own " +
+        "sanctioned shapes (chat/rail/assistant/overlay) don't already cover.",
+    ).toEqual([])
+
+    const stale = Object.keys(TABLE_BOARD_SCROLL_EXEMPT).filter((k) => !used.has(k))
+    expect(
+      stale,
+      `these TABLE_BOARD_SCROLL_EXEMPT entries match no offending scroller any more, delete them:\n  ${stale.join("\n  ")}`,
+    ).toEqual([])
+  })
+
+  it("catches a vertical scroll wrapper nested inside a <Table>", () => {
+    const before = `
+      function grid() {
+        return (
+          <Table>
+            <div className="max-h-96 overflow-y-auto">{rows}</div>
+          </Table>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture-table.tsx", before, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const offenders = findTableBoardOffendersInFile(sf, "fixture-table.tsx")
+    expect(offenders.length).toBe(1)
+  })
+
+  it("catches a vertical scroll wrapper nested inside a <Kanban> board", () => {
+    const before = `
+      function board() {
+        return (
+          <Kanban columns={columns} className="min-h-0 overflow-y-auto" />
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture-kanban.tsx", before, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const offenders = findTableBoardOffendersInFile(sf, "fixture-kanban.tsx")
+    expect(offenders.length).toBe(1)
+  })
+
+  it("leaves a table's own horizontal overflow-x-auto alone (not this law's subject)", () => {
+    const before = `
+      function grid() {
+        return (
+          <Table className="overflow-x-auto">{rows}</Table>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture-table-x.tsx", before, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    expect(findTableBoardOffendersInFile(sf, "fixture-table-x.tsx")).toEqual([])
+  })
+
+  it("draws nothing for a vertical scroll class outside any table/board wrapper", () => {
+    const before = `
+      function panel() {
+        return <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      }
+    `
+    const sf = ts.createSourceFile("fixture-outside.tsx", before, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    expect(findTableBoardOffendersInFile(sf, "fixture-outside.tsx")).toEqual([])
+  })
+})
+
+/** THE FIVE PENDING SCROLLERS, DECIDED (Round 30). Aurora's ruling, verbatim,
+ * 21 Sep 2026: "confirm", accepting every recommendation on the decisions
+ * page. Four sites were recommended keep, and stay named in
+ * `NO_NESTED_SCROLL_EXEMPT` (proved by the general census above, which is
+ * rot-checked both ways). The fifth, the assistant's paused-turn confirm
+ * list, was recommended flatten: this reads the real file straight off disk
+ * (not a fixture, so a later edit to `agent-panel.tsx` is what this test
+ * actually watches) and proves the vertical-scroll class it used to carry
+ * (`max-h-[40vh] min-h-0 overflow-y-auto`) is gone, and that the file carries
+ * no vertical-scroll class at all, so a regression cannot slip back in under
+ * a different class list. */
+describe("R91: the five pending scrollers, decided (Round 30)", () => {
+  it("agent-panel.tsx (the flattened confirm list) carries no vertical-scroll class", () => {
+    const rel = "web/components/assistant/agent-panel.tsx"
+    const path = join(ROOT, rel)
+    const stripped = stripComments(readFileSync(path, "utf8"), { keepLength: true })
+    const sf = ts.createSourceFile(path, stripped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const offenders = [...findOffendersInFile(sf, rel), ...findInlineStyleOffenders(stripped, rel)]
+    expect(
+      offenders,
+      "agent-panel.tsx's paused-turn confirm list was flattened for R91 (21 Sep 2026); it must carry no " +
+        "vertical-scroll class or style any more.",
+    ).toEqual([])
+  })
+})
 
 /** `style={{ overflowY: "auto" }}` / `overflow: "scroll"` — the non-Tailwind
  * escape hatch. Nothing in `web/components` or `shared/web` uses it as of

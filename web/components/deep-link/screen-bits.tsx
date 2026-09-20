@@ -253,8 +253,24 @@ export function CollectionCard({ children }: { children: React.ReactNode }) {
           `padding-top` here means the two can never drift: the DEFAULT above
           is the DEFAULT here, and an ancestor override of one is only ever
           real once the other pair (globals.css's `padding-top` declaration)
-          exists too, which every one of those rules already writes. */}
-      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)]">{children}</CardContent>
+          exists too, which every one of those rules already writes.
+
+          BOTH STEPS, NOT JUST THE BASE ONE (found live on staging, 21 Sep
+          2026, commit 3b1014c3 already deployed): `CardContent`'s own kit
+          default is `py-6 lg:py-[var(--space-7)]` -- a RESPONSIVE ladder, two
+          rules, one unprefixed and one inside an `lg:` media query. This
+          override used to read `pt-[var(--pinned-lead)]` alone, an
+          unprefixed rule that only ever competes with the kit's unprefixed
+          `py-6` -- Tailwind emits the `lg:` media-query rule after the base
+          rules regardless of class order, so at `lg` and above the kit's own
+          `lg:py-[var(--space-7)]` (32px) kept winning over this override
+          even though `--pinned-lead` itself correctly read 10px the whole
+          time. Measured live on Account detail's Contacts panel (the one
+          card nothing else reaches): 10px at 760px, 32px at 1440px, the same
+          class list at both widths. Fixing it needs the identical `lg:` step
+          on THIS side too, reading the same flat token twice rather than a
+          second number. */}
+      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">{children}</CardContent>
     </Card>
   )
 }

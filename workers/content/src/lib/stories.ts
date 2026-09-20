@@ -59,6 +59,7 @@ import {
   type MoscowValue,
   type Sprint,
   type Story,
+  type StoryMetrics,
   type StoryStatus,
   type StoryViewName,
 } from "@shared/types"
@@ -111,11 +112,23 @@ type StoryRow = {
   story_type: string | null
   category: string
   acceptance_criteria: string | null
+  /** WHAT WAS BUILT, AND HOW (Aurora's ruling, 21 Sep 2026: "call it build
+   * notes") — team migration 0112, the same storage `detail` already uses.
+   * Required before Done: see `refuseUndocumented`, below. */
+  build_notes: string | null
   moscow: string | null
   /** AURORA'S "CONTRIBUTES TO THE GOAL" RULING, 20 SEP 2026 — paired with
    * `sprints.goal_summary`. 0/1, team migration 0107. */
   contributes_to_goal: number
   app_name?: string | null
+  /** THE APP'S OWN ANSWER for "who is on it", when this story names no
+   * assignee of its own — the app's LEAD (`app_staff.is_lead`), the exact
+   * same correlated subselect `help.ts`'s own `app_assignee_id` already
+   * takes (team migration 0111's own header), read here so the story
+   * detail's Assigned to card can answer the identical question a ticket's
+   * own card already does (Aurora's ruling, 21 Sep 2026, "both on story
+   * detail and ticket detail we need to see to whom it's assigned"). */
+  app_assignee_id: string | null
   review_note: string | null
   review_file_url: string | null
   review_file_name: string | null
@@ -133,7 +146,7 @@ type StoryRow = {
 const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.sprint_id, s.app_id,
   s.process_id, s.step_key, s.changes_no_step, s.assignee_id, s.assignee_name, s.reviewer_id,
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
-  s.story_type, s.category, s.acceptance_criteria, s.moscow, s.contributes_to_goal, s.review_note, s.review_file_url, s.review_file_name,
+  s.story_type, s.category, s.acceptance_criteria, s.build_notes, s.moscow, s.contributes_to_goal, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
   -- A story list that made a query per story to learn its processes would be
@@ -148,6 +161,12 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
   -- so the main backlog's own card and the record's own header chip
   -- (Aurora's chip-order ruling, 20 Sep 2026) never cost a second read.
   (SELECT ap.name FROM apps ap WHERE ap.id = s.app_id) AS app_name,
+  -- THE APP'S OWN ANSWER for "who is on it" (Aurora, 21 Sep 2026), when this
+  -- story names no assignee of its own — the app's LEAD, the identical
+  -- subselect \`help.ts\`'s own \`app_assignee_id\` already takes.
+  (SELECT ast.user_id FROM app_staff ast
+    WHERE ast.app_id = s.app_id AND ast.is_lead = 1 AND ast.deactivated_at IS NULL
+    LIMIT 1) AS app_assignee_id,
   -- WHEN THIS IS DUE, AND WHY IT IS NOT A COLUMN ON THIS TABLE ANY MORE.
   -- A story is one piece of work inside a block that was sold with an end date
   -- on it, so the block's end date IS the story's deadline: two dates for one
@@ -189,15 +208,18 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
  * which is the same split `knowledge.ts` makes between `LIST_COLS` and
  * `DETAIL_COLS` for the same reason. */
 const STORY_LIST_COLS = (() => {
-  // `acceptance_criteria` rides `detail`'s own exemption — "same design as
-  // Detail" (Aurora's ruling, 20 Sep 2026) means the same weight on the page
-  // too, so a list draws neither and a by-id read (`getStory`) keeps both.
-  const listed = STORY_COLS.replace("s.detail,", "NULL AS detail,").replace(
-    "s.acceptance_criteria,",
-    "NULL AS acceptance_criteria,"
-  )
+  // `acceptance_criteria` and `build_notes` ride `detail`'s own exemption —
+  // "same design as Detail" (Aurora's ruling, 20 Sep 2026) and the same
+  // storage as `detail` (team migration 0112) both mean the same weight on
+  // the page too, so a list draws none of the three and a by-id read
+  // (`getStory`) keeps all of them.
+  const listed = STORY_COLS.replace("s.detail,", "NULL AS detail,")
+    .replace("s.acceptance_criteria,", "NULL AS acceptance_criteria,")
+    .replace("s.build_notes,", "NULL AS build_notes,")
   if (listed === STORY_COLS)
-    throw new Error("STORY_COLS no longer selects `s.detail,`/`s.acceptance_criteria,` — the list/detail split is not being made")
+    throw new Error(
+      "STORY_COLS no longer selects `s.detail,`/`s.acceptance_criteria,`/`s.build_notes,` — the list/detail split is not being made"
+    )
   return listed
 })()
 
@@ -219,6 +241,7 @@ function toStory(r: StoryRow): Story {
     sprintName: r.sprint_name,
     appId: r.app_id,
     appName: r.app_name ?? null,
+    appAssigneeId: r.app_assignee_id ?? null,
     processId: r.process_id,
     stepKey: r.step_key,
     changesNoStep: r.changes_no_step === 1,
@@ -239,6 +262,7 @@ function toStory(r: StoryRow): Story {
     // `null as string`, which would be a lie against the type.
     category: r.category || "Client-requested",
     acceptanceCriteria: r.acceptance_criteria,
+    buildNotes: r.build_notes,
     // Never trust a value the code does not recognise — the same safe
     // direction `status` above takes: an unrecognised or blank word reads as
     // "not set" rather than a lie against the closed `MoscowValue` union.
@@ -673,6 +697,9 @@ export type StoryInput = {
   /** WHAT "DONE" LOOKS LIKE — Aurora's ruling, 20 Sep 2026: "same design as
    * Detail." Optional, TEXT_LIMITS.long at the door, same as `detail`. */
   acceptanceCriteria?: unknown
+  /** WHAT WAS BUILT, AND HOW (Aurora's ruling, 21 Sep 2026: "call it build
+   * notes") — optional, TEXT_LIMITS.long at the door, same as `detail`. */
+  buildNotes?: unknown
   /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional:
    * every EXISTING story predates this field, so a value is never required,
    * only ever checked against the closed `MOSCOW_VALUES` list when one is
@@ -985,6 +1012,11 @@ export async function createStory(
   // "SAME DESIGN AS DETAIL" (Aurora's ruling, 20 Sep 2026) — optional, the
   // identical long-text limit `detail` above already reads.
   const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
+  // WHAT WAS BUILT, AND HOW — same optional long-text shape as `detail`/
+  // `acceptanceCriteria`. A create almost never carries one (the sheet that
+  // writes it opens once the story already exists), but the door accepts it
+  // either way, the same courtesy every other field on this door offers.
+  const buildNotes = optionalText(input.buildNotes, "Build notes", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
   const contributesToGoal = input.contributesToGoal === true
   // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — checked on the resolved
@@ -1036,9 +1068,9 @@ export async function createStory(
     cfg,
     guard.databaseId,
     `INSERT INTO stories (id, ref, account_id, ticket_id, app_id, process_id, step_key, changes_no_step,
-       sprint_id, title, detail, story_type, category, acceptance_criteria, moscow, contributes_to_goal, assignee_id, assignee_name, reviewer_id, reviewer_name,
+       sprint_id, title, detail, story_type, category, acceptance_criteria, build_notes, moscow, contributes_to_goal, assignee_id, assignee_name, reviewer_id, reviewer_name,
        starts_on, due_on, status, rank, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(moscow)}, ${contributesToGoal ? 1 : 0}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(buildNotes)}, ${sqlString(moscow)}, ${contributesToGoal ? 1 : 0}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await setProcesses(cfg, guard, actor, id, processIds)
 
@@ -1080,6 +1112,11 @@ export async function updateStory(
   // own doc for why the two doors treat a blank differently.
   const category = requireText(input.category, "Category", TEXT_LIMITS.short)
   const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
+  // WHAT WAS BUILT, AND HOW — replaced whole like every other field this door
+  // reads (`StoryInput.buildNotes`'s own doc): the story's own build-notes
+  // sheet always sends the field's current text back, spread from the
+  // record's own shape, so an edit made elsewhere never clears it by omission.
+  const buildNotes = optionalText(input.buildNotes, "Build notes", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
   const contributesToGoal = input.contributesToGoal === true
   // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — read on the RESOLVED
@@ -1108,7 +1145,7 @@ export async function updateStory(
     cfg,
     guard.databaseId,
     `UPDATE stories SET title = ?, detail = ?, ticket_id = ?, app_id = ?, process_id = ?, step_key = ?,
-       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, moscow = ?, contributes_to_goal = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
+       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, build_notes = ?, moscow = ?, contributes_to_goal = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
        reviewer_name = ?, starts_on = ?, due_on = ?, account_id = ?, updated_at = ?,
        editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
@@ -1126,6 +1163,7 @@ export async function updateStory(
       storyType,
       category,
       acceptanceCriteria,
+      buildNotes,
       moscow,
       contributesToGoal ? 1 : 0,
       assignee?.id ?? null,
@@ -1257,6 +1295,28 @@ async function refuseUnreviewable(
     )
 }
 
+/** THE BUILD NOTES RULE — Aurora's ruling, verbatim, 21 Sep 2026: "yes, canont
+ * be marked as don if thats not filled in, its required." A story cannot move
+ * to `done` while its own `build_notes` is empty.
+ *
+ * IDEMPOTENT LIKE `refuseUnstepped` BESIDE IT (R17): the refusal is a plain
+ * read of the row already in hand, never a second query, so a double-press on
+ * a story that is already `done` never re-asks the question at all —
+ * `setStoryStatus`'s own `status <> ?` predicate is what stops it from
+ * getting this far a second time.
+ *
+ * Checked HERE, not only at the door — `refuseUnstepped`'s own reason: there
+ * is more than one way to move a story, and one of them will be written by
+ * somebody who has never read the door's own handler. The story detail
+ * page's Done head action mirrors this same reason back as the button's own
+ * `disabled` state (`story-detail.tsx`), so a reader sees why before they
+ * ever press it — but the refusal itself lives here, once, the same "the door
+ * decides, the button only mirrors it" split R17 already asks for. */
+export function refuseUndocumented(row: { build_notes: string | null }): void {
+  if (row.build_notes && row.build_notes.trim()) return
+  throw new GuardError(400, "build_notes_required", "Write the build notes before marking it done.")
+}
+
 /** A STORY REMEMBERS ITS STAGES, team migration 0110's own writer, shaped
  * exactly like a ticket's (`help-stages.ts`'s `recordStatusEvent`): written
  * AFTER the UPDATE that moved the row, and only when that UPDATE genuinely
@@ -1295,6 +1355,7 @@ export async function setStoryStatus(
   // 6.10 — one Done button, and it belongs to the app's team lead.
   if (status === "done") await refuseDoneByAnybodyElse(cfg, guard, before.app_id)
   if (status === "done") refuseUnstepped(before)
+  if (status === "done") refuseUndocumented(before)
   const reviewNote = review?.note ?? null
   if (status === "in_review")
     await refuseUnreviewable(cfg, guard, id, reviewNote, before.review_note)
@@ -1416,6 +1477,45 @@ function phaseDayRange(startsOn: string, endsOn: string): string[] {
     days.push(new Date(t).toISOString().slice(0, 10))
   }
   return days
+}
+
+/** THE STORY DETAIL PAGE'S OWN THREE FIGURES (`StoryMetrics`, shared/types.ts
+ * carries the full reasoning for why this is a door of its own rather than a
+ * column on `getStory`). ONE ROUND TRIP for the two raw facts it needs —
+ * `work_logs`' own MIN(started_at)/SUM(seconds) for this story, aggregated in
+ * SQL rather than pulled row by row — then a second, narrow read for the
+ * done event, only reached when a work log actually exists (a story nobody
+ * has touched has no cycle time to look up a done moment for). */
+export async function getStoryMetrics(cfg: D1Rest, guard: MemberGuard, storyId: string): Promise<StoryMetrics> {
+  const work = await d1Query<{ first_started: string | null; total_seconds: number | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT MIN(started_at) AS first_started, SUM(seconds) AS total_seconds
+       FROM work_logs WHERE target_table = 'stories' AND target_id = ? AND discarded_at IS NULL`, // R14: one aggregate row
+    [storyId]
+  )
+  const firstStarted = work[0]?.first_started ?? null
+  const effortSeconds = work[0]?.total_seconds ?? 0
+  if (!firstStarted) return { cycleTimeSeconds: null, effortSeconds, flowEfficiency: null }
+
+  // THE DONE MOMENT — the LATEST time this story reached `done`, so a story
+  // reopened and closed again reads its cycle time against the close that
+  // actually stands today, not the first one it ever had.
+  const doneEvent = await d1Query<{ done_at: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT MAX(created_at) AS done_at FROM story_status_events
+      WHERE story_id = ? AND to_status = 'done'`, // R14: one aggregate row
+    [storyId]
+  )
+  const doneAt = doneEvent[0]?.done_at ?? null
+  // STILL OPEN: cycle time counts to NOW, so a story mid-flight shows real,
+  // growing elapsed time rather than "Not started" the moment work begins.
+  const endMoment = doneAt ?? new Date().toISOString()
+  const cycleTimeSeconds = Math.max(0, (Date.parse(endMoment) - Date.parse(firstStarted)) / 1000)
+  const flowEfficiency =
+    effortSeconds > 0 && cycleTimeSeconds > 0 ? (effortSeconds / cycleTimeSeconds) * 100 : null
+  return { cycleTimeSeconds, effortSeconds, flowEfficiency }
 }
 
 /** GET /api/content/stories/burndown's own read (round-28 ruling): the series a

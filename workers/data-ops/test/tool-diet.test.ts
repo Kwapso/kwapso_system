@@ -590,7 +590,10 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // ruling) shipped with a `detail` from the start, same reason.
     // 124 → 125 on 20 Sep 2026: `story_burndown` (round-28 ruling, team
     // migration 0110) shipped with a `detail` from the start, same reason.
-    const DETAILED_TOOLS = 125
+    // 125 → 126 on 21 Sep 2026: `story_metrics` (the story detail page's own
+    // Metrics panel, Aurora's design review) shipped with a `detail` from
+    // the start, same reason.
+    const DETAILED_TOOLS = 126
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

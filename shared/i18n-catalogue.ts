@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 768 strings · 3 languages · 1473 of the entries below are hand-written seed.
+// 765 strings · 3 languages · 1520 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -449,7 +449,6 @@ export const CATALOGUE: Catalogue = {
   "Process name": { de: "Prozessname", es: "Nombre del proceso", ca: "Nom del procés" },
   "Process updated.": { de: "Prozess aktualisiert.", es: "Proceso actualizado.", ca: "Procés actualitzat." },
   "Processes": { de: "Prozesse", es: "Procesos", ca: "Processos" },
-  "Processes it changes": { de: "Prozesse, die es ändert", es: "Procesos que cambia", ca: "Processos que canvia" },
   "Profile": { de: "Profil", es: "Perfil", ca: "Perfil" },
   "Profile saved.": { de: "Profil gespeichert.", es: "Perfil guardado.", ca: "Perfil guardat." },
   "Profile updated.": { de: "Profil aktualisiert.", es: "Perfil actualizado.", ca: "Perfil actualitzat." },
@@ -673,7 +672,6 @@ export const CATALOGUE: Catalogue = {
   "What this role is for (optional).": { de: "Wofür diese Rolle ist (optional).", es: "Para qué sirve este rol (opcional).", ca: "Per a què és aquest rol (opcional)." },
   "What this system does, and for whom.": { de: "Was dieses System tut, und für wen.", es: "Lo que hace este sistema y para quién.", ca: "Què fa aquest sistema, i per a qui." },
   "What those hours are worth": { de: "Was diese Stunden wert sind", es: "Lo que valen esas horas", ca: "Què valen aquestes hores" },
-  "What was done": { de: "Was getan wurde", es: "Lo que se hizo", ca: "Què s'ha fet" },
   "What was said": { de: "Was wurde gesagt", es: "Lo que se dijo", ca: "Què es va dir" },
   "What was said and decided.": { de: "Was gesagt und entschieden wurde.", es: "Lo que se dijo y se decidió.", ca: "Què es va dir i decidir." },
   "What we built, and the decisions behind it.": { de: "Was wir gebaut haben und die Entscheidungen dahinter.", es: "Lo que construimos y las decisiones detrás.", ca: "Què vam construir, i les decisions darrera." },
@@ -682,7 +680,6 @@ export const CATALOGUE: Catalogue = {
   "What we hold for you. If any of it is wrong, tell us and we'll fix it.": { de: "Was wir für Sie speichern. Falls etwas nicht stimmt, teilen Sie uns Bescheid und wir reparieren es.", es: "Lo que guardamos para ti. Si algo no es correcto, dinos y lo arreglamos.", ca: "Què guardem per a vosaltres. Si alguna cosa és incorrecta, digue'ns-ho i ho arreglarem." },
   "What we mean to cover.": { de: "Was wir abdecken möchten.", es: "Lo que queremos cubrir.", ca: "Què volem cobrir." },
   "What we need from them": { de: "Was wir von ihnen brauchen", es: "Lo que necesitamos de ellos.", ca: "Què necessitem d'ells" },
-  "What we'll tell them": { de: "Was wir ihnen sagen werden", es: "Lo que les diremos.", ca: "Què els direm" },
   "What we're telling them": { de: "Was wir ihnen erzählen", es: "Lo que les estamos diciendo.", ca: "Què els estem dient" },
   "What you actually did.": { de: "Was Sie tatsächlich getan haben.", es: "Lo que realmente hiciste.", ca: "Què va fer realment." },
   "What you bought": { de: "Was Sie gekauft haben", es: "Lo que compraste.", ca: "Què va comprar" },

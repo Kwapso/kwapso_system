@@ -2528,6 +2528,13 @@ export const SEED: Catalogue = {
   "Tool": { de: "Tool", es: "Tool", ca: "Tool" },
   "Total": { de: "Gesamt", es: "Total", ca: "Total" },
   "Try asking": { de: "Versuchen Sie zu fragen", es: "Intenta preguntar", ca: "Intenta preguntar" },
+  // The assistant's paused-turn confirm list (`agent-panel.tsx`), flattened
+  // for R91 (no nested scroll) on 21 Sep 2026: a list longer than five steps
+  // is capped by this "Show more"/"Show less" door instead of scrolling on
+  // its own. Written by hand at the same commit as the English, so the
+  // translation ceiling (R44) never rises.
+  "Show less": { de: "Weniger anzeigen", es: "Mostrar menos", ca: "Mostra menys" },
+  "Show {count} more": { de: "{count} weitere anzeigen", es: "Mostrar {count} más", ca: "Mostra {count} més" },
   "Use the address your account is registered to.": {
     de: "Verwenden Sie die Adresse, unter der Ihr Kunde registriert ist.",
     es: "Usa la dirección a la que está registrada tu cuenta.",
@@ -3675,7 +3682,6 @@ export const SEED: Catalogue = {
   "Which type is this?": { de: "Um welchen Typ handelt es sich?", es: "¿Qué tipo es?", ca: "Quin tipus és?" },
   "Who is picking this up?": { de: "Wer übernimmt das?", es: "¿Quién se encarga de esto?", ca: "Qui se n'encarrega?" },
   "Who logged it": { de: "Wer es erfasst hat", es: "Quién lo registró", ca: "Qui ho ha registrat" },
-  "Who reviews it": { de: "Wer es prüft", es: "Quién lo revisa", ca: "Qui ho revisa" },
   "Why a step takes longer, {reason}": { de: "Warum ein Schritt länger dauert: {reason}", es: "Por qué un paso tarda más: {reason}", ca: "Per què un pas triga més: {reason}" },
   "Withdraw this input": { de: "Diese Angabe zurückziehen", es: "Retirar esta aportación", ca: "Retirar aquesta aportació" },
   "Wrapped": { de: "Abgeschlossen", es: "Finalizado", ca: "Finalitzat" },
@@ -4531,4 +4537,44 @@ export const SEED: Catalogue = {
   "Inherited from": { de: "Übernommen von", es: "Heredado de", ca: "Heretat de" },
   "Change who is assigned": { de: "Zuständigkeit ändern", es: "Cambiar quién está asignado", ca: "Canvia qui hi ha assignat" },
   "Choose someone": { de: "Jemanden auswählen", es: "Elige a alguien", ca: "Tria algú" },
+
+  /* ── The Assigned to card's own clear action (Aurora's 16 Sep 2026 ruling:
+   * "Kill the 'nobody' option for staff … This 'nobody', just kill it.",
+   * reverted a 21 Sep 2026 attempt to put a "Nobody, inherit from the app"
+   * row back into the Select). Clearing the ticket's own assignee back to
+   * inherited is this text button now, offered only when the app has a lead
+   * to fall back on. ─────────────────────────────────────────────────── */
+  "Use the app's lead": {
+    de: "Lead der App verwenden",
+    es: "Usar el responsable de la app",
+    ca: "Fer servir el responsable de l'app",
+  },
+
+  /* ── THE STORY DETAIL PAGE, ONE PAGE, NO TABS (Aurora's design review, 21
+   * Sep 2026, story-detail-design.html): "call it build notes" and "canont
+   * be marked as don if thats not filled in, its required". The panel
+   * titles/words the new page needed and did not already have seeded. ──── */
+  "Build notes": { de: "Baunotizen", es: "Notas de construcción", ca: "Notes de construcció" },
+  "Write the build notes": { de: "Baunotizen schreiben", es: "Escribir las notas de construcción", ca: "Escriu les notes de construcció" },
+  "Edit the build notes": { de: "Baunotizen bearbeiten", es: "Editar las notas de construcción", ca: "Edita les notes de construcció" },
+  "What was built, and how.": { de: "Was gebaut wurde, und wie.", es: "Qué se construyó, y cómo.", ca: "Què es va construir, i com." },
+  "Add images inline.": { de: "Bilder direkt im Text hinzufügen.", es: "Añade imágenes dentro del texto.", ca: "Afegeix imatges dins del text." },
+  "Write what was built, and how…": { de: "Schreib, was gebaut wurde, und wie…", es: "Escribe qué se construyó, y cómo…", ca: "Escriu què es va construir, i com…" },
+  "Write the build notes before marking it done.": {
+    de: "Schreib die Baunotizen, bevor du es als erledigt markierst.",
+    es: "Escribe las notas de construcción antes de marcarlo como hecho.",
+    ca: "Escriu les notes de construcció abans de marcar-ho com a fet.",
+  },
+  "Nothing written yet.": { de: "Noch nichts geschrieben.", es: "Aún no hay nada escrito.", ca: "Encara no hi ha res escrit." },
+  "Related tickets": { de: "Zugehörige Tickets", es: "Tickets relacionados", ca: "Tiquets relacionats" },
+  "No related tickets.": { de: "Keine zugehörigen Tickets.", es: "Sin tickets relacionados.", ca: "Sense tiquets relacionats." },
+  "Related stories": { de: "Zugehörige Storys", es: "Historias relacionadas", ca: "Històries relacionades" },
+  "No related stories.": { de: "Keine zugehörigen Storys.", es: "Sin historias relacionadas.", ca: "Sense històries relacionades." },
+  "Phase and wave": { de: "Phase und Wave", es: "Fase y Wave", ca: "Fase i Wave" },
+  "None": { de: "Keine", es: "Ninguno", ca: "Cap" },
+  "Metrics": { de: "Kennzahlen", es: "Métricas", ca: "Mètriques" },
+  "Cycle time": { de: "Durchlaufzeit", es: "Tiempo de ciclo", ca: "Temps de cicle" },
+  "Not started": { de: "Noch nicht begonnen", es: "Sin empezar", ca: "Sense començar" },
+  "Flow efficiency": { de: "Flusseffizienz", es: "Eficiencia de flujo", ca: "Eficiència de flux" },
+  "No time log": { de: "Keine Zeiterfassung", es: "Sin registro de tiempo", ca: "Sense registre de temps" },
 }

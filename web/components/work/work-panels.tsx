@@ -469,6 +469,7 @@ export function StoriesPanel({
         accountId: s.accountId || undefined,
         storyType: s.storyType || "",
         acceptanceCriteria: s.acceptanceCriteria || undefined,
+        buildNotes: s.buildNotes || undefined,
         moscow: s.moscow || undefined,
         contributesToGoal: checked,
       })

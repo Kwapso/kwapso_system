@@ -126,10 +126,48 @@ describe("GlossaryList, renders entries", () => {
     expect(onEdit).toHaveBeenCalledWith("W9")
   })
 
-  it("a person with the delete right sees a confirm before the word is taken away", () => {
-    render(<GlossaryList rows={[makeWord({})]} canEdit={false} canDelete onEdit={() => {}} />)
-    fireEvent.click(screen.getByLabelText(/take this word away/i))
-    expect(screen.getByText("Take this word away?")).toBeTruthy()
+  // Aurora, 20 Sep 2026, on this tab: "disable the off button (only edit)."
+  // The row draws no deactivate control at all any more, even for a person
+  // who holds the delete right: `GLOSSARY_DEACTIVATE_ENABLED` in
+  // glossary-list.tsx is the one switch, and it is off.
+  it("draws no deactivate button even with the delete right, only edit", () => {
+    render(<GlossaryList rows={[makeWord({ id: "W9" })]} canEdit canDelete onEdit={() => {}} />)
+    expect(screen.queryByLabelText(/take this word away/i)).toBeNull()
+    expect(screen.getByLabelText(/correct this word/i)).toBeTruthy()
+  })
+
+  // THE OVERVIEW PREVIEW. A row shows a one-line, plain-text preview of its
+  // own definition under the word (R87's own "never clip without saying
+  // so", read here for a body instead of a title).
+  it("shows a preview of the definition under the word", () => {
+    render(
+      <GlossaryList
+        rows={[makeWord({ id: "W1", title: "Wave", body: "A package of phases sold to one account." })]}
+        canEdit={false}
+        canDelete={false}
+        onEdit={() => {}}
+      />
+    )
+    expect(screen.getByText("A package of phases sold to one account.")).toBeTruthy()
+  })
+
+  it("cuts a long definition to ~140 characters, with an ellipsis", () => {
+    const long =
+      "A sprint is a fixed block of time, usually one to three weeks, in which the team plans, builds and " +
+      "validates a slice of an app, and every sprint carries its own named type so a reader can tell at a glance " +
+      "what kind of work it holds."
+    render(
+      <GlossaryList
+        rows={[makeWord({ id: "W1", title: "Sprint", body: long })]}
+        canEdit={false}
+        canDelete={false}
+        onEdit={() => {}}
+      />
+    )
+    expect(screen.queryByText(long)).toBeNull()
+    const preview = screen.getByText(/…$/)
+    expect(preview.textContent?.length).toBeLessThanOrEqual(141)
+    expect(long.startsWith(preview.textContent?.slice(0, -1) ?? "")).toBe(true)
   })
 })
 

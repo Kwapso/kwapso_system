@@ -40,6 +40,11 @@ const HOUSEKEEPING = [
   // travels as a body field rather than a query string ("GET-style POST",
   // Aurora's own words); there is no row it changes and so nothing to ping.
   "POST /api/content/stories/burndown",
+  // A story's own Cycle time / Effort / Flow efficiency (`getStoryMetrics`).
+  // A read, work:read, no `publishChange`, the same "GET-style POST" shape
+  // as the burndown door immediately above it: nothing here changes a row,
+  // it is computed fresh off `work_logs`/`story_status_events` every time.
+  "POST /api/content/stories/metrics",
   // "THE BYTES ARE UP" — the third step of the same upload. It LOOKS (`head`)
   // and answers the reference; it writes no row, no object and no counter.
   // The module's own door writes the row and publishes there, exactly as it

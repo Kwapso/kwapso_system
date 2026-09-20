@@ -1048,14 +1048,27 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // `!about` — an account with real rollup content (contacts, apps, sprints,
   // processes, tickets, todos) is chunked even with no free-text `about`.
   // See the reader's own comment for the measured incident.
-  account: { version: 5, digest: "5cd975a7786f1500" },
-  contact: { version: 1, digest: "83d7be3dfb3fd58b" },
+  // v6: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+  // through `clampTitle` when it is over TITLE_MAX_CHARS. Byte-identical for
+  // every account whose name already fits; the bump walks the cursor back
+  // over the rare over-length legacy name still indexed whole.
+  account: { version: 6, digest: "e9115f440d83bfba" },
+  // v2: same 21 Sep 2026 amendment as account: the title now clamps.
+  contact: { version: 2, digest: "56cf3ceab4e1746f" },
   // v2 (BUILD-5 §H, 18 Sep 2026): same change as account — `generatedOnly`
   // now also looks at `url`/`stage`/`stakeholders`/`processes`, not only the
   // four free-text paragraphs.
-  app: { version: 2, digest: "99b2e40eb034b375" },
-  process: { version: 2, digest: "2d1e918ddbfe3303" },
-  sprint: { version: 1, digest: "d583d89b784d61ed" },
+  // v3: same 21 Sep 2026 amendment as account: the title now clamps.
+  app: { version: 3, digest: "c6c542effb776d08" },
+  // v3: same 21 Sep 2026 amendment as account: the title now clamps. Worth
+  // calling out here specifically: a process's own name is one R87's FORM
+  // cap deliberately never covers, so this is one of the kinds where the
+  // clamp is not just a legacy-row backstop.
+  process: { version: 3, digest: "8f4a3f084f631361" },
+  // v2: same 21 Sep 2026 amendment as account: the title now clamps.
+  sprint: { version: 2, digest: "a50bf568a60e9c7d" },
+  // UNCHANGED by the 21 Sep 2026 amendment: I1 keeps a story's own title
+  // whole, so this reader's text did not move.
   story: { version: 1, digest: "234755039c3242c1" },
   // v2: the summary says "already happened" / "still to come" from the start
   // time, where it used to quote the retired status column.
@@ -1081,8 +1094,11 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // already indexed says exactly what it said before and a bump would re-read
   // 465 sources to rewrite none of them. What moved is which PARENT the row
   // carries, which is a column and not a word.
-  meeting: { version: 5, digest: "ea4451ecac7c35d3" },
-  todo: { version: 2, digest: "9c76858afd0914a8" },
+  // v6: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+  // through `clampTitle` when it is over TITLE_MAX_CHARS.
+  meeting: { version: 6, digest: "923d29f72c260a80" },
+  // v3: same 21 Sep 2026 amendment as account: the title now clamps.
+  todo: { version: 3, digest: "8c20c83bd3ccd16b" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
   // the file and its digest covered every helper below the table. Bounding the
@@ -1096,7 +1112,8 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // the task builder is byte for byte what it was — so nothing needs re-indexing
   // and the version must not move. That this keeps happening to whichever kind is
   // declared last is worth knowing before reaching for a bump.
-  task: { version: 1, digest: "5dc7103f84e1ca87" },
+  // v2: same 21 Sep 2026 amendment as account: the title now clamps.
+  task: { version: 2, digest: "deb127c2603ff1d4" },
   // R47's three (1 Sep 2026). Every one starts at v1 because no row of them has
   // ever been indexed — there is nothing behind a cursor to leave saying the old
   // words.
@@ -1135,7 +1152,12 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // below explains for `generated_only` generally, not one word of what any
   // kind's body SAYS (the `nameSpellings` call in `body` itself is unchanged,
   // just read from a hoisted local instead of called twice).
-  person: { version: 4, digest: "bbd989ec3cbf4311" },
+  // v5: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+  // through `clampTitle` when it is over TITLE_MAX_CHARS. Worth calling out
+  // here specifically: a person's own name is one R87's FORM cap
+  // deliberately never covers, so this is one of the kinds where the clamp
+  // is not just a legacy-row backstop.
+  person: { version: 5, digest: "c6a01b7d6a08f50e" },
   // v2 (10 Sep 2026): THE READER WAS SAYING SOMETHING FALSE, and this is the
   // bump that reaches the rows already filed. It used to take
   // `MAX(CASE WHEN is_default = 1 … THEN value END)` and write "<X> is picked
@@ -1152,10 +1174,12 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // gave every kind a `generatedOnly` flag, which is metadata about the row and
   // not one word of what a person reads. v2 above is still the last change to
   // the TEXT, so the cursor must not walk the corpus again for this.
-  dropdown: { version: 3, digest: "9b0c4a58bafbd1b7" },
+  // v4: same 21 Sep 2026 amendment as account: the title now clamps.
+  dropdown: { version: 4, digest: "ee98fae5f681cbc1" },
   // Same merge, same reason as `dropdown` above: `generatedOnly` moved the hash
   // and not the sentence, so the version holds at 1.
-  portal_login: { version: 1, digest: "8fa96a5eebfff039" },
+  // v2: same 21 Sep 2026 amendment as account: the title now clamps.
+  portal_login: { version: 2, digest: "45a3f3397b4ff71d" },
 }
 
 /** Everything in the sweep that is NOT inside a kind: the shared helpers each
@@ -1353,7 +1377,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // (`ROLLUP_PRESS_SKIP_MS`, guarded by a null `knownCursor` proving that last
 // tick genuinely finished). Orchestration only, outside every per-kind
 // reader; no kind's TEXT changed and no textVersion moved.
-const SHARED_DIGEST = "8283742e47d14574"
+//
+// Moved a SEVENTH time, R87 I1 (RULES.md), amended 21 Sep 2026: the file
+// gained one new top-level import, `clampTitle` (shared/clamp-title.ts),
+// which every clamped kind's own `read()` calls. An import line, outside
+// every per-kind slice, changes no kind's TEXT and moves no textVersion on
+// its own.
+const SHARED_DIGEST = "d2f3f16eac0ca884"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

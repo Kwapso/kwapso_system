@@ -67,6 +67,7 @@
 // what the old interpolation cost and why the fence moved with it.
 
 import { automationOff } from "@shared/workers/automations"
+import { clampTitle } from "@shared/clamp-title"
 import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
@@ -1214,10 +1215,16 @@ export function googleIngestKinds(
    * `slice`, not because somebody remembered.
    *
    * Only known strings with a named source of truth are touched; anything else
-   * is left exactly as Google sent it. */
+   * is left exactly as Google sent it.
+   *
+   * THE SAME EXIT CLAMPS THE TITLE, too: R87 I1 (RULES.md, amended
+   * 21 Sep 2026), a title carried in from a Google import is no longer kept
+   * whole, it clamps to `TITLE_MAX_CHARS` on the way in like every other
+   * knowledge-source title that arrives from outside the typed form. Mended
+   * first, so a corrected name is what gets measured and cut. */
   const mended = (r: IngestRow): IngestRow => ({
     ...r,
-    title: mendMojibake(r.title),
+    title: clampTitle(mendMojibake(r.title)),
     body: mendMojibake(r.body),
   })
 

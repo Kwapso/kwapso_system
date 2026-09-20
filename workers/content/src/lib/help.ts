@@ -1910,10 +1910,16 @@ export type TicketInput = {
    * ignored outright for a portal caller, the same "ignored, not refused"
    * shape `accountId` above already takes, because an assignee is a fact
    * about our side of the fence and a client's own edit never reaches it.
-   * Left out means "leave it alone", the same rule `appId`/`moduleId`/
-   * `raisedByContactId` already follow, a person only ever sends this when
-   * they are actually choosing somebody. */
-  assigneeId?: string
+   * Left out (`undefined`) means "leave it alone", the same rule
+   * `appId`/`moduleId`/`raisedByContactId` already follow. `null` is an
+   * EXPLICIT CLEAR (Aurora's ruling, 21 Sep 2026, "Nobody, inherit from the
+   * app" on the Assigned to Select, `web/components/tickets/help-
+   * stakeholders.tsx`): the ticket's own assignee is wiped back to nothing
+   * and `effectiveAssignee()` falls back to the app's own lead. The two are
+   * NOT the same wire value: `optionalText` alone reads both as "absent",
+   * which is exactly why `updateTicket` checks the raw value for `null`
+   * before handing it to that validator. */
+  assigneeId?: string | null
 }
 
 /** WHICH APP IS THIS REQUEST ABOUT? Null is allowed and common (the agency's own
@@ -2270,9 +2276,16 @@ export async function updateTicket(
   // outright for a portal caller, `input.assigneeId` is never even read for
   // one, the same "ignored, not refused" shape `accountId` above already
   // takes, because an assignee is a fact about our side of the fence.
-  // Absent means "leave it alone", the same rule `appId`/`moduleId`/
-  // `raisedBy` above already follow, a person only sends this when they
-  // are actually choosing somebody.
+  // Absent (`undefined`) means "leave it alone", the same rule
+  // `appId`/`moduleId`/`raisedBy` above already follow, a person only sends
+  // this when they are actually choosing somebody.
+  //
+  // `null` IS AN EXPLICIT CLEAR (Aurora, 21 Sep 2026, "Nobody, inherit from
+  // the app" on the ticket's own Assigned to Select), checked on the RAW
+  // wire value, positionally (R20's own literal-comparison form), because
+  // `optionalText` answers `undefined` for both `null` and `undefined` and
+  // cannot tell "leave it" from "clear it" apart on its own.
+  const assigneeCleared = scope.kind !== "portal" && input.assigneeId === null
   const assigneeId =
     scope.kind === "portal" ? undefined : optionalText(input.assigneeId, "Assignee", TEXT_LIMITS.short)
   const assignee = assigneeId
@@ -2336,9 +2349,10 @@ export async function updateTicket(
       raisedBy,
       // Absent (undefined, a portal caller, or nobody chosen) keeps whatever
       // the ticket already carried, the same fallback `appId`/`moduleId`/
-      // `raisedBy` above already take.
-      assigneeId ?? before.assignee_id,
-      assignee?.name ?? before.assignee_name,
+      // `raisedBy` above already take. An explicit clear wins over that
+      // fallback and writes NULL, whichever the ticket carried before.
+      assigneeCleared ? null : assigneeId ?? before.assignee_id,
+      assigneeCleared ? null : assignee?.name ?? before.assignee_name,
       accountAfter,
       now,
       actor.id,
@@ -2369,7 +2383,11 @@ export async function updateTicket(
       hideValues: true,
     },
     { label: "Source", from: before.source_screen, to: optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null },
-    { label: "Assignee", from: before.assignee_name, to: assignee ? assignee.name : before.assignee_name },
+    {
+      label: "Assignee",
+      from: before.assignee_name,
+      to: assigneeCleared ? null : assignee ? assignee.name : before.assignee_name,
+    },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket edited",

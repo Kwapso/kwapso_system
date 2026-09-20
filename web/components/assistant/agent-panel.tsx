@@ -34,7 +34,6 @@ import { Toggle } from "@shared/ui/components/toggle/toggle"
 
 import { SOURCE_CHIPS, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { CollectionRegister } from "@shared/ui/components/collection-frame/collection-frame"
-import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 import { Title } from "@shared/ui/components/title/title"
 import { cn } from "@shared/ui/lib/utils"
 import { usePickedFileItems } from "@shared/web/upload-items"
@@ -46,6 +45,7 @@ import { AgentTabStrip } from "@/components/assistant/agent-tab-strip"
 import { AssistantLimitNotice } from "@/components/assistant/assistant-limit-notice"
 import { citationPills, TurnSources } from "@/components/assistant/agent-sources"
 import { AgentUsageDialog } from "@/components/assistant/agent-usage-dialog"
+import { RunSteps } from "@/components/assistant/run-steps"
 import { useAgentDock, useAgentDockTabs } from "@/lib/agent-dock"
 import { setAgentOpen } from "@/lib/agent-open"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
@@ -1631,13 +1631,20 @@ export function AgentPanel({
             <div className="flex flex-col gap-4 shadow-[var(--hairline-over)] py-4">
               <p className="text-sm font-medium">{t("I'd like to make these changes:")}</p>
               {/* Each step now carries the PAYLOAD under its label (a role's
-               * whole access sheet is a dozen lines), so the list scrolls on
-               * its own and the two buttons stay where a thumb expects them —
-               * a confirm you have to hunt for is nearly as bad as one you
-               * can't read. */}
-              <div className="max-h-[40vh] min-h-0 overflow-y-auto">
-                <RunSteps steps={chat.confirmSteps} />
-              </div>
+               * whole access sheet is a dozen lines). R91 (no nested scroll),
+               * Aurora's ruling 21 Sep 2026: this list used to scroll on its
+               * own inside the aside, a second moving region beside the
+               * thread's own sanctioned scroll. Flattened, so the page
+               * scrolls instead.
+               *
+               * THE WHOLE LIST, VERBATIM. web/test/agent-confirm-panel.test.tsx
+               * reads this file's own source for `steps={chat.confirmSteps}`:
+               * an admin approving a bare label is the regression that test
+               * exists for, so the confirm steps must reach RunSteps
+               * unsliced. The five-row cap and the "Show more" door (R88
+               * style) live INSIDE @/components/assistant/run-steps instead
+               * of at this call site, so the two are never out of step. */}
+              <RunSteps steps={chat.confirmSteps} />
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="secondary"

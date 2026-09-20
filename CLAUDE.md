@@ -670,8 +670,10 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   no photo field yet, a named, open gap). A static census, `web/test/faces-in-choices.test.ts`,
   detects a choice over a record by its own options array's field names and fails when a
   `<SelectItem>` inside one carries no `face=`. (`faces-in-choices`)
-- **One page scroll only, no nested scroll regions (R91).** Chat threads, the rail and the
-  assistant pane are the named exceptions. (`no-nested-scroll`)
+- **One page scroll only, no nested scroll regions (R91).** Chat threads, the rail, the
+  assistant pane and true overlays are the named exceptions. A table or a kanban board is NOT
+  a fifth exception, Aurora's ruling, 21 Sep 2026: "like everything else". A vertical scroll
+  inside one is an ordinary offender, censused separately. (`no-nested-scroll`)
 - **Main excludes secondary (R92).** Aurora: "when I select the main, this person should not be
   available as secondary. E.g. when I select 'Raised by,' this person should disappear from the
   'Keep in the loop' options." Two independent pickers over one shared pool — raised by / keep in

@@ -45,6 +45,7 @@ import {
   createSprint,
   createStory,
   getStory,
+  getStoryMetrics,
   listSprints,
   listStories,
   setSprintComplete,
@@ -232,6 +233,7 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   // 2026) — both optional at the boundary, exactly `category`'s own shape:
   // `createStory` is what actually enforces the four-word MoSCoW list.
   optionalText(body.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long)
+  optionalText(body.buildNotes, "Build notes", TEXT_LIMITS.long)
   optionalText(body.moscow, "Priority", TEXT_LIMITS.short)
   const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
   const { id, accountId } = await createStory(env, cfg, guard, actor, body)
@@ -257,6 +259,7 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
   requireText(body.category, "Category", TEXT_LIMITS.short)
   optionalText(body.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long)
+  optionalText(body.buildNotes, "Build notes", TEXT_LIMITS.long)
   optionalText(body.moscow, "Priority", TEXT_LIMITS.short)
   const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
   const { accountId } = await updateStory(env, cfg, guard, actor, id, body)
@@ -376,6 +379,21 @@ export async function postStoryBurndown(request: Request, env: Env): Promise<Res
   const phaseId = requireText(body.phaseId, "Phase", TEXT_LIMITS.short)
   const burndown = await storyBurndown(cfg, guard, phaseId)
   return json(burndown)
+}
+
+/** POST /api/content/stories/metrics — the story detail page's own three
+ * figures (Cycle time, Effort, Flow efficiency; `StoryMetrics`, shared/
+ * types.ts carries the shape). `work:read`, a GET-style POST like
+ * `postStoryBurndown` immediately above it, for the identical reason: the
+ * story id travels as a body field rather than a query string. Computed
+ * fresh on every read (`getStoryMetrics`), never cached per day — there is
+ * no day-by-day series here to make caching worth the staleness. */
+export async function postStoryMetrics(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Story", TEXT_LIMITS.short)
+  const metrics = await getStoryMetrics(cfg, guard, id)
+  return json(metrics)
 }
 
 /* ---------------------------------- sprints --------------------------------- */

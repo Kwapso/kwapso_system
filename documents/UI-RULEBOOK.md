@@ -39,8 +39,8 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L39)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K55)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B41)
+- [4. Collections](#4-collections) (K1 to K56)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B42)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1639,9 +1639,13 @@ carries no `face=`.
 
 ### L34: never need to scroll to see all content
 
-**The rule (R91 `no-nested-scroll`).** Aurora's ruling, 19 Sep 2026 ~13:30–13:40, verbatim: *"never need to scroll to see all content!!! (only exception chat compnents)"* — stated as a standing law to be enforced everywhere. One page scroll only; no scroll area inside a page's content. When a section or component fits its own container, nothing scrolls. When it does not, the section itself becomes a bounded scrolling region with an explicit `overflow-y: auto` / `overflow-x: auto`, never the page scrolling one region and an inner section scrolling another. **Exceptions:** chat components (the conversation thread scrolls inside its card, by this rule's own L31/L33 shape); the rail's own list of sections (pinned height, scrolls on overflow); the assistant pane (one aside scrolling region); true overlays (dialogs, sheets, popovers, listboxes — a modal or a dropdown may scroll internally and holds no relation to the page's own scroll). **Not covered:** horizontal scroll on tables and boards — those await her answer to question 4 (Round 27), open.
+**The rule (R91 `no-nested-scroll`).** Aurora's ruling, 19 Sep 2026 ~13:30–13:40, verbatim: *"never need to scroll to see all content!!! (only exception chat compnents)"* — stated as a standing law to be enforced everywhere. One page scroll only; no scroll area inside a page's content. When a section or component fits its own container, nothing scrolls. When it does not, the section itself becomes a bounded scrolling region with an explicit `overflow-y: auto` / `overflow-x: auto`, never the page scrolling one region and an inner section scrolling another. **Exceptions:** chat components (the conversation thread scrolls inside its card, by this rule's own L31/L33 shape); the rail's own list of sections (pinned height, scrolls on overflow); the assistant pane (one aside scrolling region); true overlays (dialogs, sheets, popovers, listboxes — a modal or a dropdown may scroll internally and holds no relation to the page's own scroll). **Not covered:** horizontal scroll on tables and boards. R91 is a vertical law only, horizontal was never in question.
 
-**Status: ruled, in build, 19 Sep 2026.**
+**AMENDED, 21 Sep 2026: the five pending scrollers and the tables/boards question, both settled.** Five sites (the assistant's History tab, the paused-turn confirm list, the tickets dashboard's chart column, the import wizard's rejected-rows preview, and the meeting transcript preview) were shown to Aurora on a decisions page, one recommendation each, keep or flatten. Her ruling, verbatim: *"confirm"*, she accepts every recommendation. **Kept**, moved from pending to sanctioned in `NO_NESTED_SCROLL_EXEMPT`: the History tab list ("same shape as the rail's own sanctioned list"), the dashboard chart column ("a bounded dashboard widget, not the page itself"), the import preview ("a bounded preview inside one wizard step, the same shape as a dialog body"), and the meeting transcript preview ("a transcript flowing into the page would bury everything else on the record"). **Flattened:** the paused-turn confirm list (`agent-panel.tsx`) no longer scrolls on its own; the page scrolls, and a list longer than five steps is capped by a "Show more" door (L33/R88 style) rather than a second moving region beside the thread's own sanctioned scroll.
+
+Separately, asked whether a table or a kanban board is a sanctioned shape of its own, Aurora's ruling, verbatim: *"like everything else"*, it is not. A table or a board obeys R91 exactly as every other component does, no carve-out: a vertical scroll region inside one is an ordinary offender, caught by a second, narrower census (`findTableBoardOffenders`, same test file) against `TABLE_BOARD_SCROLL_EXEMPT`, empty as of this ruling because no table or board in the app currently scrolls on its own. Horizontal stays exactly as it was: a wide table's or a board's own `overflow-x-auto` is still not this law's subject.
+
+**Status: validated, 21 Sep 2026.** Aurora's "confirm" and "like everything else" close both open items this rule carried.
 
 **Law.** [R91](../RULES.md) (`no-nested-scroll`).
 
@@ -4815,6 +4819,32 @@ truly has none.
 **Law.** None new — reinforces [G5](#g5-a-record-never-appears-without-its-face)/R35, a
 call-site fix rather than a new rule.
 
+### K56: the Sync button matches its toolbar siblings' height, and the "not synced yet" hint stays in the control's own status slot
+
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim: *"on knowelegde, the syn button its
+to small. unify with law. move the hint not broght in yet."* Two facts about one control,
+`GoogleSyncButton` (`web/components/knowledge/google-sync.tsx`). The SIZE: on the knowledge
+toolbar the Sync button sits beside the mango Ask button and the settings gear, and both of
+those stand at the kit's own default control height; Sync alone was drawing `size="sm"`
+(`--control-height-dense`, 32px), the one button in the row not matching its siblings. The
+HINT: "Not brought in yet" was never a free-floating toolbar caption to relocate, it already
+rendered in the control's own status slot, the same one the "Last brought in …" line takes
+once a sync has run; what read as a stray hint sitting beside the button was the size,
+`text-xs` next to the button's own `text-sm` label.
+
+**The shape.** `size="sm"` dropped from the Sync button, through the kit Button prop alone,
+no custom class, so it reads the kit's standing `--control-height-button` (40px), the same
+height the Ask button (no size named) and the gear (`size="icon"`, itself the standing
+height) already draw. The status line's own two text-only branches, "Last brought in …" and
+its pre-sync fallback "Not brought in yet", both move from `text-xs` to `text-sm`, still in
+the exact same ternary slot they already shared, styled alike rather than relocated.
+
+**Status: ruled, in build, 21 Sep 2026.**
+
+**Law.** None new: a call-site fix through the kit's own Button `size` prop; R72's own
+point (a control's helper text belongs to the control, not to a heading) is why the hint
+stayed in place rather than moving to CollectionHeading's title line.
+
 ---
 
 ## 5. Buttons and actions
@@ -6152,7 +6182,22 @@ the first time a person with the knowledge create right opens the tab
 the knowledge base's own existing doors, gated by the same `knowledge:create` /
 `:update` / `:delete` rights every other source already carries.
 
-**Status: ruled, in build, 20 Sep 2026.**
+**AMENDED 21 Sep 2026 - a preview in the overview, and the off button disabled.** Aurora,
+verbatim, reading the tab back: *"good. include a preview of the description in the
+overview. disable the off button (only edit)."* Two changes to the row itself
+(`web/components/knowledge/glossary-list.tsx`), the tab's own wiring and doors unchanged.
+First, each row now draws a one-line, plain-text preview of its own definition under the
+word, the first line or the first ~140 characters, whichever comes first, through the
+same `richTextPlain` seam every other list/card preview in the app already reads a body
+through (`shared/web/rich-text.ts`), never silently clipped (R87's own rule for a title,
+read here for a body): an ellipsis marks every cut that left something out. Second, the
+row's own "Take this word away" (deactivate) control no longer draws, for anyone, right or
+no right: only "Correct this word" (edit) does. The door stays: `content.setKnowledgeActive`
+and the confirm flow are unchanged in the file, the same door the record screen's own "Stop
+using this" button still calls, gated behind one switch, `GLOSSARY_DEACTIVATE_ENABLED`,
+currently off.
+
+**Status: ruled, in build, 21 Sep 2026.**
 
 **Law.** None registered.
 
@@ -6266,6 +6311,49 @@ by `web/test/wave-stage.test.ts` (the helper's four cases) and
 `web/test/wave-stage-mark.test.tsx` (the row and the head, through the one shared
 component both draw).
 
+**AMENDED 20 Sep 2026 - two fallbacks, found in the live proof.** The rule above
+named four cases for the STAGE and said nothing about what a phase with no TYPE, or
+a wave with no DATES of its own, should draw - and the live proof of this same work
+found both gaps, on the row and on the head alike.
+
+1. **A typeless active/upcoming phase is still a phase, never a blank chip.**
+   `WaveStageMark` read a `null` `sprintType` as `sprintTypeHasGlyph(type)` false and
+   `type ? t(type) : ""` - an icon-less `Badge`/span with an EMPTY label, which reads
+   as nothing at all, on the row's own Phases cell and on the wave head's own chip
+   row. The fallback: the phase's own NAME (every phase carries one; a phase cannot
+   be created without it), under the GENERIC phase icon - `CalendarDots`, the same
+   Phosphor glyph `CONCEPT_ICON.sprints` gives the Phases nav item (`web/lib/
+   pages.ts`) - never the empty label. A phase whose type IS set but is not one this
+   app's vocabulary carries a glyph for (a team's own retired or custom word) is
+   unaffected: it still reads its own word, with no icon, exactly as before - the
+   fallback is for a MISSING type, not an unrecognised one.
+
+2. **The head's own "Runs" line derives from its phases when the wave carries no
+   dates of its own.** `waveDates` read only the wave's own `startsOn`/`endsOn` and
+   fell straight to "No phases planned yet" the moment either was unset - even with
+   a dated phase sitting right there on the Phases tab, because the door's own
+   `recalcWaveDates` recalculation can lag a read, or a phase can be attached the
+   same moment the screen renders. `waveDates` now takes an optional third argument,
+   the wave's own active phases; when the wave itself carries neither date, Runs is
+   the EARLIEST phase start to the LATEST phase end (mirroring the door's own
+   recalculation), and only when no phase carries a date either does the sentence
+   stand. A wave that carries even one of its own two dates is unaffected - the
+   phases are read only when the wave itself answers neither.
+
+**Where it is wired.** Both fixes live in the same two functions B37 already names -
+`WaveStageMark` and `waveDates` (`web/components/work/waves-screen.tsx`) - so the
+row and the head still draw through the one shared component and the one shared
+helper; nothing new was built. Proved by `web/test/wave-stage-mark.test.tsx`'s own
+new cases: the typeless-phase fallback on both the `"text"` (row) and `"chip"`
+(head) variants, plus the same fixture read through `waveListRows` for the row
+specifically, and the `waveDates` phase-derivation cases (one date, several phases,
+neither date and no phases either).
+
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed the rule
+live, verbatim: *"confirm."*
+
+**Status: validated, 21 Sep 2026.**
+
 ---
 
 ### B38: "To Do" means scheduled in an active phase, not merely open
@@ -6300,13 +6388,31 @@ resolves (`OpenStoryFacetStatus`, `workers/content/src/lib/stories.ts`:
 `status=to_do`/`status=backlog` both narrow to the stored `open` status, told apart by
 the same phase-active predicate in SQL).
 
+**AMENDED 21 Sep 2026 - the Backlog TAB gets the identical facet, door-narrowed.** Until
+this pass only `work-panels.tsx`'s own nested Stories panel offered Status as a facet,
+through `<PagedFind>`'s own door-forwarding; the top-level Backlog tab (`stories-screen.tsx`,
+built on `useFilterBar` rather than `PagedFind`) offered Category alone, filtered in the
+browser. Aurora's own ruling names the filter itself as the point ("the filter offers them
+as two choices"), so the Backlog tab's `facets` array now carries a Status facet too, gated
+to that one tab (`view === "backlog"` - Reviews and Now keep whatever facets they already
+had, untouched), four choices in that order - Backlog, To Do, In Review, Done, no In
+Progress, because the everyday backlog is never the board. Narrowed through the DOOR, never
+client side (R14/R16): picking a value changes `storiesQ`'s own cache key
+(`storiesKeyForView`, `stories-screen.tsx`) and re-asks `contentApi.stories({ view:
+"backlog", status })` from page one, the identical `OpenStoryFacetStatus` words the door
+already answers for the nested panel's own facet; `<LoadMore>` carries the same narrowed key
+and status forward so paging past page one keeps the same question.
+
 **Status: shipped, 21 Sep 2026.**
 
 **Law.** None registered - an arrangement decision. Proved by
 `web/test/story-status-word.test.ts` (the label helper), `web/test/story-status-board.test.ts`
-(the List's own cell and the board's own column predicate, plus the facet's five
-choices), and `workers/content/test/stories.test.ts` (the door's own `to_do`/`backlog`
-filter, driven end to end).
+(the List's own cell and the board's own column predicate, plus the nested panel's facet's
+five choices), `web/test/stories-backlog-status-facet.test.tsx` (the Backlog tab's own four
+choices, in order, gated to that tab, and a live render proving a pick issues a real
+`status=to_do` request rather than a client-side filter), and
+`workers/content/test/stories.test.ts` (the door's own `to_do`/`backlog` filter, driven end
+to end).
 
 ---
 
@@ -6435,17 +6541,201 @@ neither an assignee nor an app to inherit from. Unlike Raised by, the row is nev
 the panel's own "just the raiser and your admins" empty state, an assignee can exist with no
 stakeholders at all.
 
-**Status: ruled and shipped (ticket side), 21 Sep 2026. Story side: parked as a design
-artifact, resolver ready.**
+**AMENDED 21 Sep 2026 - a way back to inherited.** The ruling shipped the row but not a way
+to undo it: once a ticket carried its own assignee, nothing on the page could clear it back
+to the app's own answer. The Select's first option is now a real, pickable row - the `NONE`
+sentinel (`__none__`) every other "nothing chosen" Select in this app already uses
+(`step-form-dialog.tsx`, `meeting-form-dialog.tsx`, `help-form-dialog.tsx`'s own "Raised by"),
+never a bare empty string, which Radix reads as nothing selected rather than as an item
+somebody actually picked. It reads "Nobody, inherit from the app" when the app has a lead to
+fall back to (`appAssigneeId`), and plain "Nobody" when it has none - the row never promises
+an inheritance that would not happen. Choosing it writes `assigneeId: null` through the same
+door (`content.updateHelp`), and the door tells "clear it" apart from "leave it alone" on the
+RAW wire value: `optionalText` alone answers `undefined` for both a missing field and an
+explicit `null`, so `updateTicket`'s own `assigneeCleared` (`workers/content/src/lib/help.ts`)
+checks `input.assigneeId === null` before the validator ever sees it - R20's own
+literal-comparison form, positional like every other check this door already makes. R90
+(faces in choices) still governs this row: it carries the kit's own EMPTY face (`face={{ name:
+"" }}`, a blank `Avatar`, no photo and no initials to draw) rather than no face at all, because
+there is no record behind "nobody" to draw a real one for, and the census only asks whether a
+face slot is present.
 
-**Law.** None new. Governed by the pre-existing R90 (`faces-in-choices`, the Select's own
-faces) and R75 (alphabetical options), both proved by the existing app-wide censuses, not a
-new one. Behaviour proved at the door
+**AMENDED A SECOND TIME, SAME DAY, 21 Sep 2026 - a different card from Stakeholders.** Aurora,
+reading the shipped row back, verbatim: *"nono assigned to on the very top, a different card
+from stakeholders!"* The row above had landed INSIDE `HelpStakeholders`, above Raised by, one
+`Card` among several in the Stakeholders panel - correct about the POSITION ("on the very top")
+and wrong about the CONTAINER. It is now its own top-level `Card`, `AssignedToCard`, exported
+from `help-stakeholders.tsx` beside (never inside) `HelpStakeholders`, which carries none of it
+any more - no props, no state, no render. Rendered as the FIRST panel in the ticket page's own
+right column, above Stories/Time/Stakeholders and everything else: `TicketDetailBody`
+(`web/components/tickets/ticket-detail-body.tsx`) gains a new `assignedTo` slot, first in its
+own `sidePanels`, with a matching `TICKET_PANEL_ANCHOR.assignedTo`; `help-detail.tsx` builds
+`<AssignedToCard>` from the same ticket/app/member facts the Stakeholders panel's own call used
+to hand it, through the same `editTicket` courier. Because this card now stands DIRECTLY on the
+page ground rather than nested inside another `Card`, it takes `variant="default"` (soft paper)
+in place of the `"raised"` it correctly wore while nested - R67's own ground rule
+(`ticket-detail-body.tsx`'s header), the same "a raised card standing on its own ground" bug
+that file's several rounds already exist to catch, caught here one level up before it shipped.
+Everything else about the card, and last amendment's clear-to-inherited option, are unchanged.
+
+**AMENDED A THIRD TIME, 20 Sep 2026 - the clear-to-inherited option was itself a law
+violation, corrected.** The second amendment's own "Nobody, inherit from the app" / plain
+"Nobody" row put a live pill back into a STAFF PICKER, which R79's own law already forbids:
+Aurora's 16 Sep 2026 ruling, verbatim, quoted in full because this is the sentence the second
+amendment should have been checked against and was not: *"Kill the 'nobody' option for staff.
+If we leave it empty, it's not an option. Remove it from tasks and everywhere else. This
+'nobody', just kill it."* `staff-picker-kills-nobody.test.tsx` (the census half, off disk) is
+the standing proof that `allowNobody`/`nobodyLabel` cannot come back on `StaffPillPicker`
+itself; this card's own `Select` is a different component, so the census could not see the
+"Nobody, inherit from the app" row it grew independently, and it shipped, red against the
+ruling, under a green build. **The fix is not "no way back", it is "not a picker entry".**
+The Select goes back to offering people only (sorted, R75; faced, R90; no Nobody row, at any
+`appAssigneeId` state). Clearing the ticket's own assignee back to inherited is now a plain
+text button on the card itself, `variant="link"` (the kit's own quiet, boxless action, `.kw-
+link`), reading "Use the app's lead", offered only when there is somewhere to fall back TO:
+the record carries its own assignee AND the app has a lead. **When the app has no lead, no
+clear action is offered at all** - once a ticket or story is assigned, it keeps a person,
+which is the other half of the 16 Sep 2026 ruling ("if we leave it empty, it's not an
+option") read correctly this time: emptiness is never reachable by a click, not even a click
+disguised as "inherit instead of clear". Pressing the button calls the same door,
+`onChangeAssignee(null)`, unchanged - the doors already treat `null` as an explicit clear
+(`assigneeCleared`, above), so nothing downstream of the click needed to move.
+
+**Status: ruled and shipped (ticket side), 20 Sep 2026, including the separate clear action
+and its own top-level card. Story side: parked as a design artifact, resolver ready.**
+
+**Law.** None new for the row itself. Governed by the pre-existing R90 (`faces-in-choices`,
+the Select's own faces) and R75 (alphabetical options), both proved by the existing app-wide
+censuses. **The clear action is governed by R79** (`staff-pill-row`, "there is no 'Nobody'
+pill") read together with `staff-picker-kills-nobody.test.tsx`'s own header: *"A STAFF PICKER
+NEVER OFFERS NOBODY"* - a picker never offers Nobody, so the way back to the app's lead is
+never a picker option, it is a separate action beside the picker, on the card that owns the
+fact. Behaviour proved at the door
 (`workers/content/test/ticket-gets-its-own-assignee.test.ts`: set and read back, inherits the
-app's lead, the ticket's own assignee wins, a client login cannot set it) and at the app's own
-wiring (`web/test/help-stakeholders.test.tsx`'s "Assigned to" suite: the inherited line, the
-own-assignee-wins case, the pen opening the Select and calling the door) and the resolver
-itself (`web/test/effective-assignee.test.ts`).
+app's lead, the ticket's own assignee wins, a client login cannot set it, and `assigneeId:
+null` clears it - never confused with leaving the field out) and at the app's own
+wiring (`web/test/help-stakeholders.test.tsx`'s `AssignedToCard` suite: the inherited line,
+the own-assignee-wins case, the pen opening the Select and calling the door, the Select
+offering no Nobody option at any app-lead state, and its own "the clear action returns the
+ticket's own assignee to inherited" suite: the action renders only with an own assignee AND
+an app lead, renders for neither state alone nor for a reader with no edit right, pressing it
+calls the door with `null`, and the row itself reads inherited-or-empty again once a re-render
+hands back a cleared ticket; plus its own "HelpStakeholders no longer draws an Assigned to
+row" suite, proving the extraction really left, both at render and positionally on the
+component's own signature; and its own "TicketDetailBody, Assigned to is the first panel in
+the side column" suite, rendering the real layout component and reading the DOM order directly
+rather than trusting a prop name) and the resolver itself (`web/test/effective-assignee.test.ts`).
+
+---
+
+### B42: the story detail page, one page, no tabs, with its own Build notes
+
+**The rulings.** Aurora's design review, 21 Sep 2026, over the story-detail-design.html
+artifact — a story is what we do, built the same shape the ticket already is. Two verbatim
+sentences of hers this round: *"call it build notes"* — the artifact's own third left-column
+section (what was built, and how) offered four candidate words, "Solution" recommended; she
+named the one actually shipped, never that one. And, the design's own open question ("should
+the Done action refuse to close a story with no Solution written, the same way Ready for
+review already asks for a note. Yes or No"), answered verbatim: *"yes, canont be marked as don
+if thats not filled in, its required."* Read as: a story cannot reach Done while its Build
+notes panel is empty, exactly the shape Ready for review's own review-note requirement already
+takes. Dated the same round as B41 above, and the ticket's own "Assigned to" card — parked in
+B41 as a story-side artifact — is what this round wires up for real: *"the story gets the same
+card."*
+
+**The data model.** Team migration 0112 gives `stories` one new column, `build_notes TEXT` —
+the identical storage `detail`/`acceptance_criteria` already use (rich text, sanitised into the
+`Notes` editor, list reads null it out the same way those two do, a by-id read keeps it whole).
+`Story.buildNotes: string | null` (`shared/types.ts`), read and written through the SAME door
+every other story field already rides, `updateStory`/`createStory`
+(`workers/content/src/lib/stories.ts`), which replaces every field it reads — an edit that never
+mentions `buildNotes` clears it, the identical contract every other field on that door already
+keeps. MCP: `update_story` (and `create_story`, for parity) gained `buildNotes` in schema and
+`buildBody`, documented in `documents/MCP.md` §3.
+
+**The Done rule, at the door, and mirrored on the button.** `refuseUndocumented(row)`
+(`workers/content/src/lib/stories.ts`, read beside `refuseUnstepped`, the identical CHECKLIST
+6.5 step-rule shape) refuses `setStoryStatus(id, "done", …)` with a plain message, *"Write the
+build notes before marking it done,"* when `build_notes` is empty or whitespace-only — the
+refusal is idempotent (R17), reads the row already resolved, never a second query. The story
+detail page's own Done head action mirrors the same fact back as its own `disabled` state, with
+a tooltip carrying the identical sentence, so a reader sees why before they ever press it — the
+door decides, the button only mirrors it, the same split R17 already asks of every status
+button in this app.
+
+**Where the images live.** No second attachment table. Build notes' own images ride the SAME
+mechanism the story's retired "Files and links" tab already used, `story_attachments`
+(`workers/content/src/lib/story-attachments.ts`) — itself "one table along" from
+`help_attachments`, the reply body's own mechanism, by that file's own header. The Build notes
+sheet (below) reuses the existing, tested `StoryAttachmentsPanel` for the picker; the rendered
+(non-empty) panel shows the prose followed by whichever of the story's own attachments are
+pictures, inline, the same `hasPreview`/`AttachmentPreview` pair the ticket thread's own message
+media well already draws with.
+
+**The page, one page, no tabs.** `web/components/work/story-detail.tsx`, rewritten whole.
+`RecordScreen panelVisible={false} footerVisible={false}` draws the head only (chips through
+`orderChips` — id, status, type, app, phase — the title, and the head actions: the timer, Edit,
+Ready for review, Done); the body renders as its SIBLING, the identical shape `help-detail.tsx`
+already takes for `TicketDetailBody` (`RecordScreen`'s own `panelVisible` doc: the kit's panel
+region never reads `children` once it is off). The body itself is `RecordDetailBody`
+(`web/components/records/record-detail-body.tsx`, new) — the SAME shape
+`ticket-detail-body.tsx`'s own `TicketDetailBody` proves across nine rounds of R89's own
+live-injection saga (one page scroll, the footer flush at the screen's bottom edge with the
+panel gap above it, the side column that never scrolls), extracted for this second caller
+rather than hand-copied. `TicketDetailBody` itself stays inlined and unchanged — its own JSX is
+read by `web/test/footer-on-the-edge.test.ts` at exact source position, so delegating it to the
+shared component would turn a green law red for a refactor that changes no pixel; only the
+`useIsAtLeastLg` hook moved, imported rather than duplicated. Left column, in order: Detail,
+Acceptance criteria, Build notes — each its own `TicketSidePanel` Card (that component is
+purely generic despite its ticket-flavoured name, reused rather than a second wrapper). Right
+column, in order: Assigned to (`AssignedToCard`, `help-stakeholders.tsx`, whole, unmodified —
+B41's own "the story page reads the identical rule later with no changes" came true), Related
+tickets (the ticket this story was born on, `helpOne` by id, the same `RecordRef`/title/status
+chip shape a list row anywhere else in this app takes, routed through `orderChips` for id+status
+even on a plain row), Related stories (siblings sharing the same ticket, the identical
+`sliceKey("stories-ticket", …)` cache `help-detail.tsx`'s own Related stories panel already
+reads — the two pages share one list — no progress bar), Phase and wave (the phase, and its own
+wave, read off `sprintOne`), Effort (`WorkLogsPanel`, wrapped in the same `EmptyGatedPanel` +
+`AddButton` shape `help-detail.tsx` already wears for the identical reason — that panel draws no
+title of its own), Metrics. Below `lg`, the side panels stack first, then the main column, then
+the band — `RecordDetailBody`'s own built-in order, unchanged from the ticket's.
+
+**Metrics.** Computed in a content door of its own, `getStoryMetrics`
+(`POST /api/content/stories/metrics`, `workers/content/src/lib/stories.ts`) — never a column on
+the story read, which every OTHER caller of `getStory` would then pay for unasked. Cycle time:
+seconds from the story's first work log to the moment it most recently reached Done (or to now,
+while it has not), null — "Not started" — with no work log at all. Effort: whole seconds logged,
+a discarded timer never counted. Flow efficiency: effort ÷ cycle time as a percentage, null —
+"No time log" — while either side of the division is zero. (The exploratory Delivery Metrics
+artifact read for wording proposes a richer working-day-based version for a phase-level
+dashboard; this panel follows the simpler arithmetic actually specified for it, and only takes
+the artifact's two named words, "Not started" and "No time log", for the two undefined states.)
+
+**The Build notes sheet.** `web/components/work/story-build-notes-sheet.tsx`, new — built like
+`reply-edit-sheet.tsx`: a title row, the `Notes` rich text editor (the identical editor Detail
+and Acceptance criteria already use, never a second control), the image picker below it, Cancel
+and Save at the foot. R88's single door while empty: `EmptyGatedPanel` drops the panel's own
+title row entirely, and `CollectionEmptyState`'s one "Write the build notes" button is the whole
+panel; once written, the pencil — never a second create control — reopens the identical sheet.
+Save spreads the story's own current shape (the update door replaces every field) and overrides
+only `buildNotes`, the same pattern `work-panels.tsx`'s own `toggleContributesToGoal` already
+takes for the identical reason.
+
+**Status: ruled and shipped, 21 Sep 2026.** Team migration 0112, the door + its Done refusal,
+MCP parity, the one-page rewrite, `RecordDetailBody` extracted and reused, the Build notes
+sheet, the Metrics door, strings seeded (de/es/ca).
+
+**Law.** None new. Governed by R88 (empty-state single door), R89 (footer on the edge, proved
+by construction through the shared `RecordDetailBody`), R91 (no nested scroll), R94 (chip
+order), R17 (idempotent transitions, the Done refusal). Behaviour proved at the door
+(`workers/content/test/story-build-notes.test.ts`: writing and reading build notes through the
+update door, the list/detail split, the Done refusal and its recovery, an update that omits the
+field clearing it, and the metrics door against a real work-log fixture) and at the app's own
+wiring (`web/test/story-detail.test.tsx`: the panel order in both columns, the Build notes empty
+door opening the sheet and the pencil reopening it, Save writing `buildNotes` while the rest of
+the record rides along, the Done button disabled with a reason until build notes are filled, the
+Assigned to card first with its inherited line, the Metrics figures from a fixture, and no
+nested scroll region anywhere on the page).
 
 ---
 
@@ -6892,6 +7182,27 @@ truncates any other title — never rejected, never clipped at the door.
 a caller who posts no `title` falls back to the file's own (uncapped) `fileName` rather than
 to a value `TITLE_MAX_CHARS` would have refused — this amendment writes that shape down as the
 rule rather than leaving it an accident of the fallback's own order.
+
+**Law.** R87's own amendment (`title-length`), no new rule number.
+
+**AMENDED 21 Sep 2026: an imported KNOWLEDGE title clamps; an imported ticket or story
+title still does not.** Aurora's own words, verbatim: *"imported knowledge titles are
+clamped on import at 50, imported ticket and story titles stay whole (I1)."* This narrows
+the 18 Sep I1 amendment above rather than replacing it: I1's WHOLE-on-write protection now
+belongs to a ticket's and a story's own title alone (the `ticket` and `story` kinds in
+`INGEST_KINDS`, `workers/content/src/lib/knowledge-ingest.ts`, both left untouched). Every
+other title that arrives already written somewhere else and lands in the knowledge base's
+own `title` column, a knowledge upload's file-name fallback, every OTHER mirrored kind
+(account, contact, app, process, sprint, meeting, todo, task, person, dropdown,
+portal_login), a Google import (Drive, Gmail, Calendar, Chat), and the glossary's own
+seeded words, now CLAMPS to `TITLE_MAX_CHARS` on the way in instead of being stored whole.
+One shared helper, `clampTitle` (`shared/clamp-title.ts`): the first 49 characters plus a
+single ellipsis character (U+2026) so the cut is visible, a trailing space trimmed before
+the ellipsis, and the cut moved back to a nearby space (within the last 12 characters)
+rather than landing mid-word where one exists. The typed form is unmoved by this amendment
+either: a person-typed title over the cap is still refused, in words, at the same doors
+(`requireText`/`optionalText` against `TITLE_MAX_CHARS`); nobody types their way into a
+clamp, they shorten it themselves.
 
 **Law.** R87's own amendment (`title-length`), no new rule number.
 
@@ -8800,15 +9111,15 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**248 rules.**
+**250 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L39 (39) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K55 (55) |
-| 5. Buttons and actions | B1 to B41 (41) |
+| 4. Collections | K1 to K56 (56) |
+| 5. Buttons and actions | B1 to B42 (42) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |

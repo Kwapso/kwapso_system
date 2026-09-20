@@ -47,6 +47,7 @@
 
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
+import { clampTitle } from "@shared/clamp-title"
 import { ulid } from "@shared/workers/id"
 import { EMBED_ATTEMPT_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import type { Env } from "../env"
@@ -541,7 +542,12 @@ export const INGEST_KINDS: IngestKind[] = [
     // "Their tickets — N still open" sentence both carried an em dash; both
     // now read with a comma/colon instead. The words changed, so every
     // account already indexed re-reads to pick up the new punctuation.
-    textVersion: 5,
+    //
+    // v6: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS. Byte-identical
+    // for every account whose name already fits; a bump so the rare
+    // over-length legacy name still indexed gets its title re-clamped.
+    textVersion: 6,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -672,7 +678,7 @@ export const INGEST_KINDS: IngestKind[] = [
           // repeated as if it were a passage.
           generatedOnly: !(r.about || r.contacts || r.apps || r.sprints || r.processes || r.tickets || r.todos),
           sortAt: r.sort_at,
-          title: r.name,
+          title: clampTitle(r.name), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
           summary: buildSummary({
             noun: r.account_type === "entity" ? "client company" : "person we work with",
             title: r.name,
@@ -728,7 +734,9 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "contact",
     table: "account_links",
     label: "contacts",
-    textVersion: 1,
+    // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(l.updated_at, l.created_at)", "l.id")
       const rows = await d1Query<{
@@ -764,7 +772,7 @@ export const INGEST_KINDS: IngestKind[] = [
           originRowId: r.id,
           generatedOnly: !(r.about),
           sortAt: r.sort_at,
-          title: `${r.person_name} at ${r.company_name}`,
+          title: clampTitle(`${r.person_name} at ${r.company_name}`), // R87 I1 (RULES.md): clamp on import
           summary: buildSummary({
             noun: "contact",
             title: r.person_name,
@@ -809,7 +817,10 @@ export const INGEST_KINDS: IngestKind[] = [
     // typed one of the four paragraphs" to `false`, always — see the account
     // kind's identical bump, right above, for the measured incident and the
     // full reasoning. Same body as before; no longer a card.
-    textVersion: 2,
+    //
+    // v3: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(ap.updated_at, ap.created_at)", "ap.id")
       const rows = await d1Query<{
@@ -872,7 +883,7 @@ export const INGEST_KINDS: IngestKind[] = [
           r.stage
         ),
         sortAt: r.sort_at,
-        title: r.name,
+        title: clampTitle(r.name), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
         summary: buildSummary({
           noun: "built system",
           title: r.name,
@@ -924,7 +935,13 @@ export const INGEST_KINDS: IngestKind[] = [
     // v2: R95 (no-em-dash), 20 Sep 2026 — the step name/description separator
     // carried an em dash; it now reads with a comma instead. The words
     // changed, so every process map already indexed re-reads.
-    textVersion: 2,
+    //
+    // v3: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS. Worth calling
+    // out here specifically: a process's own name is one R87's FORM cap
+    // deliberately never covers, so this is the one kind where the clamp is
+    // not just a legacy-row backstop.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(p.updated_at, p.created_at)", "p.id")
       const rows = await d1Query<{
@@ -981,7 +998,7 @@ export const INGEST_KINDS: IngestKind[] = [
         originRowId: r.id,
         generatedOnly: !(r.description || r.steps || r.comments),
         sortAt: r.sort_at,
-        title: r.name,
+        title: clampTitle(r.name), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
         summary: buildSummary({
           noun: "way of working we have mapped",
           title: r.name,
@@ -1026,7 +1043,9 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "sprint",
     table: "sprints",
     label: "sprints",
-    textVersion: 1,
+    // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(sp.updated_at, sp.created_at)", "sp.id")
       const rows = await d1Query<{
@@ -1072,7 +1091,7 @@ export const INGEST_KINDS: IngestKind[] = [
           originRowId: r.id,
           generatedOnly: !(r.goal),
           sortAt: r.sort_at,
-          title: r.name,
+          title: clampTitle(r.name), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
           summary: buildSummary({
             noun: `${r.sprint_type ?? ""} sprint`.trim(),
             title: r.name,
@@ -1260,7 +1279,10 @@ export const INGEST_KINDS: IngestKind[] = [
     // meeting and re-EMBEDS only the ones whose text actually changed, because
     // the hash decides — so this costs one pass of reads and 39 rows of
     // embedding, not 4,296.
-    textVersion: 5,
+    //
+    // v6: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 6,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -1305,7 +1327,7 @@ export const INGEST_KINDS: IngestKind[] = [
         originRowId: r.id,
         generatedOnly: !(r.agenda || r.notes || r.transcript_text || r.transcript_note),
         sortAt: r.sort_at,
-        title: r.title,
+        title: clampTitle(r.title), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
         summary: buildSummary({
           noun: "meeting",
           title: r.title,
@@ -1419,7 +1441,10 @@ export const INGEST_KINDS: IngestKind[] = [
     // v2: R95 (no-em-dash), 20 Sep 2026 — "They sent it — Name" carried an em
     // dash; it now reads "They sent it, by Name". The words changed, so
     // every to-do already indexed re-reads.
-    textVersion: 2,
+    //
+    // v3: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
       const rows = await d1Query<{
@@ -1459,7 +1484,7 @@ export const INGEST_KINDS: IngestKind[] = [
           originRowId: r.id,
           generatedOnly: !(r.detail),
           sortAt: r.sort_at,
-          title: r.title,
+          title: clampTitle(r.title), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
           summary: buildSummary({
             noun: "thing we asked the client for",
             title: r.title,
@@ -1504,7 +1529,9 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "task",
     table: "tasks",
     label: "tasks",
-    textVersion: 1,
+    // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
       const rows = await d1Query<{
@@ -1546,7 +1573,7 @@ export const INGEST_KINDS: IngestKind[] = [
         originRowId: r.id,
         generatedOnly: !(r.detail || r.work_notes),
         sortAt: r.sort_at,
-        title: r.title,
+        title: clampTitle(r.title), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
         summary: buildSummary({
           noun: "job of our own",
           title: r.title,
@@ -1631,7 +1658,13 @@ export const INGEST_KINDS: IngestKind[] = [
     // already indexed with a colleague's certificates in its text keeps saying
     // them until re-read, which is exactly the stale-wording case a bump exists
     // for; every OTHER sentence this reader writes is unchanged.
-    textVersion: 4,
+    //
+    // v5: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS. Worth calling
+    // out here specifically: a person's own name is one R87's FORM cap
+    // deliberately never covers, so this is one of the two kinds where the
+    // clamp is not just a legacy-row backstop.
+    textVersion: 5,
     read: async (cfg, guard, cursor, limit, env) => {
       // THE CORE HALF, over the native binding rather than the REST door: this
       // is the global database, which every worker reaches as `env.DB`.
@@ -1789,7 +1822,7 @@ export const INGEST_KINDS: IngestKind[] = [
             spellings.length > 1
           ),
           sortAt: m.sort_at,
-          title: name,
+          title: clampTitle(name), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
           summary: buildSummary({
             noun,
             title: name,
@@ -1876,7 +1909,9 @@ export const INGEST_KINDS: IngestKind[] = [
     // v3: R95 (no-em-dash), 20 Sep 2026 — "a pre-selection — no form here
     // picks..." carried an em dash; it now reads with a colon. The words
     // changed, so every dropdown vocabulary already indexed re-reads.
-    textVersion: 3,
+    // v4: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 4,
     rollup: true,
     // One source per LIST, so the thing mirrored is the distinct `type`.
     oneSourcePer: "type",
@@ -1912,7 +1947,7 @@ export const INGEST_KINDS: IngestKind[] = [
         originRowId: r.type,
         generatedOnly: !(r.value_list),
         sortAt: r.sort_at,
-        title: r.type,
+        title: clampTitle(r.type), // R87 I1 (RULES.md): a mirrored knowledge title clamps on import
         summary: buildSummary({
           noun: "list of choices this team keeps",
           title: r.type,
@@ -1958,7 +1993,9 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "portal_login",
     table: "portal_users",
     label: "portal logins",
-    textVersion: 1,
+    // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
+    // through `clampTitle` when it is over TITLE_MAX_CHARS.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(pu.updated_at, pu.created_at)", "pu.id")
       const rows = await d1Query<{
@@ -2000,7 +2037,7 @@ export const INGEST_KINDS: IngestKind[] = [
           originRowId: r.id,
           generatedOnly: true,
           sortAt: r.sort_at,
-          title: `Portal login at ${who}`,
+          title: clampTitle(`Portal login at ${who}`), // R87 I1 (RULES.md): clamp on import
           summary: buildSummary({
             noun: "portal login",
             title: `Portal login at ${who}`,

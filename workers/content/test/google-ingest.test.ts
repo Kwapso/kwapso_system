@@ -209,6 +209,9 @@ import {
   googleStateKeys,
   refileChatSources,
 } from "../src/lib/knowledge-google"
+import { clampTitle } from "@shared/clamp-title"
+import { mendMojibake } from "@shared/workers/mojibake"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 const db = () => holder.db as DatabaseSync
 
@@ -958,6 +961,27 @@ describe("what actually gets read", () => {
       "Re: the dispatch screen —"
     )
     expect(mail.body).toContain("park the reporting work")
+  })
+
+  // R87 I1 (RULES.md, amended 21 Sep 2026): a title carried in from a Google
+  // import is no longer kept whole — it clamps on import through the SAME
+  // `mended` exit every one of the four Google kinds shares (knowledge-
+  // google.ts), mend first, clamp second, so a corrected name is what gets
+  // measured and cut.
+  it("clamps a Google-imported title to TITLE_MAX_CHARS, mended first and cut second", async () => {
+    const long = `Ãlaap Kanchawala ${"x".repeat(40)}`
+    expect(long.length).toBeGreaterThan(TITLE_MAX_CHARS)
+    holder.mailSubject = long
+
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Alaap Kanchawala") as SourceRow
+
+    // MENDED FIRST: the mojibake'd name is corrected before anything is cut.
+    expect(mail.title).not.toContain("Ã")
+    // CLAMPED SECOND: never longer than the cap, and the cut is visible.
+    expect(mail.title.length).toBeLessThanOrEqual(TITLE_MAX_CHARS)
+    expect(mail.title.endsWith("…")).toBe(true)
+    expect(mail.title).toBe(clampTitle(mendMojibake(long)))
   })
 
   it("a Chat CONVERSATION is one source, attributed line by line, with a link back", async () => {

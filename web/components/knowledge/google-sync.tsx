@@ -273,8 +273,17 @@ export function GoogleSyncButton({
   return (
     <div className={`flex flex-col gap-1 ${className ?? ""}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <Button variant="secondary" size="sm" disabled={syncing} onClick={sync} className="gap-1">
-        {syncing ? <Spinner /> : <ArrowsClockwise className="size-3.5" aria-hidden />}
+      {/* SIZE. Aurora, 21 Sep 2026: "on knowelegde, the syn button its to small.
+          unify with law." The knowledge toolbar's other two actions, the mango
+          Ask button and the settings gear, both stand at the kit's own default
+          control height ("size=default"'s 40px --control-height-button. Ask
+          takes it implicitly by never naming a size, the gear names
+          "size=icon", itself defined as size-[var(--control-height-button)]).
+          "size=sm" dropped to 32px (--control-height-dense), the one
+          button in the row not matching its siblings. No custom classes: the
+          kit's own default is the fix. */}
+      <Button variant="secondary" disabled={syncing} onClick={sync} className="gap-1">
+        {syncing ? <Spinner /> : <ArrowsClockwise className="size-4" aria-hidden />}
         {/* RENAMED FROM "Bring it in" — her word, 17 Sep 2026: "this 'Bring it
             in' should be changed to 'Sync'." The door (`sync()`, above) and
             the two acts it can start are untouched; only the label a person
@@ -293,16 +302,29 @@ export function GoogleSyncButton({
           A sentence about the past must not be shown next to a live attempt to
           disprove it; the moment the press finishes, the row is re-read and
           this either comes back or it does not. */}
+      {/* "NOT BROUGHT IN YET". Aurora, 21 Sep 2026: "move the hint not broght
+          in yet." It was never a free floating toolbar caption to relocate:
+          it already rendered in THIS slot, the control's own status line,
+          the same one the "Last brought in ..." line takes once a sync has
+          run (K56, documents/UI-RULEBOOK.md). R72's own point applies: a
+          control's helper text belongs to the control, not to the heading
+          above it. What read as a stray hint was the STYLE, text-xs
+          beside a text-sm button label, small enough to look like a
+          caption dropped in the toolbar rather than the control's own
+          reading of itself. Restyled to text-sm, the button label's own
+          step, matching the "Last brought in" line it shares this slot
+          with. No relocation, because there was nowhere better already in
+          the component to put it. */}
       {syncing ? (
         <span className="text-muted-foreground text-xs">{t("This can take a few minutes.")}</span>
       ) : failing ? (
         <span className="text-destructive text-xs">{failing}</span>
       ) : lastRun ? (
-        <span className="text-muted-foreground text-xs">
+        <span className="text-muted-foreground text-sm">
           {t("Last brought in")} {formatActivityWhen(lastRun)}
         </span>
       ) : (
-        <span className="text-muted-foreground text-xs">{t("Not brought in yet")}</span>
+        <span className="text-muted-foreground text-sm">{t("Not brought in yet")}</span>
       )}
       </div>
       {describe && <span className="text-muted-foreground text-xs">{covers}</span>}

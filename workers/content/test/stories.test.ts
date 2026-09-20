@@ -90,6 +90,11 @@ async function addStory(body: Record<string, unknown>): Promise<string> {
   const res = await call(IDS.staffUser, "POST /api/content/stories", {
     storyType: "Feature",
     changesNoStep: true,
+    // Required before Done (Aurora's ruling, 21 Sep 2026, "canont be marked
+    // as don if thats not filled in, its required") — most cases in this
+    // file never touch Done and this default costs them nothing; the ones
+    // that test the refusal itself pass their own (empty) `buildNotes`.
+    buildNotes: "Shipped.",
     ...body,
   })
   expect(res.status, "the story door refused a plain create").toBe(200)

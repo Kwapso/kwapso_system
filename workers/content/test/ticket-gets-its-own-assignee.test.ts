@@ -116,6 +116,37 @@ describe("a ticket's own assignee", () => {
     expect(row(IDS.victimTicket).assignee_id).toBe(IDS.staffUser)
   })
 
+  // NULL IS A CLEAR, UNDEFINED IS "LEAVE IT ALONE" — Aurora's ruling, 21 Sep
+  // 2026: the Assigned to Select's first option, "Nobody, inherit from the
+  // app" (`web/components/tickets/help-stakeholders.tsx`), writes exactly
+  // this. Before this ruling there was no way back to inherited once a
+  // ticket carried its own assignee — `optionalText` alone answers
+  // `undefined` for both a missing field and an explicit `null`, so
+  // `updateTicket`'s own `assigneeCleared` reads the RAW wire value first.
+  it("assigneeId: null clears it — never confused with leaving it out", async () => {
+    await call(IDS.staffUser, "POST /api/content/help/update", {
+      id: IDS.victimTicket,
+      description: "Bergman S.A. cannot see the March invoice run",
+      assigneeId: IDS.staffUser,
+    })
+    expect(row(IDS.victimTicket).assignee_id).toBe(IDS.staffUser)
+
+    const cleared = await call(IDS.staffUser, "POST /api/content/help/update", {
+      id: IDS.victimTicket,
+      description: "Bergman S.A. cannot see the March invoice run",
+      assigneeId: null,
+    })
+    expect(cleared.status).toBe(200)
+    expect(row(IDS.victimTicket).assignee_id).toBeNull()
+    // The audit-pair name clears with it — a stray name against a null id
+    // would be a stored fact belonging to nobody.
+    expect(row(IDS.victimTicket).assignee_name).toBeNull()
+
+    const after = await ticketOne(IDS.staffUser, IDS.victimTicket)
+    expect(after.ticket?.assigneeId).toBeNull()
+    expect(after.ticket?.assigneeName).toBeNull()
+  })
+
   it("refuses an id that isn't on the team", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/help/update", {
       id: IDS.victimTicket,

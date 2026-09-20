@@ -1,20 +1,24 @@
-// R87 AMENDMENT (I1), 18 Sep 2026, her pick verbatim: "l1." The fifty-character
-// title cap (`TITLE_MAX_CHARS`, shared/types.ts) binds what a person TYPES —
-// it does not bind a title that arrives already written somewhere else. A
-// knowledge upload with no typed `title` falls back to the file's own
-// `fileName`, and `fileName` is validated against `TEXT_LIMITS.short` (200),
-// never against `TITLE_MAX_CHARS` — so it was ALREADY kept whole before this
-// ruling; this suite pins that shape down as the rule rather than leaving it
-// an accident of the fallback's own order (documents/UI-RULEBOOK.md F18's own
-// 18 Sep 2026 amendment, RULES.md's R87 row).
+// R87 AMENDMENT (I1), 18 Sep 2026, her pick verbatim: "l1," THEN NARROWED 21
+// Sep 2026, her pick verbatim: "clmap on import." The fifty-character title
+// cap (`TITLE_MAX_CHARS`, shared/types.ts) binds what a person TYPES: a
+// knowledge upload with no typed `title` used to fall back to the file's own
+// `fileName` and keep it WHOLE, past the cap, same as every other title that
+// arrives already written somewhere else. The 21 Sep ruling read that back
+// narrower: an IMPORTED KNOWLEDGE title (a file's own name, a mirrored
+// record, a Google import, a seeded glossary word) now CLAMPS to the cap on
+// the way in instead, through `clampTitle` (shared/clamp-title.ts), the
+// first 49 characters plus a single ellipsis, a word boundary honoured
+// within the last 12 characters where one exists. Imported TICKET and STORY
+// titles are the one thing I1 still keeps whole
+// (knowledge-mirror-title-clamp.test.ts covers the mirror side of that).
 //
 // TWO DOORS, ONE LAW: `POST /api/content/knowledge/upload` (a file, `title`
-// optional, imported) must accept a name past the cap and store it whole;
+// optional, imported) must accept a name past the cap and store it CLAMPED;
 // `POST /api/content/knowledge` (a typed note, `title` required) must still
-// refuse a person-typed title past the same cap. Same harness as
-// knowledge-upload-dedup.test.ts and knowledge.test.ts: the real route
-// handlers, the real SQLite team schema, only the D1 REST transport and the
-// embedding model stubbed.
+// refuse a person-typed title past the same cap, the person shortens it
+// themselves, no clamp there. Same harness as knowledge-upload-dedup.test.ts
+// and knowledge.test.ts: the real route handlers, the real SQLite team
+// schema, only the D1 REST transport and the embedding model stubbed.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -30,6 +34,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { TITLE_MAX_CHARS } from "@shared/types"
+import { clampTitle } from "@shared/clamp-title"
 
 const db = () => h.db as DatabaseSync
 
@@ -68,8 +73,8 @@ beforeEach(() => {
   )
 })
 
-describe("R87 amendment (I1): an imported title is kept whole, a typed one is still capped", () => {
-  it("a 90-character file name, no typed title, uploads clean and stores the whole name as the title", async () => {
+describe("R87 amendment (I1, narrowed 21 Sep 2026): an imported title clamps on import, a typed one is still refused over the cap", () => {
+  it("a 90-character file name, no typed title, uploads clean and stores the CLAMPED name as the title", async () => {
     const fileName = `${"B".repeat(86)}.pdf` // 90 characters, well past TITLE_MAX_CHARS (50)
     expect(fileName.length).toBe(90)
     expect(fileName.length).toBeGreaterThan(TITLE_MAX_CHARS)
@@ -77,9 +82,15 @@ describe("R87 amendment (I1): an imported title is kept whole, a typed one is st
     const res = await upload(IDS.staffUser, fileName)
     const bodyText = await res.clone().text()
     expect(res.status, bodyText).toBe(200)
-    const { source } = (await res.json()) as { source: { title: string } }
-    expect(source.title).toBe(fileName)
-    expect(source.title.length).toBe(90)
+    const { source } = (await res.json()) as { source: { title: string; fileName: string } }
+    // Clamped, not stored whole: the same helper every other non-typed
+    // writer uses, so the cut is exactly what clampTitle would produce.
+    expect(source.title).toBe(clampTitle(fileName))
+    expect(source.title.length).toBeLessThanOrEqual(TITLE_MAX_CHARS)
+    expect(source.title.endsWith("…")).toBe(true)
+    // The full name is never lost: it stays on its own field, only the
+    // title column is clamped.
+    expect(source.fileName).toBe(fileName)
   })
 
   it("a 60-character TYPED title on the note door is still refused at 400", async () => {

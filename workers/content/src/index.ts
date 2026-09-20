@@ -36,6 +36,7 @@
 //   POST /api/content/stories/update      -> edit a story
 //   POST /api/content/stories/status      -> move a story along its four states
 //   POST /api/content/stories/burndown    -> a phase's burndown series (GET-style POST, {phaseId})
+//   POST /api/content/stories/metrics     -> a story's Cycle time / Effort / Flow efficiency (GET-style POST, {id})
 //   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
 //   POST /api/content/sprints             -> start a sprint
 //   POST /api/content/sprints/update      -> edit one (name, kind, dates, PRICE)
@@ -139,6 +140,7 @@ import {
   postStoryAttachmentRemove,
   postStoryAttachmentUpdate,
   postStoryBurndown,
+  postStoryMetrics,
   postStoryStatus,
   postUpdateSprint,
   postUpdateStory,
@@ -439,6 +441,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // there is no row to publish a ping about (publish-seam.test.ts's own
   // HOUSEKEEPING list names it).
   "POST /api/content/stories/burndown": { handler: postStoryBurndown, kind: "housekeeping" },
+  "POST /api/content/stories/metrics": { handler: postStoryMetrics, kind: "housekeeping" },
   "GET /api/content/stories/attachments": { handler: getStoryAttachments, kind: "read" },
   "POST /api/content/stories/attachments": { handler: postStoryAttachment, kind: "mutation" },
   "POST /api/content/stories/attachments/update": { handler: postStoryAttachmentUpdate, kind: "mutation" },

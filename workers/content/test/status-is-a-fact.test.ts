@@ -93,6 +93,9 @@ async function story(title: string, extra: Record<string, unknown> = {}): Promis
     storyType: "Feature",
     changesNoStep: true,
     appId: "APP_ONE",
+    // Required before Done (Aurora's ruling, 21 Sep 2026) — several cases in
+    // this file move a story to done, and `extra` can still override it.
+    buildNotes: "Shipped.",
     ...extra,
   })
   return (

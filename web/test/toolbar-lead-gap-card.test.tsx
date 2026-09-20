@@ -1495,3 +1495,82 @@ describe("R83 self-check, every pinned-toolbar data-slot is one this round's CSS
     ).toMatch(/renderPanel\s*&&[\s\S]{0,2000}<TabsContent[^>]*\bdata-tab-pane\b/)
   })
 })
+
+// ============================================================================
+// R83 self-check, second miss -- THE CARD'S OWN OVERRIDE MUST BEAT THE KIT'S
+// RESPONSIVE LADDER AT EVERY STEP, NOT ONLY BELOW `lg` (found live on
+// staging, 21 Sep 2026, against commit 3b1014c3 -- already deployed, "already
+// fixed" by the commit that shipped the round above).
+// ============================================================================
+// Every proof above this block confirms the THREE ancestor rules
+// (strip-adjacency, nested-tab-pane, heading-led) still reach the cards they
+// always reached -- App detail's Phases/Stories/Tickets tabs among them,
+// still correctly 10px live. What none of them cover is the FOURTH shape,
+// `CollectionCard`'s own DEFAULT, read live on Account detail's Contacts
+// panel (nothing else reaches this card: no `.pinned-strip` sibling, no
+// `[data-tab-pane]` ancestor, no leading `CollectionHeading`).
+//
+// `--pinned-lead` itself measured correctly, 10px, at every width -- the
+// custom property fix (screen-bits.tsx's own `[--pinned-lead:var(
+// --toolbar-lead-gap)]`, a flat token, no `lg:` step) landed exactly as
+// intended. The REAL `padding-top`, on `CardContent`, did not follow it: the
+// override read `pt-[var(--pinned-lead)]` alone, unprefixed, competing only
+// with the kit's own unprefixed `py-6` half of `CARD_CONTENT_INSET_Y`
+// (`shared/ui/components/card/card.tsx`) -- never with its OTHER half,
+// `lg:py-[var(--space-7)]`, a rule Tailwind emits inside an `lg:` media
+// query, after the unprefixed rules, regardless of the order classes are
+// written in the source. Two classes of equal specificity, and the later one
+// in the compiled stylesheet wins the tie: below `lg` the unprefixed
+// override correctly beat the unprefixed `py-6` (measured live, 10px at
+// 760px); at and above `lg` there was no `lg:pt-[var(--pinned-lead)]`
+// counterpart to beat `lg:py-[var(--space-7)]`, so the kit's own 32px kept
+// winning (measured live, 32px at 1440px, same class list both widths).
+//
+// Fixed the same way every other half of this round's fix was: the SAME
+// token, read twice, once per step of the kit's own ladder --
+// `pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]` -- never a second,
+// different number for the wide case.
+describe("R83 self-check, second miss -- CollectionCard's own default pt- override reaches the kit's lg: step too", () => {
+  const SCREEN_BITS_PATH = join(ROOT, "web", "components", "deep-link", "screen-bits.tsx")
+
+  it("SOURCE: CollectionCard's CardContent carries the --pinned-lead override at BOTH the unprefixed and the lg: step, matching the kit's own py-6 lg:py-[var(--space-7)] ladder step for step", () => {
+    const src = readFileSync(SCREEN_BITS_PATH, "utf8")
+    const stripped = stripComments(src, { keepLength: true })
+    const match = /<CardContent className="([^"]*)">\{children\}<\/CardContent>/.exec(stripped)
+    expect(
+      match,
+      "CollectionCard must still wrap its children in a literal CardContent with a plain className string this census can read"
+    ).toBeTruthy()
+    const cls = match![1]
+    expect(
+      cls,
+      "the unprefixed override must still read --pinned-lead for padding-top, or a card nothing else reaches falls back to the kit's own unprefixed py-6 (24px)"
+    ).toMatch(/(?:^|\s)pt-\[var\(--pinned-lead\)\]/)
+    expect(
+      cls,
+      "an lg: companion must ALSO read --pinned-lead for padding-top -- without it, the kit's own lg:py-[var(--space-7)] (32px) wins at and above the lg breakpoint no matter what the unprefixed override says, the exact live miss on Account detail's Contacts panel (10px at 760px, 32px at 1440px, one unchanged class list)"
+    ).toMatch(/(?:^|\s)lg:pt-\[var\(--pinned-lead\)\]/)
+  })
+
+  it("DOM: a real render of CollectionCard's CardContent carries both the unprefixed and the lg: pt- override", () => {
+    const { container } = render(
+      <CollectionCard>
+        <div data-testid="child">child</div>
+      </CollectionCard>
+    )
+    const content = container.querySelector('[data-slot="card-content"]')
+    expect(content, "CollectionCard must render a [data-slot=\"card-content\"]").toBeTruthy()
+    const cls = content!.className
+    expect(cls).toMatch(/(?:^|\s)pt-\[var\(--pinned-lead\)\]/)
+    expect(cls).toMatch(/(?:^|\s)lg:pt-\[var\(--pinned-lead\)\]/)
+  })
+
+  it("RED PROOF: the unprefixed override alone -- the shape 3b1014c3 actually shipped -- fails today's stricter, two-step check", () => {
+    const onlyBase = "px-4 pb-4 pt-[var(--pinned-lead)]"
+    expect(onlyBase).toMatch(/(?:^|\s)pt-\[var\(--pinned-lead\)\]/)
+    expect(
+      onlyBase,
+      "the pre-fix shape carries no lg: companion, so it must fail the second half of the check above"
+    ).not.toMatch(/(?:^|\s)lg:pt-\[var\(--pinned-lead\)\]/)
+  })
+})

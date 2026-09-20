@@ -17,6 +17,7 @@ import type { Actor, MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { TITLE_MAX_CHARS } from "@shared/types"
+import { clampTitle } from "@shared/clamp-title"
 import { consumeAiUnit, logUsage, refundAiUnits, type UsageSource } from "@shared/workers/credits"
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { resolveOrdering } from "@shared/workers/sorting"
@@ -631,8 +632,11 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
 
   const fileName = requireText(body.fileName, "File name", TEXT_LIMITS.short)
   // The title defaults to the file's own name, because a person who dragged a
-  // contract onto the screen has already named it once.
-  const title = optionalText(body.title, "Title", TITLE_MAX_CHARS) ?? fileName // R87: title-length (RULES.md)
+  // contract onto the screen has already named it once. Nobody TYPED the
+  // file name, so R87 I1 (RULES.md, amended 21 Sep 2026) clamps it rather
+  // than refusing it — the typed override just above still refuses over the
+  // cap, same as the plain typed-note door.
+  const title = optionalText(body.title, "Title", TITLE_MAX_CHARS) ?? clampTitle(fileName) // R87: title-length (RULES.md)
   const parsed = parseUploadDataUrl(body.fileDataUrl, KNOWLEDGE_FILE_MAX_BYTES, ANY_FILE_TYPE)
   if (!parsed)
     return fail(
@@ -769,7 +773,10 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
   const fileName = queryText(url.searchParams.get("fileName"), "File name", TEXT_LIMITS.short)
   if (!fileName)
     return fail(400, "invalid_input", "That upload did not say what the file is called. Nothing was saved.")
-  const title = queryText(url.searchParams.get("title"), "Title", TEXT_LIMITS.short) ?? fileName
+  // Falls back to the file's own name when nobody typed a title: R87 I1
+  // (RULES.md, amended 21 Sep 2026) clamps that fallback rather than
+  // refusing it, same as the buffered upload door beside this one.
+  const title = queryText(url.searchParams.get("title"), "Title", TEXT_LIMITS.short) ?? clampTitle(fileName)
   const accountId = queryText(url.searchParams.get("accountId"), "Account", TEXT_LIMITS.short) ?? null
   const visibleToAppId = queryText(url.searchParams.get("visibleToAppId"), "App", TEXT_LIMITS.short) ?? null
   // …and the same for the one read only ever compared against a literal. A
@@ -869,7 +876,9 @@ export async function postConfirmKnowledgeFile(request: Request, env: Env): Prom
   const contentType = requireText(body.contentType, "File type", TEXT_LIMITS.short)
   if (!ANY_FILE_TYPE.test(contentType))
     return fail(400, "invalid_input", "That upload did not say what kind of file it is. Nothing was saved.")
-  const title = optionalText(body.title, "Title", TITLE_MAX_CHARS) ?? fileName // R87: title-length (RULES.md)
+  // Same fallback as the other two upload doors: R87 I1 (RULES.md, amended
+  // 21 Sep 2026) clamps the untyped file-name fallback rather than refusing it.
+  const title = optionalText(body.title, "Title", TITLE_MAX_CHARS) ?? clampTitle(fileName) // R87: title-length (RULES.md)
   const accountId = optionalText(body.accountId, "Account", TEXT_LIMITS.short) ?? null
   const visibleToAppId = optionalText(body.visibleToAppId, "App", TEXT_LIMITS.short) ?? null
   const privateToMe = optionalText(body.visibility, "Visibility", TEXT_LIMITS.short) === "private"
