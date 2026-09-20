@@ -48,7 +48,7 @@ const read = (p: string) => readFileSync(join(ROOT, ...p.split("/")), "utf8")
 
 const ITEMS: HeadActionItem[] = [
   { key: "close", label: "Close", onSelect: () => {} },
-  { key: "timer", label: "Start timer", onSelect: () => {} },
+  { key: "timer", label: "Start", onSelect: () => {} },
   { key: "edit", label: "Edit", onSelect: () => {} },
   { key: "archive", label: "Archive", onSelect: () => {}, destructive: true },
 ]
@@ -97,7 +97,7 @@ describe("the folded menu holds every item, ordinary then destructive", () => {
   it("opens on the trigger and lists every label, with the destructive one behind a separator", async () => {
     render(<HeadActionsFoldMenu items={ITEMS} label="More actions" />)
     const trigger = screen.getByRole("button", { name: "More actions" })
-    expect(screen.queryByText("Start timer")).toBeNull()
+    expect(screen.queryByText("Start")).toBeNull()
 
     // Radix's DropdownMenuTrigger opens off a pointer-down/up pair, not a
     // bare click — the same recipe `ticket-detail-no-tabs.test.tsx` already

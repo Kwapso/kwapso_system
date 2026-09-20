@@ -94,7 +94,9 @@ export function ReadACall({
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
+      {/* R98 — sits in the steps panel's own toolbar row beside "Add step", the
+          kit's default height, never `sm`. */}
+      <Button type="button" variant="secondary" onClick={() => setPickerOpen(true)}>
         <Sparkle className="size-3.5" />
         {t("Read a call")}
       </Button>

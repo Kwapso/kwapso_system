@@ -127,17 +127,25 @@ export type WavePhaseDay = {
   days: number
 }
 
-/** THE PLACEHOLDER DEFAULT, PER PHASE TYPE, A NEW WAVE STARTS FROM. Round
- * numbers Aurora named as a starting point on the same ruling, hers to
+/** THE PLACEHOLDER DEFAULT, PER PHASE TYPE, A NEW WAVE STARTS FROM. Hers to
  * adjust per wave on the Settings panel; never written to a row until she
  * does, so a wave born today carries none of these as real rows at all.
- * Keyed by `PhaseTypeArt.name` (`shared/sprint-types.ts`'s `PHASE_TYPES`). */
+ * Keyed by `PhaseTypeArt.name` (`shared/sprint-types.ts`'s `PHASE_TYPES`).
+ *
+ * SET TWICE. The 20 Sep 2026 ruling above named round numbers as a starting
+ * point; her very next ruling, 21 Sep 2026, verbatim, replaced them and also
+ * settled what a "day" counts: "Yes, ship. mind you, all of this is Monday to
+ * Friday, so when I say 5, it's actually a full week, but I, of course, don't
+ * count the weekends. Make sure we can adjust this on the settings in Waves.
+ * * the prefill * Audit 5 * Plan 5 * Build 15 * Pilot 5 * Revision 10 *
+ * Deploy 3 * Hypercare 7." Every number below is a WORKING day, never a
+ * calendar one, the one arithmetic `shared/working-days.ts` carries. */
 export const PHASE_DAY_DEFAULTS: Record<string, number> = {
   Audit: 5,
   Plan: 5,
-  Build: 20,
-  Pilot: 10,
+  Build: 15,
+  Pilot: 5,
   Revision: 10,
   Deploy: 3,
-  Hypercare: 10,
+  Hypercare: 7,
 }

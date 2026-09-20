@@ -32,24 +32,26 @@ type Row = {
   description: string | null
   standard_days: number | null
   position: number | null
-  /** Selected by the single-row door only — `undefined` on a list row, which is
-   * how `toValue` tells the two apart (see DETAIL_COLUMNS). */
-  created_at?: string | null
-  creator_id?: string | null
-  creator_name?: string | null
+  /** THE AUDIT BLOCK — ON EVERY READ NOW, LIST INCLUDED (K59, documents/
+   * UI-RULEBOOK.md, Aurora, 21 Sep 2026: "in choices also show columns added on
+   * and added by"). This used to be the single-row door's own extra pair
+   * (`DETAIL_COLUMNS`, since folded into `COLUMNS` below): a list of words
+   * answered a question about a VOCABULARY and nothing asked who typed each
+   * one, so carrying two more columns on every row of every read would have
+   * been paid by every screen to be spent by one. That is no longer true — the
+   * Choices screens (general and per-module) now draw an "Added" column on
+   * every row — so the two doors select the SAME columns today; `created_at`/
+   * `creator_id`/`creator_name` are never optional on a `Row` any more.
+   * `creator_id` rides along because `creator_name` is a snapshot of the name
+   * at the time — a person who has since been renamed still reads correctly,
+   * and the id is what a future face would resolve through (R35). */
+  created_at: string | null
+  creator_id: string | null
+  creator_name: string | null
 }
 
-const COLUMNS = "id, type, value, is_default, deactivated_at, mark, name_de, description, standard_days, position"
-
-/** THE SINGLE-ROW COLUMN LIST — `COLUMNS` plus the audit block the record footer
- * shows. Deliberately not folded into `COLUMNS`: the list door answers a
- * question about a VOCABULARY and nothing in a list of words asks who typed
- * each one, so carrying two more columns for every value on every read (and on
- * every mutation, which re-lists) would be paid by every screen to be spent by
- * one. `creator_id` rides along because `creator_name` is a snapshot of the
- * name at the time — a person who has since been renamed still reads correctly,
- * and the id is what a future face would resolve through (R35). */
-const DETAIL_COLUMNS = `${COLUMNS}, created_at, creator_id, creator_name`
+const COLUMNS =
+  "id, type, value, is_default, deactivated_at, mark, name_de, description, standard_days, position, created_at, creator_id, creator_name"
 
 function toValue(r: Row): SelectableValue {
   return {
@@ -63,11 +65,9 @@ function toValue(r: Row): SelectableValue {
     description: r.description ?? null,
     standardDays: r.standard_days ?? null,
     position: r.position ?? null,
-    // Absent on a list row, present on a detail one — the two doors select
-    // different columns on purpose (see DETAIL_COLUMNS).
-    ...(r.created_at === undefined
-      ? {}
-      : { createdAt: r.created_at ?? null, createdByName: r.creator_name ?? null }),
+    // ON EVERY ROW NOW — see the `Row` type's own header.
+    createdAt: r.created_at ?? null,
+    createdByName: r.creator_name ?? null,
   }
 }
 
@@ -116,7 +116,7 @@ export async function selectableOne(
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
-    `SELECT ${DETAIL_COLUMNS} FROM selectable_data WHERE id = ? LIMIT 1`,
+    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ? LIMIT 1`,
     [id]
   )
   return rows[0] ? toValue(rows[0]) : null

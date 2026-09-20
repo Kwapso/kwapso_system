@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 765 strings · 3 languages · 1520 of the entries below are hand-written seed.
+// 763 strings · 3 languages · 1538 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -531,7 +531,6 @@ export const CATALOGUE: Catalogue = {
   "Stage": { de: "Phase", es: "Etapa", ca: "Etapa" },
   "Stakeholders": { de: "Stakeholder", es: "Partes interesadas", ca: "Grups interessats" },
   "Start a timer on a story, or log an hour by hand, and the weeks fill in here.": { de: "Starten Sie einen Timer für eine Story, oder protokollieren Sie manuell eine Stunde, und die Wochen füllen sich hier auf.", es: "Inicia un temporizador en una historia, o registra una hora manualmente, y aquí se rellenan las semanas.", ca: "Inicia un cronòmetre en una història, o registra una hora manualment, i les setmanes es completen aquí." },
-  "Start timer": { de: "Zeit starten", es: "Iniciar temporizador", ca: "Iniciar temporitzador" },
   "Started": { de: "Gestartet", es: "Iniciado", ca: "Iniciat" },
   "Starts": { de: "Startet", es: "Comienza", ca: "Comença" },
   "Status": { de: "Status", es: "Estado", ca: "Estat" },
@@ -610,7 +609,6 @@ export const CATALOGUE: Catalogue = {
   "This lands in their portal with a due date, and we email them about it. Only for something we genuinely can't get on without.": { de: "Dies landet mit einem Fälligkeitsdatum in ihrem Portal und wir senden ihnen eine E-Mail darüber. Nur für etwas, das wir wirklich nicht vermeiden können.", es: "Aparece en su portal con una fecha de vencimiento, y les enviamos un correo. Solo para algo que genuinamente no podemos hacer sin.", ca: "Això apareix al seu portal amb una data de venciment, i els enviem un correu sobre això. Només per a quelcom que realment no podem fer sense." },
   "This part didn't load.": { de: "Dieser Bereich wurde nicht geladen.", es: "Esta parte no se cargó.", ca: "Aquesta part no s'ha carregat." },
   "This week": { de: "Diese Woche", es: "Esta semana", ca: "Aquesta setmana" },
-  "Tick it off": { de: "Abhaken", es: "Marcar como hecho", ca: "Marcar com a fet" },
   "Ticket": { de: "Ticket", es: "Ticket", ca: "Ticket" },
   "Ticket raised.": { de: "Ticket erstellt.", es: "Ticket creado.", ca: "Tiquet creat." },
   "Ticket updated.": { de: "Ticket aktualisiert.", es: "Ticket actualizado.", ca: "Tiquet actualitzat." },

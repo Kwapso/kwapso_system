@@ -157,11 +157,6 @@ export const SEED: Catalogue = {
    * and is reused as-is; `Forward` and `Trail` are new. */
   Forward: { de: "Vorwärts", es: "Adelante", ca: "Endavant" },
   Trail: { de: "Verlauf", es: "Historial", ca: "Historial" },
-  "Start timer": {
-    de: "Zeit starten",
-    es: "Iniciar temporizador",
-    ca: "Iniciar temporitzador",
-  },
   "Stop timer": { de: "Zeit stoppen", es: "Detener temporizador", ca: "Aturar temporitzador" },
   /* The portal's sign-in heading, which is now the whole sentence rather than
    * "Sign in to" + the brand name — the lockup above it says whose door this
@@ -4438,6 +4433,18 @@ export const SEED: Catalogue = {
   "Phase types": { de: "Phasentypen", es: "Tipos de fase", ca: "Tipus de fases" },
   "Phase updated.": { de: "Phase aktualisiert.", es: "Fase actualizada.", ca: "Fase actualitzada." },
   "Phases inside it": { de: "Phasen darin", es: "Fases dentro de él", ca: "Fases dins d'ell" },
+  // THE WORKING-DAYS RULING (Aurora, 21 Sep 2026: "mind you, all of this is
+  // Monday to Friday... I, of course, don't count the weekends").
+  "working days": { de: "Arbeitstage", es: "días laborables", ca: "dies laborables" },
+  "Monday to Friday, weekends are not counted": {
+    de: "Montag bis Freitag, Wochenenden zählen nicht",
+    es: "de lunes a viernes, los fines de semana no cuentan",
+    ca: "de dilluns a divendres, els caps de setmana no compten",
+  },
+  // AN UNDATED PHASE'S PROJECTED SPAN, on the Timeline and its own segment
+  // tooltip, and the wave head's own forecast-total row.
+  "Expected": { de: "Erwartet", es: "Previsto", ca: "Previst" },
+  "Expected length": { de: "Erwartete Dauer", es: "Duración prevista", ca: "Durada prevista" },
   "Plan a phase": { de: "Eine Phase planen", es: "Planificar una fase", ca: "Planificar una fase" },
   "Put a phase in this wave": { de: "Eine Phase in diese Wave einfügen", es: "Poner una fase en esta wave", ca: "Posar una fase en aquesta wave" },
   "Saved. Two phases in this wave run over each other.": { de: "Gespeichert. Zwei Phasen in dieser Wave überschneiden sich.", es: "Guardado. Dos fases en esta wave se solapan.", ca: "Desat. Dues fases en aquesta wave se superposen." },
@@ -4467,7 +4474,6 @@ export const SEED: Catalogue = {
   "Nothing happens on its own here. The timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.": { de: "Hier passiert nichts von selbst. Der Timer wird nicht gestoppt und keine Zeit wird geschrieben. Es ist eine Frage, die die App Ihnen stellt, und Sie beantworten sie auf drei Arten.", es: "Aquí nada ocurre por sí solo. El cronómetro no se detiene y no se registra ningún tiempo. Es una pregunta que la app te hace, y la respondes de tres formas.", ca: "Aquí no passa res per si sol. El cronòmetre no s'atura i no es registra cap temps. És una pregunta que l'app et fa, i la respons de tres maneres." },
   "That can be right. It is saved either way. Change a phase's dates if it is not.": { de: "Das kann stimmen. Es wird so oder so gespeichert. Ändern Sie die Daten einer Phase, wenn nicht.", es: "Eso puede ser correcto. Se guarda de todos modos. Cambia las fechas de una fase si no lo es.", ca: "Això pot ser correcte. Es desa de totes maneres. Canvia les dates d'una fase si no ho és." },
   "Phase days changed.": { de: "Phasentage geändert.", es: "Días de fase cambiados.", ca: "Dies de fase canviats." },
-  "days": { de: "Tage", es: "días", ca: "dies" },
   "The gathering cannot be switched off. It is what the fault record is made of. The email already is: it is addressed to nobody on purpose, and the faults are read here instead.": { de: "Das Sammeln lässt sich nicht abschalten. Daraus besteht der Fehlerdatensatz. Die E-Mail ist es bereits: Sie ist absichtlich an niemanden adressiert, und die Fehler werden stattdessen hier gelesen.", es: "La recopilación no se puede desactivar. Es de lo que está hecho el registro de fallos. El correo ya lo es: está dirigido a nadie a propósito, y los fallos se leen aquí en su lugar.", ca: "La recopilació no es pot desactivar. Això és de què està fet el registre de fallades. El correu ja ho és: està adreçat a ningú expressament, i les fallades es llegeixen aquí en lloc d'això." },
 
   /* ── The message-delete strings the reply-actions menu (kit v1.2.139) needs
@@ -4516,10 +4522,6 @@ export const SEED: Catalogue = {
   "Load more words": { de: "Weitere Wörter laden", es: "Cargar más palabras", ca: "Carrega més paraules" },
   "Nothing in the glossary yet.": { de: "Noch nichts im Glossar.", es: "Aún no hay nada en el glosario.", ca: "Encara no hi ha res al glossari." },
   "The words this team uses, and what each one means. Add one, and the assistant can answer from it too.": { de: "Die Wörter, die dieses Team verwendet, und was sie bedeuten. Füge eines hinzu, und auch der Assistent kann daraus antworten.", es: "Las palabras que usa este equipo, y qué significa cada una. Añade una, y el asistente también podrá responder a partir de ella.", ca: "Les paraules que utilitza aquest equip, i què vol dir cadascuna. Afegeix-ne una, i l'assistent també hi podrà respondre." },
-  "Take this away": { de: "Entfernen", es: "Quitar", ca: "Treu-ho" },
-  "Take this word away": { de: "Dieses Wort entfernen", es: "Quitar esta palabra", ca: "Treu aquesta paraula" },
-  "Take this word away?": { de: "Dieses Wort entfernen?", es: "¿Quitar esta palabra?", ca: "Vols treure aquesta paraula?" },
-  "The assistant stops reading it right away. Nothing is deleted, so you can bring it back any time from the knowledge base.": { de: "Der Assistent liest es ab sofort nicht mehr. Nichts wird gelöscht, du kannst es jederzeit über die Wissensdatenbank zurückholen.", es: "El asistente deja de leerla de inmediato. No se elimina nada, puedes recuperarla en cualquier momento desde la base de conocimiento.", ca: "L'assistent deixa de llegir-la de seguida. No s'elimina res, la pots recuperar en qualsevol moment des de la base de coneixement." },
   "Word": { de: "Wort", es: "Palabra", ca: "Paraula" },
   "Word updated.": { de: "Wort aktualisiert.", es: "Palabra actualizada.", ca: "Paraula actualitzada." },
   "Words and their definitions become part of the knowledge base: searchable here, and read by the assistant.": { de: "Wörter und ihre Definitionen werden Teil der Wissensdatenbank: hier durchsuchbar, und vom Assistenten gelesen.", es: "Las palabras y sus definiciones pasan a formar parte de la base de conocimiento: buscables aquí, y leídas por el asistente.", ca: "Les paraules i les seves definicions passen a formar part de la base de coneixement: cercables aquí, i llegides per l'assistent." },
@@ -4537,6 +4539,15 @@ export const SEED: Catalogue = {
   "Inherited from": { de: "Übernommen von", es: "Heredado de", ca: "Heretat de" },
   "Change who is assigned": { de: "Zuständigkeit ändern", es: "Cambiar quién está asignado", ca: "Canvia qui hi ha assignat" },
   "Choose someone": { de: "Jemanden auswählen", es: "Elige a alguien", ca: "Tria algú" },
+
+  /* ── The Assigned to card's own eyebrow, redesigned as the Stakeholders
+   * card's twin (Aurora, 21 Sep 2026, verbatim: "I wanted the 'Assigned to'
+   * to be like this: the count and the horizontal card. Redesign it."). The
+   * tile's eyebrow reads "Assigned to" when the record carries its own
+   * person (the existing seed entry above) and this new "From the app" when
+   * it does not and the app's lead is answering instead, the app's own name
+   * stays on the existing "Inherited from <app>" line beneath it. ────────── */
+  "From the app": { de: "Von der App", es: "De la app", ca: "De l'app" },
 
   /* ── The Assigned to card's own clear action (Aurora's 16 Sep 2026 ruling:
    * "Kill the 'nobody' option for staff … This 'nobody', just kill it.",
@@ -4559,6 +4570,10 @@ export const SEED: Catalogue = {
   "Edit the build notes": { de: "Baunotizen bearbeiten", es: "Editar las notas de construcción", ca: "Edita les notes de construcció" },
   "What was built, and how.": { de: "Was gebaut wurde, und wie.", es: "Qué se construyó, y cómo.", ca: "Què es va construir, i com." },
   "Add images inline.": { de: "Bilder direkt im Text hinzufügen.", es: "Añade imágenes dentro del texto.", ca: "Afegeix imatges dins del text." },
+  // "Images" (round 43, story-build-notes-sheet.tsx): the Build notes sheet's
+  // own field label over the kit's `FileUpload` drop zone, replacing the
+  // hand-built `StoryAttachmentsPanel` (Aurora's ruling, 21 Sep 2026).
+  "Images": { de: "Bilder", es: "Imágenes", ca: "Imatges" },
   "Write what was built, and how…": { de: "Schreib, was gebaut wurde, und wie…", es: "Escribe qué se construyó, y cómo…", ca: "Escriu què es va construir, i com…" },
   "Write the build notes before marking it done.": {
     de: "Schreib die Baunotizen, bevor du es als erledigt markierst.",
@@ -4572,7 +4587,6 @@ export const SEED: Catalogue = {
   "No related stories.": { de: "Keine zugehörigen Storys.", es: "Sin historias relacionadas.", ca: "Sense històries relacionades." },
   "Phase and wave": { de: "Phase und Wave", es: "Fase y Wave", ca: "Fase i Wave" },
   "None": { de: "Keine", es: "Ninguno", ca: "Cap" },
-  "Metrics": { de: "Kennzahlen", es: "Métricas", ca: "Mètriques" },
   "Cycle time": { de: "Durchlaufzeit", es: "Tiempo de ciclo", ca: "Temps de cicle" },
   "Not started": { de: "Noch nicht begonnen", es: "Sin empezar", ca: "Sense començar" },
   "Flow efficiency": { de: "Flusseffizienz", es: "Eficiencia de flujo", ca: "Eficiència de flux" },
@@ -4583,4 +4597,24 @@ export const SEED: Catalogue = {
    * Do/Done, never `storyStatusWord`'s sentence-case "In review" (which is
    * not itself in the catalogue — no literal `t(...)` call reaches it). ── */
   "In Review": { de: "In Prüfung", es: "En revisión", ca: "En revisió" },
+
+  /* ── TASK DELETE, the task detail head's own "…" menu (team migration
+   * 0113, Aurora's 21 Sep 2026 ruling: "i need delete actino for tasks on
+   * the ... button"). Same `useConfirm` shape as `delete_help_reply`'s own
+   * strings above, one module along. ─────────────────────────────────── */
+  "Delete this task?": { de: "Diese Aufgabe löschen?", es: "¿Eliminar esta tarea?", ca: "Vols eliminar aquesta tasca?" },
+  "It stops showing on every list. Nothing is deleted: the task and its history stay exactly as they are.": {
+    de: "Sie verschwindet nur aus jeder Liste. Nichts wird gelöscht, die Aufgabe und ihr Verlauf bleiben genau so erhalten.",
+    es: "Deja de mostrarse en todas las listas. No se elimina nada, la tarea y su historial se mantienen tal cual.",
+    ca: "Deixa de mostrar-se en totes les llistes. No s'elimina res, la tasca i el seu historial es mantenen tal com estan.",
+  },
+  "Task deleted.": { de: "Aufgabe gelöscht.", es: "Tarea eliminada.", ca: "Tasca eliminada." },
+  "Couldn't delete that task.": { de: "Diese Aufgabe konnte nicht gelöscht werden.", es: "No se pudo eliminar esa tarea.", ca: "No s'ha pogut eliminar aquesta tasca." },
+
+  /* ── A RECORD CANNOT CLOSE WHILE ITS CLOCK RUNS (Aurora's 21 Sep 2026
+   * ruling, the same round: "cannot mark anything as closed... if there's
+   * an active time log running"). The task head's own Done button reads
+   * this in a Tooltip while disabled; `setTaskDone` answers the same
+   * sentence in its 409. ─────────────────────────────────────────────── */
+  "Stop the timer first.": { de: "Zuerst den Timer stoppen.", es: "Detén primero el temporizador.", ca: "Atura primer el temporitzador." },
 }

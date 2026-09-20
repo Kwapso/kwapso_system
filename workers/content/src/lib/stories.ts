@@ -41,6 +41,7 @@ import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@sha
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { refuseWhileTimerRuns } from "./work-logs"
 import {
   idBatches,
   LIST_HARD_CAP,
@@ -51,6 +52,7 @@ import {
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
+import { isWorkingDay } from "@shared/working-days"
 import {
   MOSCOW_VALUES,
   PHASE_GOAL_MAX_CHARS,
@@ -682,18 +684,14 @@ export type StoryInput = {
    * a deactivated "Fix" from being creatable again the moment somebody edits
    * the vocabulary label back to it. */
   storyType?: unknown
-  /** Client-requested / Internal — the client's same ruling. REQUIRED on an
-   * edit, exactly like `storyType` (this door replaces every field it reads,
-   * never leaves one untouched — `updateTask`'s own doc, `workers/content/src/
-   * lib/tasks.ts`, carries the reason: an absent field meaning "leave it" is
-   * how an agent turn once wiped three columns nobody mentioned). On a
-   * CREATE, blank defaults to 'Client-requested' (`createStory`, below) —
-   * the one field this door fills in rather than refuses, because the form
-   * always has a pill pre-selected and a machine caller that says nothing
-   * about where the work came from almost always means the ordinary case.
-   * Validated the same way `storyType` is — an active row in "Story
-   * category", never a free string. */
-  category?: unknown
+  /** NO `category` FIELD HERE ANY MORE. Aurora's ruling, 21 Sep 2026, B43,
+   * verbatim: "The category 'Client Requested' or 'Enabler': don't put it
+   * on the edit screen. You must detect it automatically. If it's related
+   * to a ticket, it's 'Client Requested.' If not, not." Both doors DERIVE
+   * the category from the resolved `ticketId` (`deriveCategory`, below) and
+   * never read a category a caller sends — the field used to be required
+   * on an edit and defaulted on a create; there is nothing left to
+   * validate or default, only to compute. */
   /** WHAT "DONE" LOOKS LIKE — Aurora's ruling, 20 Sep 2026: "same design as
    * Detail." Optional, TEXT_LIMITS.long at the door, same as `detail`. */
   acceptanceCriteria?: unknown
@@ -726,15 +724,19 @@ function optionalMoscow(raw: unknown): MoscowValue | null {
   return value as MoscowValue
 }
 
-/** THE ENABLER RULE (Aurora's ruling, 20 Sep 2026, verbatim): "When a story's
- * origin is Enabler, must select a related ticket!" Checked HERE, on the
- * RESOLVED fields both doors already have in hand, rather than duplicated at
- * each call site — `refuseUnstepped`'s own reason, one field along: there is
- * more than one way to write a story's category (create, update), and both
- * have to ask the identical question. */
-function refuseEnablerWithNoTicket(category: string, ticketId: string | null): void {
-  if (category === "Enabler" && !ticketId)
-    throw new GuardError(400, "ticket_required", "An Enabler story has to name the ticket it enables.")
+/** THE CATEGORY, DERIVED — Aurora's ruling, 21 Sep 2026, B43, verbatim: "The
+ * category 'Client Requested' or 'Enabler': don't put it on the edit screen.
+ * You must detect it automatically. If it's related to a ticket, it's
+ * 'Client Requested.' If not, not." This INVERTS the 20 Sep 2026 rule it
+ * replaces (`refuseEnablerWithNoTicket`, this file, until today): that rule
+ * refused a caller who chose "Enabler" with no ticket; this one is never
+ * given a choice to refuse, it reads the same fact — whether a ticket is
+ * linked — the other direction. Called on the RESOLVED `ticketId` both
+ * doors already have in hand (never the raw, unvalidated body field), so a
+ * create and an edit can never disagree about what "linked to a ticket"
+ * means. */
+function deriveCategory(ticketId: string | null): string {
+  return ticketId ? "Client-requested" : "Enabler"
 }
 
 /** WHICH MAPS — proved to be live processes in the caller's own team database,
@@ -1005,10 +1007,11 @@ export async function createStory(
   // against a hardcoded five, so a sixth type added there is offered the
   // moment it exists rather than refused until this file is edited too.
   const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
-  // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — blank defaults to
-  // the ordinary case rather than refusing (`StoryInput.category`'s own doc,
-  // above says why this one field gets a default and `storyType` does not).
-  const category = optionalText(input.category, "Category", TEXT_LIMITS.short) ?? "Client-requested"
+  // WHERE THIS WORK CAME FROM — DERIVED, NOT SENT (Aurora's ruling, 21 Sep
+  // 2026, B43): Client-requested when a ticket is linked, Enabler otherwise.
+  // See `deriveCategory`'s own doc for why this replaces the 20 Sep 2026
+  // refusal rather than sitting beside it.
+  const category = deriveCategory(ticketId ?? null)
   // "SAME DESIGN AS DETAIL" (Aurora's ruling, 20 Sep 2026) — optional, the
   // identical long-text limit `detail` above already reads.
   const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
@@ -1019,9 +1022,6 @@ export async function createStory(
   const buildNotes = optionalText(input.buildNotes, "Build notes", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
   const contributesToGoal = input.contributesToGoal === true
-  // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — checked on the resolved
-  // words, before the wave below spends a round trip on anything else.
-  refuseEnablerWithNoTicket(category, ticketId ?? null)
 
   // ONE WAVE, NOT SIX TRIPS (shared/workers/parallel.ts). Every one of these
   // reads only the INPUT — not each other — so the six `await`s were sequential
@@ -1108,9 +1108,13 @@ export async function updateStory(
   const dueOn = optionalText(input.dueOn, "Due date", TEXT_LIMITS.short) ?? null
   const changesNoStep = input.changesNoStep === true
   const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
-  // REQUIRED on an edit, unlike the create door — see `StoryInput.category`'s
-  // own doc for why the two doors treat a blank differently.
-  const category = requireText(input.category, "Category", TEXT_LIMITS.short)
+  // WHERE THIS WORK CAME FROM — RE-DERIVED ON EVERY EDIT (Aurora's ruling,
+  // 21 Sep 2026, B43), off the SAME resolved `ticketId` this door already
+  // reads above: linking a ticket on an edit that had none turns a story
+  // Enabler → Client-requested, and dropping the ticket (an edit that omits
+  // `ticketId`, cleared like every other field this door replaces whole)
+  // turns it back — never a value the caller chooses.
+  const category = deriveCategory(ticketId ?? null)
   const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
   // WHAT WAS BUILT, AND HOW — replaced whole like every other field this door
   // reads (`StoryInput.buildNotes`'s own doc): the story's own build-notes
@@ -1119,11 +1123,6 @@ export async function updateStory(
   const buildNotes = optionalText(input.buildNotes, "Build notes", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
   const contributesToGoal = input.contributesToGoal === true
-  // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — read on the RESOLVED
-  // ticket, exactly as the create door does: this door replaces every field
-  // it reads (`StoryInput`'s own doc), so an edit that drops the ticket while
-  // switching to Enabler is refused here, not silently written.
-  refuseEnablerWithNoTicket(category, ticketId ?? null)
 
   // The account is re-derived rather than carried: re-pointing a story at another
   // ticket moves the work to that client's books, and the margin has to follow it.
@@ -1356,6 +1355,13 @@ export async function setStoryStatus(
   if (status === "done") await refuseDoneByAnybodyElse(cfg, guard, before.app_id)
   if (status === "done") refuseUnstepped(before)
   if (status === "done") refuseUndocumented(before)
+  // R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+  // closed (task, story, ticket, whatever) if there's an active time log
+  // running." Checked here, not only at the door, the same reason every
+  // other Done refusal in this function is checked here: there is more than
+  // one way to move a story, and one of them will be written by somebody
+  // who has never read the route's own handler.
+  if (status === "done") await refuseWhileTimerRuns(cfg, guard, { table: "stories", id })
   const reviewNote = review?.note ?? null
   if (status === "in_review")
     await refuseUnreviewable(cfg, guard, id, reviewNote, before.review_note)
@@ -1448,7 +1454,12 @@ export type StoryBurndownDay = {
   /** null when the team's stories carry no points field: `hasPoints` says so
    * once for the whole series rather than per day */
   remainingPoints: number | null
-  /** the straight line from `startTotal` on day one to zero on the last day */
+  /** the straight line from `startTotal` on day one to zero on the last day,
+   * FALLING ONLY ON WORKING DAYS (Aurora's ruling, 21 Sep 2026: "mind you,
+   * all of this is Monday to Friday... I, of course, don't count the
+   * weekends"), flat across a Saturday or a Sunday inside the phase, the
+   * same `shared/working-days.ts` reads every other day count in this app
+   * through. */
   idealCount: number
 }
 
@@ -1584,6 +1595,23 @@ export async function storyBurndown(
   const days = phaseDayRange(sprint.starts_on, sprint.ends_on)
   const lastIndex = days.length - 1
 
+  // WORKING-DAY ELAPSED, PER DAY: the ideal line's own denominator, never
+  // the calendar-day index `i` a version of this line used before 21 Sep
+  // 2026. `workingElapsed[i]` is how many of `days[1..i]` are working days
+  // (Monday to Friday), so it holds STEADY across a Saturday or a Sunday
+  // rather than dropping on it, and `workingElapsed[0]` is always 0: day one
+  // has nothing "before" it yet, working or not, which is what keeps the
+  // line starting at the full `startTotal` regardless of which weekday the
+  // phase happens to start on. `totalWorking`, the count through the LAST
+  // day, is the line's denominator: it reaches zero exactly on the phase's
+  // last day the same way the old calendar-day version did, only counting
+  // working days along the way rather than every day.
+  const workingElapsed: number[] = Array.from({ length: days.length }, () => 0)
+  for (let i = 1; i < days.length; i++) {
+    workingElapsed[i] = workingElapsed[i - 1]! + (isWorkingDay(days[i]!) ? 1 : 0)
+  }
+  const totalWorking = workingElapsed[lastIndex] ?? 0
+
   const series: StoryBurndownDay[] = days.map((date, i) => {
     const dayEnd = `${date}T23:59:59.999Z`
     let remaining = 0
@@ -1598,7 +1626,10 @@ export async function storyBurndown(
       }
       if (latest !== "done") remaining++
     }
-    const idealCount = lastIndex <= 0 ? 0 : Math.round((startTotal * (1 - i / lastIndex)) * 100) / 100
+    const idealCount =
+      lastIndex <= 0 || totalWorking <= 0
+        ? 0
+        : Math.round((startTotal * (1 - workingElapsed[i]! / totalWorking)) * 100) / 100
     return { date, remainingCount: remaining, remainingPoints: null, idealCount }
   })
 

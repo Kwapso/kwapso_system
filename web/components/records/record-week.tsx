@@ -447,7 +447,8 @@ export function RecordWeek({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-medium">{weekRangeLabel(monday, lang)}</div>
         <div className="flex items-center gap-1">
-          <Button variant="secondary" size="sm" onClick={goToday}>
+          {/* R98 — a toolbar button is the kit's default height, never `sm`. */}
+          <Button variant="secondary" onClick={goToday}>
             {t("Today")}
           </Button>
           <Button

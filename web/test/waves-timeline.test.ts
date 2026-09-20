@@ -17,11 +17,14 @@ import { softNavigate } from "@/lib/nav"
 import {
   buildWaveCalendarEntries,
   buildWaveTimelineRows,
+  waveExpectedWorkingDays,
   waveListColumns,
   waveListRows,
   waveState,
   waveWeekWindow,
 } from "@/components/work/waves-screen"
+import { addWorkingDays } from "@shared/working-days"
+import { formatDate } from "@shared/web/format"
 import type { Wave } from "@shared/waves"
 import type { Sprint, AppRow } from "@shared/types"
 
@@ -245,6 +248,125 @@ describe("buildWaveTimelineRows — one bar per wave, cut into its own sprints",
     })
     const rows = buildWaveTimelineRows([w], [], win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
     expect(rows[0]!.sublabel).toBeUndefined()
+  })
+})
+
+// Aurora's ruling, 21 Sep 2026: draw an undated phase's expected span end to
+// end from the previous phase's end (or the wave start, or today), lighter
+// than a dated segment and marked expected. Fixture with one dated phase and
+// one undated one, both in the same wave.
+describe("buildWaveTimelineRows, undated phases draw as an expected, projected span", () => {
+  const win = waveWeekWindow(0, t, "en")
+  const windowStart = win.weekStarts[0]!
+
+  function fixture() {
+    const waveEnd = addDays(windowStart, 4)
+    const w = wave({ id: "w1", accountId: "a1", startsOn: windowStart, endsOn: waveEnd })
+    const dated = sprint({
+      id: "dated",
+      name: "Build",
+      waveId: "w1",
+      sprintType: "Build",
+      startsOn: windowStart,
+      endsOn: waveEnd,
+    })
+    const undated = sprint({
+      id: "undated",
+      name: "Pilot run",
+      waveId: "w1",
+      sprintType: "Pilot",
+      startsOn: null,
+      endsOn: null,
+    })
+    return { w, waveEnd, dated, undated }
+  }
+
+  it("draws the undated phase as its own segment, toned 'expected', chained off the wave's own end", () => {
+    const { w, dated, undated } = fixture()
+    const rows = buildWaveTimelineRows([w], [dated, undated], win, "/waves", "en", [], t)
+    expect(rows.length).toBe(1)
+    const expectedSeg = rows[0]!.segments.find((s) => s.id === "undated")
+    expect(expectedSeg).toBeDefined()
+    expect(expectedSeg!.tone).toBe("expected")
+    // Pilot's placeholder default is 5 working days, chained off the wave's
+    // own recorded end (no per-wave phase-days map handed in, so the default
+    // wins). The wave's own end (4 calendar days into the window) still
+    // falls in the window's very first week column.
+    expect(expectedSeg!.start).toBe(0)
+    expect(expectedSeg!.title).toContain("Expected")
+    // Clicking it opens the phase's own record, same as a dated segment.
+    expectedSeg!.onSelect?.()
+    expect(softNavigate).toHaveBeenCalledWith("/waves/w1/sprints/undated")
+  })
+
+  it("the dated phase's own segment is untouched, a real state, never 'expected'", () => {
+    const { w, dated, undated } = fixture()
+    const rows = buildWaveTimelineRows([w], [dated, undated], win, "/waves", "en", [], t)
+    const datedSeg = rows[0]!.segments.find((s) => s.id === "dated")
+    expect(datedSeg!.tone).not.toBe("expected")
+  })
+
+  it("with no translator, the old law stands: no expected segment at all", () => {
+    const { w, dated, undated } = fixture()
+    const rows = buildWaveTimelineRows([w], [dated, undated], win, "/waves", "en")
+    expect(rows[0]!.segments.some((s) => s.id === "undated")).toBe(false)
+  })
+
+  it("a wave carrying ONLY an undated phase still reaches the axis, once a translator is in hand", () => {
+    const w = wave({ id: "w9", accountId: "a1", startsOn: null, endsOn: null })
+    const undated = sprint({ id: "u9", name: "Audit kickoff", waveId: "w9", sprintType: "Audit", startsOn: null, endsOn: null })
+    const rows = buildWaveTimelineRows([w], [undated], win, "/waves", "en", [], t)
+    expect(rows.length).toBe(1)
+    expect(rows[0]!.segments.some((s) => s.id === "u9" && s.tone === "expected")).toBe(true)
+  })
+
+  it("a wave's own per-wave phase-days map wins over the placeholder default", () => {
+    const { w, waveEnd, dated, undated } = fixture()
+    const perWave = new Map<string, Map<string, number>>([["w1", new Map([["Pilot", 2]])]])
+    const rows = buildWaveTimelineRows([w], [dated, undated], win, "/waves", "en", [], t, perWave)
+    const expectedSeg = rows[0]!.segments.find((s) => s.id === "undated")!
+    // 2 working days off the wave's own end, not Pilot's 5-day default.
+    expect(expectedSeg.title).toContain(formatDate(addWorkingDays(waveEnd, 2), "en"))
+    expect(expectedSeg.title).not.toContain(formatDate(addWorkingDays(waveEnd, 5), "en"))
+  })
+})
+
+describe("waveExpectedWorkingDays, the wave's own forecast total, in working days", () => {
+  it("undefined for a wave with no active phases at all", () => {
+    expect(waveExpectedWorkingDays([])).toBeUndefined()
+  })
+
+  it("a dated phase contributes its own real length, both ends included", () => {
+    // Monday through that week's Friday is five working days.
+    const phases = [{ startsOn: "2026-09-21", endsOn: "2026-09-25", sprintType: "Build", active: true }]
+    expect(waveExpectedWorkingDays(phases)).toBe(5)
+  })
+
+  it("an undated phase contributes its type's own day count, the default when no wave row is handed in", () => {
+    const phases = [{ startsOn: null, endsOn: null, sprintType: "Pilot", active: true }]
+    expect(waveExpectedWorkingDays(phases)).toBe(5) // Pilot's placeholder default
+  })
+
+  it("the wave's own phase-days row wins over the placeholder default", () => {
+    const phases = [{ startsOn: null, endsOn: null, sprintType: "Pilot", active: true }]
+    const byType = new Map([["Pilot", 8]])
+    expect(waveExpectedWorkingDays(phases, byType)).toBe(8)
+  })
+
+  it("sums a dated phase and an undated one together, the fixture this ruling asked for", () => {
+    const phases = [
+      { startsOn: "2026-09-21", endsOn: "2026-09-25", sprintType: "Build", active: true }, // 5
+      { startsOn: null, endsOn: null, sprintType: "Pilot", active: true }, // 5, the default
+    ]
+    expect(waveExpectedWorkingDays(phases)).toBe(10)
+  })
+
+  it("a switched-off phase never counts, dated or not", () => {
+    const phases = [
+      { startsOn: "2026-09-21", endsOn: "2026-09-25", sprintType: "Build", active: false },
+      { startsOn: null, endsOn: null, sprintType: "Pilot", active: true }, // 5
+    ]
+    expect(waveExpectedWorkingDays(phases)).toBe(5)
   })
 })
 

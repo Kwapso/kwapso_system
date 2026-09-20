@@ -4,9 +4,9 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-96 laws, 94 resolved to at least one check file, 2 unresolved.
+99 laws, 97 resolved to at least one check file, 2 unresolved.
 
-## Architecture (27)
+## Architecture (28)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -37,8 +37,9 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R68 | enforced | `one-identity-per-source` | `workers/content/test/one-identity-per-source.test.ts` |
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
+| R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
 
-## UI (60)
+## UI (62)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -102,6 +103,8 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R94 | enforced | `chip-order` | `web/test/chip-order.test.ts` |
 | R95 | enforced | `no-em-dash` | `web/test/no-em-dash.test.ts` |
 | R96 | enforced | `id-chip-is-black` | `web/test/id-chip-is-black.test.ts` |
+| R97 | enforced | `counts-beside-titles` | `web/test/counts-beside-titles.test.ts` |
+| R98 | enforced | `button-sizes` | `web/test/button-sizes.test.ts` |
 
 ## Workflow (2)
 

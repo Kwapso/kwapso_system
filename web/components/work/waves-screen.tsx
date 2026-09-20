@@ -72,9 +72,11 @@ import { companiesKey, totalKey, sprintsKey, appsKey, listFetch } from "@/lib/li
 import { softNavigate } from "@/lib/nav"
 import { usePermissions } from "@/lib/perms"
 import type { Account, AppRow, Sprint } from "@shared/types"
-import type { Wave } from "@shared/waves"
+import { PHASE_DAY_DEFAULTS, type Wave } from "@shared/waves"
 import { sprintState } from "@shared/sprint-state"
 import { waveStage, type PhaseWindow } from "@shared/wave-stage"
+import { PHASE_TYPES } from "@shared/sprint-types"
+import { addWorkingDays, workingDaySpan } from "@shared/working-days"
 import { formatDate, formatDayMonth } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
@@ -309,6 +311,51 @@ function waveApp(w: Wave, appsById: Map<string, AppRow>): AppRow | null {
     : null
 }
 
+/** ORDERED BY `PHASE_TYPES` (the Wave-lifecycle order every phase-days row
+ * already reads through), a null or unrecognised type sorting last and ties
+ * broken by name, the same ordering that gives the phase-days Settings
+ * panel its seven deterministic rows. Undated phases have no date to sort
+ * by, so the lifecycle order stands in for "which one comes next." */
+function orderPhaseTypes<T extends { sprintType: string | null; name: string }>(phases: readonly T[]): T[] {
+  const index = new Map(PHASE_TYPES.map((p, i) => [p.name, i]))
+  const rank = (p: T) => (p.sprintType ? (index.get(p.sprintType) ?? PHASE_TYPES.length) : PHASE_TYPES.length)
+  return phases.slice().sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+}
+
+/** ONE PHASE TYPE'S EXPECTED DAY COUNT: the wave's own row
+ * (`phaseDaysByType`) where the caller has one in hand, else the placeholder
+ * default (`PHASE_DAY_DEFAULTS`). `null` for a type this app has no day
+ * count for at all (a team's own custom or retired word), the same "nothing
+ * to prefill" reading `sprint-form-dialog.tsx#prefillEndDate` gives it. */
+function expectedDaysFor(sprintType: string | null, phaseDaysByType?: Map<string, number>): number | null {
+  if (!sprintType) return null
+  return phaseDaysByType?.get(sprintType) ?? PHASE_DAY_DEFAULTS[sprintType] ?? null
+}
+
+/** THE WAVE'S OWN EXPECTED LENGTH, in working days. Aurora's 21 Sep 2026
+ * phase-days ruling read forward onto the whole package rather than one
+ * phase: a forecast of how long the wave runs in total, blending what is
+ * already DATED (read back as its own real length, `workingDaySpan`) with
+ * what is not yet scheduled (that phase's own day count, the wave's row or
+ * the placeholder default). Only ACTIVE phases count, a switched-off phase
+ * was never going to happen, and a phase whose type carries no day count at
+ * all contributes nothing rather than a guess. `undefined` for a wave with
+ * no active phases at all: there is nothing to forecast, which is a
+ * different sentence from a forecast of zero. */
+export function waveExpectedWorkingDays(
+  phases: readonly (PhaseWindow & { sprintType: string | null; active: boolean })[],
+  phaseDaysByType?: Map<string, number>
+): number | undefined {
+  const active = phases.filter((p) => p.active)
+  if (active.length === 0) return undefined
+  let total = 0
+  for (const p of active) {
+    if (p.startsOn && p.endsOn) total += workingDaySpan(p.startsOn, p.endsOn)
+    else total += expectedDaysFor(p.sprintType, phaseDaysByType) ?? 0
+  }
+  return total
+}
+
 export function buildWaveTimelineRows(
   rows: Wave[],
   sprints: Sprint[],
@@ -316,18 +363,37 @@ export function buildWaveTimelineRows(
   basePath: string,
   lang: Language,
   apps: AppRow[] = [],
-  /** Optional. The caller's own `t()`, read only for the row's stage
-   * subline (`WaveStageMark`, below). Omitted draws the row exactly as
-   * before 21 Sep 2026 (no stage line), which is what every existing test
-   * that does not pass one still gets. */
-  t?: (s: string) => string
+  /** Optional. The caller's own `t()`, read for the row's stage subline
+   * (`WaveStageMark`, below) AND, added 21 Sep 2026, for drawing a wave's
+   * own UNDATED phases as a lighter, "expected" projected span, both
+   * withheld from a caller with no translator in hand, so this draws exactly
+   * the pre-21-Sep row (no stage line, no expected segments) for every test
+   * that does not pass one. */
+  t?: (s: string) => string,
+  /** THE WAVE'S OWN DAY COUNTS, keyed by waveId then phase type: the
+   * per-wave phase-days settings, where a caller happens to have them for
+   * more than one wave in hand (`wave-detail.tsx`'s own single-wave read is
+   * the only place that is true today). Omitted everywhere else in this
+   * collection screen, which is why an undated phase's expected span always
+   * falls back to `PHASE_DAY_DEFAULTS` here rather than costing this bounded
+   * list a per-wave round trip it does not otherwise make (R14). */
+  phaseDaysByWave?: Map<string, Map<string, number>>
 ): TimelineRow[] {
   const windowStart = new Date(window_.weekStarts[0] ?? isoDay(new Date()))
   const count = window_.weeks.length
   const today = isoDay(new Date())
   const byWave = new Map<string, Sprint[]>()
+  // EVERY sprint in the wave, dated or not. `byWave` above stays dated-only
+  // (every caller that pre-dates 21 Sep 2026 reads it that way); this is the
+  // second, wider map the undated/expected span below needs to find what
+  // `byWave` deliberately drops.
+  const allByWave = new Map<string, Sprint[]>()
   for (const s of sprints) {
-    if (!s.waveId || !s.startsOn || !s.endsOn) continue
+    if (!s.waveId) continue
+    const all = allByWave.get(s.waveId)
+    if (all) all.push(s)
+    else allByWave.set(s.waveId, [s])
+    if (!s.startsOn || !s.endsOn) continue
     const list = byWave.get(s.waveId)
     if (list) list.push(s)
     else byWave.set(s.waveId, [s])
@@ -336,27 +402,60 @@ export function buildWaveTimelineRows(
 
   const timelineRows: TimelineRow[] = []
   for (const w of rows) {
-    if (!w.startsOn || !w.endsOn) continue
+    const hasDatedWave = !!(w.startsOn && w.endsOn)
+    // UNDATED, ACTIVE PHASES, only computed with a translator in hand (see
+    // this function's own header), which is also what gates a wave with NO
+    // dated span of its own (only undated phases) onto the axis at all: the
+    // pre-21-Sep law stays "a wave with no dates at all is left off the
+    // axis" for every caller that cannot label what it would be drawing.
+    const undatedPhases = t
+      ? orderPhaseTypes((allByWave.get(w.id) ?? []).filter((p) => p.active && (!p.startsOn || !p.endsOn)))
+      : []
+    if (!hasDatedWave && undatedPhases.length === 0) continue
     // Captured once, as plain `string`s — a property access narrowed by the
     // guard above does not reliably survive the nested loop below, where a
     // fresh read of `w.endsOn` would be `string | null` again.
-    const waveStart = w.startsOn
-    const waveEnd = w.endsOn
+    const waveStart = w.startsOn ?? undefined
+    const waveEnd = w.endsOn ?? undefined
     const sortedSprints = (byWave.get(w.id) ?? []).slice().sort((a, b) => (a.startsOn ?? "").localeCompare(b.startsOn ?? ""))
 
-    // ONE RANGE PER SEGMENT (a sprint, or the gap before/after/between two),
-    // built in date order, before any of it touches a week column.
-    const ranges: { from: string; to: string; sprint: Sprint | null }[] = []
+    // ONE RANGE PER SEGMENT: a dated sprint, the gap before/after/between
+    // two of them, or, appended after all of that with `expected: true`, an
+    // undated phase's projected span, built in date order before any of it
+    // touches a week column.
+    const ranges: { from: string; to: string; sprint: Sprint | null; expected?: boolean }[] = []
     let cursor = waveStart
-    for (const s of sortedSprints) {
-      if (s.startsOn! > cursor) ranges.push({ from: cursor, to: s.startsOn!, sprint: null })
-      ranges.push({ from: s.startsOn!, to: s.endsOn!, sprint: s })
-      if (s.endsOn! > cursor) cursor = s.endsOn!
+    if (hasDatedWave) {
+      for (const s of sortedSprints) {
+        if (s.startsOn! > cursor!) ranges.push({ from: cursor!, to: s.startsOn!, sprint: null })
+        ranges.push({ from: s.startsOn!, to: s.endsOn!, sprint: s })
+        if (s.endsOn! > cursor!) cursor = s.endsOn!
+      }
+      if (cursor! < waveEnd!) ranges.push({ from: cursor!, to: waveEnd!, sprint: null })
+      // THE DEFENSIVE FALLBACK: dated, but this window's own sprint read
+      // found none for it (see this function's own header).
+      if (ranges.length === 0) ranges.push({ from: waveStart!, to: waveEnd!, sprint: null })
     }
-    if (cursor < waveEnd) ranges.push({ from: cursor, to: waveEnd, sprint: null })
-    // THE DEFENSIVE FALLBACK — dated, but this window's own sprint read found
-    // none for it (see this function's own header).
-    if (ranges.length === 0) ranges.push({ from: waveStart, to: waveEnd, sprint: null })
+
+    // THE EXPECTED CHAIN: each undated phase's span drawn END TO END from
+    // where the last one (dated or expected) left off, Aurora's own words:
+    // "draw each undated phase's expected span end to end from the previous
+    // phase's end (or the wave start, or today)." `waveEnd` IS that previous
+    // end once a dated wave exists (the door's own `recalcWaveDates` already
+    // makes it the latest dated sprint's own end); with no dated span at
+    // all the chain starts at the wave's own start, or today.
+    if (undatedPhases.length > 0) {
+      const phaseDaysByType = phaseDaysByWave?.get(w.id)
+      let expectedCursor = hasDatedWave ? waveEnd! : (waveStart ?? today)
+      for (const p of undatedPhases) {
+        const days = expectedDaysFor(p.sprintType, phaseDaysByType)
+        if (!days) continue
+        const from = expectedCursor
+        const to = addWorkingDays(from, days)
+        ranges.push({ from, to, sprint: p, expected: true })
+        expectedCursor = to
+      }
+    }
 
     const segments: TimelineSegment[] = []
     for (const r of ranges) {
@@ -372,7 +471,9 @@ export function buildWaveTimelineRows(
           // THE TYPE'S ICON, BEFORE THE NAME — no colour of its own (client
           // ruling, 16 Sep 2026: "they will not have colors, but icons"); the
           // segment's own fill is the sprint's STATE (upcoming/running/
-          // wrapped), a different axis this icon does not touch.
+          // wrapped), or, `r.expected`, that it is a FORECAST rather than
+          // one of those three real states at all, a different axis this
+          // icon does not touch.
           label: (
             <span className="flex min-w-0 items-center gap-1">
               <SprintTypeGlyph type={r.sprint.sprintType} className="shrink-0" />
@@ -381,8 +482,10 @@ export function buildWaveTimelineRows(
           ),
           start: clippedStart,
           span: clippedSpan,
-          tone: sprintState(r.sprint, today),
-          title: `${r.sprint.name}${r.sprint.sprintType ? ` · ${r.sprint.sprintType}` : ""} · ${formatDate(r.sprint.startsOn, lang)} to ${formatDate(r.sprint.endsOn, lang)}`,
+          tone: r.expected ? "expected" : sprintState(r.sprint, today),
+          title: r.expected
+            ? `${r.sprint.name}${r.sprint.sprintType ? ` · ${r.sprint.sprintType}` : ""} · ${t ? t("Expected") : "Expected"} · ${formatDate(r.from, lang)} to ${formatDate(r.to, lang)}`
+            : `${r.sprint.name}${r.sprint.sprintType ? ` · ${r.sprint.sprintType}` : ""} · ${formatDate(r.sprint.startsOn, lang)} to ${formatDate(r.sprint.endsOn, lang)}`,
           onSelect: () => softNavigate(`${basePath}/${w.id}/sprints/${r.sprint!.id}`),
         })
       } else {

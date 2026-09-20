@@ -572,9 +572,9 @@ function PlanReview({ plan }: { plan: NonNullable<ImportBatchView["plan"]> }) {
           <p className="text-muted-foreground text-xs">
             {t("Skipped rows are listed with reasons. Fix them and re-import, or run now without them.")}
           </p>
+          {/* R98 — this notice row's own action, the kit's default height, never `sm`. */}
           <Button
             variant="secondary"
-            size="sm"
             onClick={() => downloadRejections(rejections, "rows-to-fix.csv")}
             className="gap-1"
           >
@@ -661,9 +661,9 @@ function Report({ report }: { report: ImportBatchReport }) {
             <p className="text-sm font-medium">
               {t("Rejected rows ({count})", { count: report.rejections.length })}
             </p>
+            {/* R98 — this card header's own action, the kit's default height, never `sm`. */}
             <Button
               variant="secondary"
-              size="sm"
               onClick={() => downloadRejections(report.rejections, "import-rejections.csv")}
               className="gap-1"
             >

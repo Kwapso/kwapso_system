@@ -252,7 +252,7 @@ describe("HelpStakeholders no longer draws an Assigned to row", () => {
     { id: "u-lead", name: "Petya Bletsova", photo: null },
   ]
 
-  it("renders no 'Assigned to' text and no assignee-card, even when the old props are passed", () => {
+  it("renders no 'Assigned to' text and no assignee tile, even when the old props are passed", () => {
     // Cast through `unknown` deliberately: these props no longer exist on
     // `HelpStakeholders`'s own type (proved positionally below), passed
     // anyway at the RUNTIME boundary to prove a stale caller cannot smuggle
@@ -269,7 +269,13 @@ describe("HelpStakeholders no longer draws an Assigned to row", () => {
     } as unknown as React.ComponentProps<typeof HelpStakeholders>
     render(<HelpStakeholders {...staleProps} />)
     expect(screen.queryByText("Assigned to")).toBeNull()
-    expect(document.querySelector('[data-slot="assignee-card"]')).toBeNull()
+    expect(screen.queryByText("From the app")).toBeNull()
+    // `assignee-tile` is `AssignedToCard`'s own tile slot (redesigned 21 Sep
+    // 2026, see this file's own header on the `AssignedToCard` describe
+    // block below); its absence here is what proves this component still
+    // draws none of the assignee row, not merely that an old slot name is
+    // gone.
+    expect(document.querySelector('[data-slot="assignee-tile"]')).toBeNull()
     expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
   })
 
@@ -295,15 +301,36 @@ describe("HelpStakeholders no longer draws an Assigned to row", () => {
 // ruling ("nono assigned to on the very top, a different card from
 // stakeholders!"). Every test below renders `AssignedToCard` alone, the same
 // way `HelpStakeholders`'s own suites above render it alone.
+//
+// REDESIGNED AS THE STAKEHOLDERS CARD'S TWIN, 21 Sep 2026. Aurora, over a
+// screenshot of the Stakeholders card: "I wanted the 'Assigned to' to be
+// like this: the count and the horizontal card. Redesign it." Validated the
+// same round: "4. Validated but redesigned as explained." The card no longer
+// carries its own `data-slot="assignee-card"`, it opens with the SAME
+// `<TicketSidePanel>` register "Stakeholders" itself renders through
+// (help-detail.tsx's own call), whose `<Card>` carries the kit's plain
+// `data-slot="card"`, so every test below locates the card by its own
+// title-with-count heading (`assignedCard()`, below) rather than a bespoke
+// slot name, and the face+name tile inside it carries its own
+// `data-slot="assignee-tile"`.
 describe("AssignedToCard", () => {
   const MEMBERS = [
     { id: "u-staff", name: "Alaap Kanchwala", photo: null },
     { id: "u-lead", name: "Petya Bletsova", photo: null },
   ]
 
-  it("stands on its own top-level Card, variant default (R67, it is no longer nested on raised paper)", () => {
+  // The panel's own title never changes with state ("Assigned to" always),
+  // so this is safe to use across every state below, unlike `screen.getByText`
+  // on its own, which can match the tile's own eyebrow too when the record
+  // carries its own person (the chip also reads "Assigned to" there).
+  function assignedCard(): HTMLElement {
+    const titleSpan = screen.getByText("Assigned to", { selector: "h3 span.truncate" })
+    return titleSpan.closest('[data-slot="card"]') as HTMLElement
+  }
+
+  it("stands on its own top-level Card, variant default, the Stakeholders card's own title-with-count register (R67)", () => {
     render(<AssignedToCard />)
-    const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    const card = assignedCard()
     expect(card).toBeTruthy()
     expect(card.getAttribute("data-variant")).toBe("default")
     expect(screen.getByText("Nobody yet.")).toBeTruthy()
@@ -313,7 +340,7 @@ describe("AssignedToCard", () => {
     render(
       <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
     )
-    const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    const card = assignedCard()
     expect(within(card).getByText("Petya Bletsova")).toBeTruthy()
     expect(within(card).getByText(/Inherited from/)).toBeTruthy()
     expect(within(card).getByText(/Bergman dispatch/)).toBeTruthy()
@@ -330,9 +357,84 @@ describe("AssignedToCard", () => {
         members={MEMBERS}
       />
     )
-    const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    const card = assignedCard()
     expect(within(card).getByText("Alaap Kanchwala")).toBeTruthy()
     expect(within(card).queryByText(/Inherited from/)).toBeNull()
+  })
+
+  // THE TITLE-WITH-COUNT REGISTER, THE SAME ONE "Stakeholders" ITSELF USES
+  // (help-detail.tsx's `<TicketSidePanel title={t("Stakeholders")}
+  // count={stakeholderBadge}>`): `formatCount`, 1 when someone is assigned
+  // or inherited, nothing at all (never a bare "0") otherwise.
+  describe("the count beside the title, the Stakeholders card's own register", () => {
+    it("shows no count when nobody is assigned and there is nothing to inherit", () => {
+      render(<AssignedToCard />)
+      const titleSpan = screen.getByText("Assigned to", { selector: "h3 span.truncate" })
+      const heading = titleSpan.closest("h3") as HTMLElement
+      expect(heading.querySelector("span:not(.truncate)")).toBeNull()
+    })
+
+    it("counts 1 when the ticket carries its own assignee", () => {
+      render(<AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />)
+      const titleSpan = screen.getByText("Assigned to", { selector: "h3 span.truncate" })
+      const heading = titleSpan.closest("h3") as HTMLElement
+      expect(heading.querySelector("span:not(.truncate)")?.textContent).toBe("1")
+    })
+
+    it("counts 1 when the ticket has none of its own but inherits one from the app", () => {
+      render(
+        <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
+      )
+      const titleSpan = screen.getByText("Assigned to", { selector: "h3 span.truncate" })
+      const heading = titleSpan.closest("h3") as HTMLElement
+      expect(heading.querySelector("span:not(.truncate)")?.textContent).toBe("1")
+    })
+  })
+
+  // THE TILE'S OWN EYEBROW, "Assigned to" for the record's own person,
+  // "From the app" (the app's own name kept on its existing muted second
+  // line) when inherited. Scoped to the tile itself (`data-slot=
+  // "assignee-tile"`) so the panel's own "Assigned to" title never collides
+  // with the tile's identical eyebrow word in the own-person case.
+  describe("the tile's own eyebrow, in both states", () => {
+    it("reads 'Assigned to' when the record carries its own person", () => {
+      render(<AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />)
+      const tile = document.querySelector('[data-slot="assignee-tile"]') as HTMLElement
+      expect(within(tile).getByText("Assigned to")).toBeTruthy()
+      expect(within(tile).queryByText("From the app")).toBeNull()
+    })
+
+    it("reads 'From the app' when inherited, with the app's own name on its own muted line", () => {
+      render(
+        <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
+      )
+      const tile = document.querySelector('[data-slot="assignee-tile"]') as HTMLElement
+      expect(within(tile).getByText("From the app")).toBeTruthy()
+      expect(within(tile).queryByText("Assigned to")).toBeNull()
+      expect(within(tile).getByText(/Inherited from/)).toBeTruthy()
+      expect(within(tile).getByText(/Bergman dispatch/)).toBeTruthy()
+    })
+  })
+
+  // THE TILE ITSELF IS THE SAME COMPONENT RAISED BY DRAWS ITSELF WITH
+  // (`StakeholderTile`, help-stakeholders.tsx), not a second, hand-copied
+  // one that can drift the first time either is touched. Proved on the
+  // rendered classes rather than on the source, so a regression that
+  // reintroduces a copy with even one different class fails here.
+  it("the assigned-to tile shares the Raised by tile's own classes", () => {
+    render(<HelpStakeholders stakeholders={[MAX]} />)
+    const raisedByTile = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    const raisedByContent = raisedByTile.firstElementChild as HTMLElement
+    const raisedByClasses = raisedByContent.className
+
+    cleanup()
+
+    render(<AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />)
+    const assignedTile = document.querySelector('[data-slot="assignee-tile"]') as HTMLElement
+    const assignedContent = assignedTile.firstElementChild as HTMLElement
+
+    expect(assignedContent.className).toBe(raisedByClasses)
+    expect(assignedTile.getAttribute("data-variant")).toBe(raisedByTile.getAttribute("data-variant"))
   })
 
   it("draws no pen and no Select for a reader with no edit right", () => {
@@ -495,7 +597,7 @@ describe("AssignedToCard", () => {
           members={MEMBERS}
         />
       )
-      let card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+      let card = assignedCard()
       expect(within(card).getByText("Alaap Kanchwala")).toBeTruthy()
 
       rerender(
@@ -508,7 +610,7 @@ describe("AssignedToCard", () => {
           members={MEMBERS}
         />
       )
-      card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+      card = assignedCard()
       expect(within(card).getByText("Petya Bletsova")).toBeTruthy()
       expect(within(card).getByText(/Inherited from/)).toBeTruthy()
     })
@@ -518,7 +620,7 @@ describe("AssignedToCard", () => {
         <AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />
       )
       rerender(<AssignedToCard assigneeId={null} assigneeName={null} members={MEMBERS} />)
-      const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+      const card = assignedCard()
       expect(within(card).getByText("Nobody yet.")).toBeTruthy()
     })
   })

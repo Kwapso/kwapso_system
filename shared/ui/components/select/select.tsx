@@ -112,6 +112,22 @@ export interface SelectFace {
    * which is right for the common case (a person, a contact, a staff
    * member); an account or an app passes `square`. */
   shape?: "pill" | "square";
+  /**
+   * A GLYPH face; an icon standing in for a record that has neither a
+   * photograph nor a name to initial, a ticket's TYPE being the case this
+   * was added for. Aurora, verbatim: "on every choice component where I can
+   * choose a ticket, show me the type as the icon everywhere." Takes
+   * priority over `src`/`name` when given; `SelectFaceMark` draws it as a
+   * small glyph badge instead of through `Avatar`, because there is no
+   * photo-or-initials pair to fall back through for a type. A call site
+   * supplies a real Phosphor element (from `../../foundations/icons`), the
+   * same as `SelectItem`'s own standalone `icon` prop takes; this is a
+   * SECOND way to carry a glyph, not a replacement for that one; `icon`
+   * stays a call-site-drawn leading mark with no registered identity, while
+   * `face.icon` is a face like any other and rides the same trigger-persists
+   * -on-close pipeline the photo/initials pair below does.
+   */
+  icon?: React.ReactNode;
 }
 
 /**
@@ -124,6 +140,23 @@ export interface SelectFace {
  * to fall back.
  */
 function SelectFaceMark({ face }: { face: SelectFace }) {
+  if (face.icon) {
+    // The glyph branch; `size-[var(--avatar-sm)]` so an icon face takes
+    // exactly the footprint the photo/initials pair does (ruling 30's own
+    // small rung), never a second size a row would have to make room for.
+    return (
+      <span
+        aria-hidden="true"
+        data-slot="select-face-icon"
+        className={cn(
+          "inline-flex size-[var(--avatar-sm)] shrink-0 items-center justify-center",
+          "text-ink-secondary [&_svg]:size-[var(--icon-16)]",
+        )}
+      >
+        {face.icon}
+      </span>
+    );
+  }
   return (
     <Avatar
       /* `Avatar`'s own load state (`idle`/`loading`/`loaded`/`error`) lives
@@ -158,14 +191,122 @@ function SelectFaceMark({ face }: { face: SelectFace }) {
 }
 
 /* ----------------------------------------------------------------------------
-   Root, group and value are Radix's, unskinned.
+   THE FACE REGISTRY; how the TRIGGER learns the selected option's face with
+   NO per-call-site prop.
+
+   Before this, a trigger only ever showed a face when the call site passed
+   one explicitly (`SelectTrigger face={...}`); the call site had to resolve
+   which option was chosen and hand its face across a second time, in a
+   second place, and every Select that skipped that step (which was most of
+   them) closed back down to a bare label the instant a face-carrying option
+   was picked. Aurora, verbatim, on exactly this: "when I have selected, for
+   example, the app, in the dropdown I see the icon, but I want to continue
+   seeing it also once it's selected... still show it once it's selected, or
+   the icon." The fix has to live on the SELECT SIDE, because that is the one
+   place that already knows both which options exist and which one is
+   chosen.
+
+   `SelectItem` registers its own `(value, face)` pair into this registry as
+   it renders; `SelectTrigger` reads the registry for the CURRENT value and
+   draws that face automatically, `face` prop or not. An explicit `face` on
+   the trigger still wins; this is additive, not a breaking change to the
+   nine call sites that already pass one by hand.
+
+   WHY THIS WORKS EVEN CLOSED: Radix keeps every `SelectItem` mounted at all
+   times, open or shut; a closed `SelectContent` renders its children into a
+   detached `DocumentFragment` rather than unmounting them (`SelectContent`/
+   `SelectContentFragment` in `@radix-ui/react-select`, the same mechanism
+   that lets `SelectValue` show the right TEXT before the list has ever been
+   opened once). So every item's registering effect has already run by the
+   time the trigger paints, closed list or not, and nothing here needs to
+   peek at Radix's own internal value context to know that.
+
+   WHY A SHADOW VALUE, NOT RADIX'S OWN: Radix's per-item `isSelected` lives on
+   an internal, unexported context; reaching into it would pin this file to
+   an implementation detail rather than the public `value`/`defaultValue`/
+   `onValueChange` contract. `Select` below shadows the same value Radix
+   tracks by intercepting `onValueChange` (controlled or not), so the
+   registry can ask "whose face is this?" using only public API. */
+interface SelectFaceRegistry {
+  registerFace: (itemValue: string, face: SelectFace | undefined) => void;
+  selectedFace: SelectFace | undefined;
+}
+
+const SelectFaceContext = React.createContext<SelectFaceRegistry | null>(null);
+
+/* ----------------------------------------------------------------------------
+   Root, group and value.
 
    `Select` holds the open state and the value; `SelectGroup` is a labelled
    run of options and paints nothing on its own; `SelectValue` renders the
    chosen option's text inside the trigger and takes the `placeholder` from
-   the call site — which is why this component hardcodes no string anywhere.
+   the call site; which is why this component hardcodes no string anywhere.
+
+   `Select` itself is no longer `SelectPrimitive.Root` bare; it wraps it in
+   the face registry above, a shadow value and nothing else. Every prop
+   (`value`, `defaultValue`, `onValueChange`, `open`, …) still passes straight
+   through to Radix's own `Root`; this component adds no visible behaviour of
+   its own.
    ------------------------------------------------------------------------- */
-const Select = SelectPrimitive.Root;
+function Select({
+  value,
+  defaultValue,
+  onValueChange,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>) {
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue);
+  const currentValue = value !== undefined ? value : uncontrolledValue;
+
+  // Read inside the registration callback without making every keystroke of
+  // typing rebuild it; the callback's identity stays fixed across renders.
+  const currentValueRef = React.useRef(currentValue);
+  currentValueRef.current = currentValue;
+
+  // Never cleared on an item's unmount: a closed list still needs yesterday's
+  // selected face, and Radix's own fragment-mount trick (see above) means an
+  // item that is still IN the tree never truly unmounts anyway. Only a face
+  // that changes on a live value forces a repaint, via `bump` below.
+  const facesRef = React.useRef<Map<string, SelectFace>>(new Map());
+  const [, bump] = React.useReducer((n: number) => n + 1, 0);
+
+  const registerFace = React.useCallback((itemValue: string, face: SelectFace | undefined) => {
+    const map = facesRef.current;
+    const had = map.get(itemValue);
+    if (face) {
+      if (had === face) return;
+      map.set(itemValue, face);
+    } else if (had === undefined) {
+      return;
+    } else {
+      return; // see the comment above `facesRef`: registrations are never retracted.
+    }
+    if (itemValue === currentValueRef.current) bump();
+  }, []);
+
+  const handleValueChange = React.useCallback(
+    (next: string) => {
+      setUncontrolledValue(next);
+      onValueChange?.(next);
+    },
+    [onValueChange],
+  );
+
+  const selectedFace = currentValue ? facesRef.current.get(currentValue) : undefined;
+
+  const registry = React.useMemo<SelectFaceRegistry>(
+    () => ({ registerFace, selectedFace }),
+    [registerFace, selectedFace],
+  );
+
+  return (
+    <SelectFaceContext.Provider value={registry}>
+      <SelectPrimitive.Root value={value} defaultValue={defaultValue} onValueChange={handleValueChange} {...props}>
+        {children}
+      </SelectPrimitive.Root>
+    </SelectFaceContext.Provider>
+  );
+}
 Select.displayName = "Select";
 
 const SelectGroup = SelectPrimitive.Group;
@@ -365,6 +506,14 @@ const SelectTrigger = React.forwardRef<
   ) => {
     const invalid = error ?? (ariaInvalid === true || ariaInvalid === "true");
 
+    // An explicit `face` still wins (nine call sites already pass one by
+    // hand and keep working byte-identical); everyone else gets the
+    // registry's own answer for the CURRENT value, with no prop at all. See
+    // the face-registry block above `Select` for why this is safe to read
+    // even before the list has ever been opened.
+    const registry = React.useContext(SelectFaceContext);
+    const resolvedFace = face ?? registry?.selectedFace;
+
     return (
       <SelectPrimitive.Trigger
         ref={ref}
@@ -372,21 +521,21 @@ const SelectTrigger = React.forwardRef<
         aria-invalid={invalid || undefined}
         className={cn(
           selectTriggerVariants({ state: invalid ? "error" : "default" }),
-          face ? "justify-start" : undefined,
+          resolvedFace ? "justify-start" : undefined,
           className,
         )}
         {...props}
       >
-        {face ? <SelectFaceMark face={face} /> : null}
+        {resolvedFace ? <SelectFaceMark face={resolvedFace} /> : null}
         {children}
         {hideChevron ? null : (
           <SelectPrimitive.Icon asChild>
             {/* `--icon-button` (16) on `--ink-secondary`, as `.kw-selectwrap__chevron`
                 draws it. The colour is set by the cva so the disabled skin can
-                reach it. `ms-auto` only when `face` claimed `justify-start`
+                reach it. `ms-auto` only when `resolvedFace` claimed `justify-start`
                 above — without it the base `justify-between` already pins the
                 chevron to the end on its own. */}
-            <CaretDown className={cn("size-[var(--icon-button)] shrink-0", face ? "ms-auto" : undefined)} />
+            <CaretDown className={cn("size-[var(--icon-button)] shrink-0", resolvedFace ? "ms-auto" : undefined)} />
           </SelectPrimitive.Icon>
         )}
       </SelectPrimitive.Trigger>
@@ -642,7 +791,19 @@ export interface SelectItemProps
 const SelectItem = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Item>,
   SelectItemProps
->(({ className, children, icon, image, imageAlt = "", face, ...props }, ref) => (
+>(({ className, children, icon, image, imageAlt = "", face, ...props }, ref) => {
+  // Register this option's face into the trigger's own registry; see the
+  // face-registry block above `Select`. Radix keeps every item mounted
+  // (open or shut, see that same comment), so this runs and the trigger has
+  // the face ready well before the list is ever opened. Unconditional: a
+  // value with no `face` registers `undefined`, which the registry already
+  // treats as a no-op rather than erasing a face registered a render ago.
+  const registry = React.useContext(SelectFaceContext);
+  React.useEffect(() => {
+    registry?.registerFace(props.value, face);
+  }, [registry, props.value, face]);
+
+  return (
   <SelectPrimitive.Item
     ref={ref}
     data-slot="select-item"
@@ -692,7 +853,8 @@ const SelectItem = React.forwardRef<
       <CheckFat className="size-[var(--icon-button)]" />
     </SelectPrimitive.ItemIndicator>
   </SelectPrimitive.Item>
-));
+  );
+});
 
 SelectItem.displayName = "SelectItem";
 

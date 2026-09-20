@@ -512,6 +512,76 @@ describe("archive: put away, never lost", () => {
   })
 })
 
+// R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+// closed (task, story, ticket, whatever) if there's an active time log
+// running." `refuseWhileTimerRuns` (workers/content/src/lib/work-logs.ts),
+// wired into both of this module's closing doors, resolve (`setStatus`)
+// and archive (`setTicketArchived`): the identical guard `stories.ts` takes
+// for Done and `tasks.ts` takes for its own Done.
+describe("R99: neither close door closes a ticket its own clock is still running on", () => {
+  async function newTicket(description: string): Promise<string> {
+    return (await ticketIds(await call(IDS.staffUser, "POST /api/content/help", { description })))[0]
+  }
+
+  async function runningLogId(ticketIdVal: string): Promise<string> {
+    return (
+      db()
+        .prepare(`SELECT id FROM work_logs WHERE target_id = ? AND ended_at IS NULL`)
+        .get(ticketIdVal) as { id: string }
+    ).id
+  }
+
+  it("refuses to resolve while a timer on the ticket is still running", async () => {
+    const id = await newTicket("Still being clocked")
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "help", targetId: id })
+    const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Fixed, and here is what changed.",
+    })
+    expect(res.status).toBe(409)
+    expect((await res.json()) as { error: string }).toMatchObject({ error: "timer_running" })
+    expect(row(id).status).not.toBe("resolved")
+  })
+
+  it("resolves once that same timer is stopped", async () => {
+    const id = await newTicket("Clocked off, then answered")
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "help", targetId: id })
+    await call(IDS.staffUser, "POST /api/content/work-logs/stop", { id: await runningLogId(id) })
+    const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Fixed, and here is what changed.",
+    })
+    expect(res.status).toBe(200)
+    expect(row(id).status).toBe("resolved")
+  })
+
+  it("refuses to archive while a timer on the ticket is still running", async () => {
+    const id = await newTicket("On the clock, filed away anyway")
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "help", targetId: id })
+    const res = await call(IDS.staffUser, "POST /api/content/help/archive", { id, archived: true })
+    expect(res.status).toBe(409)
+    expect((await res.json()) as { error: string }).toMatchObject({ error: "timer_running" })
+    expect(row(id).archived_at).toBeNull()
+  })
+
+  it("archives once that same timer is stopped", async () => {
+    const id = await newTicket("Clocked off, then filed")
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "help", targetId: id })
+    await call(IDS.staffUser, "POST /api/content/work-logs/stop", { id: await runningLogId(id) })
+    expect((await call(IDS.staffUser, "POST /api/content/help/archive", { id, archived: true })).status).toBe(200)
+    expect(row(id).archived_at).not.toBeNull()
+  })
+
+  it("un-archiving never checks the clock, only closing does", async () => {
+    const id = await newTicket("Taken back out while still on the clock")
+    await call(IDS.staffUser, "POST /api/content/help/archive", { id, archived: true })
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "help", targetId: id })
+    const res = await call(IDS.staffUser, "POST /api/content/help/archive", { id, archived: false })
+    expect(res.status).toBe(200)
+    expect(row(id).archived_at).toBeNull()
+  })
+})
+
 describe("both titles, and neither overwrites the other", () => {
   it("an edit that names one title leaves the other exactly as it was", async () => {
     const id = (await ticketIds(

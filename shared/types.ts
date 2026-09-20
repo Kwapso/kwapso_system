@@ -208,15 +208,18 @@ export type SelectableValue = {
    * order the client ruled 16 Sep 2026 (`shared/app-stages.ts`'s own header;
    * R75's `ORDERED_OPTIONS_OK` entry for `app-form-dialog.tsx#stages`). */
   position: number | null
-  /** WHO WROTE THE WORD, AND WHEN — read by the SINGLE-ROW door only.
-   *
-   * Optional because the LIST door does not select them, and that is the
-   * decision rather than an oversight: the record footer is the one place that
-   * asks, so putting two more columns on the list would carry them for every
-   * value on every read to answer a question no row in a list is asking. A list
-   * row therefore has them absent; a row read through `selectableOne` has them. */
-  createdAt?: string | null
-  createdByName?: string | null
+  /** WHO WROTE THE WORD, AND WHEN — on every read now, list included (K59,
+   * documents/UI-RULEBOOK.md, Aurora, 21 Sep 2026: "in choices also show
+   * columns added on and added by"). Until then this was optional and absent
+   * on a list row on purpose: the record footer was the one place that asked,
+   * so carrying two more columns for every value on every read to answer a
+   * question no row in a list was asking would have been paid by every screen
+   * to be spent by one. The Choices screens' own "Added" column is now that
+   * second spender, so both `listSelectable` and `selectableOne`
+   * (workers/tenancy/src/lib/selectable.ts) select the same columns and this
+   * pair is never `undefined`. */
+  createdAt: string | null
+  createdByName: string | null
 }
 
 /** A role's permission matrix as the tenancy worker returns it: the module rows

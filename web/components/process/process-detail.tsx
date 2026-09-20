@@ -607,10 +607,10 @@ export function ProcessDetailScreen({
                     <p className="text-sm font-medium">{auditDate}</p>
                   </div>
                   {canEdit && (
+                    // R98 — a card header action is the kit's default height, never `sm`.
                     <Button
                       type="button"
                       variant="secondary"
-                      size="sm"
                       onClick={() => setAuditOpen(true)}
                     >
                       <PencilSimple className="size-3.5" />
@@ -630,7 +630,8 @@ export function ProcessDetailScreen({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium">{t("Connected processes")}</p>
                     {canEdit && (
-                      <Button type="button" variant="secondary" size="sm" onClick={() => setLinkOpen(true)}>
+                      // R98 — a card header action is the kit's default height, never `sm`.
+                      <Button type="button" variant="secondary" onClick={() => setLinkOpen(true)}>
                         <Plus className="size-3.5" />
                         {t("Connect a process")}
                       </Button>

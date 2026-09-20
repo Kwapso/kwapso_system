@@ -593,7 +593,10 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // 125 → 126 on 21 Sep 2026: `story_metrics` (the story detail page's own
     // Metrics panel, Aurora's design review) shipped with a `detail` from
     // the start, same reason.
-    const DETAILED_TOOLS = 126
+    // 126 → 127 on 21 Sep 2026: `delete_task` (team migration 0113, Aurora's
+    // task-detail "…" menu ruling) shipped with a `detail` from the start,
+    // same shape as its `delete_help_reply` sibling.
+    const DETAILED_TOOLS = 127
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

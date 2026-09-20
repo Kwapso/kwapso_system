@@ -785,11 +785,14 @@ function useFilterBar<T>({
           own rule for the control it replaces ("a control that does nothing is
           worse than no control"). `secondary` is the neutral paper pill every
           other control in this row stands on, and the one Button variant that
-          carries no brand fill; `sm` is the dense height the facet fields
-          take, and `self-end` lines it up with the fields rather than with
-          their captions. */}
+          carries no brand fill; `self-end` lines it up with the fields rather
+          than with their captions. R98 (21 Sep 2026) retired the `sm` height
+          this used to carry to match the dense facet fields beside it — every
+          toolbar button is the kit's default height now, so this one sits a
+          little taller than the fields it clears, which is the law's own
+          trade rather than a miss. */}
       {activeCount > 0 && (
-        <Button variant="secondary" size="sm" className="self-end" onClick={onClearFacets}>
+        <Button variant="secondary" className="self-end" onClick={onClearFacets}>
           {t("Clear filters")}
         </Button>
       )}

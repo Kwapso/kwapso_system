@@ -63,8 +63,11 @@ export type TimelineSegment = {
   /** upcoming/running/wrapped are a sprint's own three states
    * (`sprintState`, shared/sprint-state.ts); `gap` is the wave's own base
    * bar between two sprints, or the whole bar for a wave this file could
-   * not find a sprint row for. */
-  tone: "upcoming" | "running" | "wrapped" | "gap"
+   * not find a sprint row for. `expected` (added 21 Sep 2026, Aurora's phase
+   * days ruling) is a phase that carries no dates of its own yet, drawn as a
+   * projected span off its type's day count, a forecast, never a fact, so
+   * it wears a lighter fill than the three real sprint states above. */
+  tone: "upcoming" | "running" | "wrapped" | "gap" | "expected"
   /** the exact dates, already formatted by the caller (ruling 07) — the
    * hover/focus tooltip and the accessible name both read this. */
   title?: string
@@ -102,6 +105,11 @@ const TONE_FILL: Record<TimelineSegment["tone"], string> = {
   // The wave's own base bar: a quiet, existing surface token (the same one
   // every plain collection row already stands on), never a new hex.
   gap: "bg-surface-panel text-muted-foreground",
+  // A PROJECTED SPAN, NEVER A FACT: the same accent `upcoming` wears
+  // (`bg-chart-1`, sky), at a third its strength, so an expected phase reads
+  // as kin to a real upcoming one rather than a wholly new colour, and still
+  // plainly lighter than every dated segment beside it.
+  expected: "bg-chart-1/30 text-foreground",
 }
 
 // Bumped from 2.25rem (one line) so a row carrying a `sublabel` — the ordinary
@@ -156,7 +164,8 @@ export function RecordTimeline({
         <div className="text-sm font-medium">{windowLabel}</div>
         <div className="flex items-center gap-1">
           {onToday ? (
-            <Button variant="secondary" size="sm" onClick={onToday}>
+            // R98 — a toolbar button is the kit's default height, never `sm`.
+            <Button variant="secondary" onClick={onToday}>
               {t("Today")}
             </Button>
           ) : null}

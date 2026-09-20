@@ -189,12 +189,13 @@ export function StaffPanel({
           {/* WHEN SOMEBODY LEAVES. Red because it takes the profile out of the
               everyday picture, and reversible — which the confirm-free restore
               beside it says out loud. What was written stays written. */}
+          {/* R98 — this row is the screen's own page head, the kit's default
+              height, never `sm`. */}
           {mayArchive &&
             profile &&
             (profile.active ? (
               <Button
                 variant="secondary"
-                size="sm"
                 disabled={archiveBusy}
                 onClick={() => deactivateProfile(profile)}
                 className="text-destructive hover:text-destructive gap-1"
@@ -205,7 +206,6 @@ export function StaffPanel({
             ) : (
               <Button
                 variant="secondary"
-                size="sm"
                 onClick={() => void activateProfile(profile)}
                 className="gap-1"
               >

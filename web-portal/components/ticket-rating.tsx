@@ -150,8 +150,9 @@ export function TicketRating({ ticketId, resolved }: { ticketId: string; resolve
             disabled={sending}
           />
           <div className="flex justify-end">
-            {/* R84 — not a title component. */}
-            <Button type="button" variant="inverse" size="sm" disabled={sending} onClick={() => void say(picked, words)}>
+            {/* R84 — not a title component. R98 — the rating form's own foot,
+                the kit's default height, never `sm`. */}
+            <Button type="button" variant="inverse" disabled={sending} onClick={() => void say(picked, words)}>
               <PaperPlaneTilt className="size-3.5" />
               {sending ? t("Sending…") : t("Send")}
             </Button>

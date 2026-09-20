@@ -27,6 +27,18 @@
 // the identical fields — so nothing this card's pencil could do is now
 // unreachable; it is reachable in exactly one place instead of two, which is
 // what she asked for.
+//
+// `preview`, ADDED 21 Sep 2026: THE GLOSSARY TAB'S OWN CARD IS THIS CARD.
+// Aurora, on the Glossary tab's dl/dt/dd rows: "why did you invent this new
+// design? Why don't you use the kind of square card, same as in all?" The
+// Glossary tab now maps its words through this exact component, same
+// `<CardGrid>`, same press-to-open shell, no bespoke list markup of its own
+// left. The one thing a word's card needs that no other source's card does,
+// its definition, not a kind chip or a last-edited stamp, is this one
+// optional line: when a caller hands over `preview` (glossary-list.tsx's own
+// `definitionPreview`, unchanged), it takes the meta line's slot instead of
+// "Last edited {when}". Every other caller leaves it unset and the card reads
+// exactly as it always has.
 
 import * as React from "react"
 
@@ -64,6 +76,7 @@ export function sightingsLine(source: Pick<KnowledgeSource, "sightingsCount">, t
 export function KnowledgeSourceCard({
   source,
   onOpen,
+  preview,
 }: {
   source: KnowledgeSource
   /** open the record itself — the whole card is the press target, same as
@@ -71,6 +84,9 @@ export function KnowledgeSourceCard({
    * now the ONLY press target: there is no second control on the cell to
    * intercept a click before it reaches this one. */
   onOpen: () => void
+  /** THE GLOSSARY TAB'S OWN BODY LINE: see the header note above. Unset for
+   * every other caller. */
+  preview?: string
 }) {
   const { t, lang } = useLanguage()
   return (
@@ -132,13 +148,19 @@ export function KnowledgeSourceCard({
             these actually wants at a glance — is this stale? Everything else
             this card used to carry (where it's filed, who may use it, how
             many pieces, how it reached us) is still on the record's own
-            Overview tab, one press away through the card itself. */}
-        {(source.updatedAt || source.createdAt) && (
-          <p className="text-muted-foreground text-xs">
-            {t("Last edited {when}", {
-              when: formatRelative(source.updatedAt ?? source.createdAt, t, lang),
-            })}
-          </p>
+            Overview tab, one press away through the card itself.
+            THE GLOSSARY TAB'S OWN SLOT: `preview` (a word's definition)
+            takes this exact line instead, when the caller hands one over. */}
+        {preview ? (
+          <p className="text-muted-foreground text-xs">{preview}</p>
+        ) : (
+          (source.updatedAt || source.createdAt) && (
+            <p className="text-muted-foreground text-xs">
+              {t("Last edited {when}", {
+                when: formatRelative(source.updatedAt ?? source.createdAt, t, lang),
+              })}
+            </p>
+          )
         )}
       </CardContent>
     </Card>

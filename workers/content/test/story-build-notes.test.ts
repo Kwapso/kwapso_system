@@ -147,6 +147,37 @@ describe("a story's own build notes", () => {
     expect(storyRow(id).status).toBe("done")
   })
 
+  // R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+  // closed (task, story, ticket, whatever) if there's an active time log
+  // running." `refuseWhileTimerRuns` (workers/content/src/lib/work-logs.ts),
+  // wired into `setStoryStatus` beside `refuseUndocumented` above.
+  it("cannot be marked done while a timer on it is still running", async () => {
+    const id = await addStory({ title: "Still on the clock", buildNotes: "What was built, and how." })
+    // Starting the timer is itself a status move (CHECKLIST 6.7): the story
+    // flips to in_progress automatically, before this test's own refusal is
+    // even asked for.
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "stories", targetId: id })
+    expect(storyRow(id).status).toBe("in_progress")
+    const res = await call(IDS.staffUser, "POST /api/content/stories/status", { id, status: "done" })
+    expect(res.status).toBe(409)
+    expect((await res.json()) as { error: string }).toMatchObject({ error: "timer_running" })
+    // No half-close: the row is untouched past the timer's own flip.
+    expect(storyRow(id).status).toBe("in_progress")
+    expect(storyRow(id).closed_at).toBeNull()
+  })
+
+  it("can be marked done once that same timer is stopped", async () => {
+    const id = await addStory({ title: "Clocked off, then closed", buildNotes: "What was built, and how." })
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "stories", targetId: id })
+    const running = db().prepare(`SELECT id FROM work_logs WHERE target_id = ? AND ended_at IS NULL`).get(id) as {
+      id: string
+    }
+    await call(IDS.staffUser, "POST /api/content/work-logs/stop", { id: running.id })
+    const res = await call(IDS.staffUser, "POST /api/content/stories/status", { id, status: "done" })
+    expect(res.status).toBe(200)
+    expect(storyRow(id).status).toBe("done")
+  })
+
   it("an update that never mentions build notes clears them, like every other field this door replaces", async () => {
     const id = await addStory({ title: "Written, then edited", buildNotes: "First draft." })
     await call(IDS.staffUser, "POST /api/content/stories/update", {

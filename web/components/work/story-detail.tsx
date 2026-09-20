@@ -22,12 +22,22 @@
 // notes. Right column, in order: Assigned to (`AssignedToCard`,
 // `help-stakeholders.tsx` — the ticket's own card, reused whole, not
 // reimplemented: "the story gets the same card"), Related tickets, Related
-// stories, Phase and wave, Effort, Metrics. No Stakeholders panel — a story
-// has none. The dark band (`RecordFooterBand`) is last, exactly as the
-// ticket mounts it.
+// stories, Phase and wave, Effort — no separate Metrics panel any more
+// (Aurora's ruling, 21 Sep 2026, B44: its three lines moved INSIDE the
+// Effort card, see that panel's own header note below). No Stakeholders
+// panel — a story has none. The dark band (`RecordFooterBand`) is last,
+// exactly as the ticket mounts it.
 //
 // Host-composed: the head actions (timer, edit, Ready for review, Done) are
 // controls no engine block draws.
+//
+// NO TRANSLATE HERE (Aurora's ruling, 21 Sep 2026, verbatim: "stories are
+// always in english - so remove the translate from there", B43,
+// documents/UI-RULEBOOK.md). A story's own words never leave English, unlike
+// a ticket's — `TranslateAction`/`useHumanTranslation` (the ticket page's own
+// seam, `translate-human-text.tsx`) are gone from this file entirely, not
+// just unmounted: `story.title`/`detail`/`acceptanceCriteria`/`buildNotes`
+// render as written.
 
 import * as React from "react"
 
@@ -45,11 +55,10 @@ import { ReviewDialog, type ReviewFormValues } from "@/components/work/review-di
 import { storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
 import { storyStatusDotTone } from "@shared/status-tones"
 import { storyStatusWord } from "@shared/story-status-word"
-import { WorkLogsPanel } from "@/components/work/work-logs-panel"
+import { TimeFormDialog, type TimeFormValues } from "@/components/work/time-form-dialog"
 import { StoryBuildNotesSheet } from "@/components/work/story-build-notes-sheet"
 import { AssignedToCard } from "@/components/tickets/help-stakeholders"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
-import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -69,12 +78,12 @@ import { assignableMembers } from "@/lib/members"
 import { sliceKey } from "@/components/work/work-panels"
 import { ticketStatusCell } from "@/components/deep-link/shape"
 import { ticketTitle } from "@shared/web/ticket-chips"
-import { storyAttachmentsKey } from "@/lib/live-resources"
+import { runningTimersKey, storyAttachmentsKey } from "@/lib/live-resources"
 import { hasPreview, AttachmentPreview } from "@shared/web/attachment-preview"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
-import type { HelpTicket, Story, StoryAttachment, StoryMetrics } from "@shared/types"
+import type { HelpTicket, RunningTimer, Story, StoryAttachment, StoryMetrics } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
@@ -131,17 +140,37 @@ export function StoryDetailScreen({
     canLog: canLogTime,
     disabled: storyQ.data?.status === "done",
   })
+  // WHETHER THIS STORY'S OWN CLOCK IS RUNNING (R99, Aurora's 21 Sep 2026
+  // ruling, verbatim: "cannot mark anything as closed (task, story, ticket,
+  // whatever) if there's an active time log running." The door's own copy of
+  // this rule is `refuseWhileTimerRuns`, workers/content/src/lib/work-logs.ts,
+  // wired into `setStoryStatus`; this button only reads the same fact back,
+  // the same "the door decides, the button mirrors it" split `doneReason`
+  // already takes for the build notes rule below.)
+  //
+  // Reads the SAME running-timers cache key `useRecordTimerAction` above
+  // already reads (`runningTimersKey(teamId)`), one request in the air,
+  // never two (R56), the same shape `task-detail.tsx`'s own
+  // `timerRunningOnThis` already takes for the identical task rule.
+  const runningTimersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
+    contentApi.runningTimers().then((r) => r.timers)
+  )
+  const timerRunningOnThis = (runningTimersQ.data ?? []).some(
+    (x) => x.targetTable === "stories" && x.targetId === storyId
+  )
 
   const [editOpen, setEditOpen] = React.useState(false)
   const [reviewOpen, setReviewOpen] = React.useState(false)
   const [buildNotesOpen, setBuildNotesOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
-  // R88 — THE EFFORT PANEL'S OWN TITLE ROW, drawn by `EmptyGatedPanel`
-  // outside `WorkLogsPanel` itself (that component's own doc says why), the
-  // identical `workLogAddRef`/`workLogsEmpty` pair `help-detail.tsx` already
-  // wires for the ticket page.
-  const workLogAddRef = React.useRef<(() => void) | null>(null)
-  const [workLogsEmpty, setWorkLogsEmpty] = React.useState(false)
+  // THE EFFORT CARD'S OWN "LOG TIME" DIALOG (Aurora's ruling, 21 Sep 2026,
+  // B44: "Include the metrics inside the effort card ... put the number
+  // next to the effort title"). No `WorkLogsPanel` here any more — that
+  // component's own list of rows is exactly the "value entries" the ruling
+  // removes — so this page mounts `TimeFormDialog` directly, the same door
+  // `WorkLogsPanel`'s own `log()` calls (`contentApi.logTime`), fixed to
+  // this story.
+  const [addTimeOpen, setAddTimeOpen] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   // NEST, DON'T REPLACE — the identical note ticket-detail-body.tsx and this
   // file's own earlier version both carry: a related record lands INSIDE
@@ -205,18 +234,6 @@ export function StoryDetailScreen({
     invalidate(`story:metrics:${storyId}`)
   }, [storyId, teamId])
 
-  // READ THIS STORY IN YOUR OWN LANGUAGE, if you ask — every human-typed
-  // field goes in one array, buildNotes included now, so one press is one
-  // call. A hook, so it sits above the three early returns below.
-  const translation = useHumanTranslation(teamId, [
-    story?.title,
-    story?.detail,
-    story?.acceptanceCriteria,
-    story?.buildNotes,
-    story?.reviewNote,
-    story?.closingNote,
-  ])
-
   /** Run a write, say plainly if it was refused, and re-read. */
   async function run(what: () => Promise<unknown>, done: string, fallback: string) {
     setBusy(true)
@@ -232,11 +249,13 @@ export function StoryDetailScreen({
   }
 
   async function save(values: StoryFormValues) {
+    // NO `category` HERE (Aurora's ruling, 21 Sep 2026, B43) — the door
+    // derives it from `ticketId` now (workers/content/src/lib/stories.ts),
+    // never a value this form chooses.
     await contentApi.updateStory({
       id: storyId,
       title: values.title,
       storyType: values.storyType,
-      category: values.category,
       detail: values.detail || undefined,
       sprintId: values.sprintId || undefined,
       appId: values.appId || undefined,
@@ -305,6 +324,25 @@ export function StoryDetailScreen({
     toast.success(t("Sent for review."))
   }
 
+  /** WRITE TIME DOWN AGAINST THIS STORY — the identical door and shape
+   * `WorkLogsPanel`'s own `log()` takes (work-logs-panel.tsx), called here
+   * directly now that the Effort card mounts no per-log list. `refresh()`
+   * already re-reads `story:metrics:${storyId}`, so the card's own count and
+   * three lines catch up the same as every other write on this page. */
+  async function logTime(values: TimeFormValues) {
+    await contentApi.logTime({
+      targetTable: "stories",
+      targetId: storyId,
+      startedAt: values.startedAt,
+      endedAt: values.endedAt,
+      note: values.note,
+      kind: values.kind,
+      billable: values.billable,
+    })
+    refresh()
+    toast.success(t("Time logged."))
+  }
+
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4).
   if (storyQ.error)
     return (
@@ -335,7 +373,11 @@ export function StoryDetailScreen({
   // stories.ts); this button only reads the same fact back, R17's own "the
   // door decides, the button mirrors it" split.
   const buildNotesMissing = !story.buildNotes || !story.buildNotes.trim()
-  const doneReason = buildNotesMissing ? t("Write the build notes before marking it done.") : undefined
+  const doneReason = buildNotesMissing
+    ? t("Write the build notes before marking it done.")
+    : timerRunningOnThis
+      ? t("Stop the timer first.")
+      : undefined
 
   const overflow: RecordAction[] = canEdit
     ? [
@@ -367,7 +409,7 @@ export function StoryDetailScreen({
             key: "done",
             label: t("Done"),
             icon: <Check className="size-3.5" />,
-            disabled: busy || buildNotesMissing,
+            disabled: busy || buildNotesMissing || timerRunningOnThis,
             onSelect: () =>
               void run(
                 () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
@@ -388,7 +430,7 @@ export function StoryDetailScreen({
   const detailPanel = (
     <TicketSidePanel title={t("Detail")}>
       {story.detail ? (
-        <RichText html={translation.of(story.detail)} />
+        <RichText html={story.detail} />
       ) : (
         <p className="text-muted-foreground text-sm">{t("Nothing written yet.")}</p>
       )}
@@ -398,7 +440,7 @@ export function StoryDetailScreen({
   const acceptancePanel = (
     <TicketSidePanel title={t("Acceptance criteria")}>
       {story.acceptanceCriteria ? (
-        <RichText html={translation.of(story.acceptanceCriteria)} />
+        <RichText html={story.acceptanceCriteria} />
       ) : (
         <p className="text-muted-foreground text-sm">{t("Nothing written yet.")}</p>
       )}
@@ -428,7 +470,7 @@ export function StoryDetailScreen({
         />
       ) : (
         <>
-          <RichText html={translation.of(story.buildNotes ?? "")} />
+          <RichText html={story.buildNotes ?? ""} />
           {buildNotesImages.length > 0 && (
             <div className="flex flex-col gap-2">
               {buildNotesImages.map((a) => (
@@ -443,12 +485,6 @@ export function StoryDetailScreen({
 
   const mainColumn = (
     <div className="flex min-w-0 flex-col gap-6">
-      {/* Above the fields it acts on, the same position the old tabbed
-          Overview gave it — a thing somebody presses while reading and
-          presses back a moment later. */}
-      <div className="flex justify-end">
-        <TranslateAction translation={translation} />
-      </div>
       {detailPanel}
       {acceptancePanel}
       {buildNotesPanel}
@@ -473,6 +509,17 @@ export function StoryDetailScreen({
   const ticket = ticketQ.data
   const relatedTicketsPanel = (
     <TicketSidePanel title={t("Related tickets")} count={ticket ? formatCount(1) : formatCount(0)}>
+      {/* CATEGORY, AS A READ-ONLY FACT (Aurora's ruling, 21 Sep 2026, B43,
+          verbatim: "you must detect it automatically. If it's related to a
+          ticket, it's 'Client Requested.' If not, not."). The door derives
+          `story.category` off this exact relationship
+          (workers/content/src/lib/stories.ts), so it reads here rather than
+          on a control — a plain, uncoloured pill (R86: the one coloured chip
+          is status), the same shape the backlog's own category cell draws. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-muted-foreground min-w-0 basis-[12rem] text-sm">{t("Category")}</span>
+        <Badge variant="secondary">{story.category}</Badge>
+      </div>
       {ticket ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-sm">{ticketTitle(ticket)}</span>
@@ -533,41 +580,41 @@ export function StoryDetailScreen({
     </TicketSidePanel>
   )
 
-  // EFFORT — `WorkLogsPanel` draws no title of its own (its own doc:
-  // "handed to whoever draws the title row ABOVE this panel"); the ticket
-  // page's own `EmptyGatedPanel` wrapping (`help-detail.tsx`) is the pattern
-  // reused here whole, R88's single door: empty, the header and its "+"
-  // both drop, and the panel's own `CollectionEmptyState` is the one way in.
+  // EFFORT, WITH THE METRICS INSIDE IT NOW (Aurora's ruling, 21 Sep 2026,
+  // B44, verbatim: "Include the metrics inside the effort card. On the
+  // effort card, remove the value entries and put the number next to the
+  // effort title, just as you do, for example, for stakeholders."). The
+  // separate "Metrics" panel is GONE — its three lines are this card's own
+  // body now — and so is `WorkLogsPanel`'s own list of rows (the "value
+  // entries" the ruling names): the total hours ride the TITLE, the same
+  // title-with-count register `help-stakeholders.tsx`'s own
+  // `<TicketSidePanel title={t("Stakeholders")} count={stakeholderBadge}>`
+  // renders through (`TicketSidePanel`, `ticket-detail-body.tsx`).
+  //
+  // NOT `EmptyGatedPanel` ANY MORE — that shell's whole point is a header
+  // that disappears while a COLLECTION holds zero rows, in favour of one
+  // "Add the first" empty state; this card is never that shape now, it
+  // always has three facts to show ("Not started" / "0h" / "No time log"
+  // are answers, not an empty state), so the plain `TicketSidePanel` every
+  // other fact panel on this page already uses is the honest register.
+  // R88/R50 read that as a title-row `<AddButton>` outside both a
+  // `<ToolbarRow>` and an `<EmptyGatedPanel>` — `EMPTY_STATE_SINGLE_DOOR_
+  // EXEMPT`/`EMPTY_TOOLBAR_EXEMPT` (shared/rules/registry.ts) carry this
+  // file's own reason: there is no collection here to be empty, so
+  // `empty={false}` is not an escape hatch, it is the honest, permanent
+  // answer, the same shape `roles-matrix.tsx`'s own fixed-catalogue entry
+  // already argues.
+  const metrics = metricsQ.data
   const effortPanel = (
-    <EmptyGatedPanel
+    <TicketSidePanel
       title={t("Effort")}
-      empty={workLogsEmpty}
+      count={hoursLabel(metrics?.effortSeconds ?? 0)}
       action={
         canLogTime ? (
-          <AddButton label={t("Log time")} onClick={() => workLogAddRef.current?.()} empty={workLogsEmpty} />
+          <AddButton label={t("Log time")} onClick={() => setAddTimeOpen(true)} empty={false} />
         ) : undefined
       }
     >
-      <WorkLogsPanel
-        targetTable="stories"
-        targetId={storyId}
-        recordLabel={story.ref ? `${story.ref} · ${story.title}` : story.title}
-        canEdit={canEdit}
-        canLog={canLogTime}
-        showAddButton={false}
-        addTrigger={workLogAddRef}
-        onEmptyChange={setWorkLogsEmpty}
-        onActivityChanged={() => {
-          invalidate(`activity:record:stories:${storyId}`)
-          invalidate(`story:metrics:${storyId}`)
-        }}
-      />
-    </EmptyGatedPanel>
-  )
-
-  const metrics = metricsQ.data
-  const metricsPanel = (
-    <TicketSidePanel title={t("Metrics")}>
       <div className="grid grid-cols-3 gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-muted-foreground text-xs uppercase">{t("Cycle time")}</span>
@@ -600,7 +647,6 @@ export function StoryDetailScreen({
       {relatedStoriesPanel}
       {phaseAndWavePanel}
       {effortPanel}
-      {metricsPanel}
     </>
   )
 
@@ -657,7 +703,7 @@ export function StoryDetailScreen({
           <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
-      title={translation.of(story.title)}
+      title={story.title}
       actions={
         <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
           <RecordTimerButton
@@ -748,7 +794,6 @@ export function StoryDetailScreen({
           ticketId: story.ticketId ?? "",
           assigneeId: story.assigneeId ?? "",
           storyType: story.storyType ?? "",
-          category: story.category,
           processIds: story.processIds,
           changesNoStep: story.changesNoStep,
           acceptanceCriteria: story.acceptanceCriteria ?? "",
@@ -778,6 +823,16 @@ export function StoryDetailScreen({
           refresh()
           invalidate(storyAttachmentsKey(storyId))
         }}
+      />
+      {/* THE EFFORT CARD'S OWN "LOG TIME" DOOR — see `logTime`'s own doc
+          above. The identical `TimeFormDialog` shape `WorkLogsPanel` mounts
+          for the same act, fixed to this story. */}
+      <TimeFormDialog
+        open={addTimeOpen}
+        onOpenChange={setAddTimeOpen}
+        draftKey={`work-log:add:stories:${storyId}`}
+        fixedTarget={{ table: "stories", id: storyId, label: story.ref ? `${story.ref} · ${story.title}` : story.title }}
+        onSubmit={logTime}
       />
     </>
   )

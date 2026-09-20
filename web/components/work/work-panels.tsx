@@ -29,8 +29,6 @@ import {
   TableRow,
 } from "@shared/ui/components/table/table"
 import { Button } from "@shared/ui/components/button/button"
-import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
-import { Label } from "@shared/ui/components/label/label"
 import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -428,57 +426,10 @@ export function StoriesPanel({
     })
   )
 
-  // THE GOAL TOGGLE, ONLY INSIDE A PHASE. `contributesToGoal` (shared/types.ts's
-  // own doc, Aurora's ruling, 20 Sep 2026) is offered on the story form once a
-  // phase is chosen, and "toggled on the story row inside the phase board" is
-  // the same field said a second way: this panel IS that board when it hangs
-  // off a sprint. An app's or a ticket's stories offer nothing here: the flag
-  // means nothing against no phase at all.
-  //
-  // A LOCAL OVERRIDE MAP rather than trusting the row straight off `q.data`:
-  // `updateStory` REPLACES every field it reads (the door's own doc), so the
-  // call below carries the story's whole existing shape back, but the read
-  // that reflects the change takes a round trip. The override paints the
-  // flipped state at once and is cleared by a successful refresh, or put back
-  // on a refusal so the box never lies about what is saved.
-  const [pendingGoal, setPendingGoal] = React.useState<Record<string, boolean>>({})
-
-  async function toggleContributesToGoal(s: Story, checked: boolean) {
-    setPendingGoal((m) => ({ ...m, [s.id]: checked }))
-    try {
-      // THE STORY'S OWN SHAPE, SPREAD — not named field by field. `Story` and
-      // `StoryWrite` disagree on a handful of fields (a nullable read column
-      // versus an optional write one), so those still need the `|| undefined`
-      // conversion; every OTHER field, present or future, rides through the
-      // spread untouched. A handler that instead named every field by hand is
-      // exactly what R (forms-forward-everything) exists to catch: a field the
-      // door gains next is silently dropped by a call site nobody remembered
-      // to update, the same bug the owner reported on the ticket form.
-      await contentApi.updateStory({
-        ...s,
-        detail: s.detail || undefined,
-        ticketId: s.ticketId || undefined,
-        sprintId: s.sprintId || undefined,
-        appId: s.appId || undefined,
-        processId: s.processId || undefined,
-        stepKey: s.stepKey || undefined,
-        assigneeId: s.assigneeId || undefined,
-        reviewerId: s.reviewerId || undefined,
-        startsOn: s.startsOn || undefined,
-        dueOn: s.dueOn || undefined,
-        accountId: s.accountId || undefined,
-        storyType: s.storyType || "",
-        acceptanceCriteria: s.acceptanceCriteria || undefined,
-        buildNotes: s.buildNotes || undefined,
-        moscow: s.moscow || undefined,
-        contributesToGoal: checked,
-      })
-      q.refresh()
-    } catch (err) {
-      setPendingGoal((m) => ({ ...m, [s.id]: s.contributesToGoal }))
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that story."))
-    }
-  }
+  // THE GOAL TOGGLE STOOD HERE. PARKED, 21 Sep 2026 (`work/goal-row-toggle.tsx`,
+  // Aurora's ruling: "Remove the goal from the stories. I don't even know
+  // what that is, but remove it."). `useGoalToggle`/`<GoalRowToggle>` carry
+  // the exact same state and write this panel used to hold inline.
 
   const renderRows = (rows: Story[]) => (
     <RowList>
@@ -497,18 +448,6 @@ export function StoriesPanel({
             </span>
             <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind, lang)}</p>
           </div>
-          {ownerKind === "sprint" && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={`story-goal-${s.id}`}
-                checked={pendingGoal[s.id] ?? s.contributesToGoal}
-                onCheckedChange={(c) => void toggleContributesToGoal(s, c === true)}
-              />
-              <Label htmlFor={`story-goal-${s.id}`} className="text-muted-foreground text-xs font-normal">
-                {t("Contributes to the phase's goal")}
-              </Label>
-            </div>
-          )}
           {s.status === "done" && (
             <Badge variant="secondary" className="text-badge">
               {t("Done")}

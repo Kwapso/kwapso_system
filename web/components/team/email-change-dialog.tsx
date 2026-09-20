@@ -166,10 +166,10 @@ export function EmailChangeDialog({
                 <Spinner />
               </div>
             )}
+            {/* R98 — the code step's own form foot, the kit's default height, never `sm`. */}
             <div className="flex justify-between">
               <Button
                 variant="ghost"
-                size="sm"
                 disabled={busy}
                 onClick={() => {
                   setStep("email")
@@ -178,7 +178,7 @@ export function EmailChangeDialog({
               >
                 {t("Use a different email")}
               </Button>
-              <Button variant="ghost" size="sm" disabled={busy} onClick={() => void sendCode()}>
+              <Button variant="ghost" disabled={busy} onClick={() => void sendCode()}>
                 {t("Resend code")}
               </Button>
             </div>

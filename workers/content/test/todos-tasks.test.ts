@@ -768,3 +768,109 @@ describe("a task carries the two ticks, a department, and whatever that departme
     expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 0 })
   })
 })
+
+// ── DELETE (team migration 0113, Aurora's 21 Sep 2026 ruling) ─────────────────
+//
+// "i need delete actino for tasks on the ... button." NOTHING is removed — the
+// same soft-delete shape `deleteReply` already gave `help_threads` one table
+// along: the row and its activity history survive, `deactivated_at` moves and
+// the door stops handing it back.
+describe("a task is deleted the same way a reply is — deactivated, never removed", () => {
+  it("takes the row off every list and count, but keeps it and its history", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Renew the SSL certificate" })
+    const id = (db().prepare(`SELECT id FROM tasks`).get() as { id: string }).id
+
+    const res = await call(IDS.staffUser, "POST /api/content/tasks/delete", { id })
+    expect(res.status).toBe(200)
+
+    // THE ROW SURVIVES. `deactivated_at`/`deactivator_*` are set, and nothing
+    // else on it moved.
+    const row = db().prepare(`SELECT * FROM tasks WHERE id = ?`).get(id) as Record<string, string | null>
+    expect(row.deactivated_at).not.toBe(null)
+    expect(row.deactivator_id).toBe(IDS.staffUser)
+    expect(row.title).toBe("Renew the SSL certificate")
+
+    // …AND ITS HISTORY DOES TOO.
+    expect(historyFor(id)).toEqual(["Task created", "Task deleted"].sort())
+
+    // GONE FROM THE LIST, gone from `?view=all`, and gone by direct id.
+    expect(await titlesIn("open")).not.toContain("Renew the SSL certificate")
+    expect(await titlesIn("all")).not.toContain("Renew the SSL certificate")
+    const byId = (await (
+      await call(IDS.staffUser, "GET /api/content/tasks", undefined, `?id=${id}`)
+    ).json()) as { tasks: unknown[] }
+    expect(byId.tasks).toEqual([])
+
+    // …AND THE COUNT AGREES WITH THE LIST (R16) — the reply carries every
+    // facet total fresh off `countTasks`, already excluding the deleted row.
+    const body = (await res.json()) as { allTotal: number }
+    expect(body.allTotal).toBe(0)
+  })
+
+  it("refuses a second delete — the row is already gone as far as this door is concerned", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Only once" })
+    const id = (db().prepare(`SELECT id FROM tasks`).get() as { id: string }).id
+    expect((await call(IDS.staffUser, "POST /api/content/tasks/delete", { id })).status).toBe(200)
+    expect((await call(IDS.staffUser, "POST /api/content/tasks/delete", { id })).status).toBe(404)
+  })
+
+  it("a client login cannot delete a task", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Not theirs to remove" })
+    const id = (db().prepare(`SELECT id FROM tasks`).get() as { id: string }).id
+    const res = await call(IDS.contactUser, "POST /api/content/tasks/delete", { id })
+    expect(res.status).toBe(403)
+    expect(
+      (db().prepare(`SELECT deactivated_at FROM tasks WHERE id = ?`).get(id) as { deactivated_at: string | null })
+        .deactivated_at
+    ).toBe(null)
+  })
+})
+
+// ── A RUNNING CLOCK BLOCKS THE CLOSE (Aurora's 21 Sep 2026 ruling) ────────────
+//
+// "cannot mark anything as closed (task, story, ticket, whatever) if there's
+// an active time log running." The task half of it: `setTaskDone` refuses
+// `done: true` with 409 while a `work_logs` row against this task has no end.
+describe("a task cannot be marked done while its own clock is running", () => {
+  it("refuses 409 while a timer runs against it, and allows it once the timer is stopped", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Timed admin" })
+    const id = (db().prepare(`SELECT id FROM tasks`).get() as { id: string }).id
+
+    const start = await call(IDS.staffUser, "POST /api/content/work-logs/start", {
+      targetTable: "tasks",
+      targetId: id,
+    })
+    expect(start.status).toBe(200)
+
+    const blocked = await call(IDS.staffUser, "POST /api/content/tasks/done", { id, done: true })
+    expect(blocked.status).toBe(409)
+    expect(
+      (db().prepare(`SELECT status FROM tasks WHERE id = ?`).get(id) as { status: string }).status
+    ).toBe("open")
+    // No history line for a refused write.
+    expect(historyFor(id)).toEqual(["Task created"])
+
+    const logId = (db().prepare(`SELECT id FROM work_logs WHERE target_id = ?`).get(id) as { id: string }).id
+    expect((await call(IDS.staffUser, "POST /api/content/work-logs/stop", { id: logId })).status).toBe(200)
+
+    const allowed = await call(IDS.staffUser, "POST /api/content/tasks/done", { id, done: true })
+    expect(allowed.status).toBe(200)
+    expect(
+      (db().prepare(`SELECT status FROM tasks WHERE id = ?`).get(id) as { status: string }).status
+    ).toBe("done")
+  })
+
+  it("does not block PUTTING ONE BACK — only closing it", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Already done, timer running" })
+    const id = (db().prepare(`SELECT id FROM tasks`).get() as { id: string }).id
+    expect((await call(IDS.staffUser, "POST /api/content/tasks/done", { id, done: true })).status).toBe(200)
+
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "tasks", targetId: id })
+
+    const res = await call(IDS.staffUser, "POST /api/content/tasks/done", { id, done: false })
+    expect(res.status).toBe(200)
+    expect(
+      (db().prepare(`SELECT status FROM tasks WHERE id = ?`).get(id) as { status: string }).status
+    ).toBe("open")
+  })
+})

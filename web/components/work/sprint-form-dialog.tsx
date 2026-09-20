@@ -48,6 +48,8 @@ import { useLanguage } from "@shared/web/language"
 import { PHASE_TYPE_GROUP, PHASE_TYPES, phaseTypeDescription } from "@shared/sprint-types"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
+import { addWorkingDays } from "@shared/working-days"
+import { PHASE_DAY_DEFAULTS, type WavePhaseDay } from "@shared/waves"
 
 export type SprintFormValues = {
   name: string
@@ -134,6 +136,26 @@ export function sprintTypeLabel(option: SprintTypeOption, lang: string): string 
   return option.mark ? `${option.mark} ${name}` : name
 }
 
+/** THE FORM'S OWN PREFILL. Aurora's ruling, 21 Sep 2026: once a type is chosen
+ * and a start date is in hand, the end date defaults to the start plus that
+ * WAVE's own day count for the type (`wavePhaseDays`, the wave detail door's
+ * `phaseDays`, `shared/waves.ts`), falling back to the placeholder default
+ * (`PHASE_DAY_DEFAULTS`) where the wave carries no row of its own, or where
+ * this form was opened with no wave in hand at all. Working days only,
+ * `shared/working-days.ts`'s one arithmetic. Null when there is nothing to
+ * prefill yet (no type, no start, or a type this app has no day count for at
+ * all), and the caller leaves the end field exactly as it was. */
+export function prefillEndDate(
+  startsOn: string,
+  sprintType: string,
+  wavePhaseDays?: WavePhaseDay[]
+): string | null {
+  if (!startsOn || !sprintType) return null
+  const days = wavePhaseDays?.find((p) => p.phaseType === sprintType)?.days ?? PHASE_DAY_DEFAULTS[sprintType]
+  if (!days) return null
+  return addWorkingDays(startsOn, days)
+}
+
 // R87 (title-length, RULES.md): every title field reads the one shared
 // ceiling, so the marker, the counter and the door can never disagree about
 // what "too long" means.
@@ -193,6 +215,7 @@ export function SprintFormDialog({
   fixedAccount,
   initial,
   draftKey,
+  wavePhaseDays,
   onSubmit,
 }: {
   open: boolean
@@ -212,6 +235,13 @@ export function SprintFormDialog({
   /** Present = EDIT mode (prefilled; client and app shown, not offered). */
   initial?: SprintFormInitial
   draftKey?: string
+  /** THE WAVE'S OWN DAY COUNTS, for the end-date prefill below: the wave
+   * detail door's own `phaseDays` (`shared/waves.ts`), already in the
+   * caller's hand (`wave-detail.tsx`'s "Plan a phase" dialog) or fetchable
+   * where a caller knows which wave it is opening into. Omitted wherever the
+   * form is not standing inside a wave (or the caller has not wired it yet):
+   * the prefill still runs, off `PHASE_DAY_DEFAULTS` alone. */
+  wavePhaseDays?: WavePhaseDay[]
   onSubmit: (values: SprintFormValues) => Promise<void>
 }) {
   const { t, lang } = useLanguage()
@@ -239,6 +269,29 @@ export function SprintFormDialog({
   )
   const [busy, setBusy] = React.useState(false)
   const ready = values.name.trim() !== ""
+
+  // THE END-DATE PREFILL (Aurora's ruling, 21 Sep 2026). `endTouched` is
+  // false only for a form that has never carried a person's own end date
+  // (a fresh create, or an edit opened on a phase with none yet), and it
+  // flips to true, permanently, the moment the END DatePicker itself fires
+  // (never from this effect's own write, which goes through `setValues`
+  // directly rather than that handler). `prefillAnchor` is what makes this
+  // fire only on a REAL change: it starts equal to whatever the form already
+  // held at the moment it opened (a draft's own restored values included),
+  // so mounting or reopening never overwrites a date already sitting in the
+  // field, and only a type or start picked (or re-picked) while the dialog
+  // is open counts as "chosen."
+  const [endTouched, setEndTouched] = React.useState(!!initial?.endsOn)
+  const prefillAnchor = React.useRef({ start: values.startsOn, sprintType: values.sprintType })
+  React.useEffect(() => {
+    const anchor = prefillAnchor.current
+    const changed = anchor.start !== values.startsOn || anchor.sprintType !== values.sprintType
+    prefillAnchor.current = { start: values.startsOn, sprintType: values.sprintType }
+    if (!changed || endTouched) return
+    const next = prefillEndDate(values.startsOn, values.sprintType, wavePhaseDays)
+    if (next && next !== values.endsOn) setValues((s) => ({ ...s, endsOn: next }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.startsOn, values.sprintType])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -461,7 +514,15 @@ export function SprintFormDialog({
           mode="date"
           locale={lang}
           value={dateFromYMD(values.endsOn)}
-          onValueChange={(d) => setValues((s) => ({ ...s, endsOn: ymdFromDate(d) }))}
+          // A PICK HERE IS THE PERSON'S OWN, and it flips `endTouched`,
+          // permanently, so the prefill effect above never overwrites it again this
+          // session. The effect's own writes go through `setValues` directly
+          // and never call this handler, so the prefill itself can never
+          // mistake its own write for a hand edit.
+          onValueChange={(d) => {
+            setEndTouched(true)
+            setValues((s) => ({ ...s, endsOn: ymdFromDate(d) }))
+          }}
           disabled={busy}
         />
       </Field>

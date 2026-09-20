@@ -416,6 +416,74 @@
 }
 
 /* ============================================================================
+   THE <Tabs> ROOT'S OWN gap-6/gap-7 IS A FOURTH, STILL-UNCOUNTED NUMBER
+   (R83, DECISION B, 21 Sep 2026).
+   ============================================================================
+   Aurora's ruling, choosing between the two shapes drawn for her side by
+   side: the toolbar under a detail page's own tab strip (an app's own
+   Phases/Stories/Tickets tabs, an account's Contacts panel and its other
+   tabbed panels) sits 10px under the strip, exactly Ruling 7's "10 above
+   and below, both in main and details," identical to a main list's own
+   toolbar under its head.
+
+   THE CARD'S OWN LEAD IS ALREADY RIGHT. The rule two blocks up sets the
+   first-child card's `--pinned-lead`/`padding-top` to the whole
+   `--toolbar-lead-gap` (10px, `--space-2h`), and `PINNED_TOOLBAR`'s own
+   mt/pt pair (shared/web/pinned-chrome.ts) cancels it at rest the identical
+   way a top-level toolbar's own lead cancels: REST reads 0px, which is
+   correct, not a bug (the same "peek" every MATCH row in this lane's own
+   toolbar census proves).
+
+   WHAT IS STILL WRONG SITS ONE LEVEL UP. `STICKY_TABS`
+   (web/components/records/record-chrome.tsx) puts
+   `gap-[var(--space-6)] lg:gap-[var(--space-7)]` on the `<Tabs>` root
+   itself, the flex gap between `[role=tablist]` and its `TabsContent`
+   sibling, so a record's own strip and toolbar stack the card's correctly
+   cancelled 10px UNDER a second, untouched 24px (below `lg`) / 32px (`lg`
+   and up) that Ruling 7 never named and no rule here had ever reached.
+   That gap exists for a real reason (`STICKY_TABS`'s own comment): it
+   cancels the strip's own negative-margin escape so `TabsContent` still
+   lands where an ORDINARY, non-strip panel would. But that reason only
+   holds for a pane whose own leading card pays the OLD, un-cancelled inset;
+   a toolbar-led pane's card pays a CANCELLED 10px instead (the rule two
+   blocks up), so the room is pure surplus there: measured live, 32px at
+   1440, 24px at 760, on a card that already reads 0px at rest. The whole
+   visible distance above the toolbar IS this gap, alone.
+
+   ZEROED, NOT SHRUNK TO THE TOKEN. The card's own peek already supplies
+   the 10; adding the token here too would double-pay it, same shape as the
+   strip's own `--record-tab-gap` staying untouched and separate.
+
+   SCOPED TO THE ACTIVE PANE ONLY, DEFENSIVELY. This app's own `Tabs`
+   (shared/ui/components/tabs/tabs.tsx) hands Radix's `TabsContent` no
+   `forceMount`, so an inactive tab's own pane is not merely hidden, it is
+   not mounted at all today (proved live, `web/test/toolbar-lead-gap-card
+   .test.tsx`) and an unscoped `:has()` here would match nothing extra by
+   that route. `[data-state="active"]` still narrows the selector to the
+   pane Radix marks current, the same attribute `TabsTrigger`'s own active
+   styling already reads elsewhere in the kit, so a future change that force-
+   mounts every pane (the same shape Settings' own tab strips already avoid
+   on purpose, `appearance-panel.tsx`/`roles-matrix.tsx`) cannot make this
+   rule zero the gap under a FACT-ROWS/prose tab merely because some OTHER
+   pane on the same strip happens to hold a toolbar, exactly the case this
+   rule must leave alone ("do not change the gap ... a pane that starts with
+   anything else"). `:first-child` on both
+   the card and its own toolbar keeps this to a pane whose collection
+   genuinely LEADS, the same restraint the nested-tab-pane rule above
+   already applies one selector up; a pane whose card is nested one flow
+   `<div>` deep (`PagedPanelBody`/`PagedFind`'s own shape) is still reached,
+   through the plain descendant combinator between `[data-tab-pane]` and
+   `[data-slot="card"]:first-child`.
+
+   Proved by `web/test/toolbar-lead-gap-card.test.tsx`. */
+[data-slot="tabs"]:has(
+    > [data-tab-pane][data-state="active"] [data-slot="card"]:first-child
+      > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child
+  ) {
+  gap: 0px;
+}
+
+/* ============================================================================
    A CARD LED BY A HEADING PAYS THE WHOLE --toolbar-lead-gap, NOT THE STRIP'S
    REMAINDER (R83, generalised 17 Sep 2026 — the other half of this fix is in
    web/components/deep-link/collection-content.tsx's own knowledge branch).

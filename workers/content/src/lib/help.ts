@@ -58,6 +58,7 @@ import { TRIAGE_AFTER_DAYS } from "./triage"
 // order, and for why this one seam does not swallow its own failures the way
 // `logActivity` does.
 import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./help-stages"
+import { refuseWhileTimerRuns } from "./work-logs"
 import { GuardError, hasRight, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { TITLE_MAX_CHARS } from "@shared/types"
@@ -2419,6 +2420,13 @@ export async function setStatus(
   // re-stamps no editor/updated_at (no phantom re-sort), and pings nothing.
   const now = new Date().toISOString()
   const resolved = status === "resolved"
+  // R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+  // closed (task, story, ticket, whatever) if there's an active time log
+  // running." Only the resolve half of this door closes anything; every
+  // other status move is a step forward, not a close, and a timer still
+  // running on a ticket that is merely being triaged or scheduled is the
+  // ordinary case.
+  if (resolved) await refuseWhileTimerRuns(cfg, guard, { table: "help", id })
   const resolveBlock = resolved
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
     : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
@@ -2660,6 +2668,11 @@ export async function setTicketArchived(
   archived: boolean
 ): Promise<{ moved: boolean; accountId: string | null }> {
   const row = await ticketOrThrow(cfg, guard, scope, id)
+  // R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+  // closed (task, story, ticket, whatever) if there's an active time log
+  // running." Only ARCHIVING guards this: putting a ticket away is the close,
+  // taking it back out never needs its own clock stopped first.
+  if (archived) await refuseWhileTimerRuns(cfg, guard, { table: "help", id })
   const now = new Date().toISOString()
   const fence = ticketFence(guard, scope, "all")
   const set = archived

@@ -260,20 +260,54 @@ export function TaskFormDialog({
           autoFocus
         />
       </Field>
-      <Field config={detailField} htmlFor="task-detail" className={fieldSpacing}>
-        <Notes
-          key={open ? "open" : "shut"}
-          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
-          // the editable node itself, because the kit Field clones it onto its
-          // single child — and this is the label that id could never carry, since
-          // a label element's `for` attribute binds only to a labelable control
-          // and the editable node here is a plain div. Same words as the visible
-          // label, taken from the same config, so the two can never drift apart.
-          aria-label={t(detailField.label)}
+      {/* PRIORITY, RIGHT UNDER THE TITLE — Aurora's 21 Sep 2026 ruling,
+          verbatim: "on task add/edit the priority setting put it under
+          title." Same Eisenhower pair as before, only moved: two ticks, not
+          a high/medium/low word — "important" and "urgent" are different
+          questions and the old picker asked one. The line underneath says
+          which of the four the two ticks make, so nobody has to know the
+          arithmetic to use it. */}
+      <Field config={priorityField} shape="group" htmlFor="task-important" className={fieldSpacing}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="task-important"
+              checked={values.important}
+              onCheckedChange={(c) => setValues((s) => ({ ...s, important: c === true }))}
+              disabled={busy}
+            />
+            <Label htmlFor="task-important" className="text-sm font-normal">
+              {t("Important, it moves something that matters")}
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="task-urgent"
+              checked={values.urgent}
+              onCheckedChange={(c) => setValues((s) => ({ ...s, urgent: c === true }))}
+              disabled={busy}
+            />
+            <Label htmlFor="task-urgent" className="text-sm font-normal">
+              {t("Urgent, it has to happen soon")}
+            </Label>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {`${t("Priority")} ${priorityScore(values.important, values.urgent)} · ${t(
+              PRIORITY_LABEL[priorityScore(values.important, values.urgent)]
+            )}`}
+          </p>
+        </div>
+      </Field>
+      {/* DEADLINE, ABOVE WHO'S DOING IT — the same ruling's second half,
+          verbatim: "omve deadline above whos doing it." */}
+      <Field config={dueField} htmlFor="task-due" className={fieldSpacing}>
+        <DatePicker
+          id="task-due"
+          mode="date"
+          locale={lang}
+          value={dateFromYMD(values.dueOn)}
+          onValueChange={(d) => setValues((s) => ({ ...s, dueOn: ymdFromDate(d) }))}
           disabled={busy}
-          defaultValue={values.detail}
-          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
-          className="min-h-32"
         />
       </Field>
       <Field config={assigneeField} htmlFor="task-assignee" className={fieldSpacing}>
@@ -293,6 +327,22 @@ export function TaskFormDialog({
           value={values.assigneeId}
           onValueChange={(v) => setValues((s) => ({ ...s, assigneeId: v }))}
           disabled={busy}
+        />
+      </Field>
+      <Field config={detailField} htmlFor="task-detail" className={fieldSpacing}>
+        <Notes
+          key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(detailField.label)}
+          disabled={busy}
+          defaultValue={values.detail}
+          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
+          className="min-h-32"
         />
       </Field>
       <Field config={departmentField} htmlFor="task-department" className={fieldSpacing}>
@@ -354,51 +404,6 @@ export function TaskFormDialog({
           />
         </Field>
       )}
-      <Field config={dueField} htmlFor="task-due" className={fieldSpacing}>
-        <DatePicker
-          id="task-due"
-          mode="date"
-          locale={lang}
-          value={dateFromYMD(values.dueOn)}
-          onValueChange={(d) => setValues((s) => ({ ...s, dueOn: ymdFromDate(d) }))}
-          disabled={busy}
-        />
-      </Field>
-      {/* THE EISENHOWER PAIR. Two ticks, not a high/medium/low word: "important"
-          and "urgent" are different questions and the old picker asked one. The
-          line underneath says which of the four the two ticks make, so nobody has
-          to know the arithmetic to use it. */}
-      <Field config={priorityField} shape="group" htmlFor="task-important" className={fieldSpacing}>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="task-important"
-              checked={values.important}
-              onCheckedChange={(c) => setValues((s) => ({ ...s, important: c === true }))}
-              disabled={busy}
-            />
-            <Label htmlFor="task-important" className="text-sm font-normal">
-              {t("Important, it moves something that matters")}
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="task-urgent"
-              checked={values.urgent}
-              onCheckedChange={(c) => setValues((s) => ({ ...s, urgent: c === true }))}
-              disabled={busy}
-            />
-            <Label htmlFor="task-urgent" className="text-sm font-normal">
-              {t("Urgent, it has to happen soon")}
-            </Label>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            {`${t("Priority")} ${priorityScore(values.important, values.urgent)} · ${t(
-              PRIORITY_LABEL[priorityScore(values.important, values.urgent)]
-            )}`}
-          </p>
-        </div>
-      </Field>
       <Field config={fileField} htmlFor="task-file" className={fieldSpacing}>
         <FilePicker
           id="task-file"

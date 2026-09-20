@@ -71,8 +71,18 @@ describe("the knowledge gallery grid — fluid, reusing the wall's own 12rem tok
 
   it("the wall itself is <CardGrid fluid minItemWidth={KNOWLEDGE_CARD_MIN}> — never the fixed column ladder", () => {
     const branch = knowledgeCollectionBranch(read("web/components/knowledge/knowledge-screen.tsx"))
-    const gridAt = branch.indexOf("<CardGrid")
-    expect(gridAt, "the knowledge gallery's own <CardGrid>").toBeGreaterThan(-1)
+    // THE ALL TAB'S OWN GRID, ANCHORED ON ITS OWN LABEL — since 21 Sep 2026
+    // the Glossary tab draws through this exact same `<CardGrid>` shape too
+    // (own header comment, knowledge-source-card.tsx), and that same header
+    // comment quotes the literal text "<CardGrid>" in prose a few lines
+    // above the real element. A naive `indexOf("<CardGrid")` over the whole
+    // branch lands on whichever of those three comes first in the file,
+    // never reliably the All tab's own — anchoring on `label={t("Sources")}`,
+    // which only the All tab's grid carries, finds the right one every time.
+    const labelAt = branch.indexOf('label={t("Sources")}')
+    expect(labelAt, 'the All tab\'s own <CardGrid label={t("Sources")}>').toBeGreaterThan(-1)
+    const gridAt = branch.lastIndexOf("<CardGrid", labelAt)
+    expect(gridAt, "the All tab's own <CardGrid> opening tag").toBeGreaterThan(-1)
     const gridEnd = branch.indexOf(">", gridAt)
     const tag = branch.slice(gridAt, gridEnd)
     expect(tag, "fluid, the kit's own repeat(auto-fit, minmax(…)) — not the fixed columns={} ladder").toMatch(/\bfluid\b/)
@@ -113,15 +123,33 @@ describe("the knowledge gallery grid — fluid, reusing the wall's own 12rem tok
 })
 
 describe('the edit button is gone from the card — client: "the edit button is deleted from the card"', () => {
-  it("the call site passes no onEditFiling/canEdit to KnowledgeSourceCard any more", () => {
+  it("the All tab's call site passes no onEditFiling/canEdit/preview to KnowledgeSourceCard any more", () => {
     const branch = knowledgeCollectionBranch(read("web/components/knowledge/knowledge-screen.tsx"))
-    const at = branch.indexOf("<KnowledgeSourceCard")
-    expect(at, "the knowledge gallery's own card call site").toBeGreaterThan(-1)
-    const end = branch.indexOf("/>", at)
-    const tag = branch.slice(at, end)
+    // SCOPED TO THE ALL TAB'S OWN <CardGrid>...</CardGrid> BLOCK — since
+    // 21 Sep 2026 the Glossary tab mounts a SECOND, real `<KnowledgeSourceCard`
+    // call site (its own `preview={definitionPreview(source)}`, by design,
+    // see that component's own header), so a whole-file `indexOf` can no
+    // longer assume the first match is the All tab's. Anchored the same way
+    // the grid test above is, on the `label={t("Sources")}` only the All
+    // tab's grid carries.
+    const labelAt = branch.indexOf('label={t("Sources")}')
+    expect(labelAt, 'the All tab\'s own <CardGrid label={t("Sources")}>').toBeGreaterThan(-1)
+    const gridAt = branch.lastIndexOf("<CardGrid", labelAt)
+    const gridClose = branch.indexOf("</CardGrid>", gridAt)
+    expect(gridClose, "the All tab's own </CardGrid> closing tag").toBeGreaterThan(-1)
+    const block = branch.slice(gridAt, gridClose)
+
+    const at = block.indexOf("<KnowledgeSourceCard")
+    expect(at, "the All tab's own card call site").toBeGreaterThan(-1)
+    const end = block.indexOf("/>", at)
+    const tag = block.slice(at, end)
     expect(tag).not.toMatch(/onEditFiling/)
     expect(tag).not.toMatch(/\bcanEdit\b/)
     expect(tag).not.toMatch(/accountNames/)
+    // THE ALL TAB HANDS OVER NO `preview` EITHER — that slot is the
+    // Glossary tab's own addition (`definitionPreview`), never this card's;
+    // the All tab keeps drawing "Last edited {when}" exactly as before.
+    expect(tag).not.toMatch(/preview=/)
   })
 
   it("KnowledgeSourceCard's own signature and body declare no onEditFiling/canEdit prop and draw no PencilSimple", () => {

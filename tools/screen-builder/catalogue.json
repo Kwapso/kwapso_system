@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.143",
-  "sha": "04d9c1d87a226bde62a71a2b5c0ec6cdb471479d",
+  "tag": "v1.2.144",
+  "sha": "823ae3bbd86a441fb664e4b9a6c8cd294852b928",
   "syncedAt": "2026-09-20"
  },
- "generatedAt": "2026-09-20T09:12:38.215Z",
+ "generatedAt": "2026-09-20T19:54:12.292Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -6344,7 +6344,7 @@
     {
      "file": "components/select/select.tsx",
      "name": "selectTriggerVariants",
-     "line": 177,
+     "line": 318,
      "base": "flex w-full min-w-0 appearance-none items-center justify-between gap-2 h-[var(--control-height-input)] px-[var(--space-4h)] rounded-pill bg-background text-foreground text-sm font-[var(--font-weight-light)] whitespace-nowrap cursor-pointer [&>span]:min-w-0 [&>span]:truncate [&>span]:text-start data-[placeholder]:text-muted-foreground transition-[box-shadow,background-color] duration-[var(--duration-colour)] ease-kwapso disabled:cursor-not-allowed disabled:shadow-[inset_0_0_0_0.0625rem_var(--border)] disabled:bg-hair-faint disabled:text-ink-disabled disabled:[&_svg]:text-ink-disabled",
      "groups": [
       {

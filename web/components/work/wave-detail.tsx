@@ -41,7 +41,7 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
 import { OverviewList } from "@/components/records/overview-list"
 import { RecordPicker } from "@/components/records/record-picker"
 import { WaveFormDialog } from "@/components/work/wave-form-dialog"
-import { waveDates, WaveStageMark } from "@/components/work/waves-screen"
+import { waveDates, waveExpectedWorkingDays, WaveStageMark } from "@/components/work/waves-screen"
 import {
   RecordActionsMenu,
   RecordChipLink,
@@ -229,6 +229,13 @@ export function WaveDetailScreen({
     (s) => s.active && s.accountId === wave.accountId && !inThisWave.has(s.id)
   )
 
+  // THIS WAVE'S OWN PHASE-DAYS ROWS, keyed by type, for the "Expected length"
+  // overview row below (and available to hand `SprintFormDialog` its own
+  // prefill input, see `wavePhaseDays` on the "Plan a phase" dialog further
+  // down).
+  const phaseDaysByType = new Map(phaseDays.map((p) => [p.phaseType, p.days]))
+  const expectedWorkingDays = waveExpectedWorkingDays(sprints, phaseDaysByType)
+
   const overviewItems = [
     { label: t("Account"), value: wave.accountName || "" },
     {
@@ -250,6 +257,18 @@ export function WaveDetailScreen({
           : wave.sprintCount === 0
             ? t("No phases planned yet")
             : `${wave.sprintCount} ${t("phases")}`,
+    },
+    // THE WAVE'S OWN FORECAST TOTAL (Aurora's ruling, 21 Sep 2026): the sum
+    // of every active phase's own working-day length, dated phases read back
+    // as their real span and undated ones read off this wave's own phase-days
+    // Settings panel below (falling back to the placeholder default the same
+    // way the phase form's own prefill does). `undefined` for a wave with no
+    // active phases at all, which `OverviewList` drops rather than showing a
+    // forecast of nothing.
+    {
+      label: t("Expected length"),
+      value:
+        expectedWorkingDays === undefined ? undefined : `${expectedWorkingDays} ${t("working days")}`,
     },
     // The audit rows live in the record footer (D7 / CHECKLIST 11.3).
   ]
@@ -578,6 +597,10 @@ export function WaveDetailScreen({
         apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === wave.accountId)}
         fixedAccount={wave.accountId ? { id: wave.accountId, name: wave.accountName ?? "" } : undefined}
         draftKey={`sprint:add:wave:${waveId}`}
+        // THE END-DATE PREFILL'S OWN INPUT (Aurora, 21 Sep 2026): this door's
+        // read already carries the wave's phase days, so planning a phase
+        // from inside its own wave costs no extra round trip for it.
+        wavePhaseDays={phaseDays}
         onSubmit={async (v) => {
           // The create door answers with the whole LIST rather than the new row,
           // so the new sprint is the one that was not there a moment ago. Read

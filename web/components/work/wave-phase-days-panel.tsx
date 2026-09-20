@@ -7,6 +7,14 @@
 // Plan, Build, Pilot, Revision, Deploy, Hypercare), each drawing that type's
 // own icon and a number-of-days field, with Save and Cancel underneath.
 //
+// WORKING DAYS, NEVER CALENDAR ONES. Her very next ruling, 21 Sep 2026,
+// verbatim: "mind you, all of this is Monday to Friday, so when I say 5,
+// it's actually a full week, but I, of course, don't count the weekends."
+// The unit beside each field reads "working days" rather than plain "days"
+// now, and one line under the seven rows says what that means in full, so
+// nobody reads a "5" here and expects a calendar week rather than a working
+// one. `shared/working-days.ts` carries the one arithmetic this settles.
+//
 // READ-ONLY WITHOUT THE WAVE UPDATE RIGHT. `wave-detail.tsx` passes `canEdit`
 // down from its own `can("work", "update")`, the same gate its Edit/Switch off
 // actions already use; this panel adds no gate of its own, it only draws
@@ -114,17 +122,21 @@ export function WavePhaseDaysPanel({
                   className="w-20"
                   aria-label={nameFor(p.name)}
                 />
-                <span className="text-muted-foreground text-sm">{t("days")}</span>
+                <span className="text-muted-foreground text-sm">{t("working days")}</span>
               </div>
             </li>
           ))}
         </ul>
+        <p className="text-muted-foreground text-caption">
+          {t("Monday to Friday, weekends are not counted")}
+        </p>
         {canEdit && (
+          // R98 — a form foot's buttons are the kit's default height, never `sm`.
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" disabled={busy || !dirty} onClick={cancel}>
+            <Button variant="ghost" disabled={busy || !dirty} onClick={cancel}>
               {t("Cancel")}
             </Button>
-            <Button variant="inverse" size="sm" disabled={busy || !dirty} onClick={() => void save()}>
+            <Button variant="inverse" disabled={busy || !dirty} onClick={() => void save()}>
               {t("Save")}
             </Button>
           </div>

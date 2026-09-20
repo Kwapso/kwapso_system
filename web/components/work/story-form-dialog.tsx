@@ -30,11 +30,13 @@
 //     none" that has to be CHOSEN rather than left blank (6.5, Aurora's ts4) — a
 //     `Select` dropdown since 16 Sep 2026 (see the field's own note below for
 //     the correction that kept it on this form at all);
-//   • CATEGORY IS LAST, AND PREFILLED (16 Sep 2026 ruling): Client-requested
-//     when this dialog was opened FROM a ticket (`fixedTicket` set), Internal
-//     otherwise — "if it comes from a ticket, it's client requested. If it's
-//     created from scratch, it's prefilled with internal." Still editable, and
-//     still the two-pill row it already was;
+//   • NO CATEGORY CONTROL (Aurora's ruling, 21 Sep 2026, B43,
+//     documents/UI-RULEBOOK.md, verbatim: "The category 'Client Requested' or
+//     'Enabler': don't put it on the edit screen. You must detect it
+//     automatically. If it's related to a ticket, it's 'Client Requested.' If
+//     not, not."). The content door derives it from whether the story links a
+//     ticket (`workers/content/src/lib/stories.ts`) — this form no longer asks
+//     and no longer sends it;
 //   • NO DUE DATE. A story is due when the block it was sold inside is due (3.15).
 
 import * as React from "react"
@@ -42,11 +44,8 @@ import * as React from "react"
 import { LinkSimple, X } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
-import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
-import { Label } from "@shared/ui/components/label/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui/components/select/select"
-import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FactRow } from "@shared/web/fact-row"
@@ -59,6 +58,7 @@ import { ApiFailure, content as contentApi } from "@/lib/api"
 import { storyAttachmentsKey } from "@/lib/live-resources"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
+import { ticketFace } from "@shared/web/ticket-face"
 import { storyTypeIconName } from "@shared/story-types"
 import { iconComponent } from "@shared/web/screen-engine/icon"
 import type { PickableRecord } from "@/lib/pickable"
@@ -88,10 +88,15 @@ export type StoryFormValues = {
   /** Data / Tech / Bug / Feature / Change — required (CHECKLIST 6.2, client
    * ruling 15 Sep 2026). */
   storyType: string
-  /** Client-requested / Enabler (the same ruling, "Internal" renamed 20 Sep
-   * 2026) — required, defaults to Client-requested. An Enabler story must
-   * name a ticket (`ticketId` above) — Aurora's ruling, same day. */
-  category: string
+  /** CLIENT-REQUESTED / ENABLER — STILL ON THE TYPE, NO LONGER SET HERE.
+   * Aurora's ruling, 21 Sep 2026, B43: the content door derives this from
+   * whether the story links a ticket
+   * (`workers/content/src/lib/stories.ts`), so this form draws no control
+   * for it and never assigns it in the draft — optional only so
+   * `stories-screen.tsx`'s own `createStoryFrom`/`updateStory` call sites
+   * (a different lane's file) keep type-checking while they still read
+   * `values.category`; drop this field once nothing reads it. */
+  category?: string
   /** Every map this work touches (CHECKLIST 6.5). */
   processIds: string[]
   /** …or the explicit statement that it touches none. Aurora's ruling: it has to
@@ -159,15 +164,6 @@ const typeField = {
   label: "Type",
   required: true,
 }
-/** WHERE THIS WORK CAME FROM — client ruling, 15 Sep 2026. Always answered
- * (defaults to Client-requested), so `required` here reads as "always has a
- * value" rather than "must be chosen" — the same sense `typeField` already
- * carries for a control that can never sit empty. */
-const categoryField = {
-  ...defaultFieldConfig,
-  label: "Category",
-  required: true,
-}
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 // SAME DESIGN AS DETAIL (Aurora's ruling, 20 Sep 2026, verbatim): identical
 // field shape, one line down.
@@ -183,20 +179,15 @@ const sprintField = {
   label: "Phase",
   required: false,
 }
-// CONTRIBUTES TO THE GOAL (Aurora's ruling, 20 Sep 2026) — a plain checkbox,
-// never required; only shown once a phase is chosen (render site, below).
-const contributesToGoalField = { ...defaultFieldConfig, label: "Goal", required: false }
+// NO LONGER REQUIRED ON AN ENABLER (Aurora's ruling, 21 Sep 2026, B43): the
+// category is derived from whether a ticket is linked, never the other way
+// round, so there is no "Enabler needs a ticket" refusal left to mirror —
+// `enablerTicketField` (the same config with `required: true`) is gone.
 const ticketField = {
   ...defaultFieldConfig,
   label: "Tickets",
   required: false,
 }
-/** THE SAME FIELD, REQUIRED — Aurora's ruling, 20 Sep 2026, verbatim: "When a
- * story's origin is Enabler, must select a related ticket!" Read at render
- * time off `values.category` rather than baked into `ticketField` itself,
- * because whether this is required changes as somebody picks a different
- * category on the SAME open dialog. */
-const enablerTicketField = { ...ticketField, required: true }
 const processField = {
   ...defaultFieldConfig,
   label: "Processes",
@@ -222,7 +213,7 @@ export function StoryFormDialog({
   appStaff,
   processes,
   storyTypes,
-  categories,
+  categories: _categories,
   storyId,
   initial,
   draftKey,
@@ -259,8 +250,10 @@ export function StoryFormDialog({
    * work is a fact about where you are standing, and the one thing about a new
    * story nobody should be able to mistype. */
   fixedTicket?: { id: string; label: string }
-  /** OPEN tickets only (6.4), each tagged with the app it is about. */
-  tickets: { id: string; label: string; appId: string | null }[]
+  /** OPEN tickets only (6.4), each tagged with the app it is about, and its
+   * own type (`helpType`) so the pre-typed list below can draw the same face
+   * (Aurora's ruling, 21 Sep 2026) the searched half already carries. */
+  tickets: { id: string; label: string; appId: string | null; helpType?: string | null }[]
   members: PickablePerson[]
   /** WHO IS ON EACH APP (CHECKLIST 6.6) — app id → the staff user ids on it. The
    * assignee picker narrows to the chosen app's people, and the DOOR refuses
@@ -273,13 +266,17 @@ export function StoryFormDialog({
   processes: { id: string; name: string; appId: string | null }[]
   /** The team's own `Story type` dropdown values (6.2). */
   storyTypes: string[]
-  /** The team's own `Story category` dropdown values — Client-requested and
-   * Internal as seeded, editable like every other vocabulary here (never a
-   * hardcoded word, the same reason `storyTypes` is a prop and not a
-   * constant). Drawn as a two-pill row rather than a picker: unlike Type
-   * this is a genuinely SHORT, closed choice, and the kit's own segmented
-   * control (`ToggleGroup`/`ToggleGroupItem`) is built for exactly "two to
-   * four options that change how the same data is drawn." */
+  /** THE TEAM'S OWN `Story category` DROPDOWN VALUES — STILL ACCEPTED, NO
+   * LONGER DRAWN. Aurora's ruling, 21 Sep 2026, B43, documents/UI-RULEBOOK.md,
+   * verbatim: "The category 'Client Requested' or 'Enabler': don't put it on
+   * the edit screen. You must detect it automatically. If it's related to a
+   * ticket, it's 'Client Requested.' If not, not." The content door now
+   * derives the category from whether the story links a ticket
+   * (`workers/content/src/lib/stories.ts`), so this form no longer renders a
+   * picker for it — the prop stays on the signature, ignored
+   * (`categories: _categories` below), only because `useStoryFormOptions`
+   * (stories-screen.tsx) still hands it to every call site; drop the prop
+   * once that caller stops sending it. */
   categories: string[]
   /* `typeMarks` USED TO SIT HERE — the two-letter glyph beside each word, as
      a `Map<string, string>` a caller could pass instead of richer options.
@@ -353,22 +350,6 @@ export function StoryFormDialog({
           ticketId: "",
           assigneeId: defaultAssigneeId ?? "",
           storyType: "",
-          // PREFILLED BY ORIGIN (client ruling, 16 Sep 2026): a ticket raised
-          // it, so a story answering it traces back the same way; nothing did,
-          // so it defaults to our own upkeep. `fixedTicket` IS "opened from a
-          // ticket" — it is set at exactly the one call site that opens this
-          // dialog off a ticket's own Related stories tab (help-detail.tsx)
-          // — so it is the fact to read rather than a second flag saying the
-          // same thing. Still an ordinary default: the field below stays
-          // editable, same as `typeField`'s own "always answered" one field up.
-          //
-          // "INTERNAL" IS "ENABLER" NOW (20 Sep 2026 rename) — same default
-          // logic, new word, and the new word carries a new requirement (an
-          // Enabler needs a ticket, `ready` below), so a scratch create that
-          // opens on this default is not submittable until a ticket is
-          // picked or the category is switched — the ordinary shape of a
-          // form whose default answer is not yet a complete one.
-          category: fixedTicket ? "Client-requested" : "Enabler",
           processIds: [],
           changesNoStep: false,
           acceptanceCriteria: "",
@@ -429,19 +410,15 @@ export function StoryFormDialog({
   // maps it changes — the same three the door insists on, so the button is never
   // enabled into a refusal.
   //
-  // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) rides the same READY flag
-  // rather than a separate disabled reason — the door's own refusal
-  // (`refuseEnablerWithNoTicket`, workers/content/src/lib/stories.ts) is the
-  // one place this is actually enforced; this only keeps the button from
-  // being enabled into that exact refusal, `resolveProcesses`'s own reason
-  // one field up. `fixedTicket` counts as a ticket — it is a real one, just
-  // not editable on this form (see its own doc above).
-  const effectiveTicketId = fixedTicket ? fixedTicket.id : values.ticketId
+  // NO ENABLER RULE LEFT TO MIRROR (Aurora's ruling, 21 Sep 2026, B43): the
+  // category used to be a CHOICE that could conflict with the ticket picker
+  // ("an Enabler needs a ticket"); now it is DERIVED from the ticket picker,
+  // so there is nothing left here for `ready` to keep the button from being
+  // enabled into.
   const ready =
     values.title.trim() !== "" &&
     values.storyType !== "" &&
-    (values.changesNoStep || values.processIds.length > 0) &&
-    (values.category !== "Enabler" || effectiveTicketId !== "")
+    (values.changesNoStep || values.processIds.length > 0)
 
   // WHAT SOMEBODY PICKED, held until there is a story to hang it on.
   //
@@ -573,7 +550,6 @@ export function StoryFormDialog({
         ticketId: fixedTicket ? fixedTicket.id : values.ticketId,
         assigneeId: values.assigneeId,
         storyType: values.storyType,
-        category: values.category,
         processIds: values.changesNoStep ? [] : values.processIds,
         changesNoStep: values.changesNoStep,
         acceptanceCriteria: richTextValue(values.acceptanceCriteria),
@@ -809,30 +785,17 @@ export function StoryFormDialog({
           (v) => setValues((s) => ({ ...s, sprintId: v }))
         )}
       </Field>
-      {/* CONTRIBUTES TO THE GOAL (Aurora's ruling, 20 Sep 2026), only offered
-          once a phase is actually chosen — the flag means nothing against no
-          phase at all, and unchecked-and-hidden is the honest default for a
-          story with no phase rather than a control nobody can read. */}
-      {values.sprintId && (
-        <Field config={contributesToGoalField} shape="group" htmlFor="story-contributes-to-goal" className={fieldSpacing}>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="story-contributes-to-goal"
-              checked={values.contributesToGoal}
-              onCheckedChange={(c) => setValues((s) => ({ ...s, contributesToGoal: c === true }))}
-              disabled={busy}
-            />
-            <Label htmlFor="story-contributes-to-goal" className="text-sm font-normal">
-              {t("Contributes to the phase's goal")}
-            </Label>
-          </div>
-        </Field>
-      )}
-      {/* REQUIRED WHEN THE ORIGIN IS ENABLER (Aurora's ruling, 20 Sep 2026) —
-          `enablerTicketField`'s own doc says why this reads `values.category`
-          rather than a static config. */}
+      {/* THE GOAL CHECKBOX STOOD HERE. PARKED, 21 Sep 2026
+          (`work/goal-field.tsx`, Aurora's ruling: "Remove the goal from the
+          stories. I don't even know what that is, but remove it."). The
+          field itself (`values.contributesToGoal`) still rides the draft
+          untouched — see the draft's own initial values above — only the
+          control that let somebody SET it is unmounted. */}
+      {/* NO LONGER CONDITIONALLY REQUIRED (Aurora's ruling, 21 Sep 2026,
+          B43) — picking this ticket is what the door now reads to derive
+          Client-requested/Enabler, not the other way round. */}
       <Field
-        config={values.category === "Enabler" ? enablerTicketField : ticketField}
+        config={ticketField}
         htmlFor="story-ticket"
         className={fieldSpacing}
       >
@@ -842,14 +805,26 @@ export function StoryFormDialog({
           /* TICKETS PAGE (R14), so this one asks the DOOR — narrowed to the
              same app the rest of the form is narrowed to, which is what the
              in-memory `onThisApp` was doing over a loaded page. `ticketOptions`
-             stays as the list painted before anything is typed. */
+             stays as the list painted before anything is typed.
+
+             THE FACE IS THE TYPE'S ICON (Aurora's ruling, 21 Sep 2026: "on
+             every choice component where I can choose a ticket, show me the
+             type as the icon everywhere," kept visible once chosen). Wired
+             on BOTH halves now, through the same `ticketFace`
+             (shared/web/ticket-face.tsx): `searchTickets`
+             (web/lib/picker-sources.ts) hands every SEARCHED row
+             `icon: ticketFace(t).icon`, read straight off the door's own
+             `helpType`; the PRE-TYPED list below reads it too, now that
+             `useStoryFormOptions` (stories-screen.tsx) carries `helpType`
+             through its own `{ id, label, appId, helpType }` shape rather
+             than dropping it. */
           <RecordPicker
             id="story-ticket"
             value={values.ticketId || NONE}
             onChange={(v) => setValues((s) => ({ ...s, ticketId: v === NONE ? "" : v }))}
             search={(term) => searchTickets(term, { appId: appId || undefined })}
             searchKey={pickerKey(`tickets:${appId || "any"}`, teamId)}
-            options={sortedOptions(ticketOptions, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label }))}
+            options={sortedOptions(ticketOptions, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, icon: ticketFace(o).icon }))}
             emptyOption={{ value: NONE, label: t("No ticket") }}
             placeholder={t("No ticket")}
             searchPlaceholder={t("Search tickets…")}
@@ -980,35 +955,15 @@ export function StoryFormDialog({
           it now, unmounted. `values.moscow` itself is untouched (see the
           note on `useFormDraft`'s own defaults, above), so this is silent on
           an edit, not a data loss. */}
-      {/* CATEGORY, LAST AND PREFILLED — client ruling, 16 Sep 2026: "the
-          client requested or internal should be at the very bottom and
-          prefilled." Moved here from right after Type; the default (Client-
-          requested opened from a ticket, Internal from scratch) is set once,
-          in the draft's own initial value above, and this row only ever
-          shows what that answered — still editable, still the two-pill row
-          it always was. */}
-      <Field config={categoryField} shape="group" htmlFor="story-category" className={fieldSpacing}>
-        <ToggleGroup
-          id="story-category"
-          type="single"
-          value={values.category}
-          onValueChange={(v) => {
-            // Radix's own contract: re-pressing the active segment reports an
-            // empty string rather than leaving it selected. A required field
-            // with a default is never genuinely empty, so that press is a
-            // no-op instead of a value the door would refuse.
-            if (v) setValues((s) => ({ ...s, category: v }))
-          }}
-          disabled={busy}
-          aria-label={t("Category")}
-        >
-          {categories.map((c) => (
-            <ToggleGroupItem key={c} value={c} disabled={busy}>
-              {c}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </Field>
+      {/* THE CATEGORY TOGGLE STOOD HERE, LAST. REMOVED (not parked — there is
+          no door field left for a caller to set), 21 Sep 2026, Aurora's
+          ruling, B43, verbatim: "The category 'Client Requested' or
+          'Enabler': don't put it on the edit screen. You must detect it
+          automatically. If it's related to a ticket, it's 'Client
+          Requested.' If not, not." The content door derives it from whether
+          the story links a ticket now (`workers/content/src/lib/stories.ts`);
+          the story page shows the derived value as a read-only fact
+          (`story-detail.tsx`). */}
     </FormShellDialog>
   )
 }

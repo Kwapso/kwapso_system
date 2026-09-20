@@ -506,9 +506,10 @@ describe("a wave's phase days", () => {
     const { phaseDays } = await readWave(id)
     expect(phaseDays.map((p) => p.phaseType)).toEqual(PHASE_TYPES.map((p) => p.name))
     // The placeholder defaults, hers to adjust (shared/waves.ts PHASE_DAY_DEFAULTS).
+    // Her 21 Sep 2026 ruling replaced the 20 Sep starting numbers.
     expect(phaseDays.find((p) => p.phaseType === "Audit")?.days).toBe(5)
-    expect(phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(20)
-    expect(phaseDays.find((p) => p.phaseType === "Hypercare")?.days).toBe(10)
+    expect(phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(15)
+    expect(phaseDays.find((p) => p.phaseType === "Hypercare")?.days).toBe(7)
   })
 
   it("sets a subset and leaves the rest at their defaults", async () => {

@@ -277,9 +277,9 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
         <p className="text-muted-foreground text-sm">
           {t("Logos, decks, templates and photography.")} {formatCount(total)}
         </p>
+        {/* R98 — this panel's own header action, the kit's default height, never `sm`. */}
         <Button
           variant="secondary"
-          size="sm"
           onClick={() => softNavigate("/brand")}
           className="ml-auto gap-1"
         >

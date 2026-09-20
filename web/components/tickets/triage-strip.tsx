@@ -102,7 +102,9 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
             onValueChange={assign}
           />
         ) : (
-          <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>
+          // R98 — this strip is the tickets screen's own page-head bar, the
+          // kit's default height, never `sm`.
+          <Button variant="secondary" onClick={() => setPicking(true)}>
             {triage.onDuty ? t("Change") : t("Put somebody on duty")}
           </Button>
         ))}

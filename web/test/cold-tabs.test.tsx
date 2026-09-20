@@ -440,10 +440,11 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
 
 /* ----------------------------------- stories --------------------------------
  * THE STORIES TAB STRIP, added 15 Sep 2026 — `tasks-screen.tsx`'s own cold-tab
- * coverage, one collection along. Now/Planned/Backlog/Completed/Everyone's,
- * five SERVER views, and — since Everyone's needs `all_stories:read`, which
- * this cold team's empty permission sheet never holds — only the four MINE
- * tabs are reachable here. */
+ * coverage, one collection along. Now/Planned/Reviews/Completed/Backlog/All,
+ * reordered and the last renamed from Everyone's to All 21 Sep 2026 (Aurora's
+ * ruling, documents/UI-RULEBOOK.md B45) — and, since All needs
+ * `all_stories:read`, which this cold team's empty permission sheet never
+ * holds — only the four MINE tabs are reachable here. */
 
 // TODAY, AS A REAL WINDOW. The Now tab's default sub-view is the STATUS
 // BOARD, and its own "To Do" column, 21 Sep 2026's ruling, only ever holds an
@@ -537,13 +538,14 @@ describe("Stories — the tab strip on a team with nothing in it, and the canary
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
   })
 
-  it("draws Now · Planned · Backlog · Completed, and no Everyone's tab without the right", async () => {
+  it("draws Now · Planned · Reviews · Completed · Backlog, and no All tab without the right", async () => {
     renderStories([])
     expect(await screen.findByRole("tab", { name: /Now/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Planned/ })).toBeTruthy()
-    expect(screen.getByRole("tab", { name: /Backlog/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /Reviews/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Completed/ })).toBeTruthy()
-    expect(screen.queryByRole("tab", { name: /Everyone's/ })).toBeNull()
+    expect(screen.getByRole("tab", { name: /Backlog/ })).toBeTruthy()
+    expect(screen.queryByRole("tab", { name: /^All$/ })).toBeNull()
   })
 
   it("CANARY: one story draws that story, and no empty register", async () => {

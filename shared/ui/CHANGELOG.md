@@ -2,6 +2,61 @@
 
 ## Unreleased
 
+### Added - Select trigger keeps the selected face (or icon) with no per-call-site prop, and SelectFace gains a glyph variant - v1.2.144
+
+Two rulings, Aurora, verbatim: "on every choice component where I can choose
+a ticket, show me the type as the icon everywhere," and, on choice
+components generally: "when I have selected, for example, the app, in the
+dropdown I see the icon, but I want to continue seeing it also once it's
+selected. This app accounts for people everywhere where I select something
+with an avatar or an image. Still show it once it's selected, or the icon."
+
+THE BUG. v1.2.127 gave `SelectItem`/`SelectTrigger` a shared `face` prop
+rendered through one `SelectFaceMark` helper, but the TRIGGER only ever
+drew it when a call site passed `face` a second time, by hand, after
+already resolving which option was chosen to build `SelectValue`'s own
+placeholder. Nine call sites did that work; the rest closed back down to a
+bare label the instant a face-carrying option was picked, because nothing
+in the trigger itself knew what the selected option's face was.
+
+THE FIX IS ON THE SELECT SIDE, not the trigger's. `Select` (previously a
+bare re-export of `SelectPrimitive.Root`) is now a small wrapping function
+component: it shadows Radix's own value (controlled or not, by
+intercepting `onValueChange`) and provides a `SelectFaceContext` registry
+around Radix's real `Root`. Every `SelectItem` registers its own
+`(value, face)` pair into that registry inside a `React.useEffect` as it
+renders; `SelectTrigger` reads the registry for the CURRENT value and
+resolves `face ?? registry.selectedFace`; an explicit `face` prop still
+wins (byte-identical for the nine existing call sites), but nothing is
+required to get one any more. This works even before the list has ever
+been opened once, because Radix keeps every `SelectItem` mounted at all
+times; a closed `SelectContent` portals its children into a detached
+`DocumentFragment` rather than unmounting them, the same mechanism that
+lets `SelectValue` show the right TEXT with no prior open; so the
+registry is already populated by the time the trigger first paints.
+Registrations are never retracted on an item's unmount for the same
+reason in reverse: a closed list must keep showing the LAST selected
+face, and an item that is still in the JSX tree never truly unmounts
+under that fragment trick anyway.
+
+THE SECOND GAP: a ticket's type has no photograph and no name to cut to
+initials, only an icon; `SelectFace` had no slot for that. `SelectFace`
+gains `icon?: React.ReactNode`, and `SelectFaceMark` draws it as a small
+glyph badge (`size-[var(--avatar-sm)]`, matching the photo/initials pair's
+own footprint) instead of going through `Avatar` when it is given. It
+rides the exact same registry/trigger-persists pipeline as a photo face,
+so a Select built over faceless, icon-identified records (a ticket's
+type) gets both rulings from the one mechanism.
+
+Pinned in `check-select.mjs` (nine things now, up from four): the new
+`SelectFaceContext`/registry/`resolvedFace` wiring, `SelectFace`'s `icon`
+variant and `SelectFaceMark`'s glyph branch, alongside the four pre-
+existing pins (both `face` props, the shared `SelectFaceMark` helper, the
+legacy `image` prop still rendering, and the chevron's `ms-auto`/
+`justify-start` pairing; now read off `resolvedFace` rather than the raw
+`face` prop, since that is what the trigger actually renders from).
+`npm run check` is green end to end, `tsc --noEmit` included.
+
 ### Added - TicketThread takes a slide-in edit escape hatch and a face that matches the actions button - v1.2.143
 
 Aurora, on the chat menu, verbatim: "make the avatar as big as this button.

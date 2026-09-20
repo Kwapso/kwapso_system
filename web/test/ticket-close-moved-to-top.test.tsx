@@ -21,10 +21,10 @@
 // gives: a comment can say the right thing beside a prop that does the wrong
 // one, and only a render that reads the button back catches that.
 
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { HelpMessage, HelpTicket, HelpStatus } from "@shared/types"
+import type { HelpMessage, HelpTicket, HelpStatus, RunningTimer } from "@shared/types"
 
 const BASE_TICKET = {
   id: "help-1",
@@ -72,6 +72,9 @@ const api = vi.hoisted(() => ({
   // THE THREAD, MUTABLE PER TEST. Empty by default — "no messages", the
   // gate's own most-closed state (nothing has been answered back yet).
   replies: [] as HelpMessage[],
+  // RUNNING TIMERS, MUTABLE PER TEST (R99), empty by default, same as every
+  // other suite that mounts this screen.
+  timers: [] as RunningTimer[],
 }))
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -89,7 +92,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       workLogs: async () => ({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false }),
       workLogSummary: async () => ({ total: 0, totalSeconds: 0, people: [], kinds: [], weeks: [] }),
       helpAttachments: async () => ({ attachments: [], total: 0 }),
-      runningTimers: async () => ({ timers: [] }),
+      runningTimers: async () => ({ timers: api.timers }),
     },
     tenancy: {
       ...actual.tenancy,
@@ -127,17 +130,36 @@ globalThis.ResizeObserver ??= class {
 } as unknown as typeof ResizeObserver
 
 import { HelpDetailScreen } from "@/components/tickets/help-detail"
+import { clearCache } from "@shared/web/store"
 
 afterEach(cleanup)
 beforeEach(() => {
+  // R99's own cases are the first in this file to vary a CROSS-TEST cache key
+  // (`runningTimersKey("team-1")` never changes across cases here); every
+  // earlier case in this suite happened not to need this, and
+  // story-detail.test.tsx already carries the identical clear for the same
+  // reason.
+  clearCache()
   perms.can.mockReset().mockReturnValue(true)
   api.replies = []
+  api.timers = []
 })
 
 const openTicket = (status: HelpStatus, replies: HelpMessage[] = []) => {
   api.ticket = { ...BASE_TICKET, status } as HelpTicket
   api.replies = replies
   return render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
+}
+
+const RUNNING_ON_TICKET: RunningTimer = {
+  id: "log-1",
+  targetTable: "help",
+  targetId: "help-1",
+  targetLabel: "The dispatch board will not load",
+  targetRef: "BERG-T0412",
+  startedAt: "2026-09-21T09:00:00.000Z",
+  elapsedSeconds: 600,
+  runaway: false,
 }
 
 /** The title row — `data-record-region="header"`, where the kit's `Title`
@@ -284,10 +306,10 @@ describe("the triage stage's own actions replace Close/the timer on the head (Au
     expect(queryCloseButton()).toBeNull()
   })
 
-  it("draws no Start timer button at status new either", async () => {
+  it("draws no Start button at status new either", async () => {
     openTicket("new", [])
     await screen.findByRole("heading", { level: 1 })
-    expect(screen.queryByRole("button", { name: "Start timer" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull()
   })
 
   // BASE_TICKET carries `helpType: "Bug"`, which falls to `triageAct`'s
@@ -310,5 +332,55 @@ describe("the triage stage's own actions replace Close/the timer on the head (Au
     openTicket("triaged", [])
     expect(await closeButton()).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull()
+  })
+})
+
+// R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+// closed (task, story, ticket, whatever) if there's an active time log
+// running." The door's own copy is `refuseWhileTimerRuns`
+// (workers/content/src/lib/work-logs.ts), wired into `setStatus`'s resolve
+// branch and into `setTicketArchived`; the Close button and the Archive menu
+// item below only mirror the same fact back, `ticketTimerRunning`
+// (help-detail.tsx).
+describe("the close action is disabled while a timer on the ticket is still running (R99)", () => {
+  it("Close is disabled even when the thread would otherwise allow it", async () => {
+    api.timers = [RUNNING_ON_TICKET]
+    openTicket("triaged", [message("m1", false)]) // our own last word, would enable it
+    await closeButton()
+    // The running-timers read lands a beat after the button first paints,
+    // and swaps the ENABLED button for the Tooltip-wrapped disabled one, a
+    // different element rather than a mutated prop, so this re-queries
+    // instead of polling a reference captured before the swap.
+    await waitFor(() => {
+      expect((screen.getByRole("button", { name: "Close" }) as HTMLButtonElement).disabled).toBe(true)
+    })
+  })
+
+  it("a timer running on a DIFFERENT record never disables Close", async () => {
+    api.timers = [{ ...RUNNING_ON_TICKET, id: "log-2", targetTable: "stories", targetId: "story-9" }]
+    openTicket("triaged", [message("m1", false)])
+    const button = (await closeButton()) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+  })
+
+  it("Close is enabled again once no timer runs on the ticket", async () => {
+    api.timers = []
+    openTicket("triaged", [message("m1", false)])
+    const button = (await closeButton()) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+  })
+
+  it("Archive, in the ⋯ menu, is disabled the same way", async () => {
+    api.timers = [RUNNING_ON_TICKET]
+    openTicket("triaged", [])
+    await screen.findByRole("heading", { level: 1 })
+    const trigger = within(
+      document.querySelector('[data-slot="head-actions-row"]') as HTMLElement
+    ).getByRole("button", { name: "More actions" })
+    fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
+    fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
+    fireEvent.click(trigger)
+    const archive = await screen.findByRole("menuitem", { name: "Archive" })
+    expect(archive.getAttribute("aria-disabled")).toBe("true")
   })
 })

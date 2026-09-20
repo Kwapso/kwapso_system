@@ -131,8 +131,8 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 63 of the 179 tools answer on a GET (counted from the live
-  catalogue, 15 Sep 2026), and 184 of the doors in the
+- **Read** — 63 of the 186 tools answer on a GET (counted from the live
+  catalogue, 21 Sep 2026), and 185 of the doors in the
   census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
@@ -276,7 +276,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **276 doors, 208 with a tool, 68 with a written reason**, the
+  red build. Today: **277 doors, 209 with a tool, 68 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -564,10 +564,24 @@ Today it covers:
     field existed — a label for how important the work is, not an order for
     when it happens. `acceptanceCriteria` writes down what "done" looks like,
     the same long-text shape as `detail`, also optional and never backfilled.
-    `category` is Client-requested (the default) or Enabler (Kwapso-initiated
-    upkeep — renamed from Internal on 20 Sep 2026); an Enabler story must also
-    name `ticketId`, both `create_story` and `update_story` refuse with
-    `ticket_required` otherwise. `update_story` also carries `buildNotes`
+    The category (Client-requested / Enabler) is DERIVED, not sent — Aurora's
+    ruling, 21 Sep 2026, verbatim: "The category 'Client Requested' or
+    'Enabler': don't put it on the edit screen. You must detect it
+    automatically. If it's related to a ticket, it's 'Client Requested.' If
+    not, not." Neither `create_story` nor `update_story` accepts a category
+    field any more (it used to be Client-requested/Enabler, sent or
+    defaulted); both doors compute it from `ticketId` instead — linked reads
+    Client-requested, unlinked reads Enabler, re-derived on every
+    `update_story` from whichever `ticketId` that edit resolves to. The old
+    "an Enabler story must also name `ticketId`, `ticket_required` otherwise"
+    refusal is gone with it — there is nothing left to refuse once the
+    category is read off the ticket rather than chosen against it.
+    `contributesToGoal` (true/false, default false) is still a real, accepted
+    field on both doors — PARKED in the app's own UI only (Aurora's ruling,
+    same day, verbatim: "Remove the goal from the stories. I don't even know
+    what that is, but remove it."): no screen offers a way to set or see it
+    any more, but a caller here can still write and read it, and the column
+    survives untouched. `update_story` also carries `buildNotes`
     (team migration 0112, Aurora's 21 Sep 2026 ruling: "call it build notes")
     — what was built and how, the same long-text shape as `detail`, written
     through the story detail page's own slide-in sheet once the story
@@ -591,9 +605,14 @@ Today it covers:
     today, stories carry no points field yet, so the series counts stories.
   - to-dos and tasks, `raise_todo`, `complete_todo`, `cancel_todo`
     (`todos:create` / `:update` / `:delete` — what we need FROM a client), and
-    `create_task`, `update_task`, `set_task_done` (`work:create` / `work:update` —
-    what we owe ourselves; `update_task` is also how a task is RE-PRIORITISED, since
-    the 1-to-4 score is derived from its `important` and `urgent` ticks).
+    `create_task`, `update_task`, `set_task_done`, `delete_task` (`work:create` /
+    `work:update` / `work:update` / `work:update` — what we owe ourselves;
+    `update_task` is also how a task is RE-PRIORITISED, since the 1-to-4 score is
+    derived from its `important` and `urgent` ticks). `delete_task` (team migration
+    0113, Aurora's 21 Sep 2026 ruling) is a SOFT delete, the same shape as
+    `delete_help_reply` one module along: the row and its activity history survive,
+    it just stops appearing on every one of the six views and their counts. There
+    is no tool to bring one back.
   - time, `start_timer`, `stop_timer`, `log_time`, `resolve_runaway_timer`,
     `set_timer_auto_stop`, all on `work:create`. Logging your OWN hours is a create,
     not an edit: a person who may do the work may say how long it took them.

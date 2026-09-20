@@ -629,7 +629,8 @@ export function RecordCalendar({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-medium">{monthLabel(month, lang)}</div>
         <div className="flex items-center gap-1">
-          <Button variant="secondary" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
+          {/* R98 — a toolbar button is the kit's default height, never `sm`. */}
+          <Button variant="secondary" onClick={() => setMonth(startOfMonth(new Date()))}>
             {t("Today")}
           </Button>
           <Button

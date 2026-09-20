@@ -31,7 +31,16 @@ import {
   todoOrThrow,
   TODO_SORTS,
 } from "../lib/todos"
-import { countTasks, createTask, getTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
+import {
+  countTasks,
+  createTask,
+  deleteTask,
+  getTask,
+  listTasks,
+  setTaskDone,
+  updateTask,
+  type TaskFilter,
+} from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
 import { TASK_VIEWS, TITLE_MAX_CHARS, TODO_VIEWS, type TaskViewName, type TodoViewName } from "@shared/types"
 import type { Env } from "../env"
@@ -779,5 +788,25 @@ export async function postTaskDone(request: Request, env: Env): Promise<Response
   if (moved) await publishChange(env, guard.teamId, "tasks", id, "edit", accountId ?? undefined)
   // withFacets: "tasks.done" (web/lib/use-screen-actions.ts) primes the open/
   // all total caches off this reply's openTotal/allTotal.
+  return taskMutationReply(cfg, guard, id, true)
+}
+
+/** POST /api/content/tasks/delete — take a task off our own list (work:update,
+ * the same right `postUpdateTask`/`postTaskDone` already gate on — deleting a
+ * task is a correction to our own admin, not a bigger act than editing it).
+ *
+ * NOTHING IS EVER REMOVED (CONVENTIONS.md): `deleteTask` moves
+ * `deactivated_at`, never a row — the same shape `postHelpReplyDelete` takes
+ * one table along. `taskMutationReply` re-reads the row through `getTask`,
+ * which now refuses a deactivated one, so the reply answers with an empty
+ * `tasks` array and the facet totals `countTasks` recomputes with the row
+ * already excluded — the same "the list agrees with the badge" property every
+ * other task door already carries (R16). */
+export async function postDeleteTask(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "work", "update")
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Task", TEXT_LIMITS.short)
+  const { accountId } = await deleteTask(cfg, guard, actor, id)
+  await publishChange(env, guard.teamId, "tasks", id, "remove", accountId ?? undefined)
   return taskMutationReply(cfg, guard, id, true)
 }

@@ -56,6 +56,7 @@ import { appStageDotTone } from "@shared/app-stages"
 // today. See `ticketStatusCell` below.
 import { helpStatusDotTone } from "@shared/status-tones"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { selectableFieldWords } from "@shared/selectable-where"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import type {
   Account,
@@ -1042,9 +1043,19 @@ export type ChoiceGroupHome = {
 
 /** The system-wide Choices tab (Settings), a table over every choice value
  * this reader's own visible modules own — see `settings-choices-panel.tsx`
- * for how the rows are gathered and gated. Three columns, the client's own
- * words: *"the value itself · module with the icon · status: active,
+ * for how the rows are gathered and gated. The client's own words, 14 Sep
+ * 2026: *"the value itself · module with the icon · status: active,
  * inactive, and are protected."*
+ *
+ * THE MODULE CELL BECAME "WHERE", K59, 21 Sep 2026 — Aurora, verbatim: "in
+ * settibsg sticket: typ (bug, etc) but ineed to see that 'type'." The MODULE
+ * half is unchanged (`moduleTitle`, below, still `t(home.title)`); beside it
+ * now rides the FIELD a group's own values fill in (`shared/selectable-
+ * where.ts`'s `selectableFieldWords`, derived off `shared/selectable-
+ * homes.ts` rather than typed twice) — "Tickets: Type", not "Tickets" alone.
+ * See "THE MODULE, WITH THE MODULE'S ICON" below for the cell this folds
+ * into, and `settings-choices-panel.tsx`'s own header for why it is a fold
+ * (R82's six-column ceiling) rather than a seventh column.
  *
  * ── THE VALUE: A COLOUR, AN ICON, OR NOTHING — NEVER THE MARK ───────────────
  *
@@ -1190,6 +1201,20 @@ function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>)
   return null
 }
 
+/** ONE GROUP'S FIELD WORD, FOR A CELL THAT MUST NEVER THROW — `selectable
+ * FieldWords` (shared/selectable-where.ts) refuses a group `shared/selectable-
+ * homes.ts` does not name at all, which is right for a build-time completeness
+ * proof (`workers/tenancy/test/selectable-where.test.ts`) and wrong for a
+ * render: a stray or historical group should draw a Where cell with no field
+ * half, never take the whole table down with it. */
+function choiceFieldWord(type: string): string | null {
+  try {
+    return selectableFieldWords(type)?.[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 export function shapeChoicesTable(
   values: SelectableValue[],
   groupHome: Map<string, ChoiceGroupHome>,
@@ -1201,6 +1226,21 @@ export function shapeChoicesTable(
       const home = groupHome.get(v.type)
       const segment = home?.segment ?? ""
       const moduleTitle = home ? t(home.title) : v.type
+      // ── WHERE — K59, documents/UI-RULEBOOK.md, Aurora, 21 Sep 2026 ─────────
+      // "everywhere where i edit choices we need to add a c[o]lumn as for
+      // where is th[a]t choice[]! for exmaple in settibsg s[t]icket: typ[e]
+      // (bug, etc) but i[n]eed to see that 'type'." The record half is the
+      // settings page's own title (`moduleTitle`, above — the one this cell
+      // used to draw ALONE, in the retired "Module" column); the field half
+      // is `shared/selectable-where.ts`'s own answer, derived from `shared/
+      // selectable-homes.ts` rather than typed here. FOLDS the old Module
+      // column into this one (R82's six-column ceiling — see settings-
+      // choices-panel.tsx's own header for the accounting) rather than
+      // adding a seventh: the Module FACET stays, reading `moduleSegment`
+      // below unchanged, but the Module CELL does not survive as its own
+      // column now that this one says strictly more.
+      const fieldWord = choiceFieldWord(v.type)
+      const whereText = fieldWord ? `${moduleTitle}: ${t(fieldWord)}` : moduleTitle
       const colour = home?.colour?.(v.value)
       // NEVER BOTH — see `ChoiceGroupHome`'s own header. Colour is the one
       // that is actually wired today, so it wins the slot on the chance a
@@ -1226,25 +1266,55 @@ export function shapeChoicesTable(
       // a database that could still disagree: a protected row is never
       // inactive, so there is no case this ordering hides.
       const statusWord = v.isDefault ? t("Protected") : v.active ? t("Active") : t("Inactive")
+      // ── ADDED ON / ADDED BY — K59, the same ruling ─────────────────────────
+      // "in choices also show columns added on and added by". Two facts, one
+      // cell (settings-choices-panel.tsx's own header has the R82 accounting
+      // for why this is folded rather than two separate columns), the name
+      // leading and the date trailing beneath it in the muted tone every
+      // secondary line in this app already reads in — the same stack shape
+      // `record-chrome.tsx`'s own audit rows draw, one column instead of the
+      // footer's two. R54: a dropdown value is written only by staff (every
+      // write door on `selectable_data` refuses a portal caller, R21), so
+      // `staffNameFromSnapshot` is unconditional here the way it is for every
+      // OTHER staff-only record's created-by name.
+      const addedByName = staffNameFromSnapshot(v.createdByName) || v.createdByName || ""
+      const addedOn = v.createdAt ? formatDate(v.createdAt, lang) : ""
       return {
         id: v.id,
         value: valueCell,
         valueText: v.value,
-        module: (
+        where: (
           <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
             <Icon
               name={CONCEPT_ICON[segment as keyof typeof CONCEPT_ICON] ?? CONCEPT_ICON.settings}
               className="text-muted-foreground size-4 shrink-0"
             />
-            <span className="min-w-0 truncate">{moduleTitle}</span>
+            <span className="min-w-0 truncate">{whereText}</span>
           </span>
         ),
-        moduleText: moduleTitle,
-        // THE FACET'S OWN PLAIN FIELD — a filter reads `row[field]` for an
-        // exact match (`evaluateRules`, shared/web/screen-engine/config.ts),
-        // so it cannot share a key with a node column any more than search
-        // or sort can.
+        whereText,
+        // THE MODULE FACET'S OWN PLAIN FIELD, UNCHANGED — a filter reads
+        // `row[field]` for an exact match (`evaluateRules`, shared/web/
+        // screen-engine/config.ts), so it cannot share a key with a node
+        // column any more than search or sort can. The Module COLUMN folded
+        // into `where` above; the Module FACET still reads this.
         moduleSegment: segment,
+        // THE WHERE FACET'S OWN PLAIN FIELD — the field word alone ("Type",
+        // "Status", …), so a reader can narrow to every group that fills the
+        // same kind of field across every module at once.
+        whereField: fieldWord ?? "",
+        added: (
+          <span className="flex min-w-0 flex-col">
+            {addedByName && <span className="min-w-0 truncate">{addedByName}</span>}
+            {addedOn && <span className="text-muted-foreground text-xs">{addedOn}</span>}
+          </span>
+        ),
+        addedText: addedByName,
+        // THE SORT'S OWN RAW VALUE — the RAW ISO instant, never the formatted
+        // `addedOn` string above (`web/test/sorted-columns-declare-their-
+        // type.test.ts`'s own law: a sortable date column compares the fact,
+        // never the words shaped for a reader).
+        createdAtRaw: v.createdAt,
         // THE DETAILS COLUMN — see this function's own header, "THE DETAILS
         // COLUMN". `null` for every type with nothing beyond its word, which
         // `record-table.tsx` renders as a genuinely empty cell, not a dash.

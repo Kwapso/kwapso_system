@@ -9,13 +9,20 @@
 // update door, the Done head action disabled (with a reason) until build
 // notes are filled — her verbatim ruling, "canont be marked as don if thats
 // not filled in" — the Assigned to card drawn first with its inherited
-// line, the Metrics figures from a fixture, and the dark band last with no
-// nested scroll region on this page.
+// line, the Effort card's own merged metrics figures from a fixture, and
+// the dark band last with no nested scroll region on this page.
+//
+// B44 (Aurora's ruling, 21 Sep 2026): "Include the metrics inside the
+// effort card. On the effort card, remove the value entries and put the
+// number next to the effort title, just as you do, for example, for
+// stakeholders." There is no separate "Metrics" panel and no `WorkLogsPanel`
+// row list here any more — the Effort card's own title carries the total
+// hours as its count, and its body holds the three metric lines.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { HelpTicket, Sprint, Story, StoryAttachment, StoryMetrics } from "@shared/types"
+import type { HelpTicket, RunningTimer, Sprint, Story, StoryAttachment, StoryMetrics } from "@shared/types"
 
 function story(overrides: Partial<Story>): Story {
   return {
@@ -113,7 +120,9 @@ const api = vi.hoisted(() => ({
   story: null as unknown as Story,
   setStoryStatus: vi.fn(),
   updateStory: vi.fn(),
+  logTime: vi.fn(),
   metrics: null as unknown as StoryMetrics,
+  timers: [] as RunningTimer[],
 }))
 const perms = vi.hoisted(() => ({ can: vi.fn(() => true) }))
 
@@ -138,9 +147,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       storyMetrics: async () => api.metrics,
       sprints: async () => ({ sprints: [], total: 0 }),
       help: async () => ({ tickets: [], total: 0, nextCursor: null, hasMore: false }),
-      workLogs: async () => ({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false }),
-      workLogSummary: async () => ({ total: 0, totalSeconds: 0, people: [], kinds: [], weeks: [] }),
-      runningTimers: async () => ({ timers: [] }),
+      logTime: api.logTime,
+      runningTimers: async () => ({ timers: api.timers }),
     },
     tenancy: {
       ...actual.tenancy,
@@ -182,22 +190,35 @@ beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
   api.setStoryStatus.mockReset().mockResolvedValue({ stories: [] })
   api.updateStory.mockReset().mockResolvedValue({ stories: [] })
+  api.logTime.mockReset().mockResolvedValue({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false })
   api.metrics = NO_METRICS
+  api.timers = []
 })
+
+const RUNNING_ON_STORY: RunningTimer = {
+  id: "log-1",
+  targetTable: "stories",
+  targetId: "story-1",
+  targetLabel: "Add saved filters to the backlog board",
+  targetRef: "BERG-S0188",
+  startedAt: "2026-09-21T09:00:00.000Z",
+  elapsedSeconds: 600,
+  runaway: false,
+}
 
 const openStory = () =>
   render(<StoryDetailScreen teamId="team-1" storyId="story-1" basePath="/stories" />)
 
 describe("the story detail page — panel order", () => {
-  it("draws the left column Detail, Acceptance criteria, Build notes, and the right column Assigned to, Related tickets, Related stories, Phase and wave, Effort, Metrics, band last", async () => {
+  it("draws the left column Detail, Acceptance criteria, Build notes, and the right column Assigned to, Related tickets, Related stories, Phase and wave, Effort (with its metrics inside), band last", async () => {
     api.story = story({ status: "open" })
+    api.metrics = NO_METRICS
     const { container } = openStory()
     await screen.findByText("Add saved filters to the backlog board")
-    // The Effort panel's own emptiness is settled asynchronously
-    // (`WorkLogsPanel`'s own `onEmptyChange`, R88) — wait for its resting
-    // read before reading `textContent`, so this never races the panel's
-    // own late-arriving empty state under a loaded test run.
-    await screen.findByText("No time logged against this yet.")
+    // The Effort card's own three lines settle once `storyMetrics` resolves
+    // — wait for one of them before reading `textContent`, so this never
+    // races the metrics read under a loaded test run.
+    await screen.findByText("Cycle time")
 
     const text = container.textContent ?? ""
     const at = (needle: string) => {
@@ -213,10 +234,9 @@ describe("the story detail page — panel order", () => {
     const relatedTicketsAt = at("Related tickets")
     const relatedStoriesAt = at("Related stories")
     const phaseAndWaveAt = at("Phase and wave")
-    // The Effort panel is empty in this fixture (no work logs), so R88
-    // drops its own title row — its empty state's own words are the marker.
-    const effortAt = at("No time logged against this yet.")
-    const metricsAt = at("Metrics")
+    // No separate "Metrics" panel any more (B44) — the Effort card's own
+    // body is the marker, "Cycle time" being the first of its three lines.
+    const effortAt = at("Cycle time")
     const bandAt = at("Latest activity")
 
     expect(detailAt).toBeLessThan(acceptanceAt)
@@ -226,9 +246,8 @@ describe("the story detail page — panel order", () => {
     expect(relatedTicketsAt).toBeLessThan(relatedStoriesAt)
     expect(relatedStoriesAt).toBeLessThan(phaseAndWaveAt)
     expect(phaseAndWaveAt).toBeLessThan(effortAt)
-    expect(effortAt).toBeLessThan(metricsAt)
     // The dark band is the very last thing on the page.
-    expect(metricsAt).toBeLessThan(bandAt)
+    expect(effortAt).toBeLessThan(bandAt)
     expect(bandAt).toBe(text.lastIndexOf("Latest activity"))
   })
 
@@ -340,6 +359,49 @@ describe("Done is disabled until build notes are filled", () => {
   })
 })
 
+// R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything as
+// closed (task, story, ticket, whatever) if there's an active time log
+// running." The door's own copy is `refuseWhileTimerRuns`
+// (workers/content/src/lib/work-logs.ts), wired into `setStoryStatus`; this
+// button only mirrors the same fact back, the identical split
+// `doneReason`'s build-notes half already takes.
+describe("Done is disabled while a timer on the story is still running (R99)", () => {
+  it("the Done button is disabled while a timer on this story runs", async () => {
+    api.story = story({ status: "in_review", buildNotes: "<p>What we built.</p>" })
+    api.timers = [RUNNING_ON_STORY]
+    openStory()
+    await screen.findByRole("button", { name: "Done" })
+    // The running-timers read lands a beat after the button first paints,
+    // and swaps the ENABLED button for the Tooltip-wrapped disabled one, a
+    // different element rather than a mutated prop, so this re-queries
+    // instead of polling a reference captured before the swap.
+    await waitFor(() => {
+      expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true)
+    })
+    const done = screen.getByRole("button", { name: "Done" }) as HTMLButtonElement
+    fireEvent.click(done)
+    expect(api.setStoryStatus).not.toHaveBeenCalled()
+  })
+
+  it("a timer running on a DIFFERENT record never disables this one's Done button", async () => {
+    api.story = story({ status: "in_review", buildNotes: "<p>What we built.</p>" })
+    api.timers = [{ ...RUNNING_ON_STORY, id: "log-2", targetTable: "help", targetId: "ticket-1" }]
+    openStory()
+    const done = (await screen.findByRole("button", { name: "Done" })) as HTMLButtonElement
+    expect(done.disabled).toBe(false)
+  })
+
+  it("the Done button is enabled once that timer is stopped (no running timers at all)", async () => {
+    api.story = story({ status: "in_review", buildNotes: "<p>What we built.</p>" })
+    api.timers = []
+    openStory()
+    const done = (await screen.findByRole("button", { name: "Done" })) as HTMLButtonElement
+    expect(done.disabled).toBe(false)
+    fireEvent.click(done)
+    await waitFor(() => expect(api.setStoryStatus).toHaveBeenCalledWith("story-1", "done", undefined))
+  })
+})
+
 describe("Assigned to", () => {
   it("is the first panel in the right column and shows the inherited line when the story has no assignee of its own", async () => {
     api.story = story({
@@ -357,23 +419,79 @@ describe("Assigned to", () => {
   })
 })
 
-describe("Metrics — figures from a fixture", () => {
-  it("reads 'Not started' and 'No time log' before any work is logged", async () => {
+describe("No translate on the story page (B43)", () => {
+  it("renders no Translate button anywhere — a story is always in English", async () => {
     api.story = story({})
-    api.metrics = NO_METRICS
     openStory()
-    await screen.findByText("Metrics")
-    expect(await screen.findByText("Not started")).toBeTruthy()
-    expect(await screen.findByText("No time log")).toBeTruthy()
+    await screen.findByText("Add saved filters to the backlog board")
+    expect(screen.queryByRole("button", { name: /Translate/ })).toBeNull()
+  })
+})
+
+describe("Category — derived, shown as a read-only fact (B43)", () => {
+  it("shows Client-requested when the story is linked to a ticket", async () => {
+    api.story = story({ category: "Client-requested", ticketId: "ticket-1" })
+    openStory()
+    await screen.findByText("Related tickets")
+    expect(await screen.findByText("Client-requested")).toBeTruthy()
+    // A fact, not a control — no button or combobox named "Category".
+    expect(screen.queryByRole("button", { name: "Category" })).toBeNull()
+    expect(screen.queryByRole("combobox", { name: "Category" })).toBeNull()
   })
 
-  it("renders the door's own cycle time, effort and flow efficiency", async () => {
+  it("shows Enabler when the story has no ticket", async () => {
+    api.story = story({ category: "Enabler", ticketId: null })
+    openStory()
+    await screen.findByText("Related tickets")
+    expect(await screen.findByText("Enabler")).toBeTruthy()
+  })
+})
+
+describe("Effort — the metrics are inside the card now (B44)", () => {
+  it("carries the total hours as a count beside the Effort title, the same register as Stakeholders", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
     openStory()
+    await screen.findByText("Cycle time")
+    // The title row itself: "Effort" then its own count, "6.5h" — the same
+    // `<h3>{title}{count}</h3>` shape `help-stakeholders.tsx`'s own
+    // "Stakeholders 4" register renders through (`TicketSidePanel`).
+    const heading = await screen.findByRole("heading", { name: /^Effort/ })
+    expect(heading.textContent).toBe("Effort6.5h")
+  })
+
+  it("reads 'Not started' and 'No time log' before any work is logged, with '0h' beside the title", async () => {
+    api.story = story({})
+    api.metrics = NO_METRICS
+    openStory()
+    await screen.findByText("Cycle time")
+    expect(await screen.findByText("Not started")).toBeTruthy()
+    expect(await screen.findByText("No time log")).toBeTruthy()
+    const heading = await screen.findByRole("heading", { name: /^Effort/ })
+    expect(heading.textContent).toBe("Effort0h")
+  })
+
+  it("renders the door's own cycle time, effort and flow efficiency, no per-log rows", async () => {
+    api.story = story({})
+    api.metrics = FIXTURE_METRICS
+    const { container } = openStory()
     // 183600s = 51h = 2d 3h; 23400s = 6.5h; 41%.
     expect(await screen.findByText("2d 3h")).toBeTruthy()
-    expect(await screen.findByText("6.5h")).toBeTruthy()
     expect(await screen.findByText("41%")).toBeTruthy()
+    // "6.5h" appears twice on purpose — the title's own count and the
+    // body's own "Effort" line, the same figure said two ways (B44).
+    expect(screen.getAllByText("6.5h").length).toBe(2)
+    // NO WORK-LOG ROW LIST any more — `WorkLogsPanel`'s own row shape
+    // (a name/date line followed by a duration) is gone from this page.
+    expect(container.querySelector('ul[class*="divide-y"]')).toBeNull()
+  })
+
+  it("the Log time door still opens and writes through the same door WorkLogsPanel used", async () => {
+    api.story = story({})
+    api.metrics = NO_METRICS
+    openStory()
+    fireEvent.click(await screen.findByRole("button", { name: "Log time" }))
+    const dialog = await screen.findByRole("dialog")
+    expect(dialog).toBeTruthy()
   })
 })

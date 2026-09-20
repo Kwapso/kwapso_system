@@ -21,6 +21,7 @@
 import type { PickerOption } from "@/components/records/record-picker"
 import { content, tenancy } from "@/lib/api"
 import { accountOption } from "@/lib/pickable"
+import { ticketFace } from "@shared/web/ticket-face"
 
 /** The cache prefix a picker's answers land under. TEAM-SCOPED, like every key
  * in the app: a picker that cached "the companies matching Berg" without saying
@@ -78,6 +79,14 @@ export async function searchTickets(
       // is the team's own and lives in a screen's cache, and a lib that fetched
       // it would make one picker cost two round trips.
       mark: opts.marks?.get(t.helpType ?? "") ?? null,
+      // THE TYPE'S OWN ICON AS THE FACE (Aurora's ruling, 21 Sep 2026: "on
+      // every choice component where I can choose a ticket, show me the
+      // type as the icon everywhere," kept visible once picked, "or the
+      // icon") — `ticketFace` (shared/web/ticket-face.tsx), the same map
+      // the tickets list itself draws through. Read straight off the door's
+      // own `helpType`, unlike `mark` above: an icon is a real component,
+      // not a word a caller has to look up in its own vocabulary map first.
+      icon: ticketFace(t).icon,
     }))
 }
 

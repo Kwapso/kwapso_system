@@ -26,7 +26,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Alarm, StopCircle, Clock, Play, Trash } from "@shared/ui/foundations/icons"
+import { Alarm, StopCircle, Clock, Timer, Trash } from "@shared/ui/foundations/icons"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
@@ -139,7 +139,7 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
           {mine.map((s) => (
             <li key={s.id}>
               <Button variant="secondary" size="sm" className="gap-1" onClick={() => start(s.id)}>
-                <Play className="size-3.5" />
+                <Timer className="size-3.5" />
                 {s.title.length > 34 ? `${s.title.slice(0, 34)}…` : s.title}
               </Button>
             </li>

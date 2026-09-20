@@ -199,61 +199,80 @@ describe("a story is what WE do", () => {
 })
 
 // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026, team migration 0094;
-// "Internal" renamed "Enabler" 20 Sep 2026, team migration 0106): Client-
-// requested / Enabler, and the story TYPE list closed to Data / Chore / Bug /
-// Feature / Change / Spike the same day ("Tech" renamed "Chore" and "Spike"
-// added 20 Sep 2026, migration 0106), Fix deactivated rather than deleted.
-describe("category, and a closed story type", () => {
-  it("defaults category to Client-requested when none is sent", async () => {
-    const id = await addStory({ title: "Say nothing about where this came from" })
+// "Internal" renamed "Enabler" 20 Sep 2026, team migration 0106; DERIVED, no
+// longer chosen, 21 Sep 2026 (B43): Client-requested / Enabler, and the story
+// TYPE list closed to Data / Chore / Bug / Feature / Change / Spike the same
+// day ("Tech" renamed "Chore" and "Spike" added 20 Sep 2026, migration 0106),
+// Fix deactivated rather than deleted.
+describe("category is derived from the ticket, never chosen (Aurora's ruling, 21 Sep 2026, B43)", () => {
+  it("derives Client-requested when a ticket is linked on create", async () => {
+    const ticket = await seedTicket()
+    const id = await addStory({ title: "Answers a request", ticketId: ticket })
     expect(storyRow(id).category).toBe("Client-requested")
   })
 
-  it("keeps the category actually sent, with the ticket an Enabler now requires", async () => {
-    const ticket = await seedTicket()
-    const id = await addStory({ title: "Our own upkeep", category: "Enabler", ticketId: ticket })
+  it("derives Enabler when no ticket is linked on create", async () => {
+    const id = await addStory({ title: "Our own upkeep, no ticket" })
     expect(storyRow(id).category).toBe("Enabler")
   })
 
-  it("refuses an Enabler story with no ticket behind it (20 Sep 2026 ruling)", async () => {
-    const res = await call(IDS.staffUser, "POST /api/content/stories", {
-      title: "Enabler with nothing to point at",
-      storyType: "Chore",
+  it("ignores a category the caller sends — the door derives it regardless", async () => {
+    const ticket = await seedTicket()
+    const withTicket = await addStory({
+      title: "Sent Enabler, has a ticket",
       category: "Enabler",
-      changesNoStep: true,
+      ticketId: ticket,
     })
-    expect(res.status).toBe(400)
-    expect(
-      db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("Enabler with nothing to point at")
-    ).toEqual({ n: 0 })
+    expect(storyRow(withTicket).category).toBe("Client-requested")
+    const withoutTicket = await addStory({ title: "Sent Client-requested, no ticket", category: "Client-requested" })
+    expect(storyRow(withoutTicket).category).toBe("Enabler")
   })
 
-  it("update also refuses an Enabler with no ticket, and keeps the old value", async () => {
+  it("re-derives to Client-requested when a ticket is attached on update", async () => {
     const ticket = await seedTicket()
-    const id = await addStory({ title: "Edit into an Enabler", category: "Client-requested", ticketId: ticket })
-    // Re-pointing the SAME story at no ticket while switching it to Enabler —
-    // the rule reads the resolved fields on the write, not just a create.
+    const id = await addStory({ title: "Starts with no ticket" })
+    expect(storyRow(id).category).toBe("Enabler")
     const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
       id,
-      title: "Edit into an Enabler",
-      storyType: "Chore",
+      title: "Starts with no ticket",
+      storyType: "Feature",
       changesNoStep: true,
-      category: "Enabler",
-      // ticketId omitted
+      ticketId: ticket,
     })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
     expect(storyRow(id).category).toBe("Client-requested")
   })
 
-  it("refuses a category that names no active vocabulary row", async () => {
-    const res = await call(IDS.staffUser, "POST /api/content/stories", {
-      title: "A category nobody has ever heard of",
+  it("re-derives to Enabler when the ticket is dropped on update", async () => {
+    const ticket = await seedTicket()
+    const id = await addStory({ title: "Starts linked to a ticket", ticketId: ticket })
+    expect(storyRow(id).category).toBe("Client-requested")
+    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
+      id,
+      title: "Starts linked to a ticket",
       storyType: "Feature",
-      category: "Moonshot",
       changesNoStep: true,
+      // ticketId omitted — this door replaces every field it reads, so
+      // leaving it off clears the link, the same shape every other field
+      // this door replaces whole already takes.
     })
-    expect(res.status).toBe(400)
-    expect(db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("A category nobody has ever heard of")).toEqual({ n: 0 })
+    expect(res.status).toBe(200)
+    expect(storyRow(id).category).toBe("Enabler")
+  })
+
+  it("no longer refuses an Enabler with no ticket — there is nothing left to refuse", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/stories", {
+      title: "Used to be refused, now just derived",
+      storyType: "Chore",
+      changesNoStep: true,
+      // no ticketId — this used to be the refused shape ("Enabler" + no
+      // ticket); now it is simply an ordinary Enabler story.
+    })
+    expect(res.status).toBe(200)
+    const row = db()
+      .prepare(`SELECT category FROM stories WHERE title = ?`)
+      .get("Used to be refused, now just derived") as { category: string } | undefined
+    expect(row?.category).toBe("Enabler")
   })
 
   it("refuses `Fix` — deactivated by team migration 0094, no longer creatable", async () => {
@@ -285,43 +304,14 @@ describe("category, and a closed story type", () => {
     })
   })
 
-  it("update requires category — the door replaces every field it reads, never leaves one untouched", async () => {
-    const id = await addStory({ title: "Edit me" })
+  it("update succeeds with no category field at all — there is nothing left to send", async () => {
+    const id = await addStory({ title: "Edit me, no category anywhere" })
     const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
       id,
-      title: "Edit me",
+      title: "Edit me, no category anywhere",
       storyType: "Feature",
       changesNoStep: true,
-      // category deliberately omitted
-    })
-    expect(res.status).toBe(400)
-    // Untouched: the create door's own default survives the refused edit.
-    expect(storyRow(id).category).toBe("Client-requested")
-  })
-
-  it("update refuses a category that names no active vocabulary row, and keeps the old value", async () => {
-    const id = await addStory({ title: "Edit me too", category: "Client-requested" })
-    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
-      id,
-      title: "Edit me too",
-      storyType: "Feature",
-      changesNoStep: true,
-      category: "Moonshot",
-    })
-    expect(res.status).toBe(400)
-    expect(storyRow(id).category).toBe("Client-requested")
-  })
-
-  it("update carries a real category change through, with the ticket Enabler now requires", async () => {
-    const ticket = await seedTicket()
-    const id = await addStory({ title: "Turns out this was our own idea", category: "Client-requested" })
-    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
-      id,
-      title: "Turns out this was our own idea",
-      storyType: "Feature",
-      changesNoStep: true,
-      category: "Enabler",
-      ticketId: ticket,
+      // category deliberately absent — the door never reads one any more.
     })
     expect(res.status).toBe(200)
     expect(storyRow(id).category).toBe("Enabler")

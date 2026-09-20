@@ -737,7 +737,7 @@ export const RULES_REGISTRY: Rule[] = [
     id: "R83",
     dimension: "ui",
     law: "A TAB STRIP AND WHAT IT LABELS SHARE ONE GAPLESS COLUMN — THE STRIP PAYS THE WHOLE DISTANCE, A CALLER NEVER PAYS IT TWICE. The client's ruling, 16 Sep 2026: \"reduce the spacing above ALL TOOLBARS. i want it exactly as its currently below, make it like that above.\" `<ToolbarRow>` already pays its own trailing gap to what sits below it, once, as its own baked-in `mb-[var(--toolbar-content-gap)]` (R49) — that is the BELOW number, `--toolbar-content-gap`, `--space-5`. The ABOVE number is the identical value, `--tab-content-gap` (`web/app/globals.css`'s own comment: \"one value, not a new one … the same '--space-5' both already spend\"), paid by the tab strip that sits above the toolbar as ITS OWN trailing `pb-[var(--tab-content-gap)]` (`STICKY_FOLDER_TABS`, `shared/web/screen-engine/tabs-view.tsx`) — so the two numbers were already equal in the token, and every screen but one spent each exactly once: `paged-find.tsx`, `tickets-collection.tsx`, `kwapso-screen.tsx`, `settings-screen.tsx` (twice), `module-settings-screen.tsx` and `screen-bits.tsx`'s own `SectionWithCreate` all wrap a `renderFolderTabs(…)` call and the card/panel it labels in a column carrying NO `gap-*` of its own — `paged-find.tsx`'s own comment states the rule in as many words: \"this column has nothing to say about it either way and must not grow a `gap-*` of its own — that would be a second opinion about one number.\" `waves-screen.tsx` was the one call site that disagreed: its `renderFolderTabs(…)` call and the `<CollectionCard>` beneath it sat directly inside the screen's own OUTER `flex flex-col gap-6` column, alongside the page heading — a PER-SCREEN WRAPPER spending a second, unrelated 24px on top of the strip's own 20px, above the toolbar and nowhere else, which is exactly why the ABOVE gap measured larger than the BELOW one despite the token being identical. Fixed by giving the strip and its card their own inner `flex w-full flex-col` (no `gap-*`), the same shape the other six call sites already draw, with the heading staying in the outer `gap-6` where a real, single gap belongs. A STATIC CENSUS, off the disk: every `renderFolderTabs(` call whose immediate JSX parent element (fragments walked through, the same transparency R49's own census gives them) carries a `gap-*` or `space-y-*` utility in its `className` is a caller paying the strip's own number a second time, unless the file is named in `TOOLBAR_LEAD_GAP_EXEMPT` with the real reason.",
-    why: "The two tokens (`--tab-content-gap`, `--toolbar-content-gap`) were never the bug — both read `var(--space-5)` since R49 was written, and globals.css says so in its own header (\"one value, not a new one\"). The bug was a wrapper spending a SECOND number on top of the first, the identical shape R49 itself was written to stop (\"a call site that also wraps this row in a gapped column is paying the same gap twice\") — just one element higher in the tree, above the strip rather than below the row. `waves-screen.tsx`'s own comment named the reason it diverged: \"Waves is bespoke throughout, so this file calls the same exported helper directly rather than adopting the whole `SectionWithCreate` engine\" — reaching for the shared HELPER (`renderFolderTabs`) without also reaching for the shared WRAPPER SHAPE around it is exactly how one bespoke screen re-grew a gap six others had already agreed to stop paying. Checked as a census rather than left to the next screen's own care, because `SectionWithCreate`'s own comment already predicted the failure mode by name three lines above the code it describes: \"or the same number gets two owners again.\" AMENDED THE SAME DAY, 16 Sep 2026, MEASURED ON STAGING: \"every screen but one spent each exactly once\" was true of the CENSUS above (the wrapping `gap-*`/`space-y-*` check) and false of the SCREEN — that census only ever asked about a column wrapping `renderFolderTabs(…)`, and never asked what `<CollectionCard>`'s own `CardContent` spends after the strip's `pb-[var(--tab-content-gap)]`. Tasks (1600px) measured 52px above its toolbar against 20px below; Settings › Team › Members and Contacts (1280px) measured 44px above against 20px below — the card's own leading `p-4`/`lg:p-[var(--space-7)]` inset paying a second, unrelated 16-to-32px on top of the strip's correct 20, on every screen the wrapper census called clean. Fixed in `web/app/globals.css`: `.pinned-strip + [data-slot=\"card\"]` zeroes both the card's real `padding-top` on its `[data-slot=\"card-content\"]` and the R63 `--pinned-lead` custom property that reproduces it while the toolbar is stuck — the second half is load-bearing, because leaving `--pinned-lead` at the old 16/32 ladder while the real padding dropped to zero would pull a pinned toolbar UP PAST the card's own top edge, into the strip. Proved by `web/test/toolbar-lead-gap-card.test.tsx`: a real render of `renderFolderTabs` + `<CollectionCard>` shows the exact DOM adjacency (`.pinned-strip` immediately followed by `[data-slot=\"card\"]`, whose `[data-slot=\"card-content\"]` starts with `[data-slot=\"toolbar-row-pin\"]`) the new CSS rule depends on, and a census over `web/app/globals.css` proves the rule is there. AMENDED A SECOND TIME, 16 Sep 2026 EVENING, BY THE CLIENT'S OWN REACTION TO THE FLUSH-ZERO FIX: \"I'm not happy about this. It doesn't look good. Can we do an in-between with what it was and what it is now? Also, make sure it's the same on every page. I don't understand how task was 52 and setting and contacts were 44. It should be the fucking same everywhere.\" Flush-zero (above = below = 20px) proved the double-payment was gone, and was never itself the target — the LAW now is: above a toolbar = `--toolbar-lead-gap` (32px) on every screen; below = 20px (`--toolbar-content-gap`, untouched). One new token, `--toolbar-lead-gap: var(--space-7)` (`web/app/globals.css`, defined beside `--tab-content-gap`/`--toolbar-content-gap`) — 32px, the in-between she asked for, and the scale's OWN exact 32px step (`shared/ui/foundations/tokens/tokens.css`: \"p-8 is 32px, which is --space-7 here\"; `--space-6` is 24px, a card inset, not 32 — the number this token first reached for by name was the wrong one). The strip above a toolbar still pays `--tab-content-gap` (20px) as its own trailing padding; the card pays only what `--toolbar-lead-gap` has left, `calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` (12px), on both `[data-slot=\"card-content\"]`'s real `padding-top` and the R63 `--pinned-lead` property beside it — the same two-halves-together reasoning as the first amendment, now paying a remainder rather than zero. `web/test/toolbar-lead-gap-card.test.tsx` proves the token, the exact `calc()` on both properties, and — off the disk, never a hand-typed list — every `renderFolderTabs(` call site the rule actually reaches: `screen-bits.tsx`'s `SectionWithCreate`, `paged-find.tsx`'s `PagedFind` (through its own `wrap` prop, filled by real callers), `tickets-collection.tsx`, `waves-screen.tsx`, and `settings-screen.tsx`'s OUTER strip (whose Modules panel is a bare kit `Card`) — and confirms `kwapso-screen.tsx`, `module-settings-screen.tsx`, and `settings-screen.tsx`'s OWN NESTED Team/Roles strip correctly draw no card at all, so the rule reaches nothing there by design, not by omission. AMENDED A THIRD TIME, 21 SEP 2026 (ROUND 30), RULING 7 CARRIED THROUGH TO FOUR MORE SITES A PERSON HAD TO GO FIND BY EYE. Aurora, verbatim, reviewing the whole app again: \"review sping aboe toolbar everyhwere. f.e. in app / phases its completey off.\" A staging census (`toolbar-census.md`) found four outliers Ruling 7's own fix never reached, because each drew its toolbar through a shape none of this law's selectors were written to key on. (1) App detail's Phases tab (`SprintsPanel`, `web/components/work/work-panels.tsx`) draws the vendored kit's OWN `<CollectionFrame>` (`useKitPanel`, `shared/web/screen-engine/collection-frame.tsx`) rather than this app's `<ToolbarRow>`. Its toolbar carries `data-slot=\"collection-frame-toolbar\"`, a slot every rule above is blind to, so it rendered the kit panel's own untouched `p-6 lg:p-[var(--space-7)]` (24 to 32px) instead of this law's 10px. Fixed in `web/app/globals.css`, without touching the kit or `work-panels.tsx`: `[data-slot=\"collection-frame\"] [data-slot=\"collection-frame-panel\"]` now sets both `--pinned-lead` and the real `padding-top` to `--toolbar-lead-gap`, the identical pair every rule above already keeps in step, reached on the PANEL directly because that toolbar has no `[data-slot=\"card\"]` ancestor for the existing selectors to key on. (2) App detail's Stories and Tickets tabs measured 0px above, not this law's 10px, but the CODE was already correct (`data-tab-pane` unconditional on `renderPanel`'s `TabsContent`, `shared/web/screen-engine/tabs-view.tsx`, and the nested-tab-pane rule above already keys on it): the census had been read against a staging deploy behind the commit its own diagnosis was measured at, the standing trap `deploy-means-verify-the-bundle` names. A green check and a green deploy both proved nothing about which bundle was actually served. No code changed for this one; `web/test/toolbar-lead-gap-card.test.tsx`'s own R83-extended describe block already proves the DOM shape and the CSS rule live on disk. (3) Account detail's Contacts panel (`ContactsPanel`, `account-detail-panels.tsx`, hosted from `account-detail.tsx`'s Overview tab) never used `CollectionCard` at all, a hand-rolled `rounded-[var(--radius)] bg-surface-panel p-4` lookalike with no `data-slot=\"card\"`, so nothing here could ever have reached it, and `CollectionCard`'s own DEFAULT (`--pinned-lead:var(--space-4) lg:var(--space-7)`, the pre-Ruling-7 ladder, spent only where no ancestor rule overrides it) was stale besides. Fixed two ways, together: `account-detail.tsx` now hosts `<ContactsPanel>` inside the real `<CollectionCard>` (`screen-bits.tsx`), and `CollectionCard`'s own default is retargeted from the old ladder to `var(--toolbar-lead-gap)`, flat, no `lg:` step, matching Ruling 7's \"the 10pc above and below\" being one number at every width, with `CardContent`'s own real `padding-top` now reading the SAME custom property (`pt-[var(--pinned-lead)]`) instead of a hand-typed `p-4`, so the two can never drift for a fifth flow shape the way they did for this one. (4) Work logs (`web/components/work/time-panel.tsx`, `time-screen.tsx` itself draws no toolbar; `ls` confirmed the toolbar lives in the panel it hosts) measured 24px above: its `<PagedFind>` takes no `wrap`, so its toolbar pins with no card to publish `--pinned-lead` at all, and the 24px was the section's own ordinary `gap-6` between the Hours summary box and the toolbar below it, ordinary inter-panel spacing standing in for the law's lead by coincidence. Fixed by changing that one gap to `gap-[var(--toolbar-lead-gap)]`, the section's only other child being the toolbar itself, so nothing else about the panel's spacing moves. THE LAW NOW MEASURES ITSELF: `web/test/toolbar-lead-gap-card.test.tsx`'s R83 self-check describe block derives, off the disk, every `data-slot` an element wearing `PINNED_TOOLBAR` carries (asserting the app draws a pinned toolbar through exactly one name, `toolbar-row-pin`, never a second nobody wrote a rule for), reads `PINNED_TOOLBAR_IN_KIT_PANEL`'s own fixed target off `shared/web/pinned-chrome.ts` rather than typing it a second time, and proves `globals.css` still names it. Proved red then green live: the new `collection-frame-panel` selector was broken by hand (renamed to a slot nothing draws), the self-check failed exactly as designed, and `web/app/globals.css` was restored from a `cp` copy taken before the edit, never `git checkout --`, which would have taken this whole round's fix with it.",
+    why: "The two tokens (`--tab-content-gap`, `--toolbar-content-gap`) were never the bug — both read `var(--space-5)` since R49 was written, and globals.css says so in its own header (\"one value, not a new one\"). The bug was a wrapper spending a SECOND number on top of the first, the identical shape R49 itself was written to stop (\"a call site that also wraps this row in a gapped column is paying the same gap twice\") — just one element higher in the tree, above the strip rather than below the row. `waves-screen.tsx`'s own comment named the reason it diverged: \"Waves is bespoke throughout, so this file calls the same exported helper directly rather than adopting the whole `SectionWithCreate` engine\" — reaching for the shared HELPER (`renderFolderTabs`) without also reaching for the shared WRAPPER SHAPE around it is exactly how one bespoke screen re-grew a gap six others had already agreed to stop paying. Checked as a census rather than left to the next screen's own care, because `SectionWithCreate`'s own comment already predicted the failure mode by name three lines above the code it describes: \"or the same number gets two owners again.\" AMENDED THE SAME DAY, 16 Sep 2026, MEASURED ON STAGING: \"every screen but one spent each exactly once\" was true of the CENSUS above (the wrapping `gap-*`/`space-y-*` check) and false of the SCREEN — that census only ever asked about a column wrapping `renderFolderTabs(…)`, and never asked what `<CollectionCard>`'s own `CardContent` spends after the strip's `pb-[var(--tab-content-gap)]`. Tasks (1600px) measured 52px above its toolbar against 20px below; Settings › Team › Members and Contacts (1280px) measured 44px above against 20px below — the card's own leading `p-4`/`lg:p-[var(--space-7)]` inset paying a second, unrelated 16-to-32px on top of the strip's correct 20, on every screen the wrapper census called clean. Fixed in `web/app/globals.css`: `.pinned-strip + [data-slot=\"card\"]` zeroes both the card's real `padding-top` on its `[data-slot=\"card-content\"]` and the R63 `--pinned-lead` custom property that reproduces it while the toolbar is stuck — the second half is load-bearing, because leaving `--pinned-lead` at the old 16/32 ladder while the real padding dropped to zero would pull a pinned toolbar UP PAST the card's own top edge, into the strip. Proved by `web/test/toolbar-lead-gap-card.test.tsx`: a real render of `renderFolderTabs` + `<CollectionCard>` shows the exact DOM adjacency (`.pinned-strip` immediately followed by `[data-slot=\"card\"]`, whose `[data-slot=\"card-content\"]` starts with `[data-slot=\"toolbar-row-pin\"]`) the new CSS rule depends on, and a census over `web/app/globals.css` proves the rule is there. AMENDED A SECOND TIME, 16 Sep 2026 EVENING, BY THE CLIENT'S OWN REACTION TO THE FLUSH-ZERO FIX: \"I'm not happy about this. It doesn't look good. Can we do an in-between with what it was and what it is now? Also, make sure it's the same on every page. I don't understand how task was 52 and setting and contacts were 44. It should be the fucking same everywhere.\" Flush-zero (above = below = 20px) proved the double-payment was gone, and was never itself the target — the LAW now is: above a toolbar = `--toolbar-lead-gap` (32px) on every screen; below = 20px (`--toolbar-content-gap`, untouched). One new token, `--toolbar-lead-gap: var(--space-7)` (`web/app/globals.css`, defined beside `--tab-content-gap`/`--toolbar-content-gap`) — 32px, the in-between she asked for, and the scale's OWN exact 32px step (`shared/ui/foundations/tokens/tokens.css`: \"p-8 is 32px, which is --space-7 here\"; `--space-6` is 24px, a card inset, not 32 — the number this token first reached for by name was the wrong one). The strip above a toolbar still pays `--tab-content-gap` (20px) as its own trailing padding; the card pays only what `--toolbar-lead-gap` has left, `calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` (12px), on both `[data-slot=\"card-content\"]`'s real `padding-top` and the R63 `--pinned-lead` property beside it — the same two-halves-together reasoning as the first amendment, now paying a remainder rather than zero. `web/test/toolbar-lead-gap-card.test.tsx` proves the token, the exact `calc()` on both properties, and — off the disk, never a hand-typed list — every `renderFolderTabs(` call site the rule actually reaches: `screen-bits.tsx`'s `SectionWithCreate`, `paged-find.tsx`'s `PagedFind` (through its own `wrap` prop, filled by real callers), `tickets-collection.tsx`, `waves-screen.tsx`, and `settings-screen.tsx`'s OUTER strip (whose Modules panel is a bare kit `Card`) — and confirms `kwapso-screen.tsx`, `module-settings-screen.tsx`, and `settings-screen.tsx`'s OWN NESTED Team/Roles strip correctly draw no card at all, so the rule reaches nothing there by design, not by omission. AMENDED A THIRD TIME, 21 SEP 2026 (ROUND 30), RULING 7 CARRIED THROUGH TO FOUR MORE SITES A PERSON HAD TO GO FIND BY EYE. Aurora, verbatim, reviewing the whole app again: \"review sping aboe toolbar everyhwere. f.e. in app / phases its completey off.\" A staging census (`toolbar-census.md`) found four outliers Ruling 7's own fix never reached, because each drew its toolbar through a shape none of this law's selectors were written to key on. (1) App detail's Phases tab (`SprintsPanel`, `web/components/work/work-panels.tsx`) draws the vendored kit's OWN `<CollectionFrame>` (`useKitPanel`, `shared/web/screen-engine/collection-frame.tsx`) rather than this app's `<ToolbarRow>`. Its toolbar carries `data-slot=\"collection-frame-toolbar\"`, a slot every rule above is blind to, so it rendered the kit panel's own untouched `p-6 lg:p-[var(--space-7)]` (24 to 32px) instead of this law's 10px. Fixed in `web/app/globals.css`, without touching the kit or `work-panels.tsx`: `[data-slot=\"collection-frame\"] [data-slot=\"collection-frame-panel\"]` now sets both `--pinned-lead` and the real `padding-top` to `--toolbar-lead-gap`, the identical pair every rule above already keeps in step, reached on the PANEL directly because that toolbar has no `[data-slot=\"card\"]` ancestor for the existing selectors to key on. (2) App detail's Stories and Tickets tabs measured 0px above, not this law's 10px, but the CODE was already correct (`data-tab-pane` unconditional on `renderPanel`'s `TabsContent`, `shared/web/screen-engine/tabs-view.tsx`, and the nested-tab-pane rule above already keys on it): the census had been read against a staging deploy behind the commit its own diagnosis was measured at, the standing trap `deploy-means-verify-the-bundle` names. A green check and a green deploy both proved nothing about which bundle was actually served. No code changed for this one; `web/test/toolbar-lead-gap-card.test.tsx`'s own R83-extended describe block already proves the DOM shape and the CSS rule live on disk. (3) Account detail's Contacts panel (`ContactsPanel`, `account-detail-panels.tsx`, hosted from `account-detail.tsx`'s Overview tab) never used `CollectionCard` at all, a hand-rolled `rounded-[var(--radius)] bg-surface-panel p-4` lookalike with no `data-slot=\"card\"`, so nothing here could ever have reached it, and `CollectionCard`'s own DEFAULT (`--pinned-lead:var(--space-4) lg:var(--space-7)`, the pre-Ruling-7 ladder, spent only where no ancestor rule overrides it) was stale besides. Fixed two ways, together: `account-detail.tsx` now hosts `<ContactsPanel>` inside the real `<CollectionCard>` (`screen-bits.tsx`), and `CollectionCard`'s own default is retargeted from the old ladder to `var(--toolbar-lead-gap)`, flat, no `lg:` step, matching Ruling 7's \"the 10pc above and below\" being one number at every width, with `CardContent`'s own real `padding-top` now reading the SAME custom property (`pt-[var(--pinned-lead)]`) instead of a hand-typed `p-4`, so the two can never drift for a fifth flow shape the way they did for this one. (4) Work logs (`web/components/work/time-panel.tsx`, `time-screen.tsx` itself draws no toolbar; `ls` confirmed the toolbar lives in the panel it hosts) measured 24px above: its `<PagedFind>` takes no `wrap`, so its toolbar pins with no card to publish `--pinned-lead` at all, and the 24px was the section's own ordinary `gap-6` between the Hours summary box and the toolbar below it, ordinary inter-panel spacing standing in for the law's lead by coincidence. Fixed by changing that one gap to `gap-[var(--toolbar-lead-gap)]`, the section's only other child being the toolbar itself, so nothing else about the panel's spacing moves. THE LAW NOW MEASURES ITSELF: `web/test/toolbar-lead-gap-card.test.tsx`'s R83 self-check describe block derives, off the disk, every `data-slot` an element wearing `PINNED_TOOLBAR` carries (asserting the app draws a pinned toolbar through exactly one name, `toolbar-row-pin`, never a second nobody wrote a rule for), reads `PINNED_TOOLBAR_IN_KIT_PANEL`'s own fixed target off `shared/web/pinned-chrome.ts` rather than typing it a second time, and proves `globals.css` still names it. Proved red then green live: the new `collection-frame-panel` selector was broken by hand (renamed to a slot nothing draws), the self-check failed exactly as designed, and `web/app/globals.css` was restored from a `cp` copy taken before the edit, never `git checkout --`, which would have taken this whole round's fix with it. AMENDED A FOURTH TIME, DECISION B, 21 SEP 2026: A FIFTH SHAPE, ONE LEVEL UP FROM THE CARD. Aurora, shown the two candidate shapes for the space under a detail page's own tab strip side by side, picked B: the toolbar under an app's own Phases, Stories or Tickets tabs, or an account's Contacts panel and its other tabbed panels, sits 10px under the strip, exactly this ruling's own '10 above and below, both in main and details,' the same as a main list's own toolbar under its head. Round 30's own fix (point 2 above) already proved the nested card's own lead was correct: it pays the whole `--toolbar-lead-gap` (10px), cancelled at rest by `PINNED_TOOLBAR`'s own mt/pt pair the identical way a top-level toolbar's lead cancels, so a live 0px reading there is correct and was never the bug. What round 30 never named is one level up: `STICKY_TABS` (`web/components/records/record-chrome.tsx`) puts `gap-[var(--space-6)] lg:gap-[var(--space-7)]` on the kit's own `<Tabs>` root itself, the flex gap between the tab strip and its `TabsContent` sibling, needed so `TabsContent` still lands where an ordinary, non-strip panel would once the strip escapes its own card via a negative top margin. That reason only holds for a pane whose own leading card pays the OLD, un-cancelled inset; a toolbar-led pane's card pays a cancelled 10px instead, so the room is pure surplus there, measured live, 32px at 1440, 24px at 760, stacked on a card that already read 0px at rest. Fixed in `web/app/globals.css`: a new rule, `[data-slot=\"tabs\"]:has(> [data-tab-pane][data-state=\"active\"] [data-slot=\"card\"]:first-child > [data-slot=\"card-content\"] > [data-slot=\"toolbar-row-pin\"]:first-child) { gap: 0px; }`, zeroes the root's own gap, but ONLY when the ACTIVE pane's own leading card hosts a toolbar as its first child, `[data-state=\"active\"]` being Radix's own attribute on `TabsContent`. A pane that starts with anything else, fact rows or prose, keeps STICKY_TABS's ordinary gap untouched, so the law reads the same everywhere a toolbar is the first thing and nowhere else. Proved by `web/test/toolbar-lead-gap-card.test.tsx`'s own decision-B describe block: a real render of `TabsView` classed with `STICKY_TABS`, with the toolbar tab active, matches the exact selector globals.css carries (jsdom's own selector engine supports `:has()` well enough to prove this against a real composition rather than a hand-simplified stand-in); the same fixture with the fact-rows tab active instead does not match, and confirms the toolbar tab's own content is not mounted at all in that state, since this app's `Tabs` hands Radix's `TabsContent` no `forceMount`.",
     checkId: "toolbar-lead-gap",
     status: "enforced",
   },
@@ -841,6 +841,30 @@ export const RULES_REGISTRY: Rule[] = [
     law: "THE ID CHIP IS BLACK. Aurora, verbatim: \"id pill must always be black! f..e in backlgoits not black\", said over the Backlog list, whose standalone ID column drew the record's own reference (`T0001`, `B0001`, `P0001`, `W0001`, ...) as plain text, no chip at all. `shared/web/record-ref.tsx` (`RecordRef`) is the ONE shared id chip register: `<Badge variant=\"inverse\" size=\"pill\" className=\"shrink-0 tabular-nums\">`, the kit's own ink-fill token pair (`bg-surface-inverse text-ink-on-inverse`), never a literal colour, and `one-black-chip.test.ts` already forbids anything else building that TONE from scratch. What it could not see is the mirror mistake: a record's own reference drawn as a chip in the WRONG tone, or not as a chip at all. TWO SHAPES, ONE LAW: (1) a bare `{x.ref}` sitting inside a `<Badge>` that is not `variant=\"inverse\"`, which `storyLead()` and `ReviewsQueue()` (`web/components/work/stories-screen.tsx`) both did, copying each other rather than the shared register, and `story-detail.tsx`'s own chip row copied `storyLead`'s shape in turn (fixed the same session); (2) a standalone `ID` column (`field(\"ref\", \"ID\")`, Aurora's own 20 Sep 2026 ruling adding it to Planned/Backlog) whose cell `RecordTable`'s generic renderer draws as bare text, because nothing wraps a non-leading column in `RecordRef` the way it already wraps the LEADING one. CHECKED, `web/test/id-chip-is-black.test.ts`, a source census over both front doors plus `shared/web/`: every bare reference inside a non-inverse `<Badge>`, and every standalone `field(\"ref\", \"ID\")` column, must route through `<RecordRef>`, or be named in `ID_CHIP_EXEMPT` (`shared/rules/registry.ts`), keyed by `{file, contains}`, the offending line's own text, never a line number, so the pin cannot rot on an unrelated edit above it. `stories-screen.tsx` and `work-panels.tsx` are owned by another lane and were not edited here; their still-open findings are the exemption table's own entries, reported rather than silently fixed.",
     why: "THE REGISTER ALREADY EXISTED; THE GAP WAS A CENSUS THAT ONLY WATCHED ONE DIRECTION. `one-black-chip.test.ts` proves nothing else builds the ink tone FROM SCRATCH, which is the right law for R32/R39 (a colour, a control, coming only from the kit) but blind by construction to a caller that draws the RIGHT kind of thing (a record's reference) in the WRONG tone, or skips the chip entirely, a census asking \"is this Badge illegal\" cannot also answer \"is this Badge missing.\" The standalone ID column is the sharper case: it is not a wrong tone at all, it is `RecordRef`'s own guarded absent case (`if (!value) return null`) simply never being reached, because the column framework that draws it predates the ruling that made it a column.",
     checkId: "id-chip-is-black",
+    status: "enforced",
+  },
+  {
+    id: "R97",
+    dimension: "ui",
+    law: "A COUNT NEVER GETS ITS OWN CARD. Aurora, verbatim, 21 Sep 2026: \"While it is a rule that when it's a count, unless explicitly said, it doesn't deserve its own card. Just by rule, same as related tickets or related stories or stakeholders: just a count next to the title.\" A number that COUNTS THINGS never earns a card, a tile or a stat box of its own; it sits beside its panel's own title, in the count register the app already builds for exactly the case she named: `web/components/tickets/ticket-detail-body.tsx`'s `TicketSidePanel` (`{title} {count}` on the heading's own line, `text-muted-foreground shrink-0 font-[var(--font-weight-normal)]` beside the truncated title span, \"Stakeholders 4\") and `web/components/records/collection-heading.tsx`'s own badge, one level up, for a whole screen's own count. TWO SHAPES: (1) the kit's own `<StatGrid>` primitive (`shared/ui/components/stat-grid/stat-grid.tsx`), a number-and-label card by construction, three call sites today (`pulse.tsx`'s dashboard, `agent-blocks.tsx`'s assistant metric blocks, `work-logs-panel.tsx`'s hours strip); (2) a hand-rolled metrics grid, the same shape by hand, `story-detail.tsx`'s own \"Metrics\" panel (cycle time / effort / flow efficiency), a card of its own beside \"Related tickets\" and \"Related stories\" rather than folded into one of them. NO EXPLICIT EXCEPTION IS NAMED TODAY. CHECKED, `web/test/counts-beside-titles.test.ts`, over `web/components` and `web-portal/components`: every `<StatGrid` call site, and every file repeating the app's own KPI-tile value styling (`font-mono text-sm font-semibold`, two or more times in one file, the one combination this app uses for nothing else), must be named in `COUNT_REGISTER_EXEMPT`. The three dashboard-shaped `<StatGrid>` sites are named there today, reason \"pending her word\"; the story page's own Metrics panel is a known offender owned by another lane's own brief (the story lane is folding it into the Effort card the same session this law shipped), reported rather than fixed here.",
+    why: "A DASHBOARD IS ARGUABLY THE 'EXPLICITLY SAID' EXCEPTION HER OWN RULING LEAVES OPEN, AND THIS LAW DOES NOT DECIDE THAT FOR HER. Her own three examples, related tickets, related stories, stakeholders, are each a RECORD's own side panel, where a title already exists for the count to sit beside; a dashboard's whole point is a wall of standalone numbers with no panel title any one of them could fold into, which reads as a materially different shape. Ripping `pulse.tsx`'s own stat strip out on a reading of a rule she stated over a ticket's Stakeholders panel would be guessing at a decision that is hers, so every `<StatGrid>` site found is named, not removed, pending her word, and the check's own exemption table is the visible record of that open question rather than a silent pass.",
+    checkId: "counts-beside-titles",
+    status: "enforced",
+  },
+  {
+    id: "R98",
+    dimension: "ui",
+    law: "EVERY BUTTON IS THE KIT'S OWN HEIGHT. Aurora, verbatim, 21 Sep 2026, validating the fix to the Knowledge Sync button (`size=\"sm\"` sitting beside toolbar siblings at the kit's own default 40px, K56, `documents/UI-RULEBOOK.md`): \"Validated. This is a rule for all buttons, so make sure that I don't find any others like this.\" Every button in a TOOLBAR, a PAGE HEAD, a CARD HEADER or a FORM FOOT uses the kit `Button`'s default size (`h-[var(--control-height-button)]`, 40px, `shared/ui/components/button/button.tsx`) or `size=\"icon\"` (the same height, square) — `size=\"sm\"` (`--control-height-dense`, 32px) and any custom `h-`/`py-`/`px-` class on a `Button` are forbidden there, outside a named exemption. CHECKED, `web/test/button-sizes.test.ts`, a source census over both front doors plus `shared/web/`: every `<Button` (or a future `<IconButton`) carrying `size=\"sm\"` or a custom height/padding class, matched past a nested `{…}` expression so an `onClick` arrow's own `=>` never closes the tag early and a multi-line opening tag is read whole. Twenty-three call sites across seventeen files sat in a toolbar, a page head, a card header or a form foot the day this law shipped, the same shape the Sync button itself was, and were fixed the same session: the `record-calendar`/`record-week`/`record-timeline` \"Today\" buttons, `filter-bar.tsx`'s \"Clear filters\", the toolbar `actions=` slots on `account-detail-panels.tsx` and `triage-queue.tsx`, `process-detail.tsx`'s two card-header actions, `read-a-call.tsx`, `wave-phase-days-panel.tsx`'s and `email-change-dialog.tsx`'s form feet, `draft-review.tsx`'s card header, `process-date-slider.tsx`, `triage-strip.tsx`'s page head, `ticket-rating.tsx`'s form foot, `kwapso-screen.tsx`'s panel header, `staff-panel.tsx`'s page head, and `import-screen.tsx`'s two card headers. What remains in `BUTTON_SIZE_EXEMPT`, one reasoned line per site, sits outside the four named surfaces (an inline error-state retry, a chat confirm row, a composer's own send row, a standalone picker/utility control) or is a dense per-item action inside a repeated list/card, the law's own named carve-out for a table row's cousin, most marked \"pending her word\"; five sites sit in `web/components/knowledge/`, out of this lane's own brief, reported rather than fixed.",
+    why: "THE CENSUS CASTS WIDE ON PURPOSE RATHER THAN PRE-FILTERING TO THE FOUR NAMED SURFACES. Recognising \"this JSX sits inside a toolbar/page head/card header/form foot\" from source text alone is exactly the kind of structural judgement a regex cannot make reliably without either missing a real violation (a hand-rolled label-plus-action row that never calls a `<ToolbarRow>` or an `actions=` prop by name, the shape `process-detail.tsx`'s own card headers took) or flagging controls the law was never about (an error retry, a picker chip, a pagination button). So every `size=\"sm\"` Button is a candidate, and `BUTTON_SIZE_EXEMPT` is where the real call is made and left visible for review, one line per site, the same trade `id-chip-is-black`'s own two-shape census already makes rather than trusting a narrower regex to have judged correctly with nobody checking its work.",
+    checkId: "button-sizes",
+    status: "enforced",
+  },
+  {
+    id: "R99",
+    dimension: "arch",
+    law: "NO RECORD CLOSES WHILE ITS OWN CLOCK IS STILL RUNNING. Aurora, verbatim, 21 Sep 2026: \"cannot mark anything as closed (task, story, ticket, whatever) if there's an active time log running.\" ONE shared door-side refusal, `refuseWhileTimerRuns(cfg, guard, { table, id })` (`workers/content/src/lib/work-logs.ts`): a `work_logs` row with `target_table`/`target_id` matching and `ended_at IS NULL` throws `GuardError(409, \"timer_running\", \"Stop the timer first.\")`, ANY running timer on the record refusing it, not only the caller's own, two people can be on one piece of work and it is not closed while either of them is still on the clock, the same reasoning `stories.ts`'s own review-step refusal (`refuseUnreviewable`) already states beside it. WIRED INTO THREE DOORS: a story's Done (`setStoryStatus`, the `status === \"done\"` branch, beside `refuseUndocumented`), a ticket's resolve (`setStatus`'s `resolved` branch, the door `/help/resolve` alone reaches) and a ticket's archive (`setTicketArchived`, only when `archived === true`; taking one back out never needs its own clock stopped). THE UI MIRRORS the same fact rather than deciding it twice: the story page's Done button/folded action and the ticket page's Close button/folded action (both read `runningTimersKey(teamId)`, the SAME cache key `useRecordTimerAction` already reads for the Start/Stop control, R56) and the ticket page's Archive menu item are disabled with the reason \"Stop the timer first.\" while a timer on that record is running. CHECKED, `web/test/no-close-while-timer-runs.test.ts`, a source census over `workers/content/src/lib/*.ts`, the only worker whose tables `WORK_LOG_TARGETS` ever names, so no other worker can hold a close door this law reaches: a CANDIDATE is an exported function whose body (comments stripped) carries BOTH a double-quoted JS comparison against `\"done\"`/`\"resolved\"`/`\"closed\"`/`\"completed\"` (a SQL literal is always single-quoted here, `'done'`, which is what keeps a read-side filter from ever matching) and an UPDATE that actually SETS a closing-shaped column (`status`, `completed_at`, `archived_at`, `resolved`), the second clause is what tells `tasks.ts`'s `updateTask` (refuses to EDIT an already-done task, never itself closes one) apart from `setTaskDone` beside it. A candidate with no `refuseWhileTimerRuns(` call fails the build unless it is a reasoned, dated, ROT-CHECKED line in the check's own `CLOSE_DOOR_EXEMPT`, keyed by `{file, fn}` (a function's own name, never a line number, which rots on the next edit above it): `tasks.ts`'s `setTaskDone` is the one KNOWN PENDING site, dated 21 Sep 2026, owned by the tasks lane, it already carries this exact check INLINE (its own comment asks for the swap the moment the helper landed) and the row names the exact replacement call, `if (done) await refuseWhileTimerRuns(cfg, guard, { table: \"tasks\", id })`; `help.ts`'s `bulkSetStatusByFilter` is exempt because its own `resolved` branch is dead code from every route (`refuseDirectResolve` guards the one caller before this function is ever reached); `stories.ts`'s `setSprintComplete` is exempt because a SPRINT is not a `WORK_LOG_TARGETS` table, so no timer can ever run against one. A THIRD LAYER, over the doors and the two screens directly: content tests in `workers/content/test/story-build-notes.test.ts` and `workers/content/test/ticket-work-engine.test.ts` drive the real doors (a running timer refused, a stopped one allowed, on both the story and the ticket), and `web/test/story-detail.test.tsx` plus `web/test/ticket-close-moved-to-top.test.tsx` drive the two screens the same way.",
+    why: "THE CENSUS SCOPES TO `workers/content/src/lib` RATHER THAN THE WHOLE MONOREPO, AND THAT IS A DERIVED BOUND, NOT A CONVENIENT ONE: `work_logs.target_table` can only ever hold a value `WORK_LOG_TARGETS` names, and every one of those four tables (stories, help, tasks, meetings) is owned by this one worker, so a close door in any other worker (a sprint's own completion, an error log's `resolved` status, an ingest job's `completed` sync state, all real matches the literal-word grep alone would have caught, tried against the whole tree, before the UPDATE-column refinement was added) is provably outside this law's reach, not merely unlikely to be in it. The literal-word test (a DOUBLE-quoted `\"done\"` rather than a single-quoted SQL `'done'`) is what tells a JS-level comparison apart from a read-side filter, and the closing-column test (the UPDATE must SET `status`/`completed_at`/`archived_at`/`resolved`) is what tells `tasks.ts`'s `updateTask`, which refuses to edit an already-done task and touches none of those columns itself, apart from `setTaskDone` beside it, which does. Both refinements were only found by running the census against the real tree and reading every candidate it produced rather than assuming the pattern was already precise; a check whose author never read its own false positives is a check that measures nothing (`a-green-check-may-measure-nothing`'s own argument, proved again here in miniature).",
+    checkId: "no-close-while-timer-runs",
     status: "enforced",
   },
 ]
@@ -965,6 +989,8 @@ export const EMPTY_STATE_SINGLE_DOOR_EXEMPT: Record<string, string> = {
     "TWO different first-adds on one collection — `<ReadACall>` beside `<AddButton>` — the same shape `EMPTY_TOOLBAR_EXEMPT` already carries this file for R50: `CollectionEmptyState` carries a single labelled `onCreate` and cannot offer both, so both stay reachable on an empty step list exactly as they are on a populated one. R88's single door does not apply where there were always two doors by design, not one duplicated.",
   "web/components/tickets/tickets-collection.tsx":
     "the `raiseTicket` `<AddButton>` is a NODE built once (`const raiseTicket = canCreateTicket ? <AddButton…/> : null`) and handed to a `<PagedFind>`/`<ToolbarRow>` `actions` slot one line further up — the identical indirection `EMPTY_TOOLBAR_EXEMPT` already carries this file for R50. The button IS inside a toolbar's own gated slot at every real call site; the census reads position rather than data flow and cannot see through the assignment.",
+  "web/components/work/story-detail.tsx":
+    "the Effort card's own `<AddButton>` (\"Log time\") — Aurora's ruling, 21 Sep 2026, B44: \"Include the metrics inside the effort card ... put the number next to the effort title, just as you do, for example, for stakeholders.\" The card used to be `EmptyGatedPanel` wrapping `WorkLogsPanel`'s own list of rows, the genuine empty-collection shape R88 exists for; it no longer is. `WorkLogsPanel` is gone from this page (its rows are the \"value entries\" the ruling removes), replaced by the three metric lines every render, with textual fallbacks (\"Not started\"/\"0h\"/\"No time log\") standing in for zero rather than a `CollectionEmptyState`. There is no collection left to be empty — the same reasoning `roles-matrix.tsx`'s own entry already argues for a fixed catalogue — so the plain `TicketSidePanel` every other fact panel on this page uses is the honest shell, and its `<AddButton empty={false}>` records that on purpose rather than hiding it.",
 }
 
 /** R66 — A PICTOGRAPH THAT IS THE CONTENT AND IS NOT A FLAG. Keyed by
@@ -3010,6 +3036,8 @@ export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
     "TWO different first-adds on one collection, which is Contacts' exemption above in a different module: \"Add step\" types what somebody heard, and `<ReadACall>` beside it has the app propose the steps off a meeting and walk the person through them. `CollectionEmptyState` carries a single labelled `onCreate` and cannot offer both, so both stay reachable on an empty step list exactly as they are on a populated one.",
   "web/components/team/roles-matrix.tsx":
     "the grid's own <ToolbarRow> carries `empty={false}` — the rows it narrows are the team's own MODULE CATALOGUE (`TEAM_MODULES`, read off the first role sheet), which is fixed furniture for a live team rather than data it empties out. R50's question is whether the RAW row list, before search, ever holds zero rows, and for a fixed catalogue the honest answer is always no; the toolbar's search can narrow the visible rows to zero, which is a different, filtered zero the matrix's own `emptyTitle`/`emptyDescription` pair already tells apart from a true empty state.",
+  "web/components/work/story-detail.tsx":
+    "the Effort card's own <AddButton> (\"Log time\") carries `empty={false}` — Aurora's ruling, 21 Sep 2026, B44, merged the Metrics panel's three lines into this card and dropped `WorkLogsPanel`'s own list of rows, so the card no longer narrows a COLLECTION that could hold zero rows; it always shows Cycle time/Effort/Flow efficiency, with a textual fallback for none of it logged yet rather than an empty-collection state. Same reasoning as `roles-matrix.tsx` above, over metrics instead of a fixed catalogue: the honest answer to \"could this be empty\" is always no.",
 }
 
 /** R62, clause (iii) — THE FILES THAT MAY STILL DRAW A SECOND FILTERED-ZERO
@@ -4985,8 +5013,12 @@ export const REF_AS_STRING_OK: RefAsString[] = [
   },
   {
     file: "web/components/work/story-detail.tsx",
-    contains: "recordLabel={story.ref ?",
-    why: "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx above.",
+    contains: "label: story.ref ?",
+    why:
+      "`TimeFormDialog.fixedTarget.label` is typed `string` (time-form-dialog.tsx) — the " +
+      "same slot `WorkLogsPanel.recordLabel` used to fill before B44 (21 Sep 2026) dropped " +
+      "that panel from the story page's own Effort card and mounted `TimeFormDialog` " +
+      "directly for its \"Log time\" door; the string shape is unchanged, only the prop.",
   },
   {
     file: "web/components/work/sprints-screen.tsx",
@@ -5273,6 +5305,42 @@ export const PARKED: Record<string, string> = {
     "door-side sort/filter plumbing this pair fed was removed from `stories-screen.tsx`'s own toolbar wiring " +
     "alongside them (never a server-side door, both were always answered in the browser, over the loaded " +
     "page), and re-adding either is exactly re-importing this file's two exports into that toolbar again.",
+  "work/goal-field":
+    "the story FORM's own \"contributes to the phase's goal\" checkbox (`GoalField`), shown once a phase was " +
+    "chosen. Aurora's ruling, 21 Sep 2026, verbatim: \"Remove the goal from the stories. I don't even know " +
+    "what that is, but remove it.\" Parked, not dead: `Story.contributesToGoal`/the `contributes_to_goal` " +
+    "column and the create/update doors keep accepting the field untouched (`create_story`/`update_story` " +
+    "still take `contributesToGoal`, documented as parked in documents/MCP.md), and `story-form-dialog.tsx` " +
+    "still carries `values.contributesToGoal` through an edit unchanged — only the control that let somebody " +
+    "SET it is unmounted. Delete this line and wire `<GoalField>` back into `story-form-dialog.tsx` the day " +
+    "she asks for the goal back.",
+  "work/goal-row-toggle":
+    "the story ROW's own goal checkbox (`useGoalToggle`/`GoalRowToggle`), the phase board's own way to flip " +
+    "the flag straight from `StoriesPanel` (work-panels.tsx) without opening the form. Same 21 Sep 2026 " +
+    "ruling as `work/goal-field` above. Parked, not dead: the write this pair made (`contentApi.updateStory` " +
+    "with `contributesToGoal`) is exactly the door call above, unmounted from the row rather than the door " +
+    "changed. Delete this line and wire the hook and the control back into `StoriesPanel`'s own row (between " +
+    "the story's name and its Done badge, `ownerKind === \"sprint\"` only) the day she asks for the goal back.",
+  "work/goal-badge":
+    "the story LIST's own goal mark (`GoalBadge`), the small icon `stories-screen.tsx`'s own `boardCard` drew " +
+    "beside the app-name badge when a story carried the flag. Same 21 Sep 2026 ruling as the two entries " +
+    "above. Parked, not dead: the display alone moved out into a file of its own and stopped being mounted. " +
+    "Delete this line and wire `<GoalBadge>` back into `boardCard`'s own badge row (guarded on " +
+    "`s.contributesToGoal`) the day she asks for the goal back.",
+  "work/story-attachments":
+    "`StoryAttachmentsPanel`, the story's own hand-built file list and upload widget over " +
+    "`records/record-attachments.tsx`. Aurora's ruling, 21 Sep 2026, verbatim: \"On build nodes, use the " +
+    "already existing component to upload images. Do not invent anything new. Also, don't show that there's " +
+    "nothing attached.\" This panel drew its own upload control (not the kit's `FileUpload` drop zone the " +
+    "ticket composer and reply edit sheet already draw through) and an \"Nothing attached yet.\" empty line — " +
+    "exactly the two things the ruling refuses. Its one call site, `story-build-notes-sheet.tsx`, now reads " +
+    "and writes `story_attachments` straight through `FileUpload` instead. Parked, not dead: " +
+    "`records/record-attachments.tsx` (`RecordAttachments`) it wraps stays mounted elsewhere (the ticket's own " +
+    "`help-detail.tsx`, `reply-composer.tsx`, `work-logs-panel.tsx`), and this thin story-side wrapper — its " +
+    "door, its cache key, its two named sentences — is exactly the shape a future standalone \"Files and " +
+    "links\" surface for a story would reach for again. Delete this line and the file together only once " +
+    "something reaches it a second time, never by re-adding the same hand-built upload widget the ruling " +
+    "removed from the Build notes sheet.",
 }
 
 // ── R41 (picked-files-are-sent) ─────────────────────────────────────────────
@@ -5801,3 +5869,414 @@ export const VISUAL_ACCOMPANIES_TEXT_EXEMPT: Record<string, string> = {}
  * before status) were both fixed through `orderChips()` the same day this
  * law shipped. */
 export const CHIP_ORDER_EXEMPT: Record<string, string> = {}
+
+// ── counts-beside-titles (R97) ──────────────────────────────────────────────
+
+/** A still-open counts-beside-titles finding, keyed by FILE (the finding is
+ * component-level, a whole `<StatGrid>` call site or a whole hand-rolled
+ * metrics grid, never a single line the way a chip census keys itself), so
+ * one entry per file is the whole shape. Rot-checked both ways by
+ * `web/test/counts-beside-titles.test.ts`: a line naming a file the census no
+ * longer finds has outlived its subject and fails the build too. */
+export interface CountRegisterExempt {
+  file: string
+  why: string
+}
+
+/** THREE DASHBOARD-SHAPED STAT STRIPS, named rather than fixed, and ONE
+ * KNOWN OFFENDER OWNED BY ANOTHER LANE. See R97's own law text
+ * (`shared/rules/registry.ts`, above) for the full account: her ruling names
+ * a record's own side panel (Stakeholders, Related tickets, Related
+ * stories), and whether a DASHBOARD's wall of numbers is the "explicitly
+ * said" exception that leaves open is not this check's call to make. */
+export const COUNT_REGISTER_EXEMPT: CountRegisterExempt[] = [
+  {
+    file: "web/components/screens/pulse.tsx",
+    why: "pending her word — the tickets dashboard's own stat strip (admin due, hours this week, meetings this week), the clearest 'wall of numbers with no panel title to fold into' shape her ruling may not have meant to reach.",
+  },
+  {
+    file: "web/components/assistant/agent-blocks.tsx",
+    why: "pending her word — the assistant's own metric blocks (MetricBlock/StatGrid), the agent's chosen way to show a set of headline numbers inside a chat reply; the block's own `title` (BlockFrame) already names what the numbers are about, but each item is still a StatGrid tile rather than a count beside that title.",
+  },
+  {
+    file: "web/components/work/work-logs-panel.tsx",
+    why: "pending her word — the work-logs summary strip (hours logged, entries, members on it), a per-record stat strip rather than a whole-app dashboard, closer in shape to her own named examples than pulse.tsx/agent-blocks.tsx are, so named separately rather than assumed to share their answer.",
+  },
+  {
+    file: "web/components/work/story-detail.tsx",
+    why: "known offender, owned by another lane. The story lane is moving this Metrics panel (cycle time / effort / flow efficiency) into the Effort card the same session this law shipped (brief note, 21 Sep 2026); this lane's own brief forbids editing story-detail.tsx, so the finding is reported and tolerated here rather than fixed. Remove this entry once that lane reports the panel folded in.",
+  },
+]
+
+// ── button-sizes (R98) ──────────────────────────────────────────────────────
+
+/** A still-open button-sizes finding, keyed by `{file, contains}` — the
+ * offending Button's own opening-tag text (an onClick handler fragment or a
+ * distinctive attribute line), never a line number, so the pin cannot rot on
+ * an unrelated edit above it, the same shape `IdChipExempt` already takes.
+ * Rot-checked both ways by `web/test/button-sizes.test.ts`, and its own
+ * ambiguity guard refuses a `contains` that matches more than one current
+ * finding in its file. */
+export interface ButtonSizeExempt {
+  file: string
+  contains: string
+  why: string
+}
+
+export const BUTTON_SIZE_EXEMPT: ButtonSizeExempt[] = [
+  {
+    file: "shared/web/live-status.tsx",
+    contains: "onClick={() => invalidatePrefix(\"\")}",
+    why: "An inline banner/prompt action (a runaway-timer or live-sync notice), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web-portal/components/error-panel.tsx",
+    contains: "onClick={onRetry}",
+    why: "An inline error-state recovery action (a retry/reload button beside or under a failure message), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web-portal/components/ticket-rating.tsx",
+    contains: "onClick={() => (picked === score ? void say(score, words) : setPicked(score))}",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web-portal/components/ticket-screen.tsx",
+    contains: "onClick={() => fileInput.current?.click()}",
+    why: "The ticket/message composer's own send row (R89's footer shape), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web-portal/components/ticket-screen.tsx",
+    contains: "onClick={() => void send()}",
+    why: "The ticket/message composer's own send row (R89's footer shape), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web-portal/components/waiting-on-you.tsx",
+    contains: "onClick={() => pickers.current[todo.id]?.click()}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web-portal/components/waiting-on-you.tsx",
+    contains: "onClick={() => complete(todo.id)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/account-detail-panels.tsx",
+    contains: "t(\"Remove {person} from {account}?\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/account-detail-panels.tsx",
+    contains: "t(\"Contact added back.\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/account-detail-panels.tsx",
+    contains: "t(\"Take this login away?\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/account-detail-panels.tsx",
+    contains: "t(\"Access switched back on.\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/client-org-panel.tsx",
+    contains: "onClick={() => setSwitchingOff({ kind: \"department\", id: d.id, name: d.name })}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/client-org-panel.tsx",
+    contains: "onClick={() => setSwitchingOff({ kind: \"role\", id: r.id, name: r.name })}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/client-org-panel.tsx",
+    contains: "onClick={() => void toggleDepartment(r, d.id)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/client-org-panel.tsx",
+    contains: "onClick={() => void togglePerson(r, c.personAccountId)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/client-org-panel.tsx",
+    contains: "onClick={() => setPricing(x)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/client-org-panel.tsx",
+    contains: "onClick={() => setSwitchingOff({ kind: \"tool\", id: x.id, name: x.name })}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/accounts/contact-detail.tsx",
+    contains: "onClick={() => void moveToCompany()}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/accounts/contact-detail.tsx",
+    contains: "onClick={() => void giveAccess()}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/apps/app-money-panel.tsx",
+    contains: "onClick={() => softNavigate(`${host.base}/processes/${line.processId}`)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/apps/deliverables-panel.tsx",
+    contains: "onClick={() => setEditing(d)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/apps/deliverables-panel.tsx",
+    contains: "t(\"Hidden from the client.\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/apps/deliverables-panel.tsx",
+    contains: "t(\"Archived.\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/assistant/agent-panel.tsx",
+    contains: "onClick={() => void chat.resolve(false)}",
+    why: "An inline assistant/chat control (a paused-turn confirm row, or a disclosure toggle inside a chat block), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/assistant/agent-panel.tsx",
+    contains: "onClick={() => void chat.resolve(true)} disabled={chat.busy}",
+    why: "An inline assistant/chat control (a paused-turn confirm row, or a disclosure toggle inside a chat block), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/assistant/run-steps.tsx",
+    contains: "onClick={() => setExpanded((v) => !v)}",
+    why: "An inline assistant/chat control (a paused-turn confirm row, or a disclosure toggle inside a chat block), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/knowledge/google-connections.tsx",
+    contains: "onClick={() => setSharing(service as \"drive\" | \"chat\")}",
+    why: "A dense per-row action on the per-service row inside GOOGLE_SERVICES.map's own repeated list, the law's own carve-out for a table row's cousin, not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/knowledge/google-connections.tsx",
+    contains: "onClick={() => setScoping(service as GoogleScopedService)}",
+    why: "A dense per-row action on the per-service row inside GOOGLE_SERVICES.map's own repeated list, the law's own carve-out for a table row's cousin, not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/knowledge/google-connections.tsx",
+    contains: "onClick={() => setDisconnecting(service)}",
+    why: "A dense per-row action on the per-service row inside GOOGLE_SERVICES.map's own repeated list, the law's own carve-out for a table row's cousin, not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/knowledge/google-connections.tsx",
+    contains: "onClick={() => {",
+    why: "A dense per-row action on the per-service row inside GOOGLE_SERVICES.map's own repeated list (the connect button on a not-yet-connected service's own row), the law's own carve-out for a table row's cousin, not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/knowledge/google-connections.tsx",
+    contains: "t(\"Taken out.\"",
+    why: "A dense per-row remove action on a named-source row nested inside a per-service row, both repeated lists (GOOGLE_SERVICES.map, then named.map), the law's own carve-out for a table row's cousin, not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/knowledge/knowledge-detail.tsx",
+    contains: "onClick={stopUsing}",
+    why: "The knowledge source's own status-toggle action, drawn inline at the foot of its tab panel body (no Card, no FormShell) rather than in RecordChrome's own head actions row. Outside the four named surfaces; not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026, pending her word.",
+  },
+  {
+    file: "web/components/knowledge/knowledge-detail.tsx",
+    contains: "onClick={() => void useAgain()} disabled={busyActive}",
+    why: "The knowledge source's own status-toggle action, drawn inline at the foot of its tab panel body (no Card, no FormShell) rather than in RecordChrome's own head actions row. Outside the four named surfaces; not a toolbar, page head, card header or form foot. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026, pending her word.",
+  },
+  {
+    file: "web/components/knowledge/knowledge-upload-dialog.tsx",
+    contains: "onClick={() => setFile(null)}",
+    why: "A standalone picker/utility control inside the upload dialog's own drop-zone field, not the FormShellDialog's own submit/cancel foot. Outside the four named surfaces. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/knowledge/knowledge-upload-dialog.tsx",
+    contains: "onClick={() => inputRef.current?.click()}",
+    why: "A standalone picker/utility control inside the upload dialog's own drop-zone field, not the FormShellDialog's own submit/cancel foot. Outside the four named surfaces. Reviewed once the knowledge folder came out of this lane's own scope, 21 Sep 2026.",
+  },
+  {
+    file: "web/components/meetings/meeting-detail.tsx",
+    contains: "onClick={() => void saveNotes(item, notesDraft ?? \"\")}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/process/process-detail.tsx",
+    contains: "onClick={() => void unlink(l.id)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/process/steps-panel.tsx",
+    contains: "onClick={() => onShowVersion(null)}",
+    why: "An inline error-state recovery action (a retry/reload button beside or under a failure message), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/records/connections-panel.tsx",
+    contains: "onClick={() => read.refresh()}",
+    why: "An inline error-state recovery action (a retry/reload button beside or under a failure message), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/records/file-picker.tsx",
+    contains: "onClick={() => {",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/records/file-picker.tsx",
+    contains: "onClick={() => inputRef.current?.click()}",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/records/load-more.tsx",
+    contains: "disabled={busy}",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "replacingRef.current = a.id",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "onClick={() => void saveEdit(a)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "t(\"Cancel\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "t(\"Rename\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "t(\"There's no way to bring it back from here. Attach it again if you need it.\"",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "onClick={() => fileRef.current?.click()}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "onClick={() => void addLink()}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/records/record-attachments.tsx",
+    contains: "onClick={() => setAddingLink(true)}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/records/record-picker.tsx",
+    contains: "onClick={() => onPick(option.value)}",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/records/translate-human-text.tsx",
+    contains: "onClick={translation.toggle}",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/screens/kwapso-screen.tsx",
+    contains: "onClick={() => setIdentityOpen(true)}",
+    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
+  },
+  {
+    file: "web/components/shell/error-boundary.tsx",
+    contains: "onClick={() => location.reload()}",
+    why: "An inline error-state recovery action (a retry/reload button beside or under a failure message), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/shell/team-switcher.tsx",
+    contains: "className=\"h-auto w-full justify-start gap-2 px-2 py-1.5 text-[var(--spine-ink)] enabled:hover:text-[var(--spine-ink)]\"",
+    why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/team/access-tokens.tsx",
+    contains: "onClick={() => setViewingCalls(token)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/team/access-tokens.tsx",
+    contains: "onClick={() => copyInstructions(\"kwapso_mcp_YOUR_TOKEN\", t)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/team/access-tokens.tsx",
+    contains: "onClick={() => setRevoking(token)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/team/access-tokens.tsx",
+    contains: "t(\"Copied.\"",
+    why: "A copy-to-clipboard utility action inside a dialog's own body (the token secret's reveal step), not a form foot; nothing here submits.",
+  },
+  {
+    file: "web/components/team/access-tokens.tsx",
+    contains: "onClick={() => copyInstructions(secret, t)}",
+    why: "A copy-to-clipboard utility action inside a dialog's own body (the token secret's reveal step), not a form foot; nothing here submits.",
+  },
+  {
+    file: "web/components/team/invitations.tsx",
+    contains: "onClick={() => void accept(inv)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/tickets/reply-composer.tsx",
+    contains: "onClick={() => fileInput.current?.click()}",
+    why: "The ticket/message composer's own send row (R89's footer shape), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/tickets/reply-composer.tsx",
+    contains: "t(\"Send reply\"",
+    why: "The ticket/message composer's own send row (R89's footer shape), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/tickets/triage-queue.tsx",
+    contains: "onClick={() => void undo()}",
+    why: "An empty/done-state action inside a CollectionRegister's own doneAction slot (R88's own shape), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/tickets/triage-queue.tsx",
+    contains: "disabled={busy || current.missing.length > 0}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/tickets/triage-queue.tsx",
+    contains: "onClick={() => setPicker((p) => (p === \"type\" ? null : \"type\"))}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/work/time-panel.tsx",
+    contains: "onClick={() => start(s.id)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/work/time-panel.tsx",
+    contains: "onClick={() => onAnswer(timer.id, \"keep\")}",
+    why: "An inline banner/prompt action (a runaway-timer or live-sync notice), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/work/time-panel.tsx",
+    contains: "onClick={() => onAnswer(timer.id, \"discard\")}",
+    why: "An inline banner/prompt action (a runaway-timer or live-sync notice), not a toolbar, a page head, a card header or a form foot.",
+  },
+  {
+    file: "web/components/work/wave-detail.tsx",
+    contains: "onClick={() => void moveSprint(s.id, null)}",
+    why: "A dense, per-item action inside a repeated list/card row, the same shape the law's own \"dense table row actions\" allowance names, not a toolbar, a page head, a card header or a form foot. Pending her word on whether a list/card row earns the same allowance a table row does.",
+  },
+  {
+    file: "web/components/work/work-logs-panel.tsx",
+    contains: "onClick={() => summaryQ.refresh()}",
+    why: "An inline error-state recovery action (a retry/reload button beside or under a failure message), not a toolbar, a page head, a card header or a form foot.",
+  },
+]

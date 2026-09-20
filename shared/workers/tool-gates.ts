@@ -159,6 +159,10 @@ export const TOOL_GATES: Record<string, string> = {
   create_task: "work:create",
   update_task: "work:update",
   set_task_done: "work:update",
+  // The delete door gates on the same right the update/done doors do
+  // (`postDeleteTask`, `gatedBody(request, env, "work", "update")`) — team
+  // migration 0113, Aurora's 21 Sep 2026 ruling.
+  delete_task: "work:update",
   // MEETINGS gate on their own module. `set_meeting_active` is a `delete`
   // because cancelling IS this module's delete; the row survives it.
   create_meeting: "meetings:create",

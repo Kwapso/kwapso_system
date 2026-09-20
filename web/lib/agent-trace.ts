@@ -377,6 +377,13 @@ export function traceFor(
     case "update_task":
     case "set_task_done":
       return { path: `${seg(teamId, "tasks")}/${str(input, "id")}`, highlight: "main" }
+    // A DELETE lands on the LIST, not the record — the record it named is gone
+    // from there the instant this runs (team migration 0113: `getTask` refuses
+    // a deactivated row), so a trace that opened its own detail would land on
+    // the empty "that record no longer exists" state rather than showing the
+    // change. The list is where a deleted task's absence is actually visible.
+    case "delete_task":
+      return { path: seg(teamId, "tasks"), highlight: "main" }
     // MEETINGS. A create lands on the meetings list, an edit on the meeting itself.
     case "create_meeting":
     // Reading the calendar in makes many records and no one of them is the

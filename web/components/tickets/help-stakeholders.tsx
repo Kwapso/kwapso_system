@@ -150,11 +150,67 @@ import {
 } from "@shared/ui/components/select/select"
 import { sortedOptions } from "@shared/web/sorted-options"
 import { effectiveAssignee } from "@shared/effective-assignee"
+import { formatCount } from "@shared/web/format-count"
+import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 
 /** One team member this ticket may be assigned to, the same shape
  * `assignableMembers` (`web/lib/members.ts`) already hands every other
  * assignee picker in the app: agency staff only, never a client login. */
 type AssignableMember = { id: string; name: string; photo?: string | null }
+
+/** ONE HORIZONTAL FACE+NAME TILE, the shape Raised by defined (this file's
+ * header above, "RAISED BY IS HORIZONTAL TOO NOW") and Assigned to now
+ * shares, reused rather than copied so the two tiles cannot drift the way
+ * this file's own header warns two hand-rolled copies always do. A `Card
+ * variant="raised"` holding one `PersonCard orientation="horizontal"
+ * size="row"`, the same `py-3`/`lg:py-3` override that keeps the card ≈60px
+ * at every width (this file's header, "SMALLER, TOO"). `action` is an
+ * optional trailing control beside the face+name column: Assigned to's own
+ * edit pen sits exactly where Raised by's used to, before it was retired
+ * (this file's header, "THE EDIT PEN IS GONE FROM THIS CARD"); Raised by
+ * itself passes none, its own pen is gone for good. */
+function StakeholderTile({
+  dataSlot,
+  picture,
+  mark,
+  markName,
+  chip,
+  title,
+  secondary,
+  action,
+}: {
+  dataSlot: string
+  picture?: string | null
+  mark: string
+  markName?: string
+  chip: React.ReactNode
+  title: React.ReactNode
+  secondary?: React.ReactNode
+  action?: React.ReactNode
+}) {
+  return (
+    <Card data-slot={dataSlot} variant="raised">
+      {/* STILL 102px ON STAGING, NOT 60px: see this file's header, "SMALLER,
+          TOO", for why `lg:py-3` (not only the base `py-3`) is what the kit's
+          own `lg:py-[var(--space-7)]` needs to lose to. */}
+      <CardContent className="flex flex-col gap-2 px-4 py-3 lg:py-3">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <PersonCard
+            orientation="horizontal"
+            size="row"
+            picture={picture}
+            mark={mark}
+            markName={markName}
+            chip={chip}
+            title={title}
+            secondary={secondary}
+          />
+          {action}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export function HelpStakeholders({
   stakeholders,
@@ -212,31 +268,14 @@ export function HelpStakeholders({
               BEFORE (band + p-4): 2 × 16px padding + a 72px face ≈ 104px.
               AFTER (row + py-3): 2 × 12px padding + a 36px face = 60px. */}
           {(raiser || raisedByContactId) && (
-            <Card data-slot="stakeholder-card" variant="raised">
-              {/* STILL 102px ON STAGING, NOT 60px — the kit's own `CardContent`
-                  (shared/ui/components/card/card.tsx) carries
-                  `py-6 lg:py-[var(--space-7)]`, and this call's `py-3` only wins
-                  at the BASE breakpoint: it shares no prefix with `lg:py-…`, so
-                  the kit's own `lg` padding keeps winning above that width,
-                  which is exactly the 102px the live page measured. Fixed here,
-                  not in the kit (kit changes are the kit repo's, never a local
-                  workaround) — `lg:py-3` names the same override at the same
-                  breakpoint the kit's own class does, so this one card reads
-                  ≈60px at every width. */}
-              <CardContent className="flex flex-col gap-2 px-4 py-3 lg:py-3">
-                <PersonCard
-                  orientation="horizontal"
-                  size="row"
-                  picture={raiserPicture}
-                  mark={nameInitials(raiserName ?? "")}
-                  markName={raiserName ?? undefined}
-                  chip={
-                    <span className="text-micro text-muted-foreground uppercase">{t("Raised by")}</span>
-                  }
-                  title={<CardTitle className="text-sm">{raiserName}</CardTitle>}
-                />
-              </CardContent>
-            </Card>
+            <StakeholderTile
+              dataSlot="stakeholder-card"
+              picture={raiserPicture}
+              mark={nameInitials(raiserName ?? "")}
+              markName={raiserName ?? undefined}
+              chip={<span className="text-micro text-muted-foreground uppercase">{t("Raised by")}</span>}
+              title={<CardTitle className="text-sm">{raiserName}</CardTitle>}
+            />
           )}
           {/* ON THE LOOP — ONE HORIZONTAL, WRAPPING ROW OF FACE+NAME CHIPS (client,
               18 Sep 2026: "who to keep in the loop should be horizontal"). No
@@ -270,29 +309,51 @@ export function HelpStakeholders({
   )
 }
 
-/** ASSIGNED TO, ITS OWN TOP-LEVEL PANEL, A DIFFERENT CARD FROM
- * STAKEHOLDERS. Aurora's ruling, 21 Sep 2026, verbatim, correcting her own
- * same-day one that had put this row inside `HelpStakeholders` above: "nono
- * assigned to on the very top, a different card from stakeholders!" Rendered
- * as the FIRST panel in the ticket page's own right column, above
- * Stories/Time/Stakeholders and everything else
- * (`ticket-detail-body.tsx`'s own `assignedTo` slot, `help-detail.tsx`'s
- * call site), never nested inside `<HelpStakeholders>` or a
- * `<TicketSidePanel>` wrapper, so `variant="default"` here, not `"raised"`:
- * this card stands DIRECTLY on the page ground now, the same R67 rule every
- * other top-level panel on this screen already answers
- * (`ticket-detail-body.tsx`'s own header).
+/** ASSIGNED TO, REDESIGNED AS THE STAKEHOLDERS CARD'S TWIN. Aurora's
+ * ruling, 21 Sep 2026, verbatim, over a screenshot of the Stakeholders card
+ * (its title row, "Stakeholders" with a count beside it, and inside it the
+ * horizontal "Raised by" tile: a face on the left, the small-caps eyebrow
+ * above the name): "Look at the screenshot with the stakeholders. I wanted
+ * the 'Assigned to' to be like this: the count and the horizontal card.
+ * Redesign it." Validated the same round: "4. Validated but redesigned as
+ * explained." SUPERSEDES the previous paragraph here (which described this
+ * card as its own bare `Card variant="default"`, no title row, no count):
+ * `AssignedToCard` now opens with `<TicketSidePanel>`
+ * (`ticket-detail-body.tsx`), THE SAME title-with-count register
+ * "Stakeholders" itself renders through (`help-detail.tsx`'s own
+ * `<TicketSidePanel title={t("Stakeholders")} count={stakeholderBadge}>`
+ * call), never a hand-rolled title row of this card's own, with the count
+ * in the identical `formatCount` register (R16): 1 when the record carries
+ * its own assignee OR inherits one from the app, 0 (which `formatCount`
+ * renders as nothing, same as everywhere else) otherwise. Inside it, the
+ * face+name tile is `StakeholderTile` (above), the SAME component Raised by
+ * draws itself with, not a second copy: face on the left, the small-caps
+ * eyebrow over the name on the right. THE EYEBROW WORDS DIFFER FROM RAISED
+ * BY'S OWN, on purpose: "Assigned to" when the record carries its own
+ * person, "From the app" when it does not and the app's lead is answering
+ * instead, with the app's own name kept on the existing second, muted line
+ * ("Inherited from <app>", `PersonCard`'s own `secondary` slot) rather than
+ * folded into the eyebrow itself, so a translator never has to reorder a
+ * name inside a sentence. This card still stands DIRECTLY on the page
+ * ground (R67): `TicketSidePanel`'s own `Card` is `variant="default"`,
+ * never nested inside `<HelpStakeholders>` or the Stakeholders panel's own
+ * `TicketSidePanel`.
  *
- * Otherwise unchanged from the row this replaces: the same horizontal
- * `PersonCard`, the same `size="row"`, the same padding override, the muted
- * "Inherited from <app>" line when the ticket carries no assignee of its own
- * and the app's lead is answering instead (`shared/effective-assignee.ts`'s
- * `effectiveAssignee`), the pen that opens the kit `Select` (R90 faces), and
- * the "Nobody yet." words when there is truly nobody to show. The Select
- * offers people only, no "Nobody" row, Aurora's 16 Sep 2026 ruling, and
- * clearing the ticket's own assignee back to inherited is the card's own
- * "Use the app's lead" text button, not a picker entry (see this file's own
- * header). */
+ * THE PEN, THE SELECT AND "USE THE APP'S LEAD" KEEP THEIR OWN POSITIONS,
+ * only nested one level differently now the tile is `StakeholderTile`
+ * rather than this card's own hand-rolled row: the pen is `StakeholderTile`'s
+ * own `action` slot, sitting beside the face+name column exactly where
+ * Raised by's own pen used to sit on ITS tile, before it was retired
+ * (`HelpStakeholders`'s own header, "THE EDIT PEN IS GONE FROM THIS CARD"),
+ * pressing it opens the same kit `Select` (R90 faces) it always has. "Use
+ * the app's lead" stays a small text-button action under the tile, offered
+ * only when there is somewhere to fall back TO (Aurora's 16 Sep 2026 ruling,
+ * "kill the 'nobody' option for staff", this file's own header on
+ * `HelpStakeholders` above). The empty state, when the ticket has no
+ * assignee of its own and the app has no lead to inherit either, is plain
+ * words inside the card, "Nobody yet." The title row above it already
+ * says "Assigned to", so the tile's own eyebrow is not repeated a second
+ * time when there is no tile to carry it. */
 export function AssignedToCard({
   /** THE TICKET'S OWN ASSIGNEE, and the app's answer to fall back to when it
    * has none. Resolved through the one shared seam both the ticket page and
@@ -373,89 +434,91 @@ export function AssignedToCard({
     assigneeId && appAssigneeId && canEditAssignee && onChangeAssignee ? onChangeAssignee : undefined
 
   return (
-    <Card data-slot="assignee-card" variant="default">
-      <CardContent className="flex flex-col gap-2 px-4 py-3 lg:py-3">
-        <div className="flex min-w-0 items-start justify-between gap-2">
-          {assignee.id ? (
-            <PersonCard
-              orientation="horizontal"
-              size="row"
-              picture={assigneeMember?.photo}
-              mark={nameInitials(assignee.name ?? "")}
-              markName={assignee.name ?? undefined}
-              chip={
-                <span className="text-micro text-muted-foreground uppercase">{t("Assigned to")}</span>
-              }
-              title={<CardTitle className="text-sm">{assignee.name}</CardTitle>}
-              secondary={
-                assignee.inherited ? (
-                  <span className="text-muted-foreground text-xs">
-                    {t("Inherited from")} {assignee.appName}
-                  </span>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-micro text-muted-foreground uppercase">{t("Assigned to")}</span>
-              <p className="text-muted-foreground text-sm">{t("Nobody yet.")}</p>
-            </div>
-          )}
-          {/* THE PEN, WHERE RAISED BY'S OWN USED TO SIT, before it was
-              retired (`HelpStakeholders`'s own header, "THE EDIT PEN IS GONE
-              FROM THIS CARD"), that pen opened an inline `Select` right on
-              that card. This row gets a picker of its own kind, so it gets
-              the identical door: press the pen, the kit `Select` (R90 faces)
-              opens in its place. */}
-          {canEditAssignee && onChangeAssignee && members && members.length > 0 ? (
-            <EditPenButton
-              onClick={() => setPickingAssignee((v) => !v)}
-              label={t("Change who is assigned")}
-            />
+    <TicketSidePanel title={t("Assigned to")} count={formatCount(assignee.id ? 1 : 0)}>
+      {assignee.id ? (
+        <>
+          <StakeholderTile
+            dataSlot="assignee-tile"
+            picture={assigneeMember?.photo}
+            mark={nameInitials(assignee.name ?? "")}
+            markName={assignee.name ?? undefined}
+            chip={
+              <span className="text-micro text-muted-foreground uppercase">
+                {assignee.inherited ? t("From the app") : t("Assigned to")}
+              </span>
+            }
+            title={<CardTitle className="text-sm">{assignee.name}</CardTitle>}
+            secondary={
+              assignee.inherited ? (
+                <span className="text-muted-foreground text-xs">
+                  {t("Inherited from")} {assignee.appName}
+                </span>
+              ) : undefined
+            }
+            /* THE PEN, WHERE RAISED BY'S OWN USED TO SIT, before it was
+               retired (`HelpStakeholders`'s own header, "THE EDIT PEN IS
+               GONE FROM THIS CARD"), that pen opened an inline `Select`
+               right on that card. This tile gets a picker of its own kind,
+               so it gets the identical door: press the pen, the kit
+               `Select` (R90 faces) opens in its place. */
+            action={
+              canEditAssignee && onChangeAssignee && members && members.length > 0 ? (
+                <EditPenButton
+                  onClick={() => setPickingAssignee((v) => !v)}
+                  label={t("Change who is assigned")}
+                />
+              ) : undefined
+            }
+          />
+          {/* THE CLEAR ACTION, A SMALL TEXT BUTTON UNDER THE TILE, NEVER A
+              PICKER ENTRY (see the header note by `clearToInherited` above).
+              Writes `assigneeId: null` through the same door the Select
+              already calls; the doors already treat `null` as an explicit
+              clear, so the card falls straight back to `effectiveAssignee`'s
+              own inherited answer once the parent re-renders with the
+              ticket's own assignee gone. */}
+          {clearToInherited ? (
+            <Button
+              variant="link"
+              className="self-start text-sm"
+              onClick={() => void clearToInherited(null)}
+            >
+              {t("Use the app's lead")}
+            </Button>
           ) : null}
-        </div>
-        {/* THE CLEAR ACTION, A TEXT BUTTON BESIDE THE PERSON ROW, NEVER A
-            PICKER ENTRY (see the header note by `clearToInherited` above).
-            Writes `assigneeId: null` through the same door the Select
-            already calls; the doors already treat `null` as an explicit
-            clear, so the card falls straight back to `effectiveAssignee`'s
-            own inherited answer once the parent re-renders with the ticket's
-            own assignee gone. */}
-        {clearToInherited ? (
-          <Button
-            variant="link"
-            className="self-start text-sm"
-            onClick={() => void clearToInherited(null)}
-          >
-            {t("Use the app's lead")}
-          </Button>
-        ) : null}
-        {pickingAssignee && canEditAssignee && onChangeAssignee ? (
-          <Select
-            value={assigneeId ?? ""}
-            onValueChange={(v) => {
-              setPickingAssignee(false)
-              void onChangeAssignee(v)
-            }}
-          >
-            <SelectTrigger id="help-assignee" aria-label={t("Assigned to")} face={assigneeFace}>
-              <SelectValue placeholder={t("Choose someone")} />
-            </SelectTrigger>
-            <SelectContent>
-              {/* PEOPLE ONLY (16 Sep 2026 ruling), A to Z (R75), the same
-                  `sortedOptions` seam every other picker on this app reads
-                  its options through, and every row carries its own face
-                  (R90). No "Nobody" row: this Select only ever ADDS a name;
-                  the way back to the app's lead is the text button above. */}
-              {sortedOptions(members ?? [], lang, (m) => m.name).map((m) => (
-                <SelectItem key={m.id} value={m.id} face={{ src: m.photo ?? undefined, name: m.name }}>
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-      </CardContent>
-    </Card>
+          {pickingAssignee && canEditAssignee && onChangeAssignee ? (
+            <Select
+              value={assigneeId ?? ""}
+              onValueChange={(v) => {
+                setPickingAssignee(false)
+                void onChangeAssignee(v)
+              }}
+            >
+              <SelectTrigger id="help-assignee" aria-label={t("Assigned to")} face={assigneeFace}>
+                <SelectValue placeholder={t("Choose someone")} />
+              </SelectTrigger>
+              <SelectContent>
+                {/* PEOPLE ONLY (16 Sep 2026 ruling), A to Z (R75), the same
+                    `sortedOptions` seam every other picker on this app reads
+                    its options through, and every row carries its own face
+                    (R90). No "Nobody" row: this Select only ever ADDS a
+                    name; the way back to the app's lead is the text button
+                    above. */}
+                {sortedOptions(members ?? [], lang, (m) => m.name).map((m) => (
+                  <SelectItem key={m.id} value={m.id} face={{ src: m.photo ?? undefined, name: m.name }}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </>
+      ) : (
+        // EMPTY STATE, IN WORDS, INSIDE THE CARD. The title row above
+        // already says "Assigned to" (and carries no count), so the tile's
+        // own eyebrow is not repeated a second time when there is no tile.
+        <p className="text-muted-foreground text-sm">{t("Nobody yet.")}</p>
+      )}
+    </TicketSidePanel>
   )
 }

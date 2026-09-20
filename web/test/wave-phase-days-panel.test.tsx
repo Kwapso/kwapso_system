@@ -60,6 +60,15 @@ describe("WavePhaseDaysPanel, seven rows, in PHASE_TYPES order", () => {
     })
   })
 
+  it("the unit beside each field reads 'working days', and the explainer line sits under the seven rows", async () => {
+    render(
+      <WavePhaseDaysPanel teamId="team-1" phaseDays={PHASE_DAYS} canEdit={true} busy={false} onSave={vi.fn()} />
+    )
+    await screen.findByLabelText("Audit")
+    expect(screen.getAllByText("working days")).toHaveLength(7)
+    expect(screen.getByText("Monday to Friday, weekends are not counted")).toBeTruthy()
+  })
+
   it("Save calls the door with only the rows that changed", async () => {
     const onSave = vi.fn(async () => {})
     render(

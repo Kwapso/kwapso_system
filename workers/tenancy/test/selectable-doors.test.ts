@@ -93,9 +93,14 @@ describe("the dropdown-value doors run against a real schema", () => {
     expect(await selectableOne(cfg, guard, "01JNOSUCHVALUE0000000000")).toBeNull()
   })
 
-  it("the LIST read still works, and deliberately carries no audit block", async () => {
-    // The two doors select different columns on purpose (see DETAIL_COLUMNS).
-    // If that ever collapses into one, this is where it shows.
+  it("the LIST read now carries the audit block too (K59, documents/UI-RULEBOOK.md)", async () => {
+    // The two doors used to select DIFFERENT columns on purpose (see the `Row`
+    // type's own header in ../src/lib/selectable.ts) — a list of words answered
+    // a question about a vocabulary and nothing asked who typed each one. Aurora's
+    // 21 Sep 2026 ruling reversed that: the Choices screens now draw an "Added
+    // on"/"Added by" column on every row, general table and per-module panel
+    // alike, so the LIST door has to carry the same audit block the single-row
+    // door always has.
     //
     // The table is NOT empty: the migrations seed the vocabulary every new team
     // starts with, which is the state a real base is always in. So this finds
@@ -106,7 +111,8 @@ describe("the dropdown-value doors run against a real schema", () => {
     const seeded = values.find((v) => v.id === VALUE_ID)
     expect(seeded, "the list must contain the row the fixture wrote").toBeTruthy()
     expect(seeded?.value).toBe("Voucher query")
-    expect(seeded?.createdAt, "the list must not pay for columns no row in it asks for").toBeUndefined()
+    expect(seeded?.createdAt, "the list door must carry Added on now").toBe("2026-05-01T09:00:00.000Z")
+    expect(seeded?.createdByName, "the list door must carry Added by now").toBe("Ana")
   })
 
   // THE CHOICES SCREEN'S DETAILS COLUMN (settings-choices-panel.tsx, 16 Sep

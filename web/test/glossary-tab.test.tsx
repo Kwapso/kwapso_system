@@ -3,14 +3,28 @@
 // words we use and their definitions... this will let our users search
 // there, but should be part of the knowledge base and feed the assistant."
 //
+// AMENDED 21 Sep 2026: SAME CARD, SAME GRID. Aurora, on this tab's own
+// dl/dt/dd rows, verbatim: "But why did you invent this new design? Why
+// don't you use the kind of square card, same as in all?" The tab no longer
+// draws a bespoke list: it maps its words through `KnowledgeSourceCard`, the
+// exact component the Knowledge screen's "All" tab already renders its own
+// gallery with (web/components/knowledge/knowledge-screen.tsx, web/
+// components/knowledge/knowledge-source-card.tsx), inside the same
+// `<CardGrid fluid minItemWidth={KNOWLEDGE_CARD_MIN}>` wall. What used to be
+// `GlossaryList`'s own row markup is gone; the one thing that survives from
+// it is the definition-preview computation, now exported as
+// `definitionPreview` (glossary-list.tsx) and handed to the card's own
+// `preview` prop, which takes the "Last edited" meta line's slot.
+//
 // TWO KINDS OF PROOF, the same split `knowledge-search-restored.test.tsx`
 // and `knowledge-kind-tabs.test.tsx` already use for this exact screen: a
-// RENDER proof of the row itself (`GlossaryList`, which needs nothing of
-// `KnowledgeScreen`'s own heavy scope object to draw its own rows), and a
+// RENDER proof (`definitionPreview` plus `KnowledgeSourceCard` itself, which
+// needs nothing of `KnowledgeScreen`'s own heavy scope object to draw), and a
 // SOURCE-READ proof of the wiring that puts it on that screen (the tab, the
-// search placeholder, the "Add word" action), the shape the whole file
-// would need to render `<PagedFind>`'s tab strip and live cache plumbing for
-// no more certainty than reading the one line that sets each of them.
+// search placeholder, the "Add word" action, the card call site), the shape
+// the whole file would need to render `<PagedFind>`'s tab strip and live
+// cache plumbing for no more certainty than reading the one line that sets
+// each of them.
 
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -18,7 +32,8 @@ import { fileURLToPath } from "node:url"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { GlossaryList } from "@/components/knowledge/glossary-list"
+import { definitionPreview } from "@/components/knowledge/glossary-list"
+import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
 import { GlossaryFormDialog } from "@/components/knowledge/glossary-form-dialog"
 import { PagedFind, type FindQuery } from "@/components/records/paged-find"
 import type { KnowledgeSource } from "@shared/types"
@@ -30,6 +45,10 @@ const ROOT = join(HERE, "..", "..")
 
 function readKnowledgeScreen(): string {
   return readFileSync(join(ROOT, "web", "components", "knowledge", "knowledge-screen.tsx"), "utf8")
+}
+
+function readKnowledgeSourceCard(): string {
+  return readFileSync(join(ROOT, "web", "components", "knowledge", "knowledge-source-card.tsx"), "utf8")
 }
 
 function readWritePanels(): string {
@@ -81,105 +100,31 @@ function makeWord(over: Partial<KnowledgeSource>): KnowledgeSource {
   }
 }
 
-describe("GlossaryList, renders entries", () => {
-  it("shows every word and its own definition", () => {
-    render(
-      <GlossaryList
-        rows={[
-          makeWord({ id: "W1", title: "Wave", body: "A package of phases sold to one account." }),
-          makeWord({ id: "W2", title: "Ticket", body: "Something an account has asked for." }),
-        ]}
-        canEdit={false}
-        canDelete={false}
-        onEdit={() => {}}
-      />
+describe("the glossary word renders through KnowledgeSourceCard, the same card the All tab draws", () => {
+  it("the card's own data-slot is present, the word is its title, and the definition preview is its body line", () => {
+    const word = makeWord({ id: "W1", title: "Wave", body: "A package of phases sold to one account." })
+    const { container } = render(
+      <KnowledgeSourceCard source={word} preview={definitionPreview(word)} onOpen={() => {}} />
     )
-    expect(screen.getByText("Wave")).toBeTruthy()
-    expect(screen.getByText("A package of phases sold to one account.")).toBeTruthy()
-    expect(screen.getByText("Ticket")).toBeTruthy()
-    expect(screen.getByText("Something an account has asked for.")).toBeTruthy()
-  })
-
-  it("draws alphabetically regardless of the order rows arrive in", () => {
-    render(
-      <GlossaryList
-        rows={[makeWord({ id: "W2", title: "Wave" }), makeWord({ id: "W1", title: "Acceptance criteria" })]}
-        canEdit={false}
-        canDelete={false}
-        onEdit={() => {}}
-      />
-    )
-    const titles = screen.getAllByRole("term").map((h) => h.textContent)
-    expect(titles).toEqual(["Acceptance criteria", "Wave"])
-  })
-
-  it("draws no edit or delete control without the matching right", () => {
-    render(<GlossaryList rows={[makeWord({})]} canEdit={false} canDelete={false} onEdit={() => {}} />)
-    expect(screen.queryByLabelText(/correct this word/i)).toBeNull()
-    expect(screen.queryByLabelText(/take this word away/i)).toBeNull()
-  })
-
-  it("a person with the update right can open the word to correct it", () => {
-    const onEdit = vi.fn()
-    render(<GlossaryList rows={[makeWord({ id: "W9" })]} canEdit canDelete={false} onEdit={onEdit} />)
-    fireEvent.click(screen.getByLabelText(/correct this word/i))
-    expect(onEdit).toHaveBeenCalledWith("W9")
-  })
-
-  // Aurora, 20 Sep 2026, on this tab: "disable the off button (only edit)."
-  // The row draws no deactivate control at all any more, even for a person
-  // who holds the delete right: `GLOSSARY_DEACTIVATE_ENABLED` in
-  // glossary-list.tsx is the one switch, and it is off.
-  it("draws no deactivate button even with the delete right, only edit", () => {
-    render(<GlossaryList rows={[makeWord({ id: "W9" })]} canEdit canDelete onEdit={() => {}} />)
-    expect(screen.queryByLabelText(/take this word away/i)).toBeNull()
-    expect(screen.getByLabelText(/correct this word/i)).toBeTruthy()
-  })
-
-  // THE OVERVIEW PREVIEW. A row shows a one-line, plain-text preview of its
-  // own definition under the word (R87's own "never clip without saying
-  // so", read here for a body instead of a title).
-  it("shows a preview of the definition under the word", () => {
-    render(
-      <GlossaryList
-        rows={[makeWord({ id: "W1", title: "Wave", body: "A package of phases sold to one account." })]}
-        canEdit={false}
-        canDelete={false}
-        onEdit={() => {}}
-      />
-    )
+    // THE SAME CARD COMPONENT, NOT A LOOKALIKE: `data-slot="card"` is the
+    // kit's own Card primitive (shared/ui/components/card/card.tsx) stamping
+    // itself, so this is the real component rendering, not a div styled to
+    // match it.
+    expect(container.querySelector('[data-slot="card"]')).toBeTruthy()
+    expect(container.querySelector('[data-slot="card-title"]')?.textContent).toBe("Wave")
     expect(screen.getByText("A package of phases sold to one account.")).toBeTruthy()
   })
 
-  // THE REAL DOOR ROW, NOT THE FIXTURE'S OWN SHORTCUT ABOVE. Every other case
-  // in this file hands `GlossaryList` a row with `body` set directly, which
-  // is never what the list door actually returns — `shared/types.ts`'s own
-  // `KnowledgeSource` doc: "on a LIST this is always null", and
-  // `workers/content/src/lib/knowledge.ts`'s `LIST_COLS` reads `NULL AS
-  // body`. What a list row carries is `summary`, and for a glossary word that
-  // summary is `buildSummary`'s fixed opening ("<title>, a glossary word.")
-  // followed by the word's own definition (`workers/content/src/lib/
-  // knowledge-summary.ts`). Before this fix, `definitionPreview` read only
-  // `body`, so this exact row shape drew an empty `<dd>` on every real visit
-  // to the tab despite the door answering in full.
   it("reads the definition out of `summary` when `body` is null, the real door row's own shape", () => {
-    render(
-      <GlossaryList
-        rows={[
-          makeWord({
-            id: "W1",
-            title: "Ready",
-            body: null,
-            summary: "Ready, a glossary word. Every story is closed, but nobody's told the client yet.",
-          }),
-        ]}
-        canEdit={false}
-        canDelete={false}
-        onEdit={() => {}}
-      />
-    )
+    const word = makeWord({
+      id: "W1",
+      title: "Ready",
+      body: null,
+      summary: "Ready, a glossary word. Every story is closed, but nobody's told the client yet.",
+    })
+    render(<KnowledgeSourceCard source={word} preview={definitionPreview(word)} onOpen={() => {}} />)
     expect(screen.getByText("Every story is closed, but nobody's told the client yet.")).toBeTruthy()
-    // The fixed opening itself never shows — it names the word a second time
+    // The fixed opening itself never shows, it names the word a second time
     // right under the word's own heading, which is not a definition.
     expect(screen.queryByText(/a glossary word/i)).toBeNull()
   })
@@ -189,22 +134,45 @@ describe("GlossaryList, renders entries", () => {
       "A sprint is a fixed block of time, usually one to three weeks, in which the team plans, builds and " +
       "validates a slice of an app, and every sprint carries its own named type so a reader can tell at a glance " +
       "what kind of work it holds."
-    render(
-      <GlossaryList
-        rows={[makeWord({ id: "W1", title: "Sprint", body: long })]}
-        canEdit={false}
-        canDelete={false}
-        onEdit={() => {}}
-      />
-    )
+    const word = makeWord({ id: "W1", title: "Sprint", body: long })
+    render(<KnowledgeSourceCard source={word} preview={definitionPreview(word)} onOpen={() => {}} />)
     expect(screen.queryByText(long)).toBeNull()
     const preview = screen.getByText(/…$/)
     expect(preview.textContent?.length).toBeLessThanOrEqual(141)
     expect(long.startsWith(preview.textContent?.slice(0, -1) ?? "")).toBe(true)
   })
+
+  it("draws no deactivate control, the card never had one, for any source, glossary included", () => {
+    const word = makeWord({ id: "W9" })
+    render(<KnowledgeSourceCard source={word} preview={definitionPreview(word)} onOpen={() => {}} />)
+    expect(screen.queryByLabelText(/take this word away/i)).toBeNull()
+    expect(screen.queryByLabelText(/stop using this/i)).toBeNull()
+    // No SEPARATE control rides on the cell: `role="button"` belongs to the
+    // card itself (the whole card is the one press target, the identical
+    // shape the "All" tab's own card already is), never to a second element
+    // nested inside it.
+    expect(screen.queryAllByRole("button")).toHaveLength(1)
+  })
+
+  it("edit stays reachable, pressing the card is the one action, and it opens", () => {
+    const onOpen = vi.fn()
+    const word = makeWord({ id: "W9" })
+    const { container } = render(<KnowledgeSourceCard source={word} preview={definitionPreview(word)} onOpen={onOpen} />)
+    const card = container.querySelector('[data-slot="card"]')
+    expect(card).toBeTruthy()
+    fireEvent.click(card as Element)
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it("KnowledgeSourceCard's own source declares the `preview` prop, wired to the meta line's slot", () => {
+    const src = readKnowledgeSourceCard()
+    const fnAt = src.indexOf("export function KnowledgeSourceCard(")
+    expect(fnAt, "the component's own declaration").toBeGreaterThan(-1)
+    expect(src.slice(fnAt)).toMatch(/preview\?:\s*string/)
+  })
 })
 
-describe("GlossaryFormDialog, add a word", () => {
+describe("GlossaryFormDialog, add or correct a word", () => {
   const noop = async () => {}
 
   it("cannot submit until both the word and its definition are filled in", () => {
@@ -246,11 +214,29 @@ describe("GlossaryFormDialog, add a word", () => {
 })
 
 describe("the Glossary tab is wired into the Knowledge screen (source-read proof)", () => {
-  it("is drawn by hand, always present, and renders through GlossaryList", () => {
+  it("is drawn by hand, always present, and renders through the same card and grid as the All tab", () => {
     const src = readKnowledgeScreen()
-    expect(src).toMatch(/import\s*\{\s*GlossaryList\s*\}\s*from\s*"@\/components\/knowledge\/glossary-list"/)
     expect(src).toMatch(/value:\s*"glossary"/)
-    expect(src).toMatch(/<GlossaryList/)
+    // THE SAME CARD, NEVER A BESPOKE LIST. No `GlossaryList` import or call
+    // is left anywhere in this file, and the glossary branch maps its rows
+    // through `KnowledgeSourceCard` inside `<CardGrid>`, exactly the "All"
+    // tab's own call a few lines above it.
+    expect(src).not.toMatch(/GlossaryList/)
+    expect(src).not.toMatch(/<dl[\s>]/)
+    expect(src).toMatch(
+      /import\s*\{\s*definitionPreview\s*\}\s*from\s*"@\/components\/knowledge\/glossary-list"/
+    )
+    const glossaryBranchAt = src.indexOf('if (scope.kind === "team" && activeTab === "glossary")')
+    expect(glossaryBranchAt, "the glossary branch itself").toBeGreaterThan(-1)
+    const glossaryBranch = src.slice(glossaryBranchAt, glossaryBranchAt + 2000)
+    expect(glossaryBranch, "the same wall the All tab draws").toMatch(/<CardGrid fluid minItemWidth=\{KNOWLEDGE_CARD_MIN\}/)
+    expect(glossaryBranch, "the same card component").toMatch(/<KnowledgeSourceCard/)
+    expect(glossaryBranch, "the word's own definition preview, as the card's body text").toMatch(
+      /preview=\{definitionPreview\(source\)\}/
+    )
+    // NO DEACTIVATE ACTION WIRED FROM THE CARD: the call site passes only
+    // `source`, `preview` and `onOpen`, never a delete/deactivate handler.
+    expect(glossaryBranch).not.toMatch(/onDelete|setKnowledgeActive|canDelete/)
   })
 
   it("seeds itself once, through the idempotent door, the first time the tab is opened", () => {
@@ -258,14 +244,6 @@ describe("the Glossary tab is wired into the Knowledge screen (source-read proof
     expect(src).toMatch(/contentApi\s*\n?\s*\.seedGlossary\(\)/)
   })
 
-  // BUG (a): "54 rows in the database, tab still empty." The seed effect used
-  // to invalidate only `knowledgeKey(teamId)` — but `fixed={{ kind: "glossary" }}`
-  // a few lines below makes `<PagedFind>`'s own `active` true for the whole
-  // time this tab is open (paged-find.tsx's T3654 note), so the rows on
-  // screen come from the FOUND cache, never the plain list key. A seed that
-  // only invalidated the plain key left the tab reading its own pre-seed
-  // (empty) answer until a reload. `invalidateFindsOf` is the seam
-  // paged-find.tsx exports for exactly this shape.
   it("invalidates the found cache too, not only the plain list, so a first seed shows up without a reload", () => {
     const src = readKnowledgeScreen()
     const seedAt = src.indexOf(".seedGlossary()")
@@ -293,6 +271,14 @@ describe("the Glossary tab is wired into the Knowledge screen (source-read proof
     expect(src).toMatch(/fixed=\{isApp \? \{ appId: scope\.appId \} : activeTab === "all" \? undefined : \{ kind: activeTab \}\}/)
   })
 
+  it("load-more is the same LoadMore every other tab pages with", () => {
+    const src = readKnowledgeScreen()
+    const glossaryBranchAt = src.indexOf('if (scope.kind === "team" && activeTab === "glossary")')
+    const glossaryBranch = src.slice(glossaryBranchAt, glossaryBranchAt + 2000)
+    expect(glossaryBranch).toMatch(/<LoadMore/)
+    expect(glossaryBranch).toMatch(/label=\{t\("Load more words"\)\}/)
+  })
+
   it('"Add word" opens the glossary\'s own dialog, gated by the knowledge create right', () => {
     const screenSrc = readKnowledgeScreen()
     expect(screenSrc).toMatch(/t\("Add a word"\)/)
@@ -303,18 +289,28 @@ describe("the Glossary tab is wired into the Knowledge screen (source-read proof
     expect(panelsSrc).toMatch(
       /query\.panel === "add" && query\.module === "knowledge-glossary" && can\("knowledge", "create"\)/
     )
-    // THE EDIT PANEL'S OWN GATE reads the derived `glossaryEditing` (the same
-    // id-keyed read the generic knowledge edit dialog shares, this file's own
-    // header says why) rather than repeating the panel/module check inline.
+    // EDIT STAYS: the card's own press opens exactly this panel
+    // (`?panel=edit&module=knowledge-glossary&id`), the same door the row's
+    // pencil used to open, gated the same way.
     expect(panelsSrc).toMatch(/const glossaryEditing = query\.panel === "edit" && query\.module === "knowledge-glossary"/)
     expect(panelsSrc).toMatch(/open=\{glossaryEditing && !!knowledgeEditRow && can\("knowledge", "update"\)\}/)
+
+    const cardCallAt = screenSrc.indexOf(
+      "<KnowledgeSourceCard",
+      screenSrc.indexOf('if (scope.kind === "team" && activeTab === "glossary")')
+    )
+    const cardCallEnd = screenSrc.indexOf("/>", cardCallAt)
+    const cardCall = screenSrc.slice(cardCallAt, cardCallEnd)
+    expect(cardCall, "the card's own press opens the correction dialog").toMatch(
+      /panel:\s*"edit",\s*\n?\s*module:\s*"knowledge-glossary"/
+    )
   })
 })
 
 // BUG (d), REPRODUCED AT RENDER TIME: on a team with thousands of other
 // sources, `knowledgeQ`'s own resting read (the "All" tab's first page,
 // `scope.knowledgeQ.data`/`loadedSources` in knowledge-screen.tsx) never
-// carries a glossary row past page one — the Kwapso team alone has 2087+
+// carries a glossary row past page one; the Kwapso team alone has 2087+
 // tickets. If the Glossary tab ever fell back to filtering THAT array by
 // kind (the resting branch `rows.filter((s) => s.kind === "glossary")`,
 // knowledge-screen.tsx), it would read empty forever on a team that size,
@@ -371,7 +367,7 @@ describe("cause (d): the glossary tab must ask the door for kind=glossary direct
   }
 
   it("renders the door's 54 glossary rows, never a client-side filter of a large, glossary-free first page", async () => {
-    // THE RESTING "ALL" PAGE — the shape `loadedSources` has on a big team:
+    // THE RESTING "ALL" PAGE: the shape `loadedSources` has on a big team:
     // 200 stand-ins for the 2087+ tickets, none of them kind "glossary".
     const bigFirstPage: KnowledgeSource[] = Array.from({ length: 200 }, (_, i) => makeTicketMirror(i))
     const doorGlossaryRows = [
@@ -382,7 +378,7 @@ describe("cause (d): the glossary tab must ask the door for kind=glossary direct
     let askedQuery: FindQuery | undefined
     const fetchPage = async (query: FindQuery, _cursor: string | null) => {
       askedQuery = query
-      // THE DOOR'S OWN ANSWER, never derived from `bigFirstPage` — the same
+      // THE DOOR'S OWN ANSWER, never derived from `bigFirstPage`, the same
       // separation `listSources`'s SQL `kind = ?` makes server-side
       // (workers/content/src/lib/knowledge.ts).
       return {
@@ -428,7 +424,7 @@ describe("cause (d): the glossary tab must ask the door for kind=glossary direct
       expect(screen.getByText("Ticket")).toBeTruthy()
     })
     // NONE OF THE 200 TICKET MIRRORS LEAKED IN, and none of them hid the
-    // glossary rows either — the huge, glossary-free page never entered the
+    // glossary rows either; the huge, glossary-free page never entered the
     // decision at all.
     expect(screen.queryByText("Ticket mirror 0")).toBeNull()
     expect(screen.queryByText("Ticket mirror 199")).toBeNull()

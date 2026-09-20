@@ -62,7 +62,7 @@ import { CountedAbove } from "@/components/records/counted-tabs"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
 import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
-import { GlossaryList } from "@/components/knowledge/glossary-list"
+import { definitionPreview } from "@/components/knowledge/glossary-list"
 import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shape"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind, invalidateFindsOf } from "@/components/records/paged-find"
@@ -488,9 +488,20 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
           }
           const rows = found.active ? found.rows : loadedSources
           if (rows === null) return <Skeleton variant="list" lines={4} />
-          // THE GLOSSARY'S OWN SHAPE, a word and its definition read better as
-          // a LIST (R80) than as `KnowledgeSourceCard`'s mark/title/chip/line
-          // grid, which was built for a document, a ticket mirror, a meeting.
+          // THE GLOSSARY'S OWN SHAPE, THE SAME CARD AND GRID AS "ALL". Aurora,
+          // on this tab's own dl/dt/dd rows, verbatim, 21 Sep 2026: "But why
+          // did you invent this new design? Why don't you use the kind of
+          // square card, same as in all?" `KnowledgeSourceCard` is the exact
+          // component the "All" tab's own `<CardGrid>` maps below, the word as
+          // its title, the definition preview (`definitionPreview`,
+          // glossary-list.tsx) as its one body line in place of "Last edited",
+          // and the SAME card actions "All" offers: none drawn on the cell
+          // itself, the whole card is the one press target. For a glossary
+          // word that press opens the identical correction dialog the row's
+          // own pencil used to (`?panel=edit&module=knowledge-glossary`),
+          // which is "edit stays"; no deactivate control exists on this card,
+          // or ever did, so her earlier ruling ("disable the off button, only
+          // edit") holds without anything here re-asking the question.
           // NEVER RE-FILTERED WHILE A FIND IS RUNNING (R14): `found.rows` is
           // already the door's own answer to `fixed={{kind:"glossary"}}`
           // above, kind and all, so narrowing it again in the browser would
@@ -516,15 +527,23 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
                     }
                   />
                 ) : (
-                  <GlossaryList
-                    rows={glossaryRows}
-                    teamId={teamId}
-                    canEdit={can("knowledge", "update")}
-                    canDelete={can("knowledge", "delete")}
-                    onEdit={(id) =>
-                      scope.go(scope.sectionPath, { tab: "glossary", panel: "edit", module: "knowledge-glossary", id })
-                    }
-                  />
+                  <CardGrid fluid minItemWidth={KNOWLEDGE_CARD_MIN} label={t("Glossary")}>
+                    {glossaryRows.map((source) => (
+                      <KnowledgeSourceCard
+                        key={source.id}
+                        source={source}
+                        preview={definitionPreview(source)}
+                        onOpen={() =>
+                          scope.go(scope.sectionPath, {
+                            tab: "glossary",
+                            panel: "edit",
+                            module: "knowledge-glossary",
+                            id: source.id,
+                          })
+                        }
+                      />
+                    ))}
+                  </CardGrid>
                 )}
                 <LoadMore
                   listKey={found.listKey ?? listKey}

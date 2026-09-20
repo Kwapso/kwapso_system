@@ -24,7 +24,7 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Kanban, type KanbanColumn, type KanbanMove } from "@shared/ui/components/kanban/kanban"
-import { ListBullets, Kanban as KanbanGlyph, CalendarDots, Stack as StackGlyph, Target } from "@shared/ui/foundations/icons"
+import { ListBullets, Kanban as KanbanGlyph, CalendarDots, Stack as StackGlyph } from "@shared/ui/foundations/icons"
 import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { RecipeField, ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import {
@@ -158,12 +158,20 @@ export function useStoryFormOptions(teamId: string) {
     appNames: new Map((appsQ.data ?? []).map((a) => [a.id, a.name])),
     // CHECKLIST 6.4: OPEN tickets only, each tagged with the app it is about so
     // the form can narrow to the one being chosen.
+    //
+    // `helpType` RIDES ALONG TOO (Aurora's ruling, 21 Sep 2026: "on every
+    // choice component where I can choose a ticket, show me the type as the
+    // icon everywhere") — the one field `ticketFace` (shared/web/ticket-
+    // face.tsx) needs to draw the pre-typed list's own face, the same map
+    // `web/lib/picker-sources.ts`'s `searchTickets` already reads for the
+    // SEARCHED half of this same picker.
     tickets: (ticketsQ.data ?? [])
       .filter((t) => t.status !== "resolved" && !t.archivedAt)
       .map((t) => ({
         id: t.id,
         label: t.ref ? `${t.ref} · ${richTextPlain(t.description)}` : richTextPlain(t.description),
         appId: t.appId,
+        helpType: t.helpType,
       })),
     processes: (processesQ.data ?? [])
       .filter((p) => p.active)
@@ -255,17 +263,25 @@ export async function createStoryFrom(
  * produced, one change: "I agree with all you suggested — except use Backlog
  * instead of All." documents/UI-RULEBOOK.md carries the K entry with the date.
  *
+ * REORDERED, AND EVERYONE'S RENAMED TO ALL, 21 SEP 2026. Aurora's ruling,
+ * verbatim: "Reorganize backlog tabs: Now, Planned, Review, Completed,
+ * Backlog, Everyone's. Rename everyone to All." (documents/UI-RULEBOOK.md
+ * B45). The strip reads Now, Planned, Reviews, Completed, Backlog, All now —
+ * same six tabs, same gate on the last one, only the order and that one word
+ * changed.
+ *
  * FIVE TABS, FOUR OF THEM "MINE" UNCONDITIONALLY. `now`/`planned`/`backlog`/
  * `completed` narrow to the caller's own name AT THE DOOR
  * (`workers/content/src/routes/stories.ts`'s own `MINE_VIEWS`), the identical
  * shape Tasks' three MINE tabs take — including a story with no assignee at
  * all riding along (`includeUnassigned`), because this backlog is old enough
- * to carry plenty of unclaimed history. `all` is Everyone's, gated on
- * `all_stories:read` (a new module, seeded exactly like `all_tasks`).
+ * to carry plenty of unclaimed history. `all` is All (Everyone's until 21 Sep
+ * 2026), gated on `all_stories:read` (a new module, seeded exactly like
+ * `all_tasks`).
  *
  * EACH TAB OFFERS ITS OWN VIEWS (R53): Now is Board by status (default) + List;
  * Planned is List (default) + Board by sprint + Week by due date; Backlog is
- * List (default) + Board by status; Completed is List only; Everyone's is
+ * List (default) + Board by status; Completed is List only; All is
  * List (default) + Board by status.
  *
  * THE SPRINT COLUMN, on every List view, carries the sprint's own name and the
@@ -470,7 +486,7 @@ export function shapeStories(
  * the same fact down every row of the tab it sits on is furniture. Now,
  * Planned and Backlog are all "mine" and status-mixed, so Status stays; it is
  * dropped on Completed (every row already `done`) and Assignee only appears
- * on Everyone's, the one tab that is not already narrowed to the caller. */
+ * on All, the one tab that is not already narrowed to the caller. */
 const MINE_COLUMNS = [
   field("name", "Story"),
   field("type", "Type"),
@@ -537,32 +553,37 @@ function compareStories(a: Story, b: Story, sortField: "rank" | "deadline", dir:
   return dir === "asc" ? primary : -primary
 }
 
-/** THE FOUR "MINE" TABS, in the client's own order — Now first, the artifact's
- * own recommendation. Written as data so the strip, the fetch key and the
- * badge cannot fall out of step. */
+/** THE FIVE "MINE"-OR-REVIEW TABS, reordered 21 Sep 2026 — Aurora's ruling,
+ * verbatim: "Reorganize backlog tabs: Now, Planned, Review, Completed,
+ * Backlog, Everyone's. Rename everyone to All." (documents/UI-RULEBOOK.md
+ * B45). Written as data so the strip, the fetch key and the badge cannot
+ * fall out of step. */
 const STORY_TABS: { value: StoryView; label: string; icon: string }[] = [
   { value: "now", label: "Now", icon: "warning" },
   { value: "planned", label: "Planned", icon: "clipboard-text" },
-  // "Backlog", NOT "All" — the client's own correction over the design
-  // proposal's recommendation, 15 Sep 2026 (documents/UI-RULEBOOK.md K entry).
-  { value: "backlog", label: "Backlog", icon: "stack" },
-  { value: "completed", label: "Completed", icon: "check" },
-  // THE SIXTH TAB (Aurora's ruling, 20 Sep 2026: "add a tab for reviews,
-  // views Queue and List"). Always offered, unlike Everyone's below — a
+  // THE REVIEWS TAB (Aurora's ruling, 20 Sep 2026: "add a tab for reviews,
+  // views Queue and List"). Always offered, unlike the All tab below — a
   // review of finished work is not gated on `all_stories:read` the way
   // seeing everyone's ACTIVE backlog is; the door itself narrows to the
   // caller's own name for a reader who lacks that right, the identical
-  // `all`/Everyone's fallback (`STORY_VIEWS`, shared/types.ts).
+  // `all`/All fallback (`STORY_VIEWS`, shared/types.ts).
   { value: "reviews", label: "Reviews", icon: "check-circle" },
+  { value: "completed", label: "Completed", icon: "check" },
+  // "Backlog", NOT "All" — the client's own correction over the design
+  // proposal's recommendation, 15 Sep 2026 (documents/UI-RULEBOOK.md K entry).
+  { value: "backlog", label: "Backlog", icon: "stack" },
 ]
-/** THE FIFTH TAB — the door's team-wide `all` view, shown only to a reader who
+/** THE SIXTH TAB — the door's team-wide `all` view, shown only to a reader who
  * holds `all_stories:read` (`seesEveryones`, below). Kept out of `STORY_TABS`
  * itself for `tasks.ts`'s own reason: whether it appears is a permission
  * question this component answers once, not a flag every consumer of
- * `STORY_TABS` would have to filter for itself. */
+ * `STORY_TABS` would have to filter for itself.
+ *
+ * LABELLED "ALL", NOT "EVERYONE'S" — Aurora's ruling, 21 Sep 2026 (see
+ * `STORY_TABS` above): same gate, same behaviour, only the word changed. */
 const EVERYONE_TAB: { value: StoryView; label: string; icon: string } = {
   value: "all",
-  label: "Everyone's",
+  label: "All",
   icon: "asterisk",
 }
 
@@ -983,7 +1004,7 @@ export function StoriesScreen({
     return col
   })
 
-  // THE BOARD — BY STATUS (Now, Backlog, Everyone's). `KANBAN_STATUSES` is
+  // THE BOARD — BY STATUS (Now, Backlog, All). `KANBAN_STATUSES` is
   // the client's own three-column ruling (below), never the full fixed
   // lifecycle and never the team-editable "Story status" labels.
   //
@@ -1007,17 +1028,11 @@ export function StoriesScreen({
           {s.appName ?? t("No app")}
         </Badge>
         {/* THE MOSCOW TAG STOOD HERE. PARKED, 21 Sep 2026 (`moscow-chip.tsx`). */}
-        {/* CONTRIBUTES TO THE PHASE'S GOAL (Aurora's ruling, 20 Sep 2026) — a
-            small mark on the story card, icon only (R93's visual-accompanies-
-            text is about a categorical field's own colour/icon riding beside
-            its text; this is a plain boolean flag, so a bare icon with an
-            accessible label is the honest shape rather than inventing a
-            word for "on"). */}
-        {s.contributesToGoal && (
-          <span title={t("Contributes to the phase's goal")} aria-label={t("Contributes to the phase's goal")}>
-            <Target className="size-3.5 text-muted-foreground" />
-          </span>
-        )}
+        {/* THE GOAL BADGE STOOD HERE. PARKED, 21 Sep 2026 (Aurora's ruling,
+            verbatim: "Remove the goal from the stories. I don't even know
+            what that is, but remove it."). Moved whole to `goal-badge.tsx`
+            (`PARKED["work/goal-badge"]`, shared/rules/registry.ts), see that
+            file's own header for how to bring it back. */}
       </>
     ),
     // SPRINT, THEN WHO'S DOING IT WITH AN AVATAR — the ruling's own order,

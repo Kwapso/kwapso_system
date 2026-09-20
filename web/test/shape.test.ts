@@ -598,6 +598,8 @@ const selectableValue = (over: Partial<SelectableValue> & { id: string; type: st
   description: null,
   standardDays: null,
   position: null,
+  createdAt: null,
+  createdByName: null,
   ...over,
 })
 
@@ -701,6 +703,75 @@ describe("shapeChoicesTable", () => {
       expect(status!.props.dot, `${word} row's dot must read D17's "${tone}" tone`).toBe(tone)
       expect(rows?.[0].statusText, `${word} row's plain-text status word`).toBe(word)
     }
+  })
+
+  // K59 (documents/UI-RULEBOOK.md), Aurora, 21 Sep 2026: "in settibsg sticket:
+  // typ (bug, etc) but ineed to see that 'type'." The Where cell folds the
+  // module (the retired Module column's own word) with the field a group's
+  // values fill in ("Work: Type" for "Phase type", off `shared/selectable-
+  // where.ts`'s own derivation) — never the module alone.
+  it("the Where cell reads 'module: field', folding the retired Module column", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "p1", type: "Phase type", value: "Build" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(rows?.[0].whereText).toBe("Work: Type")
+    expect(rows?.[0].whereField, "the Where facet's own plain field").toBe("Type")
+    expect(rows?.[0].moduleSegment, "the Module facet still reads this, unchanged").toBe("work")
+  })
+
+  // A group Where's own map (`shared/selectable-homes.ts`) does not name —
+  // stray data, a retired group, a test fixture — draws the module alone
+  // rather than throwing the whole table down with it (`choiceFieldWord`'s
+  // own header in shape.tsx).
+  it("the Where cell falls back to the module alone for a group selectableFieldWords does not know", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "x1", type: "Not a real group", value: "Whatever" })],
+      new Map<string, ChoiceGroupHome>([["Not a real group", { segment: "work", title: "Work" }]]),
+      "en"
+    ).rows
+    expect(rows?.[0].whereText).toBe("Work")
+    expect(rows?.[0].whereField).toBe("")
+  })
+
+  // "in choices also show columns added on and added by" — one cell, name
+  // over date, and the RAW instant riding beside it for the date sort
+  // (`sorted-columns-declare-their-type.test.ts`'s own law).
+  it("the Added cell carries the creator's first name, the formatted date, and the raw instant for sort", () => {
+    const rows = shapeChoicesTable(
+      [
+        selectableValue({
+          id: "a1",
+          type: "Industry",
+          value: "Retail",
+          createdAt: "2026-05-01T09:00:00.000Z",
+          createdByName: "Ana Bergman",
+        }),
+      ],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(React.isValidElement(rows?.[0].added)).toBe(true)
+    // R54: staff are shown by first name only, everywhere.
+    expect(rows?.[0].addedText).toBe("Ana")
+    expect(rows?.[0].createdAtRaw, "the sort's own raw value, never the shaped date").toBe(
+      "2026-05-01T09:00:00.000Z"
+    )
+  })
+
+  // A value from before the audit columns existed (or a row the fixture just
+  // never set them on) draws an Added cell with nothing to say, not a crash
+  // and not a dash — the same "carries nothing" answer R81 gives elsewhere.
+  it("the Added cell is empty, not broken, for a value with no audit block", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "a2", type: "Industry", value: "Retail" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(React.isValidElement(rows?.[0].added)).toBe(true)
+    expect(rows?.[0].addedText).toBe("")
+    expect(rows?.[0].createdAtRaw).toBeNull()
   })
 })
 

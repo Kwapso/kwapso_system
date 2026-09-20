@@ -974,7 +974,7 @@ export function TriageQueue({
                      back. If it reads too heavy in use, `secondary` is one word
                      away. */
                   variant="inverse"
-                  size="sm"
+                  // R98 — a toolbar button is the kit's default height, never `sm`.
                   disabled={busy}
                   onClick={() => void undo()}
                   className="gap-1"

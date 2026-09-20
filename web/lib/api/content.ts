@@ -175,10 +175,14 @@ export type StoryWrite = {
   sprintId?: string
   appId?: string
   processId?: string
-  /** Client-requested / Internal — client ruling, 15 Sep 2026. Required on the
-   * wire (the form always has a pill selected); the CREATE door itself still
-   * defaults a blank to 'Client-requested' for a machine caller that omits it. */
-  category: string
+  /** Client-requested / Enabler — DERIVED AT THE DOOR NOW, NOT SENT.
+   * Aurora's ruling, 21 Sep 2026, B43: the content door derives this from
+   * whether the story links a ticket (`workers/content/src/lib/stories.ts`)
+   * and no longer reads a `category` sent on the wire at all. Optional here
+   * (was required) only so a caller that still names it — a lane's own
+   * `stories-screen.tsx` call sites among them — keeps type-checking; the
+   * value, if sent, is ignored. */
+  category?: string
   /** EVERY map this work touches (CHECKLIST 6.5) — sent WHOLE, because the set
    * replaces the one the story carries. An empty list is only accepted when
    * `changesNoStep` is ticked: "no process" is Aurora's explicit CHOICE, not a
@@ -997,6 +1001,12 @@ export const content = {
   }) => api<TaskListResponse>("/api/content/tasks/update", post(input)),
   setTaskDone: (id: string, done: boolean) =>
     api<TaskListResponse>("/api/content/tasks/done", post({ id, done })),
+  /** TAKE A TASK OFF THE LIST — Aurora's 21 Sep 2026 ruling on the detail
+   * head's own "…" menu. Nothing is deleted: the row and its history survive
+   * (team migration 0113), it stops appearing on every view and every one of
+   * their counts, which is exactly what this reply's facet totals answer
+   * with fresh. */
+  deleteTask: (id: string) => api<TaskListResponse>("/api/content/tasks/delete", post({ id })),
 
   /* ---------------------------------- time ---------------------------------- */
   /** R14: a PAGE of time. `total` is the row count and `totalSeconds` is the

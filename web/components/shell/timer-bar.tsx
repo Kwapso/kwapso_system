@@ -19,7 +19,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Stopwatch } from "@shared/ui/components/stopwatch/stopwatch"
-import { StopCircle, Play } from "@shared/ui/foundations/icons"
+import { StopCircle, Timer } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -218,7 +218,7 @@ function refreshTimers(teamId: string, targetTable: string, targetId: string): v
 
 /** THE CLOCK ON ONE RECORD, NORMALIZED FOR A FOLDED MENU — extracted from
  * `RecordTimerButton` below, 18 Sep 2026, so `shared/web/head-actions.tsx`'s
- * record-head fold can offer "Start timer"/"Stop timer" as an ordinary menu
+ * record-head fold can offer "Start"/"Stop timer" as an ordinary menu
  * item at a narrow width without re-deriving the running-timer state or
  * duplicating the toggle's own error handling. `RecordTimerButton` is now a
  * thin `Button` wrapper around this hook's own return value — same running-
@@ -245,6 +245,16 @@ export function useRecordTimerAction({
   canLog,
   disabled,
   enabled = true,
+  // PER-CALLER OVERRIDE, ADDITIVE ONLY, added for the task detail head's own
+  // 21 Sep 2026 ruling ("beside the mango Done"). Aurora's SAME-DAY app-wide
+  // ruling ("everywhere where there's button to start timer, rename to just
+  // 'start' and change icon for a stopwatch") landed the moment after, on
+  // this file's own default below, so every caller now reads "Start" with
+  // the Logs rail's own glyph whether or not it passes these. Left in place
+  // rather than unwound: a caller is still free to name its own words here,
+  // it simply has nothing left to differ from.
+  startLabel,
+  startIcon,
 }: {
   teamId: string
   targetTable: "stories" | "help" | "tasks"
@@ -252,6 +262,8 @@ export function useRecordTimerAction({
   canLog: boolean
   disabled?: boolean
   enabled?: boolean
+  startLabel?: string
+  startIcon?: React.ReactNode
 }): HeadActionItem | null {
   const t = useT()
   const [busy, setBusy] = React.useState(false)
@@ -287,8 +299,8 @@ export function useRecordTimerAction({
 
   return {
     key: "timer",
-    label: mine ? t("Stop timer") : t("Start timer"),
-    icon: mine ? <StopCircle className="size-3.5" /> : <Play className="size-3.5" />,
+    label: mine ? t("Stop timer") : (startLabel ?? t("Start")),
+    icon: mine ? <StopCircle className="size-3.5" /> : (startIcon ?? <Timer className="size-3.5" />),
     onSelect: () => void toggle(),
     disabled: busy || disabled,
   }
@@ -321,14 +333,20 @@ export function RecordTimerButton({
   canLog,
   /** A finished piece of work has nothing left to time. */
   disabled,
+  /** Per-caller override — see `useRecordTimerAction`'s own note. Every
+   * caller but the task head leaves both off. */
+  startLabel,
+  startIcon,
 }: {
   teamId: string
   targetTable: "stories" | "help" | "tasks"
   targetId: string
   canLog: boolean
   disabled?: boolean
+  startLabel?: string
+  startIcon?: React.ReactNode
 }) {
-  const action = useRecordTimerAction({ teamId, targetTable, targetId, canLog, disabled })
+  const action = useRecordTimerAction({ teamId, targetTable, targetId, canLog, disabled, startLabel, startIcon })
   if (!action) return null
   return (
     <Button variant="secondary" className="gap-1" disabled={action.disabled} onClick={action.onSelect}>

@@ -30,6 +30,7 @@ import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { PRIORITY_LABEL, departmentAsks, priorityScore } from "@shared/departments"
 import type { Task, TaskViewName } from "@shared/types"
+import { refuseWhileTimerRuns } from "./work-logs"
 
 type TaskRow = {
   id: string
@@ -174,7 +175,11 @@ export type TaskFilter = {
 }
 
 function taskWhere(filter: TaskFilter): { sql: string; params: string[] } {
-  const clauses: string[] = []
+  // A DELETED TASK IS GONE FROM EVERY VIEW — team migration 0113, Aurora's 21
+  // Sep 2026 ruling. The same clause `taskWhere` and `countTasks` both open
+  // with, so a badge and the list under it can never disagree about a row
+  // that was deleted between the two reads (R16).
+  const clauses: string[] = ["t.deactivated_at IS NULL"]
   const params: string[] = []
   const view = viewClause(filter.view ?? "open")
   if (view.sql) {
@@ -315,12 +320,22 @@ export type TaskCounts = {
  * paging rather than after it.
  *
  * Deliberately ignores the view: opening a DONE task by id has to work, or the
- * completed tab could show a row nothing could open. */
+ * completed tab could show a row nothing could open.
+ *
+ * DOES NOT IGNORE `deactivated_at` (team migration 0113): a deleted task is
+ * treated as gone here too, the same posture `help.ts`'s reply-by-id lookup
+ * already takes for a deactivated reply — the single-row read has to answer
+ * the SAME question the list does, or a direct link would keep opening a
+ * record its own list swears does not exist any more. This is also what makes
+ * the ordinary row-level live patch work for free: a viewer's open list
+ * re-reads the touched row through this same function on every ping, gets
+ * `null` back the moment it is deleted, and drops it (`patchRow`,
+ * shared/web/store.ts). */
 export async function getTask(cfg: D1Rest, guard: MemberGuard, id: string): Promise<Task | null> {
   const rows = await d1Query<TaskRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? LIMIT 1`,
+    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? AND t.deactivated_at IS NULL LIMIT 1`,
     [id]
   )
   const row = rows[0]
@@ -332,7 +347,9 @@ export async function countTasks(
   guard: MemberGuard,
   filter: { assigneeId?: string; includeUnassigned?: boolean }
 ): Promise<TaskCounts> {
-  const clauses: string[] = []
+  // SAME CLAUSE `taskWhere` OPENS WITH (team migration 0113): a deleted task
+  // counts in nobody's badge, the same way it lists on nobody's view.
+  const clauses: string[] = ["t.deactivated_at IS NULL"]
   // ONE MORE `todayIso()` FOR `planned_n`, inserted where its own SUM sits in
   // the SELECT below (right after `upcoming_n`) — the params array is
   // positional, so the two must move together.
@@ -509,7 +526,7 @@ export async function updateTask(
   const rows = await d1Query<{ status: string; title: string; important: number; urgent: number }>(
     cfg,
     guard.databaseId,
-    "SELECT status, title, important, urgent FROM tasks WHERE id = ? LIMIT 1",
+    "SELECT status, title, important, urgent FROM tasks WHERE id = ? AND deactivated_at IS NULL LIMIT 1",
     [id]
   )
   const before = rows[0]
@@ -595,11 +612,12 @@ export async function setTaskDone(
   const rows = await d1Query<TaskRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? LIMIT 1`,
+    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? AND t.deactivated_at IS NULL LIMIT 1`,
     [id]
   )
   const row = rows[0]
   if (!row) throw new GuardError(404, "task_not_found", "That task doesn't exist.")
+  if (done) await refuseWhileTimerRuns(cfg, guard, { table: "tasks", id })
   const now = new Date().toISOString()
   const status = done ? "done" : "open"
   const changed = await d1Query<{ id: string }>(
@@ -617,4 +635,49 @@ export async function setTaskDone(
     relatedRowId: id,
   })
   return { moved: true, accountId: row.account_id }
+}
+
+/** DELETE A TASK — Aurora's 21 Sep 2026 ruling on the detail head's own "…"
+ * menu: "i need delete actino for tasks on the ... button." Team migration
+ * 0113 gave `tasks` the same `deactivated_at`/`deactivator_*` pair
+ * `deleteReply` (workers/content/src/lib/help.ts) already writes for a
+ * reply — the shape every soft delete in this schema keeps
+ * (CONVENTIONS.md): the row and its activity history stay exactly where they
+ * were, only `deactivated_at` moves, and `listTasks`/`countTasks`/`getTask`
+ * are the one place that stop drawing it.
+ *
+ * R17, THE SAME WAY `deleteReply` IS: the current-status predicate
+ * (`deactivated_at IS NULL`) rides the WRITE itself, not only the read above,
+ * so two concurrent deletes racing past the same lookup still move at most
+ * one row and write history once. */
+export async function deleteTask(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  id: string
+): Promise<{ accountId: string | null }> {
+  const rows = await d1Query<{ account_id: string | null; title: string; ref: string | null }>(
+    cfg,
+    guard.databaseId,
+    "SELECT account_id, title, ref FROM tasks WHERE id = ? AND deactivated_at IS NULL LIMIT 1",
+    [id]
+  )
+  const row = rows[0]
+  if (!row) throw new GuardError(404, "task_not_found", "That task doesn't exist.")
+  const now = new Date().toISOString()
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE tasks SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?, deactivator_name = ?
+      WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+    [now, actor.id, actor.email, actor.name, id]
+  )
+  if (!changed[0]) return { accountId: row.account_id }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Task deleted",
+    description: `${actor.name} deleted the task ${row.ref ?? row.title}`,
+    relatedTable: "tasks",
+    relatedRowId: id,
+  })
+  return { accountId: row.account_id }
 }

@@ -225,13 +225,11 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   await refusePortalCaller(cfg, guard)
   requireText(body.title, "Title", TEXT_LIMITS.short)
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
-  // Blank is legal here — `createStory` defaults it to 'Client-requested' —
-  // so `optionalText`, not `requireText`; the boundary still checks the
-  // POSITION even though the field may be absent (R20).
-  optionalText(body.category, "Category", TEXT_LIMITS.short)
+  // NO `category` HERE ANY MORE (Aurora's ruling, 21 Sep 2026, B43) — the
+  // door derives it from `ticketId`, below, and never reads a category off
+  // the wire; there is nothing left at this position to check.
   // "SAME DESIGN AS DETAIL" / MUST-SHOULD-COULD-WON'T (Aurora's ruling, 20 Sep
-  // 2026) — both optional at the boundary, exactly `category`'s own shape:
-  // `createStory` is what actually enforces the four-word MoSCoW list.
+  // 2026) — both optional at the boundary.
   optionalText(body.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long)
   optionalText(body.buildNotes, "Build notes", TEXT_LIMITS.long)
   optionalText(body.moscow, "Priority", TEXT_LIMITS.short)
@@ -257,7 +255,7 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
-  requireText(body.category, "Category", TEXT_LIMITS.short)
+  // NO `category` HERE ANY MORE, same reason as the create door above.
   optionalText(body.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long)
   optionalText(body.buildNotes, "Build notes", TEXT_LIMITS.long)
   optionalText(body.moscow, "Priority", TEXT_LIMITS.short)

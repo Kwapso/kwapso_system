@@ -58,6 +58,7 @@
 //   POST /api/content/tasks               -> write down a piece of admin
 //   POST /api/content/tasks/update        -> correct it (title, who, when, priority)
 //   POST /api/content/tasks/done          -> tick it / put it back
+//   POST /api/content/tasks/delete        -> take it off our own list (soft delete)
 //   GET  /api/content/triage              -> whose week it is + the tickets nobody has read
 //   POST /api/content/triage              -> put somebody on triage duty for a week
 //   GET  /api/content/insights            -> the team's week in numbers (per-module gated)
@@ -162,6 +163,7 @@ import {
   postCancelTodo,
   postCompleteTodo,
   postCreateTask,
+  postDeleteTask,
   postUpdateTask,
   postCreateTodo,
   postTaskDone,
@@ -482,6 +484,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/tasks": { handler: postCreateTask, kind: "mutation" },
   "POST /api/content/tasks/update": { handler: postUpdateTask, kind: "mutation" },
   "POST /api/content/tasks/done": { handler: postTaskDone, kind: "mutation" },
+  "POST /api/content/tasks/delete": { handler: postDeleteTask, kind: "mutation" },
   // TRIAGE — whose week it is, and what has been sitting unread. Both refused to
   // a client login: an unread request is our failure, not an SLA we promised.
   "GET /api/content/triage": { handler: getTriage, kind: "read" },

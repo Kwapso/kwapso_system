@@ -234,4 +234,33 @@ describe("POST /api/content/stories/burndown, the series a phase's chart plots",
     expect(body.days.find((d) => d.date === "2026-04-02")?.remainingCount).toBe(1)
     expect(body.days.find((d) => d.date === "2026-04-03")?.remainingCount).toBe(1)
   })
+
+  // Aurora's ruling, 21 Sep 2026, verbatim: "mind you, all of this is Monday
+  // to Friday... I, of course, don't count the weekends." A phase this test
+  // runs Monday 2026-03-02 through the following Monday 2026-03-09, eight
+  // calendar days, with a Saturday and a Sunday sitting inside it, so the
+  // ideal line has somewhere real to prove it does not drop on either of them.
+  it("the ideal line falls only on working days, flat across the weekend inside the phase", async () => {
+    const phaseId = await addSprint({ name: "Crosses a weekend", startsOn: "2026-03-02", endsOn: "2026-03-09" })
+    for (let i = 0; i < 5; i++) await addStory({ title: `Weekend story ${i}`, sprintId: phaseId })
+
+    const body = (await (
+      await call(IDS.staffUser, "POST /api/content/stories/burndown", { phaseId })
+    ).json()) as { startTotal: number; days: { date: string; idealCount: number }[] }
+
+    expect(body.startTotal).toBe(5)
+    const byDate = new Map(body.days.map((d) => [d.date, d.idealCount]))
+    // Mon, Tue, Wed, Thu, Fri: one working day at a time, 5 down to 1.
+    expect(byDate.get("2026-03-02")).toBe(5)
+    expect(byDate.get("2026-03-03")).toBe(4)
+    expect(byDate.get("2026-03-04")).toBe(3)
+    expect(byDate.get("2026-03-05")).toBe(2)
+    expect(byDate.get("2026-03-06")).toBe(1)
+    // Sat and Sun: flat, the same figure Friday closed at, no calendar-day
+    // drop across the weekend.
+    expect(byDate.get("2026-03-07")).toBe(1)
+    expect(byDate.get("2026-03-08")).toBe(1)
+    // The following Monday: the phase's own last day, back to zero.
+    expect(byDate.get("2026-03-09")).toBe(0)
+  })
 })

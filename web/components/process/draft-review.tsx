@@ -300,12 +300,14 @@ function Groups({
         </span>
         <span className="flex-1" />
         {/* Two buttons with two fixed variants — never one button whose variant
-            reports the state, which is a tab strip in disguise (R3). */}
-        <Button type="button" variant="secondary" size="sm" className="gap-1" onClick={onKeepAll}>
+            reports the state, which is a tab strip in disguise (R3). R98 — this
+            row is the panel's own card header, the kit's default height, never
+            `sm`. */}
+        <Button type="button" variant="secondary" className="gap-1" onClick={onKeepAll}>
           <Checks className="size-3.5" />
           {t("Keep all")}
         </Button>
-        <Button type="button" variant="ghost" size="sm" className="gap-1" onClick={onDropAll}>
+        <Button type="button" variant="ghost" className="gap-1" onClick={onDropAll}>
           <ArrowUUpLeft className="size-3.5" />
           {t("Leave all out")}
         </Button>

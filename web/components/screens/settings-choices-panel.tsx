@@ -214,6 +214,7 @@ import { SelectableFormDialog, type ChoiceModuleOption } from "@/components/choi
 import { ApiFailure, tenancy } from "@/lib/api"
 import type { Can } from "@/lib/perms"
 import type { SelectableValue } from "@shared/types"
+import { selectableFieldWords } from "@shared/selectable-where"
 
 const renameValueField = { ...defaultFieldConfig, label: "Value", required: true }
 const renameMarkField = {
@@ -420,6 +421,28 @@ export function SettingsChoicesPanel({
     }
   }
 
+  // THE WHERE FACET'S OWN OPTIONS — every distinct field word among the
+  // groups this reader can see, derived off `groupHome` rather than typed
+  // here (this file's header, "THE MODULE COLUMN, DERIVED, NOT TYPED TWICE" —
+  // the same discipline applied one column along). A page whose every group
+  // fills the same field (Tickets: only "Type") resolves to one option, and
+  // the facet is left off entirely below — a filter with one answer decides
+  // nothing, `moduleOptions`' own reasoning for `create: false` groups,
+  // applied here to a facet instead of a control.
+  const whereFacetOptions = Array.from(
+    new Set(
+      Array.from(groupHome.keys())
+        .map((type) => {
+          try {
+            return selectableFieldWords(type)?.[0] ?? null
+          } catch {
+            return null
+          }
+        })
+        .filter((word): word is string => word !== null)
+    )
+  ).map((word) => ({ value: word, label: t(word) }))
+
   if (valuesQ.error)
     return (
       <ShapeStateBody
@@ -544,24 +567,36 @@ export function SettingsChoicesPanel({
     actions: <RecordActionsMenu tone="row" actions={valueActions(rows[i])} />,
   }))
 
-  // THE MODULE COLUMN — DROPPED UNDER `scope`. See this file's header: a
-  // scoped mounting narrows `modulesWithChoices` to exactly one page, whose
-  // own tab strip already names it, so the column would say the same word on
-  // every row.
+  // THE WHERE COLUMN — K59, documents/UI-RULEBOOK.md, Aurora, 21 Sep 2026:
+  // "everywhere where i edit choices we need to add a c[o]lumn as for where is
+  // th[a]t choice[]! for exmaple in settibsg s[t]icket: typ[e] (bug, etc) but
+  // i[n]eed to see that 'type'." NEVER dropped under `scope`, unlike the old
+  // Module column it folds (see below): her own example is written FROM a
+  // scoped page ("in settings tickets") and asks to see the FIELD there too,
+  // so the column carries real information even when every row shares one
+  // module. `shapeChoicesTable` (deep-link/shape.tsx) builds the cell as
+  // "Module: Field" — the same module title the retired Module column drew,
+  // plus the field word `shared/selectable-where.ts` derives off `shared/
+  // selectable-homes.ts`.
+  //
+  // THE ADDED COLUMN — same ruling: "in choices also show columns added on
+  // and added by." Folded into ONE cell (creator name over the date,
+  // `shapeChoicesTable`'s own `added` field) rather than two columns, which
+  // is what holds this table at six under R82's ceiling: value + where +
+  // details + status + added + actions. The alternative — a seventh column —
+  // is the one R82 explicitly forbids ("squeezed onto the end"), and folding
+  // Module into Where (rather than, say, dropping Details) keeps every
+  // column's own FACT rather than dropping one.
   const columns: TableColumn[] = [
     { key: "value", label: t("Value"), sort: "value", searchKey: "valueText", sortKey: (r) => r.valueText },
-    ...(scope
-      ? []
-      : [
-          {
-            key: "module",
-            label: t("Module"),
-            sort: "module",
-            searchKey: "moduleText",
-            sortKey: (r) => r.moduleText,
-            defaultDir: "asc",
-          } satisfies TableColumn,
-        ]),
+    {
+      key: "where",
+      label: t("Where"),
+      sort: "where",
+      searchKey: "whereText",
+      sortKey: (r) => r.whereText,
+      defaultDir: "asc",
+    },
     // THE DETAILS COLUMN — client ruling, 16 Sep 2026 evening: "add … an
     // in-between column with details or info or whatever, and include this
     // from each case." `shapeChoicesTable` (deep-link/shape.tsx) is what
@@ -569,8 +604,7 @@ export function SettingsChoicesPanel({
     // cell it already built. No `sort`/`searchKey` — the same shape the
     // `actions` column below takes, and for the same reason: the cell is a
     // decoration (an icon, a dot, a duration), never a fact this table
-    // orders or searches by. R82: value + module + details + status +
-    // actions is five columns, one under the six-column ceiling.
+    // orders or searches by.
     { key: "details", label: t("Details") },
     {
       key: "status",
@@ -579,6 +613,18 @@ export function SettingsChoicesPanel({
       searchKey: "statusText",
       sortKey: (r) => r.statusText,
       defaultDir: "asc",
+    },
+    // ADDED — creator name over the date. `sortType: "date"` +
+    // `sortKey` reading the RAW instant (`createdAtRaw`, never the shaped
+    // `addedText`) is `sorted-columns-declare-their-type.test.ts`'s own law
+    // for exactly this shape.
+    {
+      key: "added",
+      label: t("Added"),
+      sort: "added",
+      sortType: "date",
+      sortKey: (r) => r.createdAtRaw,
+      searchKey: "addedText",
     },
     // NO `label`/`sort` — an actions column is a control, never a fact to
     // order the table by (the same shape `record-table.tsx`'s OWN built-in
@@ -611,8 +657,11 @@ export function SettingsChoicesPanel({
     emptyText: scope ? t("No values yet.") : t("No choices match what you're looking for."),
     userFilter: true,
     filterFacets: [
-      // THE MODULE FACET — DROPPED UNDER `scope`, same reason as the column
-      // above: filtering by module on a page that already IS one module.
+      // THE MODULE FACET — DROPPED UNDER `scope`, same reason the old Module
+      // COLUMN used to drop: filtering by module on a page that already IS
+      // one module. Unaffected by the Module column folding into Where
+      // (shape.tsx's own header) — the facet reads `moduleSegment`, a plain
+      // field `shapeChoicesTable` still carries on every row.
       ...(scope
         ? []
         : [
@@ -623,6 +672,20 @@ export function SettingsChoicesPanel({
               options: modulesWithChoices.map(({ page }) => ({ value: page.segment, label: t(page.title) })),
             },
           ]),
+      // THE WHERE FACET — K59, this file's header. Left off entirely when it
+      // would offer one answer (`whereFacetOptions`'s own derivation, above);
+      // present, scoped or not — her own example asked for it FROM a scoped
+      // page.
+      ...(whereFacetOptions.length > 1
+        ? [
+            {
+              field: "whereField",
+              label: t("Where"),
+              control: "select" as const,
+              options: whereFacetOptions,
+            },
+          ]
+        : []),
       // ONE THREE-WAY FACET — see this file's header for why the separate
       // Protected yes/no facet that used to stand beside this is gone:
       // "protected" now implies "active", so Protected is a mutually

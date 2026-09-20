@@ -1276,6 +1276,31 @@ again, which is the only property that matters here.
   real reason for skipping one goes in `ID_CHIP_EXEMPT`
   (`shared/rules/registry.ts`), keyed by the offending line's own text,
   never a line number.
+- **R97 `counts-beside-titles`**, if your module's screen shows a count of
+  things (related records, stakeholders, a dashboard tile), draw it beside
+  its panel's own title, in the count register (`TicketSidePanel`'s `count`
+  prop, or `CollectionHeading`'s badge), never as its own card, tile or stat
+  box. `web/test/counts-beside-titles.test.ts` censuses every `<StatGrid`
+  call site and every hand-rolled metrics grid; a real reason for skipping
+  one goes in `COUNT_REGISTER_EXEMPT` (`shared/rules/registry.ts`), keyed
+  by file.
+- **R98 `button-sizes`**, if your module draws a button in a toolbar, a page
+  head, a card header or a form foot, use the kit `Button`'s default size
+  or `size="icon"`, never `size="sm"` or a custom height/padding class.
+  `web/test/button-sizes.test.ts` censuses every `<Button` carrying
+  `size="sm"` or a custom `h-`/`py-`/`px-` class; a real reason for skipping
+  one goes in `BUTTON_SIZE_EXEMPT` (`shared/rules/registry.ts`), keyed by
+  `{file, contains}`, never a line number.
+- **R99 `no-close-while-timer-runs`**, if your module marks a record closed
+  (a status move to done, resolved, closed or completed), call
+  `refuseWhileTimerRuns(cfg, guard, { table, id })`
+  (`workers/content/src/lib/work-logs.ts`) before the write, so a record
+  with a running timer on it cannot close, and mirror the same refusal on
+  the closing button with the reason "Stop the timer first."
+  `web/test/no-close-while-timer-runs.test.ts` censuses every close door in
+  `workers/content/src/lib`; a real, dated reason for skipping one goes in
+  the check's own `CLOSE_DOOR_EXEMPT`, keyed by `{file, fn}`, never a line
+  number.
 
 **The words** (the ones that catch every new module, every time)
 

@@ -92,6 +92,7 @@ import { renderFolderTabs, defaultTabsConfig, TabsView } from "@shared/web/scree
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { STICKY_TABS } from "@/components/records/record-chrome"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(import.meta.dirname, "..", "..")
@@ -1572,5 +1573,194 @@ describe("R83 self-check, second miss -- CollectionCard's own default pt- overri
       onlyBase,
       "the pre-fix shape carries no lg: companion, so it must fail the second half of the check above"
     ).not.toMatch(/(?:^|\s)lg:pt-\[var\(--pinned-lead\)\]/)
+  })
+})
+
+// ============================================================================
+// R83, DECISION B, 21 Sep 2026 -- THE <Tabs> ROOT'S OWN gap-6/gap-7 IS A
+// FOURTH, STILL-UNCOUNTED NUMBER. Aurora's ruling: the toolbar under a
+// detail page's own tab strip (an app's own Phases/Stories/Tickets tabs, an
+// account's Contacts panel and its other tabbed panels) sits 10px under the
+// strip, exactly Ruling 7's "10 above and below, both in main and details."
+// ============================================================================
+// Every proof above this block already establishes that a first-child card
+// nested inside a record's own tab pane pays the WHOLE --toolbar-lead-gap
+// (10px) as its own --pinned-lead/padding-top, cancelled at rest by
+// PINNED_TOOLBAR's own mt/pt pair the identical way a top-level toolbar's
+// lead cancels. What none of them touch is `STICKY_TABS`
+// (web/components/records/record-chrome.tsx), which puts
+// `gap-[var(--space-6)] lg:gap-[var(--space-7)]` on the <Tabs> root itself --
+// the flex gap between [role=tablist] and its TabsContent sibling -- so the
+// card's correctly cancelled 10px still sat under an untouched 24px (below
+// lg) / 32px (lg and up) nothing here had ever reached.
+//
+// FIXED AT THE SEAM: globals.css now zeroes that gap, but ONLY when the
+// ACTIVE tab pane's own leading card hosts a toolbar as its first child --
+// jsdom's own selector engine (nwsapi, the same one Element.matches() and
+// querySelector use) supports :has() well enough to prove the exact
+// selector text globals.css carries actually matches a REAL render of this
+// composition, not a hand-simplified stand-in.
+describe("R83, decision B -- the <Tabs> root's own gap-6/gap-7 is zeroed for a toolbar-led active pane, and left alone for anything else", () => {
+  const GLOBALS_CSS_PATH = join(ROOT, "web", "app", "globals.css")
+  const TOKENS_CSS_PATH = join(ROOT, "shared", "ui", "foundations", "tokens", "tokens.css")
+
+  /** The literal selector text globals.css must carry -- read once, used by
+   * both the CSS proof (does the file contain it) and the DOM proof (does a
+   * real render match it), so the two can never quietly drift apart. */
+  const ZERO_GAP_SELECTOR =
+    '[data-slot="tabs"]:has(> [data-tab-pane][data-state="active"] [data-slot="card"]:first-child > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child)'
+
+  function TabbedRecordFixture({ toolbarActive }: { toolbarActive: boolean }) {
+    return (
+      <TabsView
+        className={STICKY_TABS}
+        config={{
+          ...defaultTabsConfig,
+          tabs: [
+            { value: "toolbar", label: "Tickets", icon: "", badge: "", badgeVariant: "" },
+            { value: "facts", label: "Overview", icon: "", badge: "", badgeVariant: "" },
+          ],
+        }}
+        value={toolbarActive ? "toolbar" : "facts"}
+        renderPanel={(t) =>
+          t.value === "toolbar" ? (
+            <CollectionCard>
+              <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                <div data-slot="toolbar-row-column">the toolbar</div>
+              </div>
+              <div data-testid="rows">the rows</div>
+            </CollectionCard>
+          ) : (
+            <div data-testid="facts">fact rows, prose, nothing a toolbar draws</div>
+          )
+        }
+      />
+    )
+  }
+
+  it("DOM: a real STICKY_TABS-classed <Tabs> root, with the toolbar tab active, matches the exact selector globals.css carries", () => {
+    render(<TabbedRecordFixture toolbarActive={true} />)
+
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    expect(tabsRoot, "TabsView must render the kit's Tabs root, data-slot=\"tabs\"").toBeTruthy()
+
+    // SANITY -- this is the real, un-simplified composition: STICKY_TABS's
+    // own gap-6/lg:gap-7 classes are on this exact element, so a rule that
+    // beats them has something real to beat.
+    expect(tabsRoot.className, "the root must actually carry STICKY_TABS's own base gap").toMatch(
+      /(?:^|\s)gap-\[var\(--space-6\)\]/
+    )
+    expect(tabsRoot.className, "and its lg: step").toMatch(/(?:^|\s)lg:gap-\[var\(--space-7\)\]/)
+
+    const activePane = document.querySelector('[data-tab-pane][data-state="active"]')
+    expect(activePane, "the active pane must carry both data-tab-pane and data-state=active").toBeTruthy()
+    const card = activePane!.querySelector('[data-slot="card"]')
+    expect(card === activePane!.firstElementChild, "the card must be the active pane's own first child").toBe(true)
+    const content = card!.querySelector(':scope > [data-slot="card-content"]')
+    expect(
+      content!.firstElementChild?.getAttribute("data-slot"),
+      "the toolbar must be the card content's own first child"
+    ).toBe("toolbar-row-pin")
+
+    expect(
+      tabsRoot.matches(ZERO_GAP_SELECTOR),
+      "the real, rendered <Tabs> root must match the exact selector globals.css keys the gap override on"
+    ).toBe(true)
+  })
+
+  it("DOM: the SAME fixture, with the fact-rows tab active instead, does NOT match -- STICKY_TABS's own gap-6/gap-7 must stay untouched here", () => {
+    render(<TabbedRecordFixture toolbarActive={false} />)
+
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    const activePane = document.querySelector('[data-tab-pane][data-state="active"]')
+    expect(activePane!.querySelector('[data-testid="facts"]'), "the active pane must be the fact-rows one").toBeTruthy()
+
+    // VERIFIED, NOT ASSUMED -- this app's own Tabs (shared/ui/components/
+    // tabs/tabs.tsx) passes no forceMount to Radix's TabsContent, so the
+    // inactive tab is not merely hidden, it is not mounted at all: no
+    // toolbar-row-pin exists anywhere in this render. The RUN itself is the
+    // proof (querySelector across the whole document, not scoped to any
+    // pane), and it is why the CSS selector's own [data-state="active"]
+    // guard is a defensive second line, not the only reason this passes.
+    expect(
+      document.querySelector('[data-slot="toolbar-row-pin"]'),
+      "with the fact-rows tab active and no forceMount anywhere in this Tabs composition, the toolbar tab's own content is not mounted at all -- confirming there is nothing here for an unguarded :has() to have falsely matched either"
+    ).toBeNull()
+
+    expect(
+      tabsRoot.matches(ZERO_GAP_SELECTOR),
+      "a Tabs root whose ACTIVE pane starts with fact rows must not match the toolbar-only selector -- the gap between the strip and a pane that starts with anything else must not change"
+    ).toBe(false)
+  })
+
+  it('CSS: globals.css carries the exact zero-gap rule on [data-slot="tabs"]:has(...), unconditionally (no @media wrapper, so the same rule applies at every width, lg and below alike)', () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    const rule = new RegExp(
+      String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+    )
+    expect(
+      css,
+      "web/app/globals.css must zero the gap on the exact selector this suite's DOM proof above renders and matches"
+    ).toMatch(rule)
+
+    // NO lg: COMPANION -- the fix is one flat value at every width, unlike
+    // STICKY_TABS's own base/lg pair it is overriding. web/app/globals.css
+    // carries no @media block anywhere today (this repo does its
+    // responsive work through Tailwind's lg: class prefix, never a raw
+    // media query in this file), so the simplest true statement is also the
+    // exact guard: this file gaining ANY @media block would be the first
+    // one, and a future edit that wraps THIS rule in one would have to add
+    // it.
+    expect(
+      css,
+      "web/app/globals.css must carry no @media block -- the zero-gap rule above must apply at every width, lg and below alike, never scoped to one breakpoint"
+    ).not.toMatch(/@media/)
+  })
+
+  it("ARITHMETIC: the pane's own padding-top plus the (now zeroed) tabs gap equals the same 10px token a top-level toolbar's lead already reads, at every width", () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    const tokens = readFileSync(TOKENS_CSS_PATH, "utf8")
+
+    // THE CARD'S OWN CONTRIBUTION -- proved elsewhere in this file
+    // (the nested-tab-pane rule) to be var(--toolbar-lead-gap), and
+    // --toolbar-lead-gap itself resolves to var(--space-2h).
+    expect(css, "--toolbar-lead-gap must still resolve to --space-2h").toMatch(
+      /--toolbar-lead-gap:\s*var\(--space-2h\)\s*;/
+    )
+    const spaceMatch = /--space-2h:\s*([0-9.]+)rem/.exec(tokens)
+    expect(spaceMatch, "shared/ui's own tokens.css must define --space-2h in rem").toBeTruthy()
+    const spaceTwoHRem = Number(spaceMatch![1])
+    const rootFontPx = 16
+    const cardLeadPx = spaceTwoHRem * rootFontPx
+    expect(cardLeadPx, "--space-2h must be the scale's 10px half-step").toBe(10)
+
+    // THE TABS ROOT'S OWN CONTRIBUTION, ONCE THIS RULE FIRES -- 0px, proved
+    // by the CSS test above and the DOM match proof before it.
+    const tabsGapPxOnceFired = 0
+
+    // THE SUM -- the same 10px Ruling 7 names for a top-level toolbar,
+    // reached the same way (a cancelled lead, not a literal margin), at
+    // every width: the zero-gap rule carries no lg: step, so this sum holds
+    // identically below lg and at lg and above.
+    expect(cardLeadPx + tabsGapPxOnceFired, "card lead (10) + tabs-root gap (0, once fired) must equal 10").toBe(10)
+  })
+
+  it("RED PROOF: a stylesheet missing the zero-gap rule does not satisfy the CSS proof above", () => {
+    const preFix = `
+      [data-tab-pane] [data-slot="card"]:first-child {
+        --pinned-lead: var(--toolbar-lead-gap);
+      }
+      [data-tab-pane] [data-slot="card"]:first-child > [data-slot="card-content"] {
+        padding-top: var(--toolbar-lead-gap);
+      }
+    `
+    const rule = new RegExp(
+      String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+    )
+    expect(preFix, "the pre-fix stylesheet (card lead alone, no root-gap override) must not match today's rule").not.toMatch(
+      rule
+    )
   })
 })

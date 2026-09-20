@@ -8079,6 +8079,43 @@ CREATE INDEX idx_help_assignee ON help (assignee_id);
 ALTER TABLE stories ADD COLUMN build_notes TEXT;
 `,
   },
+  {
+    // A TASK GETS A DELETE — Aurora's 21 Sep 2026 ruling: "i need delete
+    // actino for tasks on the ... button." `tasks` (0016) carries a
+    // `created_at`/`creator_*` and `updated_at`/`editor_*` audit pair
+    // already, read at the head of this migration's own PRAGMA check before
+    // writing it, but no `deactivated_at`: unlike `accounts`, `apps` or
+    // `help_threads` (0108), a task was never a record anybody put away, only
+    // one that was finished. Deleting one is a NEW act, not a rename of an
+    // existing status.
+    //
+    // THE SAME SHAPE 0108 GAVE `help_threads` FOR ITS OWN DELETE HALF
+    // (`deleteReply`), and for the identical reason (CONVENTIONS.md,
+    // deactivate-never-delete): the row and its activity history survive
+    // exactly as they were, `deactivated_at` moves and nothing else, and
+    // `listTasks`/`countTasks`/`getTask` (workers/content/src/lib/tasks.ts)
+    // are the one place that stops drawing it. Four columns, not two — a
+    // deactivator is a DIFFERENT fact from the last editor (the whoever wrote
+    // the task's last edit is not necessarily who deleted it, unlike
+    // `deleteReply`'s reasoned reuse of `editor_*` for a table that carries no
+    // separate deactivator pair at all), so this follows the MAJORITY shape
+    // in this schema (`accounts`, `apps`, `account_links`, `portal_users`…):
+    // its own `deactivator_id`/`deactivator_email`/`deactivator_name` beside
+    // `deactivated_at`.
+    //
+    // NUMBERED 0113, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0112 is the highest version on both the local
+    // tree and `origin/main` as of 21 Sep 2026, so 0113 is the next free
+    // number.
+    version: "0113_a_task_gets_a_delete",
+    sql: `
+ALTER TABLE tasks ADD COLUMN deactivated_at TEXT;
+ALTER TABLE tasks ADD COLUMN deactivator_id TEXT;
+ALTER TABLE tasks ADD COLUMN deactivator_email TEXT;
+ALTER TABLE tasks ADD COLUMN deactivator_name TEXT;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

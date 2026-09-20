@@ -534,6 +534,46 @@ export async function runningTimers(cfg: D1Rest, guard: MemberGuard): Promise<Ru
   })
 }
 
+/** R99, "cannot mark anything as closed (task, story, ticket, whatever) if
+ * there's an active time log running." Aurora's ruling, verbatim, 21 Sep
+ * 2026. ONE shared refusal for every door that closes a record, so a story's
+ * Done, a ticket's resolve, a ticket's archive and a task's Done all ask the
+ * identical question the identical way rather than four copies of one
+ * predicate drifting apart.
+ *
+ * `target.table` is NOT re-checked against `WORK_LOG_TARGETS` here: the
+ * caller already knows what it is closing (a story door names "stories", a
+ * ticket door names "help", a task door names "tasks"), and re-validating an
+ * allow-list this same file already owns would only be a second place that
+ * list could go stale. `target.id` is bound, never interpolated.
+ *
+ * ANY running timer refuses the close, not only the caller's own, the same
+ * reasoning `stories.ts`'s `refuseUnreviewable` states for the review step
+ * beside this one: two people can be on one piece of work, and it is not
+ * closed while either of them is still on the clock.
+ *
+ * `LIMIT 1`, not a count: the door only ever needs to know ONE thing, whether
+ * to refuse, and stops at the first live row rather than counting every one
+ * still running.
+ *
+ * `workers/content/src/lib/tasks.ts`'s `setTaskDone` carries this exact
+ * check inline, dated 21 Sep 2026, with its own note to replace it with this
+ * helper "the moment it lands"; this is that landing. The tasks door's own
+ * replacement call is `refuseWhileTimerRuns(cfg, guard, { table: "tasks", id })`. */
+export async function refuseWhileTimerRuns(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  target: { table: string; id: string }
+): Promise<void> {
+  const running = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM work_logs WHERE target_table = ? AND target_id = ? AND ended_at IS NULL AND discarded_at IS NULL LIMIT 1`,
+    [target.table, target.id]
+  )
+  if (running[0]) throw new GuardError(409, "timer_running", "Stop the timer first.")
+}
+
 /** Is this person's "starting a timer stops my others" switch on? Off unless they
  * have said otherwise — a setting that silently stopped your other work would be
  * discovered by losing an hour. */

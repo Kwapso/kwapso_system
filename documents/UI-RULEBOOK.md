@@ -37,10 +37,10 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L39)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L42)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K56)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B42)
+- [4. Collections](#4-collections) (K1 to K60)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B47)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1703,6 +1703,36 @@ live: no em dash anywhere a person reads.
 **Status: ruled and in build, 21 Sep 2026.** The three Backlog sites this rule was written over — `storyLead()`'s and `ReviewsQueue()`'s own chips, and the standalone `ID` column shared by `PLANNED_BACKLOG_COLUMNS` and `REVIEWS_LIST_COLUMNS` (`web/components/work/stories-screen.tsx`) — now route through the register too: the two badges call `<RecordRef>` directly, and the column wires it through `RecordTable`'s own `TableColumn.render` slot, keyed off the `ref` column, while the shaped row still carries the raw string for search and sort. `ID_CHIP_EXEMPT` carries no entry for `stories-screen.tsx` any more.
 
 **Law.** [R96](../RULES.md) (`id-chip-is-black`), a source census, `web/test/id-chip-is-black.test.ts`, over both front doors plus `shared/web/`: every bare record reference sitting inside a `Badge` that is not `variant="inverse"`, and every standalone `field("ref", "ID")` column, must route through `<RecordRef>` — directly, or through a `render` callback the census recognises by its own wiring shape — or be named in `ID_CHIP_EXEMPT`, keyed by the offending line's own text rather than a line number.
+
+---
+
+### L40: a count never gets its own card
+
+**The rule (R97 `counts-beside-titles`).** Aurora's ruling, 21 Sep 2026, verbatim: *"While it is a rule that when it's a count, unless explicitly said, it doesn't deserve its own card. Just by rule, same as related tickets or related stories or stakeholders: just a count next to the title."* A number that counts things (how many tickets, how many stories, how many stakeholders) never earns a card, a tile or a stat box of its own; it sits beside its panel's own title, in the count register the app already builds for exactly the case she named: `TicketSidePanel`'s own `count` prop (`{title} {count}` on the heading's own line, "Stakeholders 4") and `CollectionHeading`'s own badge, one level up, for a whole screen's own count.
+
+**Status: ruled, and read as open, 21 Sep 2026.** Two shapes found the day this rule was written: the kit's own `<StatGrid>` primitive (a number-and-label card by construction), three call sites, the tickets dashboard's own stat strip, the assistant's metric blocks, and the work-logs summary strip; and a hand-rolled metrics grid, the story page's own "Metrics" panel (cycle time / effort / flow efficiency). Whether a dashboard's own wall of numbers is the "explicitly said" exception her ruling leaves open is not decided here — every `<StatGrid>` site found is named, not removed, reason "pending her word". The story page's own Metrics panel is a known offender another lane owns (it is folding the panel into the Effort card the same session this rule was written); reported rather than fixed here.
+
+**Law.** [R97](../RULES.md) (`counts-beside-titles`), a source census, `web/test/counts-beside-titles.test.ts`, over `web/components` and `web-portal/components`: every `<StatGrid` call site, and every file repeating the app's own KPI-tile value styling (`font-mono text-sm font-semibold`, two or more times in one file) twice or more, must be named in `COUNT_REGISTER_EXEMPT`, keyed by file.
+
+---
+
+### L41: every button is the kit's own height
+
+**The rule (R98 `button-sizes`).** Aurora's ruling, 21 Sep 2026, verbatim, validating the fix to the Knowledge Sync button (`size="sm"` sitting beside toolbar siblings at the kit's own default 40px, K56 above): *"Validated. This is a rule for all buttons, so make sure that I don't find any others like this."* Every button in a toolbar, a page head, a card header or a form foot uses the kit `Button`'s own default size, or `size="icon"` (the same 40px height), never `size="sm"` (32px) or a custom height/padding class.
+
+**Status: ruled and in build, 21 Sep 2026.** Twenty-three call sites across seventeen files carried `size="sm"` in one of the four named surfaces the day this rule was written and were fixed the same session: the `record-calendar`/`record-week`/`record-timeline` "Today" buttons, `filter-bar.tsx`'s "Clear filters", the toolbar `actions=` slots on `account-detail-panels.tsx` and `triage-queue.tsx`, `process-detail.tsx`'s two card-header actions, `read-a-call.tsx`, `wave-phase-days-panel.tsx`'s and `email-change-dialog.tsx`'s form feet, `draft-review.tsx`'s card header, `process-date-slider.tsx`, `triage-strip.tsx`'s page head, `ticket-rating.tsx`'s form foot, `kwapso-screen.tsx`'s panel header, `staff-panel.tsx`'s page head, and `import-screen.tsx`'s two card headers.
+
+**Law.** [R98](../RULES.md) (`button-sizes`), a source census, `web/test/button-sizes.test.ts`, over both front doors plus `shared/web/`: every `<Button` (or a future `<IconButton`) carrying `size="sm"` or a custom `h-`/`py-`/`px-` class, matched past a nested `{…}` expression so an `onClick` arrow's own `=>` never closes the tag early, must sit outside a toolbar, a page head, a card header and a form foot, or be named in `BUTTON_SIZE_EXEMPT`, keyed by `{file, contains}`, the offending Button's own opening-tag text rather than a line number.
+
+---
+
+### L42: no record closes while its own clock is still running
+
+**The rule (R99 `no-close-while-timer-runs`).** Aurora's ruling, 21 Sep 2026, verbatim: *"cannot mark anything as closed (task, story, ticket, whatever) if there's an active time log running."* A story's Done button, a ticket's Close button and a ticket's Archive menu item all ask the same question, whether a timer is running on that record, and are disabled, with the reason *"Stop the timer first,"* while one is. The check lives at the door first (`refuseWhileTimerRuns`, `workers/content/src/lib/work-logs.ts`, `GuardError(409, "timer_running", "Stop the timer first.")`), and the button only reads the same fact back, the shape every mirrored refusal in this app already takes.
+
+**Status: ruled and in build, 21 Sep 2026.** Three doors carry the check: a story's Done (`setStoryStatus`), a ticket's resolve (`setStatus`) and a ticket's archive (`setTicketArchived`). `tasks.ts`'s own Done door already carried this exact check, written inline before the shared helper existed, with its own note asking for the swap the moment it landed; that swap is a known pending site owned by the tasks lane, not made here.
+
+**Law.** [R99](../RULES.md) (`no-close-while-timer-runs`), a source census, `web/test/no-close-while-timer-runs.test.ts`, over `workers/content/src/lib`: every exported function that both compares a status to one of "done", "resolved", "closed" or "completed" and writes a closing column (`status`, `completed_at`, `archived_at`, `resolved`) must call `refuseWhileTimerRuns(`, or be named in the check's own `CLOSE_DOOR_EXEMPT`, keyed by `{file, fn}`, a dated reason and never a line number.
 
 ---
 
@@ -4083,6 +4113,29 @@ together:
 `web/components/deep-link/screen-bits.tsx`, `web/components/accounts/account-detail.tsx`,
 `web/components/work/time-panel.tsx`).**
 
+**DECISION B, 21 Sep 2026: the space under a detail page's own tab strip is the SAME 10
+above, 10 below every other toolbar reads, in every tabbed record.** Aurora, choosing
+between the two shapes drawn side by side: the toolbar under a detail page's own tab strip
+(an app's own Phases, Stories, Tickets tabs; an account's Contacts panel and its other
+tabbed panels) sits 10px under the strip, exactly this rule's "10 above and below, both in
+main and details." Round 18's own fix above already made the nested card's own lead pay the
+whole `--toolbar-lead-gap` (10px), cancelled at rest by `PINNED_TOOLBAR`'s own mt/pt peek the
+identical way a top-level toolbar's lead cancels, so a live, unscrolled reading of 0px above
+was already correct there. What that round never reached was one level up: `STICKY_TABS`
+(`web/components/records/record-chrome.tsx`) puts `gap-[var(--space-6)] lg:gap-[var(--space-7)]`
+on the kit's own `<Tabs>` root, the flex gap between the tab strip and its `TabsContent`
+sibling, so the card's correctly cancelled 10px still sat under an untouched 24px below `lg`
+and 32px at `lg` and up, on top of a card that already measured 0px at rest, nothing here had
+ever named or reached. Fixed in `web/app/globals.css`: a new rule zeroes that flex gap, but
+only when the ACTIVE tab pane's own leading card hosts a collection toolbar as its first
+child (`[data-slot="tabs"]:has(> [data-tab-pane][data-state="active"] [data-slot="card"]
+:first-child > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child)`),
+so a pane that starts with anything else (fact rows, prose) keeps its ordinary gap. Proved by
+`web/test/toolbar-lead-gap-card.test.tsx`.
+
+**Status: ruled, in build, 21 Sep 2026 (`web/app/globals.css`,
+`web/test/toolbar-lead-gap-card.test.tsx`).**
+
 ### K34: the Accounts collection strip is Active · Inactive · All, defaulting to Active
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"For account status, let's keep
@@ -4844,6 +4897,137 @@ the exact same ternary slot they already shared, styled alike rather than reloca
 **Law.** None new: a call-site fix through the kit's own Button `size` prop; R72's own
 point (a control's helper text belongs to the control, not to a heading) is why the hint
 stayed in place rather than moving to CollectionHeading's title line.
+
+---
+
+### K57: faces stay visible once selected, kit v1.2.144
+
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim: *"on choice components, when I have
+selected, for example, the app, in the dropdown I see the icon, but I want to continue
+seeing it also once it's selected. This app accounts for people everywhere where I select
+something with an avatar or an image. Still show it once it's selected, or the icon."*
+
+**The gap.** R90's own kit v1.2.127 face slot only ever showed on a `SelectTrigger` when
+the call site passed a `face` prop a SECOND time, by hand, after already resolving which
+option was chosen. Nine call sites did that work; every other Select closed back down to a
+bare label the instant a face-carrying option was picked.
+
+**The shape.** Kit v1.2.144 (`kwapso-design`): `Select` is now a small wrapping function
+component around Radix's own `Root`, carrying a face registry every `SelectItem` populates
+with its own `(value, face)` pair as it renders. `SelectTrigger` reads that registry for the
+current value and draws the face on its own, no per-call-site prop required, an explicit
+`face` still overriding it where one is already given. Works before the list is ever opened
+once, because Radix keeps every `SelectItem` mounted (open or shut) the same way it keeps
+`SelectValue`'s own text current with no prior open.
+
+**Status: ruled, in build, 21 Sep 2026 (kit `kwapso-design` v1.2.144, synced to
+`shared/ui/`; pinned in the kit's own `components/select/check-select.mjs`).**
+
+**Law.** R90 (`faces-in-choices`), amended by this kit tag: the census
+(`web/test/faces-in-choices.test.ts`) still asks whether an identity-bearing Select's
+options carry `face=`; this rule is what makes the trigger keep showing it afterwards.
+
+### K58: ticket pickers show the type icon
+
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim: *"On every choice component where I
+can choose a ticket, show me the type as the icon everywhere."*
+
+**The shape.** `ticketFace(ticket)` (`shared/web/ticket-face.tsx`) builds the `SelectFace`
+for a ticket from its own type, through the same map the tickets list already draws
+(`ticketTypeIconName`, `shared/ticket-types.ts`): the bug glyph for an Issue, the question
+mark for a Question, the regular plus circle for an Extra, the chat bubble for Feedback, and
+a neutral ticket glyph for a renamed or untyped ticket rather than a blank option. It reads
+through kit v1.2.144's own `SelectFace.icon` variant (K57), so a ticket picker's trigger
+keeps the type icon once an option is picked, the same as a face does.
+
+**Status: ruled, in build, 21 Sep 2026 (`shared/web/ticket-face.tsx`); the story form's own
+ticket picker (`web/components/work/story-form-dialog.tsx`) is a separate lane's file and
+wires the helper on its own turn; a census of `web/components` and `shared/web` on 21 Sep
+2026 found no OTHER Select or picker in the app choosing a specific ticket record yet.**
+
+**Law.** R93 (`visual-accompanies-text`): a choice over a record with its own visual draws
+that visual beside the text, never text alone; K57/kit v1.2.144 is what keeps it drawn once
+chosen.
+
+---
+
+### K59: choices show a Where column and filter, and Added on / Added by, with sort by name and created on
+
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim: *"everywhere where i edit choices we
+need to add a cokumn as for where is taht choiceeee! for exmaple in settibsg sticket: typ
+(bug, etc) but in eed to see that 'type'. makes sense no? also have it as a filter. in
+choices also show columns added on and added by, and add sort (name, xreated on) this
+everywhere where choices."*
+
+**The shape.** One component draws every choices table in the app — the general Settings ›
+Choices tab and every per-module Choices panel both mount `SettingsChoicesPanel`
+(`web/components/screens/settings-choices-panel.tsx`), scoped or not — so one change reaches
+both. A **Where** column (`shared/selectable-where.ts`'s `selectableFieldWords`, derived off
+the group-to-table/column map `shared/selectable-homes.ts` already keeps, never a second
+list) reads "Tickets: Type", "Stories: Status", "Phases: Type" — the module a group is edited
+on beside the field its values fill in. It folds the table's old Module column (module alone)
+rather than adding a seventh, and it is drawn even on a scoped, single-module page, because
+her own example is written from one ("in settings tickets… I need to see that 'type'"). A
+**Where filter** facet reads the same field word, offered only when a reader's visible groups
+actually span more than one (a facet with one answer decides nothing). The list door
+(`listSelectable`, `workers/tenancy/src/lib/selectable.ts`) already hands back the WHOLE
+team vocabulary in one bounded, capped read — never paged, not a `GROWING_COLLECTIONS` entry
+— so both the Where and the pre-existing Module/Status filters narrow the already-fetched rows
+client-side, the same mechanism the Status facet has always used; R14/R16 (paged/growing
+lists) do not apply to this door. **Added on / Added by** fold into one **Added** column
+(creator's first name over the date, the same stack shape a record's own footer draws) —
+`listSelectable` now selects the audit block (`created_at`/`creator_id`/`creator_name`) on
+every row, not only the single-row door, so `SelectableValue.createdAt`/`createdByName` are
+never absent from a list read again. **Sort by name** was already the Value column's own
+header (`sort: "value"`); **sort by created on** is the new Added column's header
+(`sortType: "date"`, comparing the raw instant, never the formatted date).
+
+**Status: ruled, in build, 21 Sep 2026** (`shared/selectable-where.ts`,
+`web/components/deep-link/shape.tsx`'s `shapeChoicesTable`,
+`web/components/screens/settings-choices-panel.tsx`); worker change in
+`workers/tenancy/src/lib/selectable.ts`; tests in
+`workers/tenancy/test/selectable-where.test.ts` (every seeded group resolves a field word),
+`workers/tenancy/test/selectable-doors.test.ts` (the list door's audit block), and
+`web/test/shape.test.ts` (the Where/Added cells and the date sort's raw key).
+
+**Law.** R82 (`table-column-budget`): value + where + details + status + added + actions is
+six columns, the ceiling itself — Module folded into Where and Added on/Added by folded into
+one Added column are what hold the line, so no `TABLE_COLUMN_BUDGET_EXEMPT` entry was needed.
+R75 (`sorted-options`): the Where facet's options sort A→Z for free, through
+`shared/web/screen-engine/filter-bar.tsx`'s own `optionsFor` chokepoint every facet already
+passes through. `sorted-columns-declare-their-type.test.ts`: the Added column's `sortType:
+"date"` + raw `sortKey` is what that census requires of any sortable date cell.
+
+---
+
+### K60: every timer-start button reads "Start", with the stopwatch icon
+
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim: *"everywhere where there's button to
+start timer, rename to just 'start' and change icon for a stopwatch (same as in navbar for
+logs)."*
+
+**The shape.** The Logs rail entry's own glyph is `CONCEPT_ICON.time` (`web/lib/pages.ts`),
+`"timer"`, the kit's `Timer` Phosphor component, so "the stopwatch" and "the same as the
+Logs rail" name one glyph. The app's one shared start/stop toggle, `useRecordTimerAction` /
+`RecordTimerButton` (`web/components/shell/timer-bar.tsx`), is what the ticket head and the
+story head both read; its "not mine" branch now defaults to `t("Start")` and `<Timer>`
+rather than `t("Start timer")` and `<Play>`. The Stop half is untouched on purpose: it has
+always drawn `StopCircle`, never `Play`, so it was never in the icon family this ruling
+retired. The Stories page's own per-story quick-launch strip (`StartTimerStrip`,
+`web/components/work/time-panel.tsx`) took the same glyph swap; its label stays each story's
+own title rather than the bare word "Start", since five buttons in a row read alike
+otherwise, and the word this ruling names is what the CONTROL says, not what identifies
+which record it starts. Task detail's own button is a separate, same-day lane (its own
+21 Sep 2026 ruling, "beside the mango Done") wiring a `startLabel`/`startIcon` override on
+the same shared control; it inherits this default for free and is not re-touched here.
+
+**Status: ruled, in build, 21 Sep 2026** (`web/components/shell/timer-bar.tsx`,
+`web/components/work/time-panel.tsx`); census in `web/test/timer-start-word.test.ts`, which
+walks every call site that wires a timer-start control and fails on a leftover "Start timer"
+string or `Play` icon, task detail/task form named out (another lane's own file).
+
+**Not a law.** No registry entry, a plain copy/icon rename recorded here for the next
+reader, checked only by the census test named above.
 
 ---
 
@@ -6197,6 +6381,25 @@ and the confirm flow are unchanged in the file, the same door the record screen'
 using this" button still calls, gated behind one switch, `GLOSSARY_DEACTIVATE_ENABLED`,
 currently off.
 
+**AMENDED AGAIN 21 Sep 2026 - the same card as "All," not a bespoke list.** Aurora, on the
+tab's own rows, verbatim: *"But why did you invent this new design? Why don't you use the
+kind of square card, same as in all?"* The dl/dt/dd row this section describes above is
+gone: the Glossary tab now maps its words through `KnowledgeSourceCard`, the exact component
+and `<CardGrid fluid minItemWidth={KNOWLEDGE_CARD_MIN}>` wall the Knowledge screen's "All" tab
+already draws (`web/components/knowledge/knowledge-screen.tsx`), never a second card shape for
+one kind of source. The word is the card's own title; the definition preview from the
+amendment above is its one body line, through a new `preview` prop on `KnowledgeSourceCard`
+(`web/components/knowledge/knowledge-source-card.tsx`) that takes the "Last edited" meta
+line's slot when a caller hands one over, unset everywhere else. The card offers the exact
+actions "All" offers: none drawn on the cell itself, the whole card is the one press target,
+which is "edit stays, no deactivate" read structurally rather than restated: pressing a word's
+card opens the same correction dialog its row's pencil used to
+(`?panel=edit&module=knowledge-glossary`), and no deactivate control exists on this card, or
+ever did, so the ruling two paragraphs above holds without anything here re-asking the
+question. Search and load-more are unchanged, the tab's own `<PagedFind>`/`<LoadMore>`. The
+preview computation itself (`definitionPreview`, formerly private to the row) is the one thing
+that survives from `glossary-list.tsx`, now exported for the card call site to read.
+
 **Status: ruled, in build, 21 Sep 2026.**
 
 **Law.** None registered.
@@ -6601,8 +6804,39 @@ disguised as "inherit instead of clear". Pressing the button calls the same door
 `onChangeAssignee(null)`, unchanged - the doors already treat `null` as an explicit clear
 (`assigneeCleared`, above), so nothing downstream of the click needed to move.
 
-**Status: ruled and shipped (ticket side), 20 Sep 2026, including the separate clear action
-and its own top-level card. Story side: parked as a design artifact, resolver ready.**
+**AMENDED A FOURTH TIME, 21 Sep 2026 - redesigned as the Stakeholders card's own twin.**
+Aurora, over a screenshot of the ticket page's Stakeholders card (its title row reading
+"Stakeholders" with the count "4" beside it, and inside it the horizontal "Raised by" tile -
+a round face on the left, the small-caps eyebrow "RAISED BY" above the name "Marco Hasler"),
+verbatim: *"Look at the screenshot with the stakeholders. I wanted the 'Assigned to' to be
+like this: the count and the horizontal card. Redesign it."* Validated the same round: *"4.
+Validated but redesigned as explained."* `AssignedToCard` no longer draws its own bare `Card`
+with a hand-rolled title row - it opens with `<TicketSidePanel>` (`ticket-detail-body.tsx`),
+the SAME title-with-count register "Stakeholders" itself renders through
+(`help-detail.tsx`'s own `<TicketSidePanel title={t("Stakeholders")}
+count={stakeholderBadge}>` call): the title "Assigned to", and a count beside it in the
+identical `formatCount` register (R16) - 1 when the record carries its own assignee or
+inherits one from the app, 0 (rendered as nothing, never a bare "0") otherwise. Inside it,
+the face+name row is drawn by a new, shared `StakeholderTile` (`help-stakeholders.tsx`) - the
+SAME component Raised by's own tile now draws itself with, extracted from Raised by's
+pre-existing markup rather than copied, so the two tiles cannot drift the way this file's own
+header already warns two hand-rolled copies always do: a face on the left, the small-caps
+eyebrow over the name on the right. The eyebrow's own words differ from Raised by's - "Assigned
+to" when the record carries its own person, "From the app" (a new, seeded string) when it does
+not and the app's lead is answering instead, with the app's own name kept on the existing
+second, muted line ("Inherited from &lt;app&gt;") rather than folded into the eyebrow itself.
+The pen and the Select it opens keep their own position, now `StakeholderTile`'s own `action`
+slot, exactly where Raised by's own pen used to sit on its tile before it was retired (this
+book's own account above, "THE EDIT PEN IS GONE"); "Use the app's lead" stays a small text-
+button action under the tile, offered only when there is somewhere to fall back to. The empty
+state, when neither an assignee nor an app lead exists, is the plain words "Nobody yet." inside
+the card - the title row above it already says "Assigned to", so the tile's own eyebrow is not
+repeated when there is no tile to carry it. The card still stands DIRECTLY on the page ground
+(R67): `TicketSidePanel`'s own `Card` is `variant="default"`, unchanged.
+
+**Status: ruled and shipped (ticket side), 21 Sep 2026, including the separate clear action,
+its own top-level card, and its 21 Sep 2026 redesign as the Stakeholders card's twin. Story
+side: parked as a design artifact, resolver ready.**
 
 **Law.** None new for the row itself. Governed by the pre-existing R90 (`faces-in-choices`,
 the Select's own faces) and R75 (alphabetical options), both proved by the existing app-wide
@@ -6736,6 +6970,225 @@ door opening the sheet and the pencil reopening it, Save writing `buildNotes` wh
 the record rides along, the Done button disabled with a reason until build notes are filled, the
 Assigned to card first with its inherited line, the Metrics figures from a fixture, and no
 nested scroll region anywhere on the page).
+
+---
+
+### B43: stories are English only, carry no goal, derive their category, and the Build notes sheet uses the kit's own drop zone
+
+**The rulings.** Aurora, 21 Sep 2026, four verbatim sentences over the story form and the
+story page. On translation: *"stories are always in englihs - so remov ethe translate from
+there."* On the goal flag: *"Remove the goal from the stories. I don't even know what that
+is, but remove it."* On the category: *"The category 'Client Requested' or 'Enabler': don't
+put it on the edit screen. You must detect it automatically. If it's related to a ticket,
+it's 'Client Requested.' If not, not."* On the Build notes sheet's own image picker: *"On
+build nodes, use the already existing component to upload images. Do not invent anything
+new. Also, don't show that there's nothing attached."*
+
+**No translate.** `TranslateAction`/`useHumanTranslation` (`translate-human-text.tsx`, the
+ticket page's own seam) are gone from `story-detail.tsx` entirely — never unmounted, never
+parked, simply not imported: a story's own words are English, full stop, unlike a ticket's.
+Every field that used to read `translation.of(...)` (title, detail, acceptance criteria,
+build notes) now renders what is actually stored. Translate stays exactly as it was on
+tickets and everywhere else.
+
+**No goal, parked.** The "contributes to the phase's goal" checkbox is gone from the story
+form (`story-form-dialog.tsx`), the story rows (the phase board's own toggle,
+`work-panels.tsx`'s `StoriesPanel`), and the story list (the backlog board card's own icon,
+`stories-screen.tsx`). `Story.contributesToGoal`/`stories.contributes_to_goal` and the
+create/update doors keep the field untouched — `create_story`/`update_story` still accept
+`contributesToGoal`, documented as parked in `documents/MCP.md` §3 — only the three UI
+surfaces are gone, each moved to a file of its own (`work/goal-field.tsx`,
+`work/goal-row-toggle.tsx`, `work/goal-badge.tsx`) and unmounted, named in `PARKED`
+(`shared/rules/registry.ts`) so the app's own orphan-components census proves each one
+draws nothing while paused.
+
+**Category, derived.** The two-pill Category control is gone from the story form. The
+content door now derives it instead of reading it: `deriveCategory(ticketId)`
+(`workers/content/src/lib/stories.ts`) answers Client-requested when the resolved
+`ticketId` is set and Enabler otherwise, on both `createStory` and `updateStory` —
+replacing `refuseEnablerWithNoTicket`, the 20 Sep 2026 rule this inverts: that rule REFUSED
+an Enabler story with no ticket; this one is never given a choice to refuse, because there
+is no longer a category a caller can choose against the ticket. Re-pointing an existing
+story's ticket on an edit re-derives the category the same way — link one and it reads
+Client-requested, drop it (an edit that omits `ticketId`, cleared like every other field
+this door replaces whole) and it reads Enabler again. Neither `create_story` nor
+`update_story` accepts a `category` field on the wire any more (`documents/MCP.md` §3). The
+story page shows the derived word as a plain, read-only fact — an uncoloured pill beside
+"Category" in the Related tickets panel (R86: the one coloured chip is status) — never a
+control.
+
+**The Build notes sheet's own drop zone.** `story-build-notes-sheet.tsx` no longer draws
+`StoryAttachmentsPanel` (`work/story-attachments.tsx`, over
+`records/record-attachments.tsx`) — a hand-built list-and-upload widget with its own
+"Nothing attached yet." empty line, exactly the two things the ruling refuses. It draws
+`FileUpload` (`@shared/ui/components/file-upload/file-upload`) instead, the SAME kit drop
+zone `reply-composer.tsx`'s Paperclip and `reply-edit-sheet.tsx`'s own Attachments field
+already draw through, wired straight to `story_attachments` (the identical door
+`story-form-dialog.tsx`'s own file field and the story page's inline preview both read).
+Uploads happen the moment a file is picked, never deferred — the story already exists by
+the time this sheet opens (R41). `work/story-attachments.tsx` is unmounted and PARKED
+(`shared/rules/registry.ts`), not deleted: `records/record-attachments.tsx` it wraps stays
+mounted elsewhere (the ticket's own attachments, `reply-composer.tsx`,
+`work-logs-panel.tsx`), and the thin story-side wrapper is exactly the shape a future
+standalone "Files and links" surface for a story would reach for again.
+
+**Status: ruled and shipped, 21 Sep 2026.** All four surfaces changed; `documents/MCP.md`
+and the tool catalogue updated for the derived category and the parked goal field; content
+tests covering category derivation on create, on an update that links a ticket, and on an
+update that drops one; web tests covering the parked goal surfaces, the absent translate
+control, the derived category fact, and the Build notes sheet's own drop zone.
+
+**Law.** None new. Governed by R86 (the one coloured chip is status, for the Category
+pill), R41 (a picked file is either sent or refused, never dropped, for the Build notes
+sheet's own upload), R28/R33 (the translation catalogue, for every string this round moved
+or removed).
+
+---
+
+### B44: the Effort card carries its own metrics, and a count sits beside its title like Stakeholders'
+
+**The ruling.** Aurora, verbatim, 21 Sep 2026: *"Include the metrics inside the effort
+card. On the effort card, remove the value entries and put the number next to the effort
+title, just as you do, for example, for stakeholders."*
+
+**What changed.** The story page's separate "Metrics" panel is gone. Its three lines —
+Cycle time, Effort, Flow efficiency — are the Effort card's own body now, and
+`WorkLogsPanel`'s own list of rows (the "value entries" the ruling names) is gone from this
+page too: the card never mounts `WorkLogsPanel` at all any more. The Effort card's own
+title carries the total logged hours as its count, through the SAME title-with-count
+register `help-stakeholders.tsx`'s own "Stakeholders 4" already renders through
+(`TicketSidePanel title={t("Effort")} count={hoursLabel(...)}`,
+`ticket-detail-body.tsx`) — the identical `<h3>{title}{count}</h3>` shape, not a second one
+invented for this card. Related tickets and Related stories already carried their own
+counts the same way; nothing changed there.
+
+**Logging time still works.** The "Log time" door survives, now a plain `TimeFormDialog`
+(`time-form-dialog.tsx`) mounted directly on the story page and opened from the Effort
+card's own title-row action, writing through the identical `contentApi.logTime` call
+`WorkLogsPanel`'s own `log()` made. A write refreshes the page's existing `refresh()`
+(which already re-reads `story:metrics:<id>`), so the card's count and its three lines
+catch up the same way every other write on this page does.
+
+**Why not `EmptyGatedPanel`.** The Effort card is no longer a COLLECTION that can hold
+zero rows — it always shows three facts, with a textual fallback ("Not started" / "0h" /
+"No time log") standing in for none logged rather than an empty-collection state — so
+`EmptyGatedPanel` (R88's own shell, built for a header that disappears while a list is
+empty) is the wrong register now. The card is the same plain `TicketSidePanel` every other
+fact panel on this page already uses, and its own "Log time" `<AddButton>` carries a
+reasoned, permanent `empty={false}` (`EMPTY_TOOLBAR_EXEMPT`/`EMPTY_STATE_SINGLE_DOOR_EXEMPT`,
+`shared/rules/registry.ts`) — the same reasoning `roles-matrix.tsx`'s own fixed-catalogue
+entry already argues: there is no collection here to be empty.
+
+**Status: ruled and shipped, 21 Sep 2026.** The Metrics panel removed, its three lines
+merged into the Effort card, the count wired through the Stakeholders register, the Log
+time door rebuilt on `TimeFormDialog` directly, `web/test/story-detail.test.tsx` updated
+for the new panel order and the merged card.
+
+**Law.** None new. Governed by R88 (empty-state single door, and the reasoned exemption
+this card now carries), R50 (the empty-toolbar census, same exemption), R16 (a collection's
+count through one seam — the count here is a computed hours figure through the same
+register, not a second one).
+
+---
+
+### B45: backlog tabs reordered, Everyone's renamed to All
+
+**The ruling.** Aurora, verbatim, 21 Sep 2026: *"Reorganize backlog tabs: Now, Planned,
+Review, Completed, Backlog, Everyone's. Rename everyone to All."*
+
+**What changed.** `STORY_TABS`/`EVERYONE_TAB` (`web/components/work/stories-screen.tsx`)
+draw the same six tabs K27 named, in the order she asked for — **Now · Planned · Reviews ·
+Completed · Backlog · All** — and the sixth tab's own word changed from Everyone's to All.
+Nothing else moved: the gate (`all_stories:read`), the predicates, and every tab's own
+views and facets stay exactly as K27 and the rulings after it left them.
+
+**Law.** None new. Governed by R53 (the toolbar's slot set is the row's, and its sort slot
+is a default) — the tab strip is still `STORY_TABS`/`EVERYONE_TAB` as data, so the strip,
+the fetch key and the badge cannot fall out of step.
+
+---
+
+### B46: phase days are working days, the prefill, and the Timeline's expected spans
+
+**The ruling.** Aurora, verbatim, 21 Sep 2026: *"Yes, ship. mind you, all of this is Monday
+to Friday, so when I say 5, it's actually a full week, but I, of course, don't count the
+weekends. Make sure we can adjust this on the settings in Waves. * the prefill * Audit 5 *
+Plan 5 * Build 15 * Pilot 5 * Revision 10 * Deploy 3 * Hypercare 7."*
+
+**What changed.** B32's own placeholder defaults (Audit 5, Plan 5, Build 20, Pilot 10,
+Revision 10, Deploy 3, Hypercare 10) are replaced by the seven numbers she named here (Audit
+5, Plan 5, Build 15, Pilot 5, Revision 10, Deploy 3, Hypercare 7,
+`PHASE_DAY_DEFAULTS`, `shared/waves.ts`), and every one of them, on every wave's own
+Settings panel too, is now a WORKING day rather than a calendar one. One shared helper,
+`shared/working-days.ts` (`addWorkingDays`, `workingDaysBetween`, `workingDaySpan`,
+`isWorkingDay`), Monday through Friday, a weekend start rolling forward to the next
+Monday before it counts, is the one arithmetic every day count in this app now reads
+through. `wave-phase-days-panel.tsx`'s own unit label reads "working days" instead of
+"days," with one line under the seven rows, through `t()`, saying "Monday to Friday,
+weekends are not counted."
+
+**The prefill.** `sprint-form-dialog.tsx`'s phase form (`prefillEndDate`) fills the end
+date in, still editable, the moment a type is chosen and a start date is in hand, or a
+start is picked with a type already chosen: the start plus that wave's own day count for
+the type (its `phaseDays` row, off the wave detail door the "Plan a phase" dialog already
+holds), falling back to the placeholder default where the wave carries no row of its own.
+It never overwrites an end date a person has typed by hand, tracked from the moment their
+own pick lands on the end field, not from this effect's own write.
+
+**The Timeline.** `waves-screen.tsx#buildWaveTimelineRows` draws an undated, active
+phase's own expected span end to end from the previous phase's end (the wave's own
+recorded end once a dated phase exists), or the wave's own start, or today, using that
+phase type's day count, toned "expected" (`record-timeline.tsx`), a lighter fill than a
+dated phase's real state, and titled with the word "Expected." A wave carrying only
+undated phases now reaches the axis at all, where before it was left off entirely. The
+wave's own forecast total, `waveExpectedWorkingDays`, sums every active phase's own
+working-day length (a dated phase read back as its real span, an undated one off its own
+day count) and shows on the wave's own head, a new "Expected length" row on its Overview
+tab.
+
+**The burndown's ideal line.** `storyBurndown`'s (`workers/content/src/lib/stories.ts`)
+ideal line now falls only on working days, flat across a Saturday or a Sunday inside the
+phase, off the same `isWorkingDay` the rest of this ruling reads through.
+
+**Status: ruled and shipped, 21 Sep 2026.** Defaults changed, `shared/working-days.ts`
+added with its own unit tests, the prefill wired and tested, the Timeline's expected spans
+and the wave head's forecast total built and tested, the Settings panel's copy changed and
+its test updated, the burndown's ideal line fixed and tested, strings seeded (de/es/ca).
+
+**Law.** None new. Governed by R33 (every extracted position asks for its translation) for
+the panel's new unit label and explainer line, and R28 (the translation catalogue) for
+every new sentence this ruling adds.
+
+---
+
+### B47: task delete, the tick-off renamed "Done" and made mango, and the form's field order
+
+**The ruling.** Aurora, verbatim, 21 Sep 2026: *"i need delete actino for tasks on the ...
+button"*; *"in task the main buton is mark as odne, tick it off. finde shorter
+alr¡ternative for the word, and make the button mango"*; *"on task add/edit the priority
+setting put it under title. omve deadline above whos doing it."*
+
+**What changed.** The task detail head's "…" menu gains a Delete item, confirmed through
+the app's `useConfirm` pattern (`shared/web/use-confirm.tsx`) and a soft delete: `POST
+/api/content/tasks/delete` (team migration 0113, `deactivated_at`/`deactivator_*`, the
+same shape `delete_help_reply` already gave a reply one module along) — nothing is
+removed, the row and its history survive, it stops appearing on every view and every one
+of their counts. The main head action is the tick-off, one word, "Done" (matching the
+story and ticket states, R34), drawn with the kit `Button`'s default variant (mango,
+R84), first in the head actions row and its folded menu, while the task is open; once
+done it reads "Reopen" as a secondary. It shows disabled, with a `Tooltip` explaining why,
+while a work log against the task has no end — *"cannot mark anything as closed... if
+there's an active time log running,"* her same-round ruling, held at the door too
+(`setTaskDone` answers 409, "Stop the timer first."). The task add/edit form's field order
+is now Title, Priority (right under the title), Deadline, Assigned to (who's doing it),
+then the rest (Detail, Department, the App/Account picker the department reveals, the
+file).
+
+**Status: ruled and shipped, 21 Sep 2026.** Door, migration, MCP tool (`delete_task`) and
+UI built and tested; strings seeded (de/es/ca).
+
+**Law.** None new. Governed by R84 (mango lives only in a screen's own title component's
+action slot) and R98 (every button the kit's own default size).
 
 ---
 
@@ -9111,15 +9564,15 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**250 rules.**
+**262 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L39 (39) |
+| 2. Page layout and width | L1 to L42 (42) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K56 (56) |
-| 5. Buttons and actions | B1 to B42 (42) |
+| 4. Collections | K1 to K60 (60) |
+| 5. Buttons and actions | B1 to B47 (47) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |
@@ -9167,7 +9620,8 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R90 | [L32](#l32-any-choice-over-a-person-a-contact-an-account-or-an-app-shows-the-same-face-the-lists-show) | R91 | [L34](#l34-never-need-to-scroll-to-see-all-content) |
 | R92 | [L35](#l35-when-a-main-person-is-chosen-they-disappear-from-the-secondary-picker-over-the-same-pool) | R93 | [L36](#l36-every-avatar-icon-or-colour-rides-beside-its-text--filters-views-and-select-components-alike) |
 | R94 | [L37](#l37-a-records-chips-draw-in-one-fixed-order--id-status-type-main-parent-secondary-parent) | R95 | [L38](#l38-no-em-dash-anywhere-a-person-reads) |
-| R96 | [L39](#l39-the-id-chip-is-black) | | |
+| R96 | [L39](#l39-the-id-chip-is-black) | R97 | [L40](#l40-a-count-never-gets-its-own-card) |
+| R98 | [L41](#l41-every-button-is-the-kits-own-height) | R99 | [L42](#l42-no-record-closes-while-its-own-clock-is-still-running) |
 
 ### The seven files that carry most of it
 

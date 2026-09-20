@@ -69,7 +69,8 @@ export function ProcessDateSlider({
           {shown === auditDate && <Badge variant="secondary">{t("the audit date")}</Badge>}
         </div>
         {shown !== null && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => onChange(null)}>
+          // R98 — this toolbar-shaped nav row is the kit's default height, never `sm`.
+          <Button type="button" variant="ghost" onClick={() => onChange(null)}>
             {t("Back to today")}
           </Button>
         )}

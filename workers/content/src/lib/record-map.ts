@@ -271,6 +271,9 @@ export const RETIRABLE = new Set([
   "portal_users",
   "processes",
   "sprints",
+  // TEAM MIGRATION 0113 — a task can be deleted now (Aurora's 21 Sep 2026
+  // ruling), the same soft delete every other row in this set already has.
+  "tasks",
   "waves",
 ])
 

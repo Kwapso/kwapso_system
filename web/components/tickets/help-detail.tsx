@@ -69,6 +69,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Card } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
 import { TicketThread, type ThreadAttachment } from "@shared/ui/components/ticket-thread/ticket-thread"
 // R88's TWO-SEGMENT BAR (Aurora, 20 Sep 2026, Related stories) — the kit's own
 // primitive; see the block below for why a green overlay div sits on top of
@@ -124,6 +125,7 @@ import type {
   HelpStakeholder,
   HelpStatus,
   HelpTicket,
+  RunningTimer,
   SelectableValue,
   Story,
   TeamMember,
@@ -173,7 +175,7 @@ import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 import { ReplyEditSheet } from "@/components/tickets/reply-edit-sheet"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { appsKey, listFetch, totalKey, triageKey } from "@/lib/live-resources"
+import { appsKey, listFetch, runningTimersKey, totalKey, triageKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
@@ -423,7 +425,7 @@ export function HelpDetailScreen({
    * before the ticket itself is on screen — a sixth request in front of the
    * five-request budget. Gated on the record being in hand, it leaves no
    * earlier than `RecordTimerButton` below ever did; the folded menu item
-   * still renders meanwhile (as plain "Start timer", the same as a timer
+   * still renders meanwhile (as plain "Start", the same as a timer
    * nobody has started yet) and updates once the read lands. */
   const timerAction = useRecordTimerAction({
     teamId,
@@ -433,6 +435,26 @@ export function HelpDetailScreen({
     disabled: ticket?.status === "resolved",
     enabled: !!ticket,
   })
+  // WHETHER THIS TICKET'S OWN CLOCK IS RUNNING (R99, Aurora's 21 Sep 2026
+  // ruling, verbatim: "cannot mark anything as closed (task, story, ticket,
+  // whatever) if there's an active time log running." The door's own copy of
+  // this rule is `refuseWhileTimerRuns`, workers/content/src/lib/work-logs.ts,
+  // wired into both `setStatus`'s resolve branch and `setTicketArchived`;
+  // Close and Archive below only read the same fact back.
+  //
+  // Reads the SAME running-timers cache key `useRecordTimerAction` above
+  // already reads (`runningTimersKey(teamId)`), one request in the air,
+  // never two (R56), the same shape `story-detail.tsx`'s own
+  // `timerRunningOnThis` and `task-detail.tsx`'s own `timerRunningOnThis`
+  // already take for the identical rule on the other two targets. Gated the
+  // same `enabled: !!ticket` way `timerAction` above is, for the same
+  // cold-screen-hops reason its own comment states.
+  const runningTimersQ = useCached<RunningTimer[]>(ticket ? runningTimersKey(teamId) : null, () =>
+    content.runningTimers().then((r) => r.timers)
+  )
+  const ticketTimerRunning = (runningTimersQ.data ?? []).some(
+    (x) => x.targetTable === "help" && x.targetId === helpId
+  )
   // WRITING WORK DOWN IS THE WORK MODULE'S RIGHT, NOT THE TICKET'S. A person who
   // may read and answer requests is not necessarily a person who may put things
   // on the team's backlog, so the button on the Related stories tab asks the
@@ -1323,7 +1345,11 @@ export function HelpDetailScreen({
                 key: "archive",
                 label: t("Archive"),
                 icon: <Archive className="size-3.5" />,
-                disabled: statusBusy || archiveBusy,
+                // R99: archiving is a close (it puts the request away), and
+                // the same clock rule the Close button below mirrors applies
+                // here too: `setTicketArchived`'s own `refuseWhileTimerRuns`
+                // call guards this exact case at the door.
+                disabled: statusBusy || archiveBusy || ticketTimerRunning,
                 destructive: true,
                 onSelect: archiveTicket,
               },
@@ -1347,7 +1373,10 @@ export function HelpDetailScreen({
             label: t("Close"),
             icon: <CheckCircle className="size-3.5" />,
             onSelect: () => setResolving(true),
-            disabled: statusBusy || !latestIsOurs,
+            // R99: the same running-timer refusal the wide row's own Close
+            // button mirrors below, `setStatus`'s `refuseWhileTimerRuns` call
+            // on the resolve branch.
+            disabled: statusBusy || !latestIsOurs || ticketTimerRunning,
           },
         ]
       : []),
@@ -1427,7 +1456,28 @@ export function HelpDetailScreen({
           what the census reads, it was always inside the title. `variant`
           left off is `Button`'s own default, which is mango
           (`web/test/mango-title-only.test.ts`, "omitted"). */}
-      {canClose && (
+      {/* R99, Aurora's 21 Sep 2026 ruling, verbatim: "cannot mark anything
+          as closed (task, story, ticket, whatever) if there's an active time
+          log running." `ticketTimerRunning` (above) mirrors the door's own
+          `refuseWhileTimerRuns` call on the resolve branch of `setStatus`; a
+          Tooltip carries the reason, the same shape the story page's own
+          Done button already takes for its build-notes refusal. The
+          `!latestIsOurs` case keeps its plain, reasonless disable, unchanged
+          from before this law. */}
+      {canClose && ticketTimerRunning && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <Button disabled className="shrink-0 gap-1">
+                <CheckCircle className="size-3.5" />
+                {t("Close")}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{t("Stop the timer first.")}</TooltipContent>
+        </Tooltip>
+      )}
+      {canClose && !ticketTimerRunning && (
         <Button disabled={statusBusy || !latestIsOurs} onClick={() => setResolving(true)} className="shrink-0 gap-1">
           <CheckCircle className="size-3.5" />
           {t("Close")}
