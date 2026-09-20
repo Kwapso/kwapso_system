@@ -508,7 +508,30 @@
    frame.tsx`) and this app has no business hard-coding its layer count.
 
    Extended by `web/test/toolbar-lead-gap-card.test.tsx`'s own DOM proof
-   (`Element.matches`, the collection-frame shape). */
+   (`Element.matches`, the collection-frame shape).
+
+   EXTENDED AGAIN -- a `PagedPanelBody`-nested pane (the app detail's Stories
+   and Tickets tabs among them) STILL paid the untouched 32/24px, proved live
+   with Playwright against staging: `[data-slot="card-content"]`'s own first
+   child there is never `[data-slot="toolbar-row-pin"]` directly, it is one
+   plain wrapper `<div class="flex w-full flex-col">` -- `PagedFind`'s own
+   `toolbarAndRows` node (`web/components/records/paged-find.tsx`), which
+   every `PagedPanelBody` caller gets for free through its `wrap={(toolbarAnd
+   Rows) => <CollectionCard>{toolbarAndRows}</CollectionCard>}` (`work-panels
+   .tsx`) -- with the toolbar as THAT wrapper's own first child instead. The
+   card selector's `> [data-slot="toolbar-row-pin"]:first-child` demanded a
+   DIRECT child of `card-content`, so the `>` combinator, not `:first-child`,
+   was the step that failed; the Phases tab (`SprintsPanel`) never runs this
+   branch at all, it is the collection-frame shape below. A SECOND card
+   alternative admits exactly this one wrapper, `:first-child` chained at
+   both levels so it still cannot reach a card-content that leads with prose
+   or a fact row: `:first-child` on the wrapper keeps it card-content's own
+   first content, and `:first-child` on the toolbar keeps it the wrapper's,
+   so anything else ahead of either breaks the chain the same way the
+   original alternative already refused a toolbar that was not first. Proved
+   live on both tabs (Stories, Tickets) and by `web/test/toolbar-lead-gap-
+   card.test.tsx`'s DOM reproduction of the real `PagedFind`/`CollectionCard`
+   wrapper chain. */
 [data-slot="tabs"]:has(
     > [data-tab-pane][data-state="active"] [data-slot="card"]:first-child
       > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child
@@ -516,6 +539,10 @@
 [data-slot="tabs"]:has(
     > [data-tab-pane][data-state="active"] [data-slot="collection-frame"]:first-child
       [data-slot="collection-frame-toolbar"]:first-child
+  ),
+[data-slot="tabs"]:has(
+    > [data-tab-pane][data-state="active"] [data-slot="card"]:first-child
+      > [data-slot="card-content"] > :first-child > [data-slot="toolbar-row-pin"]:first-child
   ) {
   gap: 0px;
 }

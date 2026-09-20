@@ -1884,11 +1884,19 @@ describe("R83, decision B -- the <Tabs> root's own gap-6/gap-7 is zeroed for a t
 
   it('CSS: globals.css joins the collection-frame selector to the card selector on the SAME rule, one `{ gap: 0px }` block, comma-separated', () => {
     const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    // TOLERANT OF A JOINED THIRD SELECTOR, 21 Sep 2026 -- the PagedPanelBody
+    // wrapper extension (further down this file) comma-joins a third selector
+    // onto this SAME rule after the collection-frame one, so the
+    // collection-frame selector's own closing paren is no longer always
+    // followed straight by `{` -- it may be followed by `, <third selector>
+    // {` instead. `(?:,[\s\S]*?)?` makes that join optional rather than
+    // assumed, the identical tolerance this file's own card-selector proof
+    // above already applies for the same reason.
     const rule = new RegExp(
       String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
         String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*,\s*` +
         String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="collection-frame"\]:first-child\s+` +
-        String.raw`\[data-slot="collection-frame-toolbar"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+        String.raw`\[data-slot="collection-frame-toolbar"\]:first-child\s*\)\s*(?:,[\s\S]*?)?\{\s*gap:\s*0px\s*;\s*\}`
     )
     expect(
       css,
@@ -1909,11 +1917,178 @@ describe("R83, decision B -- the <Tabs> root's own gap-6/gap-7 is zeroed for a t
       String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
         String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*,\s*` +
         String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="collection-frame"\]:first-child\s+` +
-        String.raw`\[data-slot="collection-frame-toolbar"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+        String.raw`\[data-slot="collection-frame-toolbar"\]:first-child\s*\)\s*(?:,[\s\S]*?)?\{\s*gap:\s*0px\s*;\s*\}`
     )
     expect(
       cardOnly,
       "a rule missing the collection-frame selector must not read as today's extended, two-selector rule"
     ).not.toMatch(rule)
+  })
+
+  // ==========================================================================
+  // R83 EXTENDED AGAIN, 21 Sep 2026 -- A PagedPanelBody-NESTED PANE (the app
+  // detail's Stories and Tickets tabs among them) STILL PAID THE UNTOUCHED
+  // 32/24px. Diagnosed live with Playwright against staging: `[data-slot=
+  // "card-content"]`'s own first child there is never `[data-slot="toolbar-
+  // row-pin"]` directly, it is one plain wrapper `<div class="flex w-full
+  // flex-col">` -- `PagedFind`'s own `toolbarAndRows` node (paged-find.tsx),
+  // which every `PagedPanelBody` caller (work-panels.tsx: Stories, Processes,
+  // App meetings, App tickets, To-dos) gets for free through its own
+  // `wrap={(toolbarAndRows) => <CollectionCard>{toolbarAndRows}</
+  // CollectionCard>}` -- with the toolbar as THAT wrapper's own first child
+  // instead of card-content's. The `>` combinator between card-content and
+  // the toolbar was the step that failed, never `:first-child` on either
+  // side, and never the pane/card half above it (already reached through a
+  // descendant combinator, proved by the ORIGINAL card describe block).
+  // ==========================================================================
+  const WRAPPED_CARD_ZERO_GAP_SELECTOR =
+    '[data-slot="tabs"]:has(> [data-tab-pane][data-state="active"] [data-slot="card"]:first-child > [data-slot="card-content"] > :first-child > [data-slot="toolbar-row-pin"]:first-child)'
+
+  /** `PagedPanelBody`'s exact real shape (work-panels.tsx's own `wrap`):
+   * `CollectionCard`'s `CardContent` wraps `PagedFind`'s own `toolbarAndRows`
+   * div, and THAT div, never `CardContent` itself, holds the toolbar as its
+   * first child -- reproduced as a fixture rather than mounting the real
+   * `<PagedFind>`, the same restraint every other fixture in this file takes. */
+  function PagedPanelBodyTabbedFixture({ toolbarActive }: { toolbarActive: boolean }) {
+    return (
+      <TabsView
+        className={STICKY_TABS}
+        config={{
+          ...defaultTabsConfig,
+          tabs: [
+            { value: "stories", label: "Stories", icon: "", badge: "", badgeVariant: "" },
+            { value: "facts", label: "Overview", icon: "", badge: "", badgeVariant: "" },
+          ],
+        }}
+        value={toolbarActive ? "stories" : "facts"}
+        renderPanel={(t) =>
+          t.value === "stories" ? (
+            <CollectionCard>
+              <div className="flex w-full flex-col">
+                <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                  <div data-slot="toolbar-row-column">the toolbar</div>
+                </div>
+                <div data-testid="rows">the rows</div>
+              </div>
+            </CollectionCard>
+          ) : (
+            <div data-testid="facts">fact rows, prose, nothing a toolbar draws</div>
+          )
+        }
+      />
+    )
+  }
+
+  it("DOM: a real STICKY_TABS-classed <Tabs> root, with a PagedPanelBody-shaped toolbar tab active (the app detail's Stories/Tickets tabs), matches the wrapped-card selector globals.css carries, and NOT the direct-child card selector", () => {
+    render(<PagedPanelBodyTabbedFixture toolbarActive={true} />)
+
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    const activePane = document.querySelector('[data-tab-pane][data-state="active"]')
+    const card = activePane!.querySelector('[data-slot="card"]')
+    expect(card === activePane!.firstElementChild, "the card must be the active pane's own first child").toBe(true)
+    const content = card!.querySelector(':scope > [data-slot="card-content"]')
+    const wrapper = content!.firstElementChild
+    expect(
+      wrapper?.getAttribute("data-slot"),
+      "card-content's own first child must be a plain wrapper, never the toolbar directly -- PagedFind's own toolbarAndRows div"
+    ).toBeNull()
+    expect(
+      wrapper?.firstElementChild?.getAttribute("data-slot"),
+      "the toolbar must be the wrapper's own first child"
+    ).toBe("toolbar-row-pin")
+
+    expect(
+      tabsRoot.matches(WRAPPED_CARD_ZERO_GAP_SELECTOR),
+      "the real, rendered <Tabs> root must match the wrapped-card selector globals.css keys the gap override on"
+    ).toBe(true)
+
+    // THE DIRECT-CHILD CARD SELECTOR MUST NOT ALSO CLAIM THIS -- the whole
+    // point of the original selector's failure on this exact shape, proved
+    // structurally rather than merely asserted.
+    expect(
+      tabsRoot.matches(ZERO_GAP_SELECTOR),
+      "the direct-child card selector must not match a card-content whose first child is a wrapper, not the toolbar itself"
+    ).toBe(false)
+  })
+
+  it("DOM: the SAME fixture, with the fact-rows tab active instead, does NOT match the wrapped-card selector", () => {
+    render(<PagedPanelBodyTabbedFixture toolbarActive={false} />)
+
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    const activePane = document.querySelector('[data-tab-pane][data-state="active"]')
+    expect(activePane!.querySelector('[data-testid="facts"]'), "the active pane must be the fact-rows one").toBeTruthy()
+
+    expect(
+      document.querySelector('[data-slot="toolbar-row-pin"]'),
+      "no forceMount on this app's own Tabs -- the inactive Stories pane is not mounted at all"
+    ).toBeNull()
+
+    expect(
+      tabsRoot.matches(WRAPPED_CARD_ZERO_GAP_SELECTOR),
+      "a Tabs root whose ACTIVE pane starts with fact rows must not match the wrapped-card selector either"
+    ).toBe(false)
+  })
+
+  it("RED PROOF: a wrapper that itself leads with prose before the toolbar does not match the wrapped-card selector -- :first-child on the toolbar's own side of the chain still refuses it", () => {
+    function ProseLeadFixture() {
+      return (
+        <TabsView
+          className={STICKY_TABS}
+          config={{
+            ...defaultTabsConfig,
+            tabs: [{ value: "stories", label: "Stories", icon: "", badge: "", badgeVariant: "" }],
+          }}
+          value="stories"
+          renderPanel={() => (
+            <CollectionCard>
+              <div className="flex w-full flex-col">
+                <p>a fact row ahead of the toolbar</p>
+                <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                  <div data-slot="toolbar-row-column">the toolbar</div>
+                </div>
+              </div>
+            </CollectionCard>
+          )}
+        />
+      )
+    }
+    render(<ProseLeadFixture />)
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    expect(
+      tabsRoot.matches(WRAPPED_CARD_ZERO_GAP_SELECTOR),
+      "a wrapper whose own first child is prose, not the toolbar, must not match -- the toolbar is no longer :first-child of ITS parent either"
+    ).toBe(false)
+  })
+
+  it('CSS: globals.css carries the wrapped-card selector as a third, comma-joined alternative on the SAME rule', () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    const rule = new RegExp(
+      String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*:first-child\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+    )
+    expect(
+      css,
+      "web/app/globals.css must carry the wrapped-card selector (one first-child wrapper between card-content and the toolbar) on the same zero-gap rule"
+    ).toMatch(rule)
+  })
+
+  it("RED PROOF: the rule without the wrapped-card selector (this round's own pre-fix shape) does not satisfy the CSS proof above", () => {
+    const preFix = `
+      [data-slot="tabs"]:has(
+          > [data-tab-pane][data-state="active"] [data-slot="card"]:first-child
+            > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child
+        ),
+      [data-slot="tabs"]:has(
+          > [data-tab-pane][data-state="active"] [data-slot="collection-frame"]:first-child
+            [data-slot="collection-frame-toolbar"]:first-child
+        ) {
+        gap: 0px;
+      }
+    `
+    const rule = new RegExp(
+      String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*:first-child\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+    )
+    expect(preFix, "the pre-fix rule (no wrapped-card selector) must not match today's extended proof").not.toMatch(rule)
   })
 })
