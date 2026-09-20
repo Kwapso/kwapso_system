@@ -215,6 +215,34 @@ describe("stories-screen.tsx's own Backlog Status facet — declared order", () 
   })
 })
 
+describe("the Backlog tab's Status facet — RENDERED order", () => {
+  // R75: `useFilterBar` alphabetizes every facet's options by default
+  // (`sortedOptions(optionsFor(f), lang)`), so the "declared order" suite
+  // above — a static read of the source array — cannot see whether that
+  // default sort still runs on top of it. Before `ordered: true` was set on
+  // this facet, the DECLARED array above (Backlog, To Do, In Review, Done)
+  // rendered as Backlog, Done, In Review, To Do — alphabetical, not the
+  // lifecycle order Aurora ruled. This suite opens the real panel and reads
+  // the option list a person actually sees.
+  it("opens with Backlog, To Do, In Review, Done, in that order — not alphabetical", async () => {
+    renderBacklog([ONE_STORY])
+    await screen.findAllByText(/Move dispatch onto the driver app/)
+    if (screen.queryAllByRole("group", { name: "Status" }).length === 0)
+      fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
+    const facet = await screen.findByRole("group", { name: "Status" })
+    fireEvent.click(within(facet).getByRole("button"))
+    const listbox = await screen.findByRole("listbox")
+    await waitFor(() => expect(within(listbox).getAllByRole("option").length).toBe(5))
+    const labels = within(listbox)
+      .getAllByRole("option")
+      .map((el) => el.textContent?.trim())
+    // The panel's own leading "clear this facet" option ("Any status") comes
+    // first, ahead of the four real choices — not part of the ordering this
+    // law is about, so it is sliced off before the assertion.
+    expect(labels.slice(1)).toEqual(["Backlog", "To Do", "In Review", "Done"])
+  })
+})
+
 describe("the Backlog tab's Status facet narrows through the door, never client side", () => {
   it("choosing To Do issues a request carrying status=to_do", async () => {
     asked.length = 0

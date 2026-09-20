@@ -869,16 +869,34 @@ export function StoriesScreen({
     // choices, not `work-panels.tsx`'s own StoriesPanel facet's five, this
     // tab is the everyday backlog, never the board, so In Progress is left
     // off exactly as Aurora's brief named it.
+    //
+    // `ordered: true` — a LIFECYCLE PIPELINE (R75's own named class, "a
+    // status pipeline"), not a naming vocabulary, so it is declared in the
+    // order a person reads a story's own progress rather than left to
+    // `useFilterBar`'s default A→Z (R75's first-half seam would otherwise
+    // read Backlog, Done, In Review, To Do). The flag needs the matching
+    // `FACET_ORDER_OK` line (shared/rules/registry.ts) beside it, the same
+    // pairing `apps-screen.tsx#stage` and `wave-finder.tsx#sprintType`
+    // already carry for their own pipelines.
+    //
+    // "In Review", CAPITAL R — the story's own status CHIP's word
+    // (`story-detail.tsx`, `stories-screen.tsx`'s `storyLead`, both drawn
+    // through `storyStatusWord`) is sentence case ("In review"), the List's
+    // own convention; this facet is a short, Title Case LABEL beside three
+    // others that already read that way (Backlog, To Do, Done), the same
+    // Title Case the board's own `KANBAN_STATUS_LABEL.in_review` spells for
+    // the identical reason (`storyStatusWord`'s own header: "a caller that
+    // wants the Board's Title Case columns … spells those two directly").
     ...(view === "backlog"
       ? [
           {
-            field: "status",
+            field: "status", ordered: true,
             label: t("Status"),
             control: "select" as const,
             options: [
               { value: "backlog", label: t("Backlog") },
               { value: "to_do", label: t("To Do") },
-              { value: "in_review", label: t(storyStatusWord("in_review", null)) },
+              { value: "in_review", label: t("In Review") },
               { value: "done", label: t(storyStatusWord("done", null)) },
             ],
           },

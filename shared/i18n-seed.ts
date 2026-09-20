@@ -4577,4 +4577,10 @@ export const SEED: Catalogue = {
   "Not started": { de: "Noch nicht begonnen", es: "Sin empezar", ca: "Sense començar" },
   "Flow efficiency": { de: "Flusseffizienz", es: "Eficiencia de flujo", ca: "Eficiència de flux" },
   "No time log": { de: "Keine Zeiterfassung", es: "Sin registro de tiempo", ca: "Sense registre de temps" },
+
+  /* ── THE BACKLOG TAB'S OWN STATUS FACET (round 32, stories-screen.tsx) —
+   * "In Review", Title Case, the facet's own short label beside Backlog/To
+   * Do/Done, never `storyStatusWord`'s sentence-case "In review" (which is
+   * not itself in the catalogue — no literal `t(...)` call reaches it). ── */
+  "In Review": { de: "In Prüfung", es: "En revisión", ca: "En revisió" },
 }

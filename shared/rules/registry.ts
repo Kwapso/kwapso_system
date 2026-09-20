@@ -5450,6 +5450,13 @@ export const FACET_ORDER_OK: Record<string, string> = {
     "(\"not started, audit, plan, build, validation, refinements and enhancement, in that order\"), first read " +
     "onto App stage and corrected the same day onto Sprint type — the identical class `apps-screen.tsx#stage` " +
     "above is registered for, one vocabulary along.",
+  "web/components/work/stories-screen.tsx#status":
+    "the Backlog tab's own Status facet (Backlog, To Do, In Review, Done) is a STORY'S OWN LIFECYCLE, the same " +
+    "class of PIPELINE `apps-screen.tsx#stage` and `wave-finder.tsx#sprintType` above are registered for, not a " +
+    "naming vocabulary a reader searches by word — Aurora's own order, over the two virtual words her 21 Sep " +
+    "2026 ruling added (\"To Do means its scheduled in an active phase, Backlog otherwise\"). Without the flag " +
+    "`useFilterBar`'s default A→Z reads Backlog, Done, In Review, To Do, which is not the order a story " +
+    "actually moves through.",
 }
 
 // ── R77 (tab-strips-pin) ────────────────────────────────────────────────────

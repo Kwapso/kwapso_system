@@ -239,6 +239,36 @@ describe("the story detail page — panel order", () => {
     const scrollers = container.querySelectorAll('[class*="overflow-y-auto"]')
     expect(scrollers.length).toBe(0)
   })
+
+  // R91 — the case above renders below `lg` only: `web/test/setup.ts` stubs
+  // `window.matchMedia` to always answer `matches: false`, so
+  // `RecordDetailBody`'s own `useIsAtLeastLg()` never picks the `lg`
+  // grid branch under the default mock and a scroll class living only in
+  // that branch would pass unseen. This case forces `matches: true` so the
+  // two-column grid (`main` beside `side`) actually mounts, closing that
+  // blind spot.
+  it("carries no nested scroll region at lg widths either — no element on the page is marked overflow-y-auto", async () => {
+    const original = window.matchMedia
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+    try {
+      api.story = story({ status: "open" })
+      const { container } = openStory()
+      await screen.findByText("Add saved filters to the backlog board")
+      const scrollers = container.querySelectorAll('[class*="overflow-y-auto"]')
+      expect(scrollers.length).toBe(0)
+    } finally {
+      window.matchMedia = original
+    }
+  })
 })
 
 describe("Build notes — R88 single door", () => {

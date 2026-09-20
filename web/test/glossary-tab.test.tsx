@@ -151,6 +151,39 @@ describe("GlossaryList, renders entries", () => {
     expect(screen.getByText("A package of phases sold to one account.")).toBeTruthy()
   })
 
+  // THE REAL DOOR ROW, NOT THE FIXTURE'S OWN SHORTCUT ABOVE. Every other case
+  // in this file hands `GlossaryList` a row with `body` set directly, which
+  // is never what the list door actually returns — `shared/types.ts`'s own
+  // `KnowledgeSource` doc: "on a LIST this is always null", and
+  // `workers/content/src/lib/knowledge.ts`'s `LIST_COLS` reads `NULL AS
+  // body`. What a list row carries is `summary`, and for a glossary word that
+  // summary is `buildSummary`'s fixed opening ("<title>, a glossary word.")
+  // followed by the word's own definition (`workers/content/src/lib/
+  // knowledge-summary.ts`). Before this fix, `definitionPreview` read only
+  // `body`, so this exact row shape drew an empty `<dd>` on every real visit
+  // to the tab despite the door answering in full.
+  it("reads the definition out of `summary` when `body` is null, the real door row's own shape", () => {
+    render(
+      <GlossaryList
+        rows={[
+          makeWord({
+            id: "W1",
+            title: "Ready",
+            body: null,
+            summary: "Ready, a glossary word. Every story is closed, but nobody's told the client yet.",
+          }),
+        ]}
+        canEdit={false}
+        canDelete={false}
+        onEdit={() => {}}
+      />
+    )
+    expect(screen.getByText("Every story is closed, but nobody's told the client yet.")).toBeTruthy()
+    // The fixed opening itself never shows — it names the word a second time
+    // right under the word's own heading, which is not a definition.
+    expect(screen.queryByText(/a glossary word/i)).toBeNull()
+  })
+
   it("cuts a long definition to ~140 characters, with an ellipsis", () => {
     const long =
       "A sprint is a fixed block of time, usually one to three weeks, in which the team plans, builds and " +
