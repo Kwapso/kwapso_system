@@ -886,13 +886,14 @@ let MY_TICKET
   )
 
   // Correcting the wording and re-ranking are the two powers SCOPE ch.07 gives
-  // the account over its own requests. Both are governed by the LOCK, so a
-  // ticket a staff member has read answers politely and moves nothing — which is
-  // why what is asserted is that the door ANSWERS, not that it changed a row.
+  // the account over its own requests. Both are governed by the LOCK, which
+  // answers 409 when locked, so a ticket a staff member has read answers politely
+  // and moves nothing - which is why what is asserted is that the door ANSWERS,
+  // not that it changed a row.
   const edited = await portalPost("/api/content/help/update", { id: MY_TICKET.id, description: FIX.myTicket }, client)
-  ok("they can correct their own wording (or be held by the lock)", edited.ok || edited.status === 403, `status ${edited.status}`)
+  ok("they can correct their own wording (or be held by the lock)", edited.ok || edited.status === 409, `status ${edited.status}`)
   const ranked = await portalPost("/api/content/help/rank", { id: MY_TICKET.id }, client)
-  ok("they can drag their company's requests into order", ranked.ok || ranked.status === 403, `status ${ranked.status}`)
+  ok("they can drag their company's requests into order", ranked.ok || ranked.status === 409, `status ${ranked.status}`)
 
   // "they can confirm a request should go ahead" was asserted here, against
   // `POST /api/content/help/validate` — the one lifecycle door a client could
