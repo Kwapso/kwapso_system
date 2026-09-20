@@ -7756,22 +7756,44 @@ ${storedWordColumns(PHASE_TYPE_GROUP)
   )
   .join("")}
 
--- 4 · THE SEVEN CANONICAL WORDS, THEIR ORDER AND THEIR MARK — generated from
+-- 4 · THE SEVEN CANONICAL WORDS, THEIR ORDER AND THEIR MARK, generated from
 -- \`PHASE_TYPES\` (shared/sprint-types.ts), the 0098 shape read one migration
--- along: a plain rename lands ON the row a candidate spelling already
--- occupies (never a duplicate), a wholly new word (Deploy, Hypercare) is
--- inserted fresh and protected the same way 0106's "Spike" is.
+-- along. FIXED 20 Sep 2026: the earlier "UPDATE ... WHERE value IN (candidates)"
+-- shape renamed and reactivated every row that matched a candidate spelling,
+-- live or dormant, so a live "Plan" and a deactivated "Plan" both turned into
+-- a live "Plan" and the partial unique index on (type, value) WHERE
+-- deactivated_at IS NULL refused the second one, on the Kwapso team itself.
+-- Now, per canonical word, exactly one row is chosen to carry the canonical
+-- value, mark and position: the live row already spelled the canonical word,
+-- else any other live candidate, else the most recently deactivated candidate
+-- (reactivated), else nothing at all (the INSERT below is the fresh row path,
+-- unchanged, same as before). Every other row sharing a candidate spelling
+-- stays deactivated, or becomes deactivated, keeping whatever word it already
+-- carries, its own value never rewritten. Never two rows spelled the same way
+-- live at once, which is the whole invariant the unique index (migration
+-- 0100) polices.
 ${PHASE_TYPES.map((p, i) => {
   const position = i + 1
   const mark = APP_STAGES.find((a) => a.name === p.name)?.mark ?? null
   const candidates = phaseTypeCandidates(p.name).map((n) => sqlString(n)).join(", ")
+  const chosenRow = `(SELECT id FROM selectable_data
+      WHERE type = ${sqlString(PHASE_TYPE_GROUP)} AND value IN (${candidates})
+      ORDER BY (deactivated_at IS NULL) DESC, (value = ${sqlString(p.name)}) DESC, deactivated_at DESC, created_at ASC, id ASC
+      LIMIT 1)`
   return `
 UPDATE selectable_data
    SET value = ${sqlString(p.name)}, mark = ${sqlString(mark)}, position = ${position},
        is_default = 1, deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
        updated_at = datetime('now')
  WHERE type = ${sqlString(PHASE_TYPE_GROUP)}
-   AND value IN (${candidates});
+   AND id = ${chosenRow};
+
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'), deactivator_name = 'System', updated_at = datetime('now')
+ WHERE type = ${sqlString(PHASE_TYPE_GROUP)}
+   AND value IN (${candidates})
+   AND deactivated_at IS NULL
+   AND id != ${chosenRow};
 
 INSERT INTO selectable_data (id, type, value, is_default, mark, position, created_at, creator_name)
 SELECT lower(hex(randomblob(16))), ${sqlString(PHASE_TYPE_GROUP)}, ${sqlString(p.name)}, 1, ${sqlString(mark)}, ${position}, datetime('now'), 'System'
