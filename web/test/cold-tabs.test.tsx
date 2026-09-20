@@ -445,6 +445,19 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
  * this cold team's empty permission sheet never holds — only the four MINE
  * tabs are reachable here. */
 
+// TODAY, AS A REAL WINDOW. The Now tab's default sub-view is the STATUS
+// BOARD, and its own "To Do" column, 21 Sep 2026's ruling, only ever holds an
+// `open` story whose own phase is active TODAY (`storyBelongsOnKanbanColumn`,
+// stories-screen.tsx). `ONE_STORY` is `open`, so it needs a phase spanning
+// today to stay reachable on this canary's own default render, not a fixed
+// date, so this test never rots the day the calendar moves past it.
+const TODAY = new Date().toISOString().slice(0, 10)
+function addDays(iso: string, n: number): string {
+  const d = new Date(iso)
+  d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 const ONE_STORY = {
   id: "st1",
   ref: "B0001",
@@ -453,8 +466,8 @@ const ONE_STORY = {
   status: "open",
   ticketId: null,
   ticketRef: null,
-  sprintId: null,
-  sprintName: null,
+  sprintId: "sp1",
+  sprintName: "Sprint now",
   appId: null,
   appName: null,
   processId: null,
@@ -467,7 +480,8 @@ const ONE_STORY = {
   reviewerName: null,
   startsOn: null,
   dueOn: null,
-  sprintEndsOn: null,
+  sprintEndsOn: addDays(TODAY, 5),
+  sprintStartsOn: addDays(TODAY, -5),
   closedAt: null,
   closingNote: null,
   storyType: "Feature",

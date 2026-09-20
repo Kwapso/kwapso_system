@@ -68,7 +68,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { primeCache, useCached } from "@shared/web/store"
 import type { StoryAttachment } from "@shared/types"
-import { MOSCOW_VALUES, TITLE_MAX_CHARS } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { richTextValue } from "@shared/web/rich-text"
 import { pickedFileId, storedFileToUploadItem, usePickedFileItems } from "@shared/web/upload-items"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -172,10 +172,12 @@ const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 // SAME DESIGN AS DETAIL (Aurora's ruling, 20 Sep 2026, verbatim): identical
 // field shape, one line down.
 const acceptanceCriteriaField = { ...defaultFieldConfig, label: "Acceptance criteria", required: false }
-// MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — never
-// required: every EXISTING story predates the field, so a value is a choice
-// rather than a gate.
-const moscowField = { ...defaultFieldConfig, label: "Priority", required: false }
+// MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026). PARKED,
+// 21 Sep 2026 ("pause everything to do with moscow"). The field's own config
+// and its rendered control moved to `moscow-field.tsx`, unmounted
+// (`PARKED["work/moscow-field"]`); this form still carries `values.moscow`
+// untouched, so an edit on an existing story keeps whatever priority it
+// already had.
 const sprintField = {
   ...defaultFieldConfig,
   label: "Phase",
@@ -972,26 +974,12 @@ export function StoryFormDialog({
           disabled={busy}
         />
       </Field>
-      {/* MOSCOW — Aurora's ruling, 20 Sep 2026. Optional, so the group's own
-          "nothing chosen" state is a genuine third option, not one of the
-          four words — re-pressing the active segment clears it, the reverse
-          of the required Category group just below. */}
-      <Field config={moscowField} shape="group" htmlFor="story-moscow" className={fieldSpacing}>
-        <ToggleGroup
-          id="story-moscow"
-          type="single"
-          value={values.moscow}
-          onValueChange={(v) => setValues((s) => ({ ...s, moscow: v }))}
-          disabled={busy}
-          aria-label={t("Priority")}
-        >
-          {MOSCOW_VALUES.map((v) => (
-            <ToggleGroupItem key={v} value={v} disabled={busy}>
-              {v}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </Field>
+      {/* MOSCOW, PARKED, 21 Sep 2026 ("pause everything to do with moscow,
+          but remind me at later stages"). The field used to sit here, a
+          segmented control over `values.moscow`; `moscow-field.tsx` carries
+          it now, unmounted. `values.moscow` itself is untouched (see the
+          note on `useFormDraft`'s own defaults, above), so this is silent on
+          an edit, not a data loss. */}
       {/* CATEGORY, LAST AND PREFILLED — client ruling, 16 Sep 2026: "the
           client requested or internal should be at the very bottom and
           prefilled." Moved here from right after Type; the default (Client-

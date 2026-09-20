@@ -41,7 +41,7 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
 import { OverviewList } from "@/components/records/overview-list"
 import { RecordPicker } from "@/components/records/record-picker"
 import { WaveFormDialog } from "@/components/work/wave-form-dialog"
-import { waveDates } from "@/components/work/waves-screen"
+import { waveDates, WaveStageMark } from "@/components/work/waves-screen"
 import {
   RecordActionsMenu,
   RecordChipLink,
@@ -321,6 +321,12 @@ export function WaveDetailScreen({
               {t("Switched off")}
             </Badge>
           )}
+          {/* THE WAVE'S OWN STAGE. Aurora's ruling, 21 Sep 2026, verbatim:
+              "stage wave: read the active pahse that sit." Icon + word off
+              the active phase's own TYPE, no colour. `WaveStageMark`'s own
+              header (waves-screen.tsx), the identical helper the wave row
+              and the T3 timeline draw through. */}
+          <WaveStageMark phases={sprints.filter((s) => s.active)} t={t} variant="chip" />
           {wave.accountId && wave.accountName ? (
             <RecordChipLink href={`${basePath}/${waveId}/accounts/${wave.accountId}`}>
               {wave.accountName}

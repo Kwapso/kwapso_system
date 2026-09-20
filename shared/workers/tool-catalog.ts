@@ -916,9 +916,9 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Edit a ticket by `id`. `accountId` can be set once and never moved. Fields left out keep their value, so `titleEn` never blanks `titleDe`.",
     detail:
-      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries. `titleDe` and `titleEn` are the ticket's two titles and are corrected the same way — this is how a title is added to a ticket that has none, and how a translated one is filled in beside the original. Leaving one out keeps what is already there, so writing `titleEn` never blanks `titleDe`.",
+      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries. `titleDe` and `titleEn` are the ticket's two titles and are corrected the same way — this is how a title is added to a ticket that has none, and how a translated one is filled in beside the original. Leaving one out keeps what is already there, so writing `titleEn` never blanks `titleDe`. `assigneeId` names who is on it, a member of this team, staff only; leaving it out keeps whoever is already on it, and when nobody is, the ticket reads as inherited from its app's own lead.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/update",
-    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S }, ["id", "description"]),
+    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S, assigneeId: S }, ["id", "description"]),
     // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
     // derive it. Exposed by hand — the titles included, and they are the reason
     // this tool now matters twice over. `translate-ticket` is kept off the machine
@@ -926,7 +926,10 @@ export const SHARED_TOOLS: SharedTool[] = [
     // then call THIS tool with `titleEn`; that sentence was written before the
     // field existed here, so the exclusion rested on a call nobody could make.
     // The three `source*` fields stay out for the reason create_help_ticket gives.
-    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId"), titleDe: opt(i, "titleDe"), titleEn: opt(i, "titleEn") }),
+    // `assigneeId` (Aurora, 21 Sep 2026, R22 parity with the door's own new
+    // field, workers/content/src/lib/help.ts's `updateTicket`) added the same
+    // way every other field here was: read in lib/help.ts, exposed by hand.
+    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId"), titleDe: opt(i, "titleDe"), titleEn: opt(i, "titleEn"), assigneeId: opt(i, "assigneeId") }),
     // CONFIRM, and this is the one that mattered. The door SETS `account_id` on a
     // ticket that had none, and a ticket carries its whole reply history — so one
     // silent call could hand an internal agency conversation to a client's portal.

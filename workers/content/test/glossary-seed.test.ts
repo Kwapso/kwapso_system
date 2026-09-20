@@ -149,4 +149,34 @@ describe("GET /api/content/knowledge?kind=glossary, the list door, after the see
     const byKind = body.byKind as Record<string, number>
     expect(byKind.glossary).toBe(GLOSSARY_ENTRIES.length)
   })
+
+  // CAUSE (c), RULED OUT: `listSources`'s own WHERE (`sourcesWhere`,
+  // workers/content/src/lib/knowledge.ts) narrows by the reader's fence and
+  // by `filter.kind` — nothing there reads `indexed_at`/`chunk_count`/
+  // `index_error`. A row is LISTABLE the moment it is WRITTEN; indexing
+  // (`indexOneSource`, Vectorize) is what makes it SEARCHABLE by the
+  // assistant later, a separate concern the list door never gates on. This
+  // is the ordinary state right after a seed: the door has returned but the
+  // sweep/indexOneSource call for 54 rows has not necessarily finished (or,
+  // here, is forced to look like it never will).
+  it("lists every seeded word even when none of them are indexed yet — listing never waits on Vectorize", async () => {
+    await seedDoor(IDS.staffUser)
+    db().exec(
+      `UPDATE knowledge_sources
+         SET indexed_at = NULL, chunk_count = 0, indexed_chunks = 0, index_error = 'not indexed yet'
+         WHERE kind = 'glossary'`
+    )
+    const { status, body } = await listDoor(IDS.staffUser)
+    expect(status).toBe(200)
+    // THE LIST PAGES (R14) — a page of unindexed rows is exactly the case
+    // this test is about, so it asserts the PAGE is unindexed and glossary,
+    // and reads the exact total off the same sidecar the existing byKind
+    // test above already trusts, rather than assuming one page holds all 54.
+    const sources = body.sources as { title: string; kind: string; indexedAt: string | null }[]
+    expect(sources.length).toBeGreaterThan(0)
+    expect(sources.every((s) => s.kind === "glossary")).toBe(true)
+    expect(sources.every((s) => s.indexedAt === null), "still unindexed, and still listed").toBe(true)
+    const byKind = body.byKind as Record<string, number>
+    expect(byKind.glossary, "the exact total still counts every unindexed row").toBe(GLOSSARY_ENTRIES.length)
+  })
 })

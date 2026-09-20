@@ -143,7 +143,12 @@ export type KnowledgeLinkRead = { provider: string; kind: string; words: number 
 /** The facets the story list door parses — mirrored here so a caller cannot
  * invent one the server ignores in silence. */
 export type StoryQuery = {
-  status?: Story["status"]
+  /** THE TWO VIRTUAL WORDS ride here too (Aurora's ruling, 21 Sep 2026: "to do
+   * means its scheduled in an active phase"): `"to_do"`/`"backlog"` narrow to
+   * `open` stories by whether their own phase is active today, never a fifth/
+   * sixth stored status (`shared/story-status-word.ts`, `OpenStoryFacetStatus`
+   * on the worker side). */
+  status?: Story["status"] | "to_do" | "backlog"
   ticketId?: string
   sprintId?: string
   /** all the work on one system — a story always has an app, and only sometimes
@@ -562,6 +567,11 @@ export const content = {
     appId?: string
     moduleId?: string
     raisedByContactId?: string
+    /** WHO IS ON IT (Aurora, 21 Sep 2026), staff only, left out to keep
+     * whoever the ticket already carries. See `shared/types.ts`'s
+     * `assigneeId` for the redaction and `shared/effective-assignee.ts`
+     * for how the page reads the fallback when it is null. */
+    assigneeId?: string
   }) =>
     api<{
       tickets: HelpTicket[]

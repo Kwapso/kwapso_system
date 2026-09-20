@@ -3,16 +3,20 @@
 // `editor_id`, `editor_name`, `deactivated_at`), against a real SQLite
 // database running the real team migrations, the real route handlers
 // (`postHelpReplyUpdate`/`postHelpReplyDelete`) and the real `lib/help.ts`
-// seam (`updateReply`/`deleteReply`/`assertMayChangeReply`). Four things:
+// seam (`updateReply`/`deleteReply`/`assertMayEditReply`/`assertMayDeleteReply`).
+// Four things:
 //
-//   1. THE FENCE. The author always may change their own reply. Past that,
+//   1. THE FENCE. Aurora's 21 Sep 2026 ruling narrowed Edit and left Delete as
+//      it was: the author always may change their own reply. Past that,
 //      `help:update` — the same "ticket edit right" `resolve_help_ticket`/
 //      `archive_help_ticket` already require — reaches every OTHER staff
-//      member's reply. A CLIENT LOGIN never gets that second half, whatever
-//      its own role happens to hold — `help-fence.test.ts`'s own burglar role
-//      is deliberately granted every right, so this suite proves the portal
-//      branch is checked BEFORE any right lookup, not merely that this
-//      harness's client role lacks one.
+//      member's reply for DELETE ONLY, never for edit; rewriting somebody
+//      else's words is refused even with that right. A CLIENT LOGIN never
+//      gets the second half either way, whatever its own role happens to
+//      hold; `help-fence.test.ts`'s own burglar role is deliberately
+//      granted every right, so this suite proves the portal branch is
+//      checked BEFORE any right lookup, not merely that this harness's
+//      client role lacks one.
 //   2. THE LIMITS. An empty or over-long body is refused the same way a new
 //      reply already is (`TEXT_LIMITS.long`, shared with `postHelpReply`).
 //   3. THE SOFT DELETE. A removed reply stops appearing in the thread AND its
@@ -145,7 +149,7 @@ describe("update_help_reply / delete_help_reply — the author always may", () =
   })
 })
 
-describe("update_help_reply / delete_help_reply — the ticket edit right reaches every OTHER staff reply", () => {
+describe("update_help_reply / delete_help_reply, the ticket edit right reaches every OTHER staff reply for DELETE ONLY (Aurora's 21 Sep 2026 ruling)", () => {
   it("a staff member with NO help:update right may not edit a colleague's reply", async () => {
     const id = await reply(IDS.staffUser, "the admin's own words")
     const res = await call(LIMITED_STAFF, "POST /api/content/help/reply/update", { id, body: "rewritten" })
@@ -160,18 +164,28 @@ describe("update_help_reply / delete_help_reply — the ticket edit right reache
     expect(res.status).toBe(403)
   })
 
-  it("a staff member WITH the ticket edit right may edit a colleague's reply", async () => {
+  it("a colleague WITH the ticket edit right may still not edit another member's reply, Edit is author only now", async () => {
     const id = await reply(LIMITED_STAFF, "needs a staff correction")
     const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", { id, body: "corrected by an editor" })
-    expect(res.status, await res.clone().text()).toBe(200)
-    const data = (await res.json()) as { replies: { id: string; body: string }[] }
-    expect(data.replies.find((r) => r.id === id)?.body).toBe("corrected by an editor")
+    expect(res.status).toBe(403)
+    const data = (await res.json()) as { error: string }
+    expect(data.error).toBe("forbidden")
+    const row = db().prepare(`SELECT message_body FROM help_threads WHERE id = ?`).get(id) as { message_body: string }
+    expect(row.message_body).toBe("needs a staff correction") // refused before any write
   })
 
   it("a staff member WITH the ticket edit right may delete a colleague's reply", async () => {
     const id = await reply(LIMITED_STAFF, "needs to go")
     const res = await call(IDS.staffUser, "POST /api/content/help/reply/delete", { id })
     expect(res.status, await res.clone().text()).toBe(200)
+  })
+
+  it("the author still edits their own reply even without the ticket edit right", async () => {
+    const id = await reply(LIMITED_STAFF, "my own words")
+    const res = await call(LIMITED_STAFF, "POST /api/content/help/reply/update", { id, body: "my own words, fixed" })
+    expect(res.status, await res.clone().text()).toBe(200)
+    const data = (await res.json()) as { replies: { id: string; body: string }[] }
+    expect(data.replies.find((r) => r.id === id)?.body).toBe("my own words, fixed")
   })
 })
 

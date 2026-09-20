@@ -54,6 +54,7 @@ import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
 import { applyClickGesture, clickGesture, rowOpenHandlers } from "@/lib/row-open"
 import { HELP_STATUSES } from "@shared/types"
+import { storyStatusWord } from "@shared/story-status-word"
 import type {
   AppRow,
   HelpTicket,
@@ -86,26 +87,6 @@ import { HELP_STATUS, ticketStatusCell } from "@/components/deep-link/shape"
 import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
 import { memberFace, ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
 import { ticketTitle } from "@shared/web/ticket-chips"
-
-/** The four states a story moves through, in the words a person reads. The
- * states the code trusts are STORY_STATUSES; this is only their spelling.
- *
- * "OPEN" RENAMED "BACKLOG" (Aurora's ruling, 20 Sep 2026, verbatim): "Open
- * becomes Backlog (the story exists but isn't scheduled yet)." The fixed key
- * underneath is untouched — still `open` — and team migration 0106 carries
- * the identical word move onto the matching `Story status` dropdown row, so
- * this hardcoded fallback and that team-editable label never disagree. The
- * stories BOARD (`stories-screen.tsx`'s own `KANBAN_STATUS_LABEL`) draws a
- * DIFFERENT word for this same status — "To Do" — deliberately: that is
- * Aurora's own kanban-column ruling, the same day, and the two words answer
- * two different questions ("what kind of thing is this" here, "which column
- * does it sit in" there). */
-export const STORY_STATUS_LABEL: Record<Story["status"], string> = {
-  open: "Backlog",
-  in_progress: "In progress",
-  in_review: "In review",
-  done: "Done",
-}
 
 /** A row in one of these lists, faded when the record is switched off or
  * finished. Nothing here is ever hidden for being done: "finished" is a state,
@@ -387,7 +368,7 @@ function PagedPanelBody<T>({
 function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket", lang: Language): string {
   return (
     [
-      STORY_STATUS_LABEL[s.status],
+      storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn }),
       // R54: an assignee is always one of ours — a story is agency work.
       staffNameFromSnapshot(s.assigneeName) || "unassigned",
       s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
@@ -549,19 +530,33 @@ export function StoriesPanel({
       sorts={translatedSorts("stories", t)}
       defaultSort={COLLECTION_SORTS.stories.defaultSort}
       // THE ONE REAL FACET this narrower view can offer without a second
-      // fetch: the four stages every story moves through, the same words
-      // `STORY_STATUS_LABEL` renders on the row. `assigneeId`/`sprintId` are
+      // fetch: the stages every story moves through, the same words
+      // `storyStatusWord` renders on the row. `assigneeId`/`sprintId` are
       // door filters too (`StoryFilter`, workers/content/src/lib/stories.ts),
       // but both need an OPTIONS list — the team's members, the app's
       // sprints — this panel is not handed, and a facet with nowhere to get
       // its options from is the useless dropdown `translatedFacets` itself
       // refuses to draw.
+      //
+      // FIVE CHOICES FOR FOUR STATUSES (Aurora's ruling, 21 Sep 2026: "to do
+      // means its scheduled in an active phase"): `open` splits into two
+      // FACET values, `to_do`/`backlog`, that both narrow to the one stored
+      // `open` status; the door tells them apart by whether the story's own
+      // phase is active today (`OpenStoryFacetStatus`, workers/content/src/
+      // lib/stories.ts). Neither is a stored status, so `story.status` never
+      // equals either one.
       facets={[
         {
           field: "status",
           label: t("Status"),
           control: "select",
-          options: Object.entries(STORY_STATUS_LABEL).map(([value, label]) => ({ value, label: t(label) })),
+          options: [
+            { value: "backlog", label: t("Backlog") },
+            { value: "to_do", label: t("To Do") },
+            { value: "in_progress", label: t(storyStatusWord("in_progress", null)) },
+            { value: "in_review", label: t(storyStatusWord("in_review", null)) },
+            { value: "done", label: t(storyStatusWord("done", null)) },
+          ],
         },
       ]}
       // WHAT THIS PANEL IS ALREADY ASKING — the sprint/app/ticket it hangs off

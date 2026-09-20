@@ -598,6 +598,48 @@
 }
 
 /* ============================================================================
+   THE SAME 10px LEAD, WHEN THE TOOLBAR IS THE KIT'S OWN (R49/R83 EXTENDED,
+   21 Sep 2026). Aurora, verbatim: "review sping aboe toolbar everyhwere. f.e.
+   in app / phases its completey off."
+   ============================================================================
+   Every rule above keys off `[data-slot="card"]` / `[data-slot="card-content"]`,
+   this app's own wrapper, published by `<ToolbarRow>`/`<PagedFind>`'s own
+   `data-slot="toolbar-row-pin"` one level down. A collection drawn through
+   `useKitPanel` (`shared/web/screen-engine/collection-frame.tsx`) never
+   reaches any of them: its toolbar is the vendored kit's own `CollectionFrame`
+   (`shared/ui/components/collection-frame/collection-frame.tsx`), whose
+   `data-slot="collection-frame-toolbar"` sits directly inside
+   `data-slot="collection-frame-panel"`, no `[data-slot="card"]` anywhere in
+   that subtree for a single rule above to key on. Measured live, App detail's
+   Phases tab (`SprintsPanel`, `web/components/work/work-panels.tsx`, out of
+   this lane's file list, hosts the kit frame via `useKitPanel`): 111px above
+   the toolbar at 1440, 103px at 760, the kit panel's own untouched
+   `p-6 lg:p-[var(--space-7)]` (`collectionPanelVariants`, read off the kit
+   itself so the number lands on 10, never 10 plus its own), not this law's
+   token.
+
+   THE SAME SHAPE, ONE MORE ELEMENT TO REACH. `--pinned-lead` already reaches
+   this panel: `PINNED_TOOLBAR_IN_KIT_PANEL` (`shared/web/pinned-chrome.ts`)
+   publishes it on the frame's own root at `--space-6`/`--space-7`, the
+   panel's real geometry, so the pin's own peek already matches what the panel
+   actually pays. That geometry is the kit's own inset, never this law's
+   number, so both halves are retargeted here together (the custom property
+   AND the real padding, the identical pair every rule above already keeps in
+   step), or a pinned toolbar would land somewhere the panel's own padding
+   never was. Redeclared on the panel itself, not the frame's root: a custom
+   property a descendant redeclares always outranks the one it would
+   otherwise inherit, so this never has to out-cascade
+   `PINNED_TOOLBAR_IN_KIT_PANEL`'s own inline arbitrary property on a
+   different element. The BELOW gap is untouched: the panel's own `pb-5 -mb-5`
+   pair on the toolbar (same file) already cancels to zero at rest against the
+   panel's `gap-5`, the identical "peek" shape the top-level screens use,
+   confirmed live, 0px below, on Phases already. */
+[data-slot="collection-frame"] [data-slot="collection-frame-panel"] {
+  --pinned-lead: var(--toolbar-lead-gap);
+  padding-top: var(--toolbar-lead-gap);
+}
+
+/* ============================================================================
    THE GROUND A PINNED BAR PAINTS (R63).
    ============================================================================
    A pinned toolbar has to PAINT, or the rows scroll through it — and it has to

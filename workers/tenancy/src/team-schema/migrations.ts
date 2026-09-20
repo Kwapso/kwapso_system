@@ -8013,6 +8013,50 @@ SELECT lower(hex(randomblob(16))), s.id, 'in_review', 'done',
    );
 `,
   },
+  {
+    // A TICKET GETS ITS OWN ASSIGNEE. Aurora's ruling, verbatim, 21 Sep 2026:
+    // "both on story detail and ticket detail we need to see to whom it's
+    // assigned, normally this gets inherited from the app." A story has
+    // carried `assignee_id`/`assignee_name` since the work engine shipped
+    // (this file's own 0007-era columns); `help` carried none, because a
+    // ticket used to answer "who is on it" only through the work underneath
+    // it. The SCOPE this asks for is wider: a ticket wants an assignee of
+    // its own, one a person with the edit right can set, and a FALLBACK to
+    // the app when nobody has.
+    //
+    // THE SAME AUDIT-PAIR SHAPE `stories.assignee_id`/`assignee_name`
+    // ALREADY KEEP, deliberately mirrored rather than invented fresh: a
+    // stored id plus a stored name, snapshotted at the write (see
+    // `workers/content/src/lib/help.ts`'s `updateTicket`), so a list of
+    // fifty tickets draws fifty names with no join.
+    //
+    // NO COLUMN ON `apps`, AND THAT IS THE DELIBERATE HALF OF THIS
+    // MIGRATION. An app already has exactly one "who owns this system" fact,
+    // `app_staff.is_lead` (team migration 0030), the row `app-detail.tsx`'s
+    // own Lead field already reads and writes. Her words are "this gets
+    // INHERITED FROM THE APP", not "the app gets a second field", and a
+    // second, disconnected `apps.assignee_id` column beside an existing lead
+    // would be two answers to one question that can disagree the first time
+    // the lead changes and the copy does not follow (the same argument this
+    // file's own `sprint_ends_on` header makes for a story's due date and a
+    // sprint's end date: "two dates for one promise is two dates that
+    // disagree"). So the app side of the inheritance reads `app_staff`
+    // directly (`workers/content/src/lib/help.ts`'s `TICKET_COLS`, a
+    // correlated subselect exactly like `app_logo`'s own two lines up), and
+    // nothing is added here for it.
+    //
+    // NUMBERED 0111, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0110 is the highest version on both the
+    // local tree and `origin/main` as of 21 Sep 2026, so 0111 is the next
+    // free number.
+    version: "0111_a_ticket_gets_its_own_assignee",
+    sql: `
+ALTER TABLE help ADD COLUMN assignee_id TEXT;
+ALTER TABLE help ADD COLUMN assignee_name TEXT;
+CREATE INDEX idx_help_assignee ON help (assignee_id);
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

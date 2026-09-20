@@ -302,7 +302,18 @@ export function TimePanel({
   const runaways = (timersQ.data ?? []).filter((t) => t.runaway)
 
   return (
-    <section className="flex flex-col gap-6">
+    // THE GAP ABOVE THE TOOLBAR IS THE LAW'S TOKEN, NOT THE PANEL GAP (Aurora,
+    // 21 Sep 2026: "review sping aboe toolbar everyhwere. f.e. in app / phases
+    // its completey off", measured live at 24px here, the section's own
+    // ordinary `gap-6` between this box and `<PagedFind>` below, standing in
+    // for the toolbar's own lead by accident rather than by the token every
+    // other toolbar answers to). `<PagedFind>` here takes no `wrap`, so its own
+    // `data-slot="toolbar-row-pin"` pins flush with no card around it to
+    // publish `--pinned-lead`. This section's flex gap was the only thing
+    // standing above it, so it is the one thing this fix touches: the SAME
+    // two children, the SAME two boxes, a `gap-[var(--toolbar-lead-gap)]`
+    // between them instead of the ordinary inter-panel `gap-6`.
+    <section className="flex flex-col gap-[var(--toolbar-lead-gap)]">
       {/* THE HOURS, above the toolbar rather than inside it: it is a second,
           different number from whatever the search box below is narrowing —
           the collection's own count (the heading above says that) is a third —

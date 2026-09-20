@@ -9,6 +9,11 @@
 //   · ANOTHER member, with no ticket edit right (`help:update`), sees Copy
 //     only — the menu still draws (Copy needs no permission), Edit and
 //     Delete simply do not;
+//   · ANOTHER member WITH the ticket edit right sees Copy and Delete, but
+//     still never Edit. Aurora's 21 Sep 2026 ruling narrowed Edit to the
+//     author alone, and left Delete reaching every reply the right already
+//     governs (`assertMayEditReply`/`assertMayDeleteReply`,
+//     workers/content/src/lib/help.ts);
 //   · pressing Edit opens the app's own slide-in sheet (`reply-edit-sheet.tsx`,
 //     Aurora's SAME-DAY follow-up ruling: "open the edit as slide in. can
 //     edit text and date and attachments"), never the kit's own inline
@@ -179,8 +184,9 @@ beforeEach(() => {
   deleteHelpReply.mockReset()
   // The default fixture: no special ticket edit right (`help:update` false),
   // every other module read true — isolates "the author always may" from "a
-  // held right also may", which the fence itself keeps as two separate
-  // clauses (`assertMayChangeReply`, workers/content/src/lib/help.ts).
+  // held right also may (delete only)", which the fence itself keeps as two
+  // separate functions now (`assertMayEditReply`/`assertMayDeleteReply`,
+  // workers/content/src/lib/help.ts).
   perms.can.mockReset().mockImplementation((module: string, right: string) => !(module === "help" && right === "update"))
 })
 
@@ -226,6 +232,24 @@ describe("another member, with no ticket edit right, gets Copy only", () => {
     expect(screen.getByRole("menuitem", { name: "Copy" })).toBeTruthy()
     expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull()
     expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull()
+  })
+})
+
+// AURORA'S 21 SEP 2026 RULING, narrowing Edit off the ticket edit right while
+// leaving Delete on it: "who may edit: A author onñy." A colleague holding
+// help:update could edit ANY reply before this ruling; now that right still
+// lets them take one out, but rewriting somebody else's words is refused
+// even with it, proved at the door in
+// workers/content/test/help-reply-actions.test.ts, proved at this wiring
+// here.
+describe("another member WITH the ticket edit right sees Copy and Delete, never Edit", () => {
+  it("the ticket edit right reaches Delete but not Edit on a colleague's reply", async () => {
+    perms.can.mockReset().mockReturnValue(true) // help:update true, same as every other module
+    const [, other] = await renderThread()
+    await openMessageActions(other)
+    expect(screen.getByRole("menuitem", { name: "Copy" })).toBeTruthy()
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeTruthy()
+    expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull()
   })
 })
 

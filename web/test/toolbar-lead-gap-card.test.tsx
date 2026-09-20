@@ -1374,3 +1374,124 @@ describe("the below gap — PagedFind's own pinned toolbar tracks --toolbar-cont
     ).not.toContain("toolbar-content-gap")
   })
 })
+
+// ============================================================================
+// THE LAW MEASURES ITSELF (R49/R83, ROUND 30, 21 Sep 2026). Aurora, verbatim:
+// "review sping aboe toolbar everyhwere. f.e. in app / phases its completey
+// off." Four outliers this round were found by a PERSON reading screen after
+// screen: App detail's Phases tab drew the vendored kit's own
+// `<CollectionFrame>` (`data-slot="collection-frame-toolbar"`), a slot none
+// of R49/R83's card-keyed selectors had ever been written to reach; Account
+// detail's Contacts panel fell through to `CollectionCard`'s own stale,
+// un-tokened default; Work logs paid an ordinary inter-panel `gap-6` where
+// the toolbar's own lead belonged. A person cannot re-read every screen every
+// round, so this is that census, off the disk: a FIFTH slot that draws a
+// `PINNED_TOOLBAR`-family toolbar tomorrow, through a shape none of
+// `web/app/globals.css`'s rules already reach, is caught here, red, before
+// it ships to staging for somebody to notice by eye a second time.
+// ============================================================================
+describe("R83 self-check, every pinned-toolbar data-slot is one this round's CSS actually reaches", () => {
+  const GLOBALS_CSS_PATH = join(ROOT, "web", "app", "globals.css")
+  const PINNED_CHROME_PATH = join(ROOT, "shared", "web", "pinned-chrome.ts")
+
+  // WHERE A TOOLBAR CAN BE DRAWN FROM, so this census reads exactly the files
+  // R83's own registers already treat as in scope: the two front doors' own
+  // components, the app-shared screen engine, and the vendored kit (whose OWN
+  // toolbar-pinning shape, `collection-frame.tsx`, is what this round's fix
+  // had to reach around, never edit, R39/`kit-supplies-the-ui`).
+  const SCAN_ROOTS: { root: string; extensions: string[] }[] = [
+    { root: join(ROOT, "web", "components"), extensions: [".tsx"] },
+    { root: join(ROOT, "web-portal", "components"), extensions: [".tsx"] },
+    { root: join(ROOT, "shared", "web"), extensions: [".tsx", ".ts"] },
+    { root: join(ROOT, "shared", "ui", "components"), extensions: [".tsx"] },
+  ]
+
+  /** Every `data-slot="…"` this codebase gives to an element that ALSO reads
+   * `PINNED_TOOLBAR` or `PINNED_TOOLBAR_IN_KIT_PANEL` on the same opening
+   * tag, the one shared shape every pinned toolbar in this app draws
+   * through (`shared/web/pinned-chrome.ts`'s own header: "the pin belongs to
+   * the ROW, nothing else writes a `sticky top-…` on a toolbar of its
+   * own"). Comments stripped first, so a paragraph of prose that happens to
+   * say both words within one window (this very file has several) is never
+   * misread as a second call site. The window is generous (one JSX tag can
+   * run long with a `cn(...)` className) but bounded, so it cannot walk into
+   * an unrelated element two tags later. */
+  function pinnedToolbarSlots(): Set<string> {
+    const found = new Set<string>()
+    for (const { root, extensions } of SCAN_ROOTS) {
+      for (const file of sourceFiles(root, { extensions, skipTests: true })) {
+        const stripped = stripComments(file.source, { keepLength: true })
+        const re = /data-slot="([\w-]+)"[^>]{0,600}?\bPINNED_TOOLBAR(?:_IN_KIT_PANEL)?\b/g
+        for (const m of stripped.matchAll(re)) found.add(m[1])
+      }
+    }
+    return found
+  }
+
+  it("DERIVED: the app draws a pinned toolbar through exactly one self-tagged slot, toolbar-row-pin, every <ToolbarRow>/<PagedFind>/<WaveFinder>/roles-matrix/appearance-panel call site names it, and none names a second word", () => {
+    const slots = pinnedToolbarSlots()
+    expect(
+      [...slots],
+      "every element wearing PINNED_TOOLBAR must carry data-slot=\"toolbar-row-pin\", a second name here is a toolbar this round's globals.css coverage was never written to find"
+    ).toEqual(["toolbar-row-pin"])
+  })
+
+  it("CSS: toolbar-row-pin's own lead is reached through its CARD ancestor, not its own name, proving the mechanism this census's ONE allowed slot actually depends on is still on disk", () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    // The three shapes R83 covers a toolbar-row-pin-hosting card through:
+    // strip-adjacency, the nested tab pane, and a heading-led card. Any ONE
+    // missing is the exact class of outlier this round fixed a member of.
+    expect(css, "the strip-adjacency rule must still set --pinned-lead to the token").toMatch(
+      /\.pinned-strip \+ \[data-slot="card"\][\s\S]{0,200}--pinned-lead:\s*var\(--toolbar-lead-gap\)/
+    )
+    expect(css, "the nested-tab-pane rule must still set --pinned-lead to the token").toMatch(
+      /\[data-tab-pane\] \[data-slot="card"\]:first-child\s*\{\s*--pinned-lead:\s*var\(--toolbar-lead-gap\)/
+    )
+    expect(css, "the heading-led rule must still set --pinned-lead to the token").toMatch(
+      /:has\(> \[data-slot="headline"\]\)\) \+ \[data-slot="card"\][\s\S]{0,200}--pinned-lead:\s*var\(--toolbar-lead-gap\)/
+    )
+  })
+
+  it("CSS: every OTHER pinned-toolbar family's own fixed target slot is named in globals.css's lead rule, derived off pinned-chrome.ts rather than hand-typed", () => {
+    const pinnedChrome = readFileSync(PINNED_CHROME_PATH, "utf8")
+    const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    // `PINNED_TOOLBAR_IN_KIT_PANEL` is the one other pin family. Its own
+    // fixed target is read off ITS OWN source rather than typed here a
+    // second time, so a future third family (or a renamed slot) is read
+    // fresh every run.
+    const targetMatch = /\[&_\[data-slot=([\w-]+)\]\]:sticky/.exec(pinnedChrome)
+    expect(targetMatch, "PINNED_TOOLBAR_IN_KIT_PANEL must still target a data-slot").toBeTruthy()
+    const target = targetMatch![1]
+    expect(target, "PINNED_TOOLBAR_IN_KIT_PANEL's own known target").toBe("collection-frame-toolbar")
+    // AND THE PANEL THAT HOSTS IT. collection-frame-toolbar has no
+    // [data-slot="card"] ancestor to be reached through the way toolbar-row-pin
+    // is, so this round's fix names the PANEL directly (globals.css, added
+    // 21 Sep 2026). Both halves, the custom property and the real padding,
+    // exactly as every rule above keeps them.
+    expect(
+      css,
+      `globals.css must set --pinned-lead to the token on [data-slot="collection-frame-panel"], the container of [data-slot="${target}"]`
+    ).toMatch(/\[data-slot="collection-frame-panel"\][\s\S]{0,120}--pinned-lead:\s*var\(--toolbar-lead-gap\)/)
+    expect(
+      css,
+      `globals.css must set the real padding-top to the token on [data-slot="collection-frame-panel"]`
+    ).toMatch(/\[data-slot="collection-frame-panel"\][\s\S]{0,220}padding-top:\s*var\(--toolbar-lead-gap\)/)
+  })
+
+  it("RED PROOF: a slot this census does not know about fails the exact-equality check above, rather than silently passing", () => {
+    // Not a call into pinnedToolbarSlots(). A literal fixture proving the
+    // ASSERTION SHAPE itself is a trap, not merely today's data. `toEqual`
+    // against a fixed one-item array fails on any extra or renamed entry.
+    const hypothetical = new Set(["toolbar-row-pin", "screen-toolbar-pin"])
+    expect(() => expect([...hypothetical]).toEqual(["toolbar-row-pin"])).toThrow()
+  })
+
+  it("SOURCE: every renderPanel TabsContent still carries data-tab-pane, the marker the nested-tab-pane rule above depends on, so App detail's Stories/Tickets tabs (which host their own toolbar through exactly this path) keep the 10px this round confirmed rather than losing it to a future edit", () => {
+    const src = readFileSync(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx"), "utf8")
+    const stripped = stripComments(src, { keepLength: true })
+    expect(
+      stripped,
+      "TabsView's renderPanel branch must still mark every TabsContent with data-tab-pane, unconditionally, never behind a per-screen flag a future record detail could omit"
+    ).toMatch(/renderPanel\s*&&[\s\S]{0,2000}<TabsContent[^>]*\bdata-tab-pane\b/)
+  })
+})

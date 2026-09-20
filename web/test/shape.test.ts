@@ -112,6 +112,10 @@ const ticket: HelpTicket = {
   appLogo: null,
   raisedByContactId: null,
   raisedByContactName: null,
+  // Nobody has claimed this one and it has no app to inherit from either.
+  assigneeId: null,
+  assigneeName: null,
+  appAssigneeId: null,
   // Only a ticket that WAITED ever carries one, and this one never did.
   validatedAt: null,
   createdAt: "2026-06-13T10:00:00.000Z",

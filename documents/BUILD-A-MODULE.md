@@ -1264,6 +1264,18 @@ again, which is the only property that matters here.
   translation catalogue and seed, every JSX text node/`t(...)` argument
   reachable from either front door, `shared/web/`, `shared/workers/
   email-template.ts` and every send site, and `shared/glossary.ts`.
+- **R96 `id-chip-is-black`**, if your module's record carries a reference
+  (`shared/workers/refs.ts`, a ticket/story/sprint/meeting/app/wave/input
+  style short code), draw it through `<RecordRef>`
+  (`shared/web/record-ref.tsx`), the one shared id chip register, never a
+  hand rolled `Badge` in another tone and never a bare-text table column. A
+  standalone id column (`field("ref", "ID")`) must wrap its cell value in
+  `<RecordRef>` too, the same as a leading, name-adjacent one. `web/test/
+  id-chip-is-black.test.ts` censuses every bare `{x.ref}` inside a
+  non-inverse `Badge` and every standalone `field("ref", "ID")` column; a
+  real reason for skipping one goes in `ID_CHIP_EXEMPT`
+  (`shared/rules/registry.ts`), keyed by the offending line's own text,
+  never a line number.
 
 **The words** (the ones that catch every new module, every time)
 

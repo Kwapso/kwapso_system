@@ -495,12 +495,17 @@ Today it covers:
     **`update_help_reply` / `delete_help_reply`** (team migration 0108, Aurora's
     20 Sep 2026 chat-edit-pencil ruling) mirror the app's own edit/copy/delete
     menu on a reply, R22 parity with `POST /api/content/help/reply/update` and
-    `POST /api/content/help/reply/delete`. Both share ONE fence: the reply's own
-    author may always change it, and past that `help:update` (the same right
-    `resolve_help_ticket` and `archive_help_ticket` already require) reaches
-    every other member's reply too. `delete_help_reply` is a soft delete, same
-    as `archive_help_ticket`: nothing is removed, the reply and its activity
-    entry survive, it only stops showing in the thread. Neither sends email.
+    `POST /api/content/help/reply/delete`. **THE TWO NOW CARRY DIFFERENT
+    FENCES**, as of Aurora's 21 Sep 2026 ruling, verbatim: "who may edit: A
+    author onny." `update_help_reply` is AUTHOR ONLY: the reply's own author
+    may always change it, and nobody else, whatever right they hold
+    (`assertMayEditReply`, workers/content/src/lib/help.ts). `delete_help_reply`
+    keeps the wider fence it always had: the author, or past that `help:update`
+    (the same right `resolve_help_ticket` and `archive_help_ticket` already
+    require), reaching every other member's reply too
+    (`assertMayDeleteReply`). `delete_help_reply` is a soft delete, same as
+    `archive_help_ticket`: nothing is removed, the reply and its activity entry
+    survive, it only stops showing in the thread. Neither sends email.
 
     **`update_help_reply` gained `createdAt` and `attachments` on 20 Sep 2026**,
     the same day's follow-up ruling ("open the edit as slide in. can edit text

@@ -4822,8 +4822,16 @@ describe("RULES — the laws of the base", () => {
       ],
       [
         "web/components/deep-link/screen-bits.tsx",
-        "the app's own collection container publishes the inset it spends — the SAME ladder `cn(\"p-4\")` leaves on CardContent, --space-4 and --space-7 above lg, so the number cannot grow a second owner",
-        ["[--pinned-lead:var(--space-4)]", "lg:[--pinned-lead:var(--space-7)]"],
+        // R83/RULING 7, EXTENDED 21 Sep 2026. The app's own collection
+        // container publishes the SAME token CardContent's own real
+        // `padding-top` now reads (`pt-[var(--pinned-lead)]`), not the old
+        // 16/32px ladder. A card reached through a fourth flow shape (an
+        // account's own Contacts panel) fell through to that stale default
+        // and never agreed with Ruling 7's flat 10px, so the two are now one
+        // number rather than two that happened to match everywhere the
+        // ancestor rules already reached.
+        "the app's own collection container publishes --toolbar-lead-gap directly, flat at every width, the SAME token CardContent's own padding-top now reads, so the number cannot grow a second owner",
+        ["[--pinned-lead:var(--toolbar-lead-gap)]"],
         String.raw`export function CollectionCard[\s\S]*?\n\}`,
       ],
       [
@@ -5504,6 +5512,7 @@ describe("RULES — the laws of the base", () => {
       "visual-accompanies-text", // R93: web/test/visual-accompanies-text.test.ts — every <Select>/<RecordPicker> choosing over a module-named source array carries the module's own icon (icon= / icon:), or is named in VISUAL_ACCOMPANIES_TEXT_EXEMPT
       "chip-order", // R94: web/test/chip-order.test.ts — orderChips()'s own unit tests, plus a census over every id+status chip row (<RecordRef + variant="status"/ticketStatusCell() within one window) built through orderChips(), or named in CHIP_ORDER_EXEMPT
       "no-em-dash", // R95: web/test/no-em-dash.test.ts — six censuses (i18n-strings.json, i18n-seed.ts every language, the front doors' own appFiles() import closure read at visitStrings()'s seven positions, shared/web/ read the same way directly off disk, shared/workers/email-template.ts plus every derived sendBrandedEmail(/brandedEmail( send site, and shared/glossary.ts), each stripped of comments first and each with its own tripwire, no exemptions table
+      "id-chip-is-black", // R96: web/test/id-chip-is-black.test.ts, every bare {x.ref} inside a non-inverse <Badge>, plus every standalone field("ref", "ID") column, over web/ + web-portal/ + shared/web/, or named in ID_CHIP_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

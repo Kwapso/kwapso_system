@@ -86,10 +86,25 @@ const RAISER: HelpStakeholder = {
   origin: "raiser",
 } as unknown as HelpStakeholder
 
-// TWO RELATED STORIES — enough to prove "no cap" means something (V1 capped
+// Today, computed rather than hardcoded — `storyStatusWord`'s own default
+// clock, the same shape `story-status-board.test.ts`'s own `TODAY`/`addDays`
+// take, so this file never races a fixed date.
+const TODAY = new Date().toISOString().slice(0, 10)
+function addDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number)
+  const dt = new Date(y!, (m ?? 1) - 1, (d ?? 1) + n)
+  const pad = (v: number) => String(v).padStart(2, "0")
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+}
+
+// FOUR RELATED STORIES — enough to prove "no cap" means something (V1 capped
 // at five; two is not a cap-proving number on its own, but the type/status
 // chip assertions below need only one, and a second row is what proves nothing
-// besides `.slice(0, N)` was quietly reintroduced under a different name).
+// besides `.slice(0, N)` was quietly reintroduced under a different name) —
+// plus two more (story-3/story-4, below) proving the row's own status word
+// now reads `storyStatusWord`, not the retired `STORY_STATUS_LABEL`: an open
+// story reads "To Do" only inside an active phase, "Backlog" otherwise
+// (Aurora's ruling, 21 Sep 2026).
 const RELATED_STORIES = [
   {
     id: "story-1",
@@ -106,6 +121,26 @@ const RELATED_STORIES = [
     status: "open",
     storyType: "Feature",
     ticketId: "help-1",
+  },
+  {
+    id: "story-3",
+    ref: "BERG-S0190",
+    title: "Open story scheduled in a phase running today",
+    status: "open",
+    storyType: "Feature",
+    ticketId: "help-1",
+    sprintStartsOn: addDays(TODAY, -5),
+    sprintEndsOn: addDays(TODAY, 5),
+  },
+  {
+    id: "story-4",
+    ref: "BERG-S0191",
+    title: "Open story with no phase scheduled at all",
+    status: "open",
+    storyType: "Feature",
+    ticketId: "help-1",
+    sprintStartsOn: null,
+    sprintEndsOn: null,
   },
 ] as unknown as Story[]
 
@@ -261,7 +296,7 @@ describe("the ticket detail draws no tabs", () => {
 })
 
 describe("the two-column body renders all four panels", () => {
-  it("draws the conversation, Related stories, Time logs and Stakeholders together, nothing behind a click", async () => {
+  it("draws the conversation, Related stories, Effort and Stakeholders together, nothing behind a click", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
 
@@ -273,8 +308,8 @@ describe("the two-column body renders all four panels", () => {
     // RELATED STORIES — the panel's own title.
     expect(screen.getByText("Related stories")).toBeTruthy()
 
-    // TIME LOGS, the panel's own title.
-    expect(screen.getByText("Time logs")).toBeTruthy()
+    // EFFORT, the panel's own title.
+    expect(screen.getByText("Effort")).toBeTruthy()
 
     // STAKEHOLDERS — the panel's own title, and the people pill inside it.
     expect(screen.getByText("Stakeholders")).toBeTruthy()
@@ -287,7 +322,7 @@ describe("the two-column body renders all four panels", () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
-    const time = screen.getByText("Time logs").closest('[data-slot="card"]')
+    const time = screen.getByText("Effort").closest('[data-slot="card"]')
     const stakeholders = screen.getByText("Stakeholders").closest('[data-slot="card"]')
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
@@ -378,6 +413,29 @@ describe("related stories show every row, uncapped, with a type chip and a statu
     await screen.findByRole("heading", { level: 1 })
     const panel = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
     expect(await within(panel).findByRole("button", { name: "New story" })).toBeTruthy()
+  })
+
+  // R96's own wave-lane finding: `help-detail.tsx` used to import the retired,
+  // UNCONDITIONAL `STORY_STATUS_LABEL` (open -> "Backlog", always) for this
+  // exact row; every other surface already reads `storyStatusWord`, which asks
+  // whether the story's own phase is active TODAY. Proves the row now agrees
+  // with the rest of the app rather than carrying its own, older answer.
+  it("an open story's status word says 'To Do' only inside an active phase, 'Backlog' otherwise", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const panel = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
+
+    const activeRow = within(panel)
+      .getByText("Open story scheduled in a phase running today")
+      .closest("li") as HTMLElement
+    expect(within(activeRow).getByText("To Do")).toBeTruthy()
+    expect(within(activeRow).queryByText("Backlog")).toBeNull()
+
+    const noPhaseRow = within(panel)
+      .getByText("Open story with no phase scheduled at all")
+      .closest("li") as HTMLElement
+    expect(within(noPhaseRow).getByText("Backlog")).toBeTruthy()
+    expect(within(noPhaseRow).queryByText("To Do")).toBeNull()
   })
 })
 

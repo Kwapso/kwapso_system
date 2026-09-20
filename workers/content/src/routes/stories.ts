@@ -65,12 +65,20 @@ import type { Env } from "../env"
  * count can never be asked different questions (R16) and so the machine surface
  * has ONE thing to mirror (R19). Every value goes through the query half of the
  * validation seam at the boundary, where the boundary actually is. */
+// THE STATUS FILTER'S FULL ALLOW-LIST. The four stored statuses plus the two
+// VIRTUAL words a facet may ask for (Aurora's ruling, 21 Sep 2026: "to do
+// means its scheduled in an active phase": `OpenStoryFacetStatus`, lib/
+// stories.ts). Neither word is ever written to `stories.status`; `storyWhere`
+// is what turns either one into `status = 'open'` plus the phase predicate
+// that tells them apart.
+const STORY_STATUS_FILTER_VALUES = [...STORY_STATUSES, "to_do", "backlog"] as const
+
 function storyFilterFrom(url: URL): StoryFilter {
   const status = queryText(url.searchParams.get("status"), "Status")
   const asked = queryText(url.searchParams.get("view"), "View")
   return {
-    status: (STORY_STATUSES as readonly string[]).includes(status ?? "")
-      ? (status as StoryStatus)
+    status: (STORY_STATUS_FILTER_VALUES as readonly string[]).includes(status ?? "")
+      ? (status as StoryFilter["status"])
       : undefined,
     ticketId: queryText(url.searchParams.get("ticketId"), "Ticket"),
     sprintId: queryText(url.searchParams.get("sprintId"), "Sprint"),

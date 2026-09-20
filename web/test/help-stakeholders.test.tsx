@@ -45,7 +45,7 @@
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpStakeholder } from "@shared/types"
@@ -224,5 +224,100 @@ describe("HelpStakeholders — On the loop, one horizontal row", () => {
   it("does not render the loop card at all when nobody but the raiser is on the ticket", () => {
     const { container } = render(<HelpStakeholders stakeholders={[MAX]} />)
     expect(container.querySelector('[data-slot="loop-card"]')).toBeNull()
+  })
+})
+
+// ASSIGNED TO. Aurora's ruling, verbatim, 21 Sep 2026: "both on story detail
+// and ticket detail we need to see to whom it's assigned, normally this gets
+// inherited from the app." Drawn exactly like Raised by, above it, always
+// rendered, see help-stakeholders.tsx's own header for the account.
+describe("HelpStakeholders, Assigned to, first", () => {
+  const MEMBERS = [
+    { id: "u-staff", name: "Alaap Kanchwala", photo: null },
+    { id: "u-lead", name: "Petya Bletsova", photo: null },
+  ]
+
+  it("renders before Raised by, even with no stakeholders at all", () => {
+    render(<HelpStakeholders stakeholders={[]} />)
+    const assigned = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    expect(assigned).toBeTruthy()
+    expect(screen.getByText("Nobody yet.")).toBeTruthy()
+    // Still first in DOM order, ahead of the empty-state sentence below it.
+    const empty = screen.getByText("Just the person who raised it and your admins so far.")
+    expect(
+      assigned.compareDocumentPosition(empty) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it("shows the inherited line when the ticket has none of its own and the app does", () => {
+    render(
+      <HelpStakeholders
+        stakeholders={[]}
+        appId="app-1"
+        appName="Bergman dispatch"
+        appAssigneeId="u-lead"
+        members={MEMBERS}
+      />
+    )
+    const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    expect(within(card).getByText("Petya Bletsova")).toBeTruthy()
+    expect(within(card).getByText(/Inherited from/)).toBeTruthy()
+    expect(within(card).getByText(/Bergman dispatch/)).toBeTruthy()
+  })
+
+  it("the ticket's own assignee wins, no inherited line", () => {
+    render(
+      <HelpStakeholders
+        stakeholders={[]}
+        assigneeId="u-staff"
+        assigneeName="Alaap Kanchwala"
+        appId="app-1"
+        appName="Bergman dispatch"
+        appAssigneeId="u-lead"
+        members={MEMBERS}
+      />
+    )
+    const card = screen.getByText("Assigned to").closest('[data-slot="assignee-card"]') as HTMLElement
+    expect(within(card).getByText("Alaap Kanchwala")).toBeTruthy()
+    expect(within(card).queryByText(/Inherited from/)).toBeNull()
+  })
+
+  it("draws no pen and no Select for a reader with no edit right", () => {
+    render(
+      <HelpStakeholders
+        stakeholders={[]}
+        appId="app-1"
+        appName="Bergman dispatch"
+        appAssigneeId="u-lead"
+        members={MEMBERS}
+      />
+    )
+    expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
+    expect(screen.queryByRole("combobox")).toBeNull()
+  })
+
+  it("the pen opens the kit Select (R90 faces), and picking someone calls the door", async () => {
+    const onChangeAssignee = vi.fn(async () => {})
+    render(
+      <HelpStakeholders
+        stakeholders={[]}
+        appId="app-1"
+        appName="Bergman dispatch"
+        appAssigneeId="u-lead"
+        members={MEMBERS}
+        canEditAssignee
+        onChangeAssignee={onChangeAssignee}
+      />
+    )
+    expect(screen.queryByRole("combobox")).toBeNull()
+    fireEvent.click(screen.getByLabelText("Change who is assigned"))
+    const trigger = document.getElementById("help-assignee") as HTMLElement
+    expect(trigger).toBeTruthy()
+    fireEvent.click(trigger)
+    const option = await screen.findByRole("option", { name: /Alaap Kanchwala/ })
+    // R90: every SelectItem over a person carries its own face.
+    expect(option.querySelector("[aria-hidden]")).toBeTruthy()
+    fireEvent.click(option)
+    expect(onChangeAssignee).toHaveBeenCalledWith("u-staff")
   })
 })

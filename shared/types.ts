@@ -776,6 +776,38 @@ export type HelpTicket = {
    * record has to be able to say both. */
   raisedByContactId: string | null
   raisedByContactName: string | null
+  /** WHO IS ON IT. Aurora's ruling, verbatim, 21 Sep 2026: "both on story
+   * detail and ticket detail we need to see to whom it's assigned, normally
+   * this gets inherited from the app." `assigneeId`/`assigneeName` are the
+   * ticket's OWN answer, the same audit-pair habit `raisedByContactId`/
+   * `raisedByContactName` above already keep (team migration 0111), set by
+   * a person holding the ticket edit right and overriding whatever the app
+   * would otherwise say. Null on a ticket nobody has set one on, which is
+   * not "nobody": see `appAssigneeId` below and `shared/effective-
+   * assignee.ts`'s `effectiveAssignee`, the one resolver this and the
+   * story page both read the answer through.
+   *
+   * REDACTED TO A CLIENT LOGIN, UNCONDITIONALLY, and not `hideEditor`'s own
+   * self-view exception (an assignee is always staff, by construction: R54's
+   * agency-staff-only pickers, `web/lib/members.ts`'s `assignableMembers`),
+   * SCOPE ch.06's own sentence, "the portal shows work status but never
+   * which staff member is doing it", the identical rule `storyCount`'s own
+   * comment already states for the reason this pair exists at all. */
+  assigneeId: string | null
+  assigneeName: string | null
+  /** THE APP'S OWN ANSWER, read when the ticket carries none of its own,
+   * off `app_staff.is_lead` (the app's existing "who owns this system" fact,
+   * `AppRow.staff`, editable on `app-detail.tsx`'s own Lead field), never a
+   * second, disconnected assignee column on `apps`: the app already carries
+   * exactly one such fact, and a second one beside it would be two answers
+   * that can disagree the first time the lead changes and the copy does not
+   * follow. A plain id, not a name+id pair: a lead is a LIVE relationship
+   * with no "as of" to snapshot, so its current name is read the way every
+   * other staff face on a page already is, client-side, off the team's own
+   * cached members list. Redacted to a client login the same as
+   * `assigneeId` above, for the same reason. Null on a ticket with no app,
+   * or an app with no lead staffed to it yet. */
+  appAssigneeId: string | null
   /** WHEN THE CLIENT'S MAIN STAKEHOLDER CONFIRMED THEY WANTED IT, back when we
    * asked. Nothing sets it any more: the confirmation gate was retired with
    * `awaiting_validation` on 7 Sep 2026 (see `HELP_STATUSES`), and an extra now
@@ -2160,6 +2192,11 @@ export type Story = {
    * block's date is the promise; two dates for one promise is two dates that
    * disagree the first time a sprint moves. Null on a story with no sprint. */
   sprintEndsOn: string | null
+  /** THE SPRINT'S OWN START DATE, joined the same way `sprintEndsOn` is. Added
+   * 21 Sep 2026 so a screen can ask "is this story's own phase active today"
+   * (`shared/story-status-word.ts`) without a second read. Null on a story with
+   * no sprint, or one whose sprint has no start date yet. */
+  sprintStartsOn: string | null
   closedAt: string | null
   /** what we will tell the client. Closing a story appends this to the ticket's
    * DRAFT resolution — a draft, never a sent message. */

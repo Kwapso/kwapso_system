@@ -129,6 +129,7 @@ import type {
   TeamMember,
 } from "@shared/types"
 import { helpStatusDotTone, storyStatusDotTone } from "@shared/status-tones"
+import { storyStatusWord } from "@shared/story-status-word"
 import { storyTypeIconName } from "@shared/story-types"
 // A VALUE, not a type — it must not ride the `import type` block above.
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
@@ -163,7 +164,7 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
 import { ResolveDialog, type ResolveFormValues } from "@/components/tickets/resolve-dialog"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
-import { sliceKey, STORY_STATUS_LABEL } from "@/components/work/work-panels"
+import { sliceKey } from "@/components/work/work-panels"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { TicketStages } from "@/components/tickets/ticket-stages"
 import { WorkLogsPanel } from "@/components/work/work-logs-panel"
@@ -709,6 +710,10 @@ export function HelpDetailScreen({
     appId?: string
     moduleId?: string
     raisedByContactId?: string
+    // WHO IS ON IT (Aurora, 21 Sep 2026), staff only, correctable the same
+    // way; the door ignores it outright for a portal caller, which this
+    // screen never is.
+    assigneeId?: string
   }) {
     const { tickets, byType, byStatus, byAccount } = await content.updateHelp({ id: helpId, ...input })
     // Merge, don't replace: priming the whole key with this first page threw
@@ -1797,7 +1802,7 @@ export function HelpDetailScreen({
                   // avatar as big as this button" (the message-actions
                   // trigger). Kit v1.2.143's `faceSize="md"` draws every
                   // face at 40px, the trigger's own `size="icon"` height.
-                  faceSize="md"
+                  faceSize="sm"
                   banner={
                     ticket.sourceScreen ? (
                       <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
@@ -1882,25 +1887,32 @@ export function HelpDetailScreen({
                       // "make it like p4 wth the 3 options menu (edit,
                       // copy/delete)", and her SAME-DAY follow-up ("open the
                       // edit as slide in. can edit text and date and
-                      // attachments"). Copy needs no handler to work (the
-                      // kit's own doc on `ThreadMessageActions`), it is set
-                      // unconditionally so every reply draws the trigger at
-                      // all. Edit/Delete are the reply's OWN fence: the person
-                      // who wrote it always, and past that whoever already
-                      // holds the ticket edit right (`canEdit`, defined above,
-                      // the same `help:update` the door itself checks,
-                      // `assertMayChangeReply`, workers/content/src/lib/help.ts),
-                      // never a client login here, because this screen is
-                      // staff-only. `onEditRequest` (kit v1.2.143) wins over
-                      // the kit's own inline editor and draws the Edit row on
-                      // its own, so no `onEdit` is passed at all.
+                      // attachments"). NARROWED 21 SEP 2026, verbatim: "who
+                      // may edit: A author onñy" (read as offered to her: the
+                      // author may edit and delete their own reply; a person
+                      // holding the ticket edit right may DELETE any reply
+                      // but never edit someone else's words; a client from
+                      // the portal only ever touches their own, unchanged).
+                      // Copy needs no handler to work (the kit's own doc on
+                      // `ThreadMessageActions`), it is set unconditionally so
+                      // every reply draws the trigger at all. EDIT is the
+                      // author's own fence, nothing else reaches it any
+                      // more. DELETE keeps the wider fence: the author, or
+                      // whoever already holds the ticket edit right
+                      // (`canEdit`, defined above, the same `help:update`
+                      // `assertMayDeleteReply`, workers/content/src/lib/
+                      // help.ts, checks at the door), never a client login
+                      // here, because this screen is staff-only.
+                      // `onEditRequest` (kit v1.2.143) wins over the kit's
+                      // own inline editor and draws the Edit row on its own,
+                      // so no `onEdit` is passed at all.
                       actions: {
                         onCopy: () => { toast.success(t("Copied.")) },
+                        ...(r.authorId === myUserId
+                          ? { onEditRequest: (id: string) => { requestReplyEdit(id) } }
+                          : {}),
                         ...(r.authorId === myUserId || canEdit
-                          ? {
-                              onEditRequest: (id: string) => { requestReplyEdit(id) },
-                              onDelete: (id: string) => { confirmDeleteReply(id) },
-                            }
+                          ? { onDelete: (id: string) => { confirmDeleteReply(id) } }
                           : {}),
                       },
                       // team migration 0105 — a pill chip per file
@@ -2056,7 +2068,7 @@ export function HelpDetailScreen({
                           // it. Kit v1.2.128.
                           node: (
                             <Badge key="status" variant="status" dot={storyStatusDotTone(s.status)} className="shrink-0">
-                              {t(STORY_STATUS_LABEL[s.status])}
+                              {storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn })}
                             </Badge>
                           ),
                         },
@@ -2170,7 +2182,7 @@ export function HelpDetailScreen({
           // `workLogAddRef` opener — is the one door.
           canSeeTime ? (
             <EmptyGatedPanel
-              title={t("Time logs")}
+              title={t("Effort")}
               empty={workLogsEmpty}
               action={
                 canLogTime ? (
@@ -2222,6 +2234,21 @@ export function HelpDetailScreen({
               canEditRaisedBy={canEdit}
               onChangeRaisedBy={(raisedByContactId) =>
                 editTicket({ description: ticket.description, raisedByContactId })
+              }
+              // ASSIGNED TO (Aurora, 21 Sep 2026), same edit right as the
+              // rest of the ticket (`canEdit`, above, `help:update`), the
+              // same agency-staff-only list every other picker on this
+              // screen reads (`assignableMembers(membersQ.data)`, the
+              // identical call `triageAssignOptions` above already makes).
+              assigneeId={ticket.assigneeId}
+              assigneeName={ticket.assigneeName}
+              appId={ticket.appId}
+              appName={ticket.appName}
+              appAssigneeId={ticket.appAssigneeId}
+              members={assignableMembers(membersQ.data)}
+              canEditAssignee={canEdit}
+              onChangeAssignee={(assigneeId) =>
+                editTicket({ description: ticket.description, assigneeId })
               }
             />
           </TicketSidePanel>

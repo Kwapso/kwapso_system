@@ -25,13 +25,15 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
+import { RecordRef } from "@shared/web/record-ref"
+import { orderChips } from "@shared/web/chip-order"
 import { Check, CheckSquare, PencilSimple } from "@shared/ui/foundations/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/work/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/work/review-dialog"
-import { MoscowChip, storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
-import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
+import { storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
 import { storyStatusDotTone } from "@shared/status-tones"
+import { storyStatusWord } from "@shared/story-status-word"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { StoryAttachmentsPanel } from "@/components/work/story-attachments"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
@@ -241,7 +243,10 @@ export function StoryDetailScreen({
     )
 
   const overviewItems = [
-    { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
+    {
+      label: t("Status"),
+      value: storyStatusWord(story.status, { startsOn: story.sprintStartsOn, endsOn: story.sprintEndsOn }),
+    },
     // THE ICON JOINS THE WORD HERE TOO (client ruling, 16 Sep 2026) — the
     // identical chip the List row and the Board card now draw
     // (`storyTypeChip`, stories-screen.tsx), so the record's own detail
@@ -250,10 +255,12 @@ export function StoryDetailScreen({
     // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — beside Type,
     // the same overview list, so both halves of the ruling read together.
     { label: t("Category"), value: story.category },
-    // MOSCOW (Aurora's ruling, 20 Sep 2026) — the same coloured tag the
-    // backlog's own rows and cards draw, or a plain dash for the 3,677
-    // pre-existing stories with none set.
-    { label: t("Priority"), value: story.moscow ? <MoscowChip value={story.moscow} /> : "" },
+    // THE PRIORITY ROW (MoSCoW) STOOD HERE. PARKED, 21 Sep 2026. Aurora's
+    // ruling, verbatim: "pause everything to do with moscow, but remind me
+    // at later stages." `story.moscow` is untouched; the chip that drew it
+    // moved to `moscow-chip.tsx` (`PARKED["work/moscow-chip"]`,
+    // shared/rules/registry.ts) and this row is dropped rather than shown
+    // empty. Delete this comment and restore the row the day she asks.
     { label: t("Reference"), value: story.ref || "" },
     // R54: a story is agency work, so the assignee is one of ours.
     { label: t("Who's doing it"), value: staffNameFromSnapshot(story.assigneeName) || "Nobody yet" },
@@ -324,7 +331,7 @@ export function StoryDetailScreen({
         // screen that captures time". The tab was already here and called Time;
         // Work logs is the word the glossary and the section both use now.
         value: "time",
-        label: t("Time logs"),
+        label: t("Effort"),
         icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
@@ -416,9 +423,14 @@ export function StoryDetailScreen({
       // chip — which is what drawing both at once would do.
       //
       // THE FIVE CHIPS, IN HER OWN ORDER:
-      //   1. id      — the story's own reference, the same mono badge every
-      //                other list row leads with (`storyLead`, stories-
-      //                screen.tsx).
+      //   1. id      , the story's own reference, through the ONE shared id
+      //                chip register (`RecordRef`, shared/web/record-ref.tsx)
+      //                every site draws the black chip from (R96,
+      //                id-chip-is-black). It was a hand-rolled `Badge
+      //                variant="secondary"` copying `storyLead`'s OWN
+      //                non-black badge (stories-screen.tsx), the wrong
+      //                model to copy, fixed here; that file's own two sites
+      //                are reported, not edited (a different lane owns it).
       //   2. status  — WITH A COLOUR (client ruling, 2026-08-31: "the status
       //                scheme is not only for tickets … map colors").
       //   3. type    — the identical icon+word chip the backlog's own rows
@@ -432,25 +444,54 @@ export function StoryDetailScreen({
       //                own reference is not yet a field this record reads.
       chips={
         <>
-          {story.ref && (
-            <Badge variant="secondary" className="font-mono">
-              {story.ref}
-            </Badge>
-          )}
-          <Badge variant="status" dot={storyStatusDotTone(story.status)}>
-            {STORY_STATUS_LABEL[story.status]}
-          </Badge>
-          {storyTypeChip(story.storyType)}
-          {story.appId && story.appName ? (
-            <RecordChipLink href={`${host.base}/apps/${story.appId}`}>
-              <span className="underline">{story.appName}</span>
-            </RecordChipLink>
-          ) : null}
-          {story.sprintId && story.sprintName ? (
-            <RecordChipLink href={`${host.base}/sprints/${story.sprintId}`}>
-              <span className="underline">{story.sprintName}</span>
-            </RecordChipLink>
-          ) : null}
+          {/* R94 (chip-order, shared/web/chip-order.ts): id, status, type,
+              main parent, secondary parent. This row already drew them in
+              that order by hand; routing it through the shared seam makes
+              the order the seam's property rather than this JSX sequence's,
+              the same fix `help-detail.tsx`'s own story-preview row took.
+              (Surfaced by R96's own fix just above: the id chip only became
+              a `<RecordRef` the chip-order census can see once it stopped
+              being a hand-rolled `Badge`.) */}
+          {orderChips([
+            { kind: "id", node: <RecordRef key="id" value={story.ref} /> },
+            {
+              kind: "status",
+              node: (
+                <Badge key="status" variant="status" dot={storyStatusDotTone(story.status)}>
+                  {storyStatusWord(story.status, { startsOn: story.sprintStartsOn, endsOn: story.sprintEndsOn })}
+                </Badge>
+              ),
+            },
+            {
+              kind: "type",
+              // `storyTypeChip` is typed `React.ReactNode` (stories-screen.tsx,
+              // shared by every other caller); `orderChips` infers its own `T`
+              // from every entry in this array, and the other four already
+              // narrow to `Element | null`, so this one is narrowed to match
+              // rather than widening every sibling back to `ReactNode`,
+              // accurate either way, since the function only ever returns a
+              // `<Badge>` or `null`.
+              node: storyTypeChip(story.storyType) as React.ReactElement | null,
+            },
+            {
+              kind: "mainParent",
+              node:
+                story.appId && story.appName ? (
+                  <RecordChipLink key="app" href={`${host.base}/apps/${story.appId}`}>
+                    <span className="underline">{story.appName}</span>
+                  </RecordChipLink>
+                ) : null,
+            },
+            {
+              kind: "secondaryParent",
+              node:
+                story.sprintId && story.sprintName ? (
+                  <RecordChipLink key="sprint" href={`${host.base}/sprints/${story.sprintId}`}>
+                    <span className="underline">{story.sprintName}</span>
+                  </RecordChipLink>
+                ) : null,
+            },
+          ])}
           {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
               `help-detail.tsx`'s own ("aign the menu to the chips"). */}
           <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />

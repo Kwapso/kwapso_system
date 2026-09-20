@@ -63,11 +63,12 @@ export const SEED: Catalogue = {
   // 2026); see the comment beside its `time` entry in web/lib/pages.ts for
   // the alternatives still awaiting her pick.
   "Work logs": { de: "Zeiterfassung", es: "Registros de tiempo", ca: "Registres de temps" },
-  // AMENDED 20 Sep 2026, round 28, verbatim: "Inside stories and tickets, let's
-  // rename 'effort' to 'time log.'" Only the STORY and TICKET record's own
-  // panel/tab now say this; task and meeting detail keep "Work logs" above.
-  // See documents/UI-RULEBOOK.md row B27.
-  "Time logs": { de: "Zeitprotokoll", es: "Registro de tiempo", ca: "Registre de temps" },
+  // AMENDED AGAIN 21 Sep 2026: Aurora's own words, "no, we said we call taht
+  // effort niside ticket or story, no?" Reverts the round 28 rename above.
+  // Only the STORY and TICKET record's own panel/tab say this; task and
+  // meeting detail keep "Work logs" above; the rail entry stays "Hours".
+  // See documents/UI-RULEBOOK.md row B27 item 12.
+  Effort: { de: "Aufwand", es: "Esfuerzo", ca: "Esforç" },
   Hours: { de: "Stunden", es: "Horas", ca: "Hores" },
   // RENAMED FROM "Knowledge base" — R85, the same ruling: "'Knowledge Base':
   // reduce it to 'Knowledge'." The route (/knowledge) and every identifier
@@ -114,6 +115,7 @@ export const SEED: Catalogue = {
   Ready: { de: "Fertig", es: "Listo", ca: "Llest" },
   Resolved: { de: "Erledigt", es: "Resuelto", ca: "Resolt" },
   Done: { de: "Erledigt", es: "Hecho", ca: "Fet" },
+  "To Do": { de: "Zu erledigen", es: "Por hacer", ca: "Per fer" },
   Active: { de: "Aktiv", es: "Activo", ca: "Actiu" },
   Archived: { de: "Archiviert", es: "Archivado", ca: "Arxivat" },
 
@@ -4416,6 +4418,7 @@ export const SEED: Catalogue = {
   "No phases in this wave yet.": { de: "Noch keine Phasen in dieser Wave.", es: "Aún no hay fases en esta wave.", ca: "Encara no hi ha fases en aquesta wave." },
   "No phases planned yet": { de: "Noch keine Phasen geplant", es: "Aún no hay fases planificadas", ca: "Encara no hi ha fases planificades" },
   "No phases start this month.": { de: "Diesen Monat beginnt keine Phase.", es: "Ninguna fase empieza este mes.", ca: "Cap fase comença aquest mes." },
+  "No phases yet": { de: "Noch keine Phasen", es: "Aún no hay fases", ca: "Encara no hi ha fases" },
   "No phases yet.": { de: "Noch keine Phasen.", es: "Aún no hay fases.", ca: "Encara no hi ha fases." },
   "No waves or phases have a start date yet.": { de: "Noch keine Wave oder Phase mit Startdatum.", es: "Aún ninguna wave o fase tiene fecha de inicio.", ca: "Encara cap wave o fase té data d'inici." },
   "No work in this phase yet.": { de: "Noch keine Arbeit in dieser Phase.", es: "Aún no hay trabajo en esta fase.", ca: "Encara no hi ha feina en aquesta fase." },
@@ -4518,4 +4521,14 @@ export const SEED: Catalogue = {
   // seed already makes for "Burndown": a product term this app already says
   // in English.
   "e.g. Wave": { de: "z. B. Wave", es: "p. ej. Wave", ca: "p. ex. Wave" },
+
+  /* ── The ticket's own "Assigned to" row (Aurora's ruling, 21 Sep 2026):
+   * "both on story detail and ticket detail we need to see to whom it's
+   * assigned, normally this gets inherited from the app." "Assigned to"
+   * itself already has a seed entry (17 Sep 2026 hygiene pass, above); these
+   * are the four new strings the row itself needed. ─────────────────────── */
+  "Nobody yet.": { de: "Noch niemand.", es: "Nadie todavía.", ca: "Ningú encara." },
+  "Inherited from": { de: "Übernommen von", es: "Heredado de", ca: "Heretat de" },
+  "Change who is assigned": { de: "Zuständigkeit ändern", es: "Cambiar quién está asignado", ca: "Canvia qui hi ha assignat" },
+  "Choose someone": { de: "Jemanden auswählen", es: "Elige a alguien", ca: "Tria algú" },
 }

@@ -50,7 +50,6 @@ import {
 import { LoadMore } from "@/components/records/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/work/story-form-dialog"
 import { StartTimerStrip } from "@/components/work/time-panel"
-import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { useSessionUserId } from "@/lib/use-active-team"
 import { usePermissions } from "@/lib/perms"
@@ -68,11 +67,10 @@ import type { Language } from "@shared/i18n"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { storyStatusDotTone } from "@shared/status-tones"
+import { storyInActivePhase, storyStatusWord } from "@shared/story-status-word"
 import {
-  MOSCOW_VALUES,
   type AppRow,
   type HelpTicket,
-  type MoscowValue,
   type ProcessSummary,
   type SelectableValue,
   type Sprint,
@@ -80,7 +78,6 @@ import {
   type StoryStatus,
   type TeamMember,
 } from "@shared/types"
-import type { AppStageDotTone } from "@shared/app-stages"
 import { useAfterPaint } from "@shared/web/after-paint"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, useCached } from "@shared/web/store"
@@ -91,6 +88,8 @@ import { storyTypeIconName, type StoryTypeIconName } from "@shared/story-types"
 import { iconComponent } from "@shared/web/screen-engine/icon"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef } from "@shared/web/record-ref"
+import { orderChips } from "@shared/web/chip-order"
 
 /** WHAT A STORY NEEDS TO BE WRITTEN AT ALL — the sprints it could sit in, the
  * apps it could be on, the open requests it could answer, and the people it
@@ -343,11 +342,7 @@ void STORY_TYPE_ICON_CENSUS
 function storyLead(s: Story): React.ReactNode {
   return (
     <span className="flex items-center gap-2 min-w-0">
-      {s.ref && (
-        <Badge variant="secondary" className="font-mono shrink-0">
-          {s.ref}
-        </Badge>
-      )}
+      <RecordRef value={s.ref} />
       <span className="truncate">{s.title}</span>
     </span>
   )
@@ -362,51 +357,43 @@ function categoryChip(s: Story): React.ReactNode {
   )
 }
 
-/** THE MOSCOW TAG'S OWN COLOUR (Aurora's ruling, 20 Sep 2026: "Must poppy,
- * Should orange, Could blue, Won't grey — as a proposal"). `red` is this
- * app's own poppy (`--dot-red` resolves to `--destructive`, which IS
- * `--kw-poppy` — `shared/ui/foundations/tokens/tokens.css`); `archived` is
- * the existing muted grey a "not going to happen" state already wears
- * elsewhere in this app, reused rather than a new tone invented for one
- * word. THIS IS THE ONE NAMED EXCEPTION R86 asks for beside task priority
- * (`COLOURED_CHIP_OK`, shared/rules/registry.ts, `#MoscowChip`) — a
- * priority, not a status, coloured on the client's own explicit ruling. */
-const MOSCOW_DOT_TONE: Record<MoscowValue, AppStageDotTone> = {
-  Must: "red",
-  Should: "orange",
-  Could: "blue",
-  "Won't": "archived",
-}
-
-/** THE MOSCOW TAG — a colour per rank, the client's ruling above, drawn the
- * identical `Badge variant="status" dot={…}` shape `tasks-screen.tsx`'s own
- * `PriorityChip` already takes for the one other coloured-by-priority field
- * this app carries. Exported so `story-detail.tsx` can draw the same tag on
- * the record's own Overview row. */
-export function MoscowChip({ value }: { value: MoscowValue }): React.ReactNode {
-  return (
-    <Badge variant="status" dot={MOSCOW_DOT_TONE[value]}>
-      {value}
-    </Badge>
-  )
-}
+/* THE MOSCOW TAG (`MoscowChip`) STOOD HERE, AND IS PARKED, 21 Sep 2026.
+ * Aurora's ruling, verbatim: "pause everything to do with moscow, but remind
+ * me at later stages." Moved whole to `moscow-chip.tsx`
+ * (`PARKED["work/moscow-chip"]`, shared/rules/registry.ts), see that file's
+ * own header for how to bring it back. */
 
 /** THE KANBAN BOARD'S OWN THREE COLUMNS AND WORDS (Aurora's ruling, 20 Sep
  * 2026, verbatim): "In stories kanban, the columns are: In Progress, To Do,
  * In Review" — that exact order, and "On stories/new, remove the 'done'
  * column and expand the other three to full width — only 3 instead of 4."
  *
- * A SEPARATE WORD FROM `STORY_STATUS_LABEL`, DELIBERATELY. `open`'s ordinary
- * label is "Backlog" now (the SAME ruling's other clause, `work-panels.tsx`),
- * but the kanban's own column reads "To Do" — the two answer different
- * questions ("what kind of thing is this" versus "which column is it sitting
- * in right now"), the same way a ticket's own board and its list can title a
- * status differently without disagreeing about what the status IS. */
+ * "TO DO" IS NARROWED, 21 SEP 2026. Aurora's correction: "Backlog, To Do:
+ * nono, to do means its scheduled in an active phase." The column still
+ * reads "To Do", it draws nothing else now, because `statusBoardColumns`
+ * (below) only ever puts an OPEN story in this column when
+ * `storyInActivePhase` says its own phase is active today
+ * (`shared/story-status-word.ts`). An open story OUTSIDE an active phase
+ * (no phase, a future one, or one that has ended) is a Backlog story, and
+ * this board has no Backlog column to put it in (the decision this ruling's
+ * brief asked for named out loud): it is simply left off the board, the
+ * same way a done story already is; it is still on the List and Backlog
+ * tabs, where `storyStatusWord` draws it as "Backlog". */
 const KANBAN_STATUSES = ["in_progress", "open", "in_review"] as const satisfies readonly StoryStatus[]
 const KANBAN_STATUS_LABEL: Record<(typeof KANBAN_STATUSES)[number], string> = {
   in_progress: "In Progress",
   open: "To Do",
   in_review: "In Review",
+}
+
+/** WHETHER A STORY BELONGS IN ONE OF THE BOARD'S THREE COLUMNS: every
+ * `in_progress`/`in_review` story does; an `open` one only when its own
+ * phase is active today. EXPORTED so `web/test/story-status-board.test.ts`
+ * can pin the 21 Sep 2026 ruling without rendering the whole board. */
+export function storyBelongsOnKanbanColumn(s: Story, status: (typeof KANBAN_STATUSES)[number]): boolean {
+  if (s.status !== status) return false
+  if (status !== "open") return true
+  return storyInActivePhase({ startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn })
 }
 
 /** THE SPRINT COLUMN'S TWO LINES — the sprint's own name, and the wave it was
@@ -431,8 +418,13 @@ function sprintCell(s: Story, waveNames: Map<string, string | null>): React.Reac
  * and the raw fields the Board and Week read straight off `Story` instead
  * (status, sprint dates, assignee) because neither of those needs the
  * formatted, translated cell. TAKES ROWS ALREADY IN ORDER — this shapes, it
- * does not sort (R53: one order, decided at the toolbar). */
-function shapeStories(
+ * does not sort (R53: one order, decided at the toolbar).
+ *
+ * EXPORTED so `web/test/story-status-board.test.ts` can pin the List's own
+ * status word (Aurora's ruling, 21 Sep 2026) without rendering the whole
+ * screen, the same reason `waves-screen.tsx`'s own row shapers are
+ * exported for `waves-timeline.test.ts`. */
+export function shapeStories(
   stories: Story[],
   waveNames: Map<string, string | null>,
   lang: Language,
@@ -459,12 +451,12 @@ function shapeStories(
       // (beside it) already gets its own column for the identical reason.
       type: storyTypeChip(s.storyType),
       category: categoryChip(s),
-      // MOSCOW, RENDERED AS A TAG (Aurora's ruling, 20 Sep 2026) — a plain
-      // dash rather than an empty cell for the 3,677 pre-existing stories
-      // that predate the field, the same fallback every other optional chip
-      // on this row already takes.
-      moscow: s.moscow ? <MoscowChip value={s.moscow} /> : null,
-      status: STORY_STATUS_LABEL[s.status],
+      // MOSCOW STOOD HERE, RENDERED AS A TAG. PARKED, 21 Sep 2026
+      // (`moscow-chip.tsx`). No `TableColumn` here has ever read this `moscow`
+      // key (R82's own note above named the card tag and the toolbar as
+      // where it lives, never a seventh column), so removing it drops dead
+      // data rather than a live cell.
+      status: storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn }),
       sprint: sprintCell(s, waveNames),
       assignee: staffNameFromSnapshot(s.assigneeName) || "Nobody yet",
       app: s.appName ?? "",
@@ -525,29 +517,18 @@ const REVIEWS_LIST_COLUMNS = [
  * already carries (`Story.rank`, the same field the door's own default
  * ordering reads) and Deadline, the sprint's own end date where there is a
  * sprint and the story's legacy date where there is not
- * (`Story.sprintEndsOn`). */
+ * (`Story.sprintEndsOn`). MOSCOW STOOD HERE TOO. PARKED, 21 Sep 2026
+ * (`moscow-filters.tsx`'s own `moscowSortOption`). */
 function storySortOptions(t: (s: string) => string): SortOption[] {
   return [
     { value: "rank", label: t("Order"), defaultDir: "asc" },
     { value: "deadline", label: t("Deadline"), defaultDir: "asc" },
-    // MOSCOW, SORTABLE (Aurora's ruling, 20 Sep 2026: "let users … sort the
-    // backlog by it") — Must first descending, the priority order itself.
-    { value: "moscow", label: t("Priority"), defaultDir: "asc" },
   ]
 }
 
 const NO_DEADLINE_SENTINEL = "9999-99-99"
-/** MUST < SHOULD < COULD < WON'T, so ascending reads highest-priority-first —
- * the order the four words are always said in, not the alphabet. A story
- * with none set sorts after all four, in either direction. */
-const MOSCOW_RANK: Record<MoscowValue, number> = { Must: 0, Should: 1, Could: 2, "Won't": 3 }
 
-function compareStories(a: Story, b: Story, sortField: "rank" | "deadline" | "moscow", dir: "asc" | "desc"): number {
-  if (sortField === "moscow") {
-    const rank = (s: Story) => (s.moscow ? MOSCOW_RANK[s.moscow] : 4)
-    const primary = rank(a) - rank(b)
-    return dir === "asc" ? primary : -primary
-  }
+function compareStories(a: Story, b: Story, sortField: "rank" | "deadline", dir: "asc" | "desc"): number {
   const key = (s: Story) =>
     sortField === "rank" ? (s.rank ?? s.id) : (s.sprintEndsOn ?? s.dueOn ?? NO_DEADLINE_SENTINEL)
   const av = key(a)
@@ -627,18 +608,38 @@ function ReviewsQueue({
           }}
         >
           <div className="flex flex-wrap items-center gap-2">
-            {s.ref && (
-              <Badge variant="secondary" className="font-mono">
-                {s.ref}
-              </Badge>
-            )}
-            <Badge variant="status" dot={storyStatusDotTone(s.status)}>
-              {STORY_STATUS_LABEL[s.status]}
-            </Badge>
-            {storyTypeChip(s.storyType)}
-            <Badge variant="secondary" className={s.appName ? "underline" : "italic opacity-55"}>
-              {s.appName ?? t("No app")}
-            </Badge>
+            {/* R94 (chip-order, shared/web/chip-order.ts): id, status, type,
+                main parent, secondary parent, routed through the shared seam
+                rather than this hand-written JSX order. */}
+            {orderChips([
+              { kind: "id", node: <RecordRef key="id" value={s.ref} /> },
+              {
+                kind: "status",
+                node: (
+                  <Badge key="status" variant="status" dot={storyStatusDotTone(s.status)}>
+                    {storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn })}
+                  </Badge>
+                ),
+              },
+              {
+                kind: "type",
+                // `storyTypeChip` is typed `React.ReactNode` (its own declared
+                // return type, shared by every other caller); the other three
+                // entries here narrow to `Element`, so this one is narrowed to
+                // match rather than widening every sibling back to
+                // `ReactNode` — the same cast `story-detail.tsx`'s own
+                // `orderChips` call already carries for the identical reason.
+                node: storyTypeChip(s.storyType) as React.ReactElement | null,
+              },
+              {
+                kind: "mainParent",
+                node: (
+                  <Badge key="app" variant="secondary" className={s.appName ? "underline" : "italic opacity-55"}>
+                    {s.appName ?? t("No app")}
+                  </Badge>
+                ),
+              },
+            ])}
           </div>
           <span className="font-medium">{s.title}</span>
           <span className="text-muted-foreground text-sm">{richTextPlain(s.detail)}</span>
@@ -777,7 +778,7 @@ export function StoriesScreen({
   // pages a huge collection down to one tab's worth of rows, and this narrows
   // that page once for every view underneath it).
   const [query, setQuery] = React.useState("")
-  const [sortField, setSortField] = React.useState<"rank" | "deadline" | "moscow">("rank")
+  const [sortField, setSortField] = React.useState<"rank" | "deadline">("rank")
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
   // THE STORIES SCREEN'S OWN FACET — Category, the client's 15 Sep 2026 ruling.
   // One facet, in the browser, over whichever tab's page is loaded, the same
@@ -813,7 +814,8 @@ export function StoriesScreen({
     ? rawRows.filter((r) => r.title.toLowerCase().includes(needle) || (r.ref ?? "").toLowerCase().includes(needle))
     : rawRows
   if (facetValues.category) filteredRows = filteredRows.filter((r) => r.category === facetValues.category)
-  if (facetValues.moscow) filteredRows = filteredRows.filter((r) => r.moscow === facetValues.moscow)
+  // THE MOSCOW FACET STOOD HERE. PARKED, 21 Sep 2026 (`moscow-filters.tsx`'s
+  // own `moscowFacet`).
 
   // CALLED UNCONDITIONALLY, ABOVE EVERY EARLY RETURN — `apps-screen.tsx`/
   // `collection-frame.tsx`'s own discipline for `useFilterBar`. Options come
@@ -821,21 +823,14 @@ export function StoriesScreen({
   // the same source the form's two pills read), never the rows on screen —
   // a category with no CURRENT story still offers to filter by it, no
   // different from any other closed-vocabulary facet in the app.
+  // THE MOSCOW FACET STOOD HERE TOO. PARKED, 21 Sep 2026
+  // (`moscow-filters.tsx`'s own `moscowFacet`).
   const facets: FilterFacet[] = [
     {
       field: "category",
       label: t("Category"),
       control: "select",
       options: options.categories.map((c) => ({ value: c, label: c })),
-    },
-    // MOSCOW, FILTERABLE (Aurora's ruling, 20 Sep 2026) — the fixed four
-    // words, never a live vocabulary read (`MOSCOW_VALUES`, shared/types.ts),
-    // the same closed-list shape a ticket's own fixed-enum facets take.
-    {
-      field: "moscow",
-      label: t("Priority"),
-      control: "select",
-      options: MOSCOW_VALUES.map((v) => ({ value: v, label: v })),
     },
   ]
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
@@ -907,6 +902,14 @@ export function StoriesScreen({
     const col: TableColumn = { key: f.column, label: f.field.label }
     if ((f as any).sortType) col.sortType = (f as any).sortType
     if ((f as any).sortKey) col.sortKey = (f as any).sortKey
+    // R96: THE STANDALONE ID COLUMN (Planned/Backlog's and Reviews' own
+    // `field("ref", "ID")`) draws through the same black chip register every
+    // other reference in this app does — `TableColumn`'s own `render` slot
+    // (record-table.tsx), the seam this table already offers rather than a
+    // second row shape. The row itself still hands over the RAW string
+    // (`shapeStories()`'s `ref: s.ref || ""`, unchanged), so search and sort
+    // over the shaped rows keep comparing the value, never a rendered node.
+    if (f.column === "ref") col.render = (value) => <RecordRef value={value as string | null | undefined} />
     return col
   })
 
@@ -922,9 +925,8 @@ export function StoriesScreen({
   // handling, the same reason the sprint badge it replaces was always a
   // plain `Badge` and not a link either; the underline alone carries "this
   // names a real record" without adding a second click target. The MoSCoW
-  // tag (Aurora's separate ruling, same day: "render the priority as a
-  // colored tag on each story card") rides the same badge row, last, so it
-  // never competes with the two identity chips for the leading position.
+  // tag used to ride the same badge row, last. PARKED, 21 Sep 2026
+  // (`moscow-chip.tsx`).
   const boardCard = (s: Story) => ({
     id: s.id,
     title: s.title,
@@ -934,7 +936,7 @@ export function StoriesScreen({
         <Badge variant="secondary" size="pill" className={s.appName ? "underline" : "italic opacity-55"}>
           {s.appName ?? t("No app")}
         </Badge>
-        {s.moscow && <MoscowChip value={s.moscow} />}
+        {/* THE MOSCOW TAG STOOD HERE. PARKED, 21 Sep 2026 (`moscow-chip.tsx`). */}
         {/* CONTRIBUTES TO THE PHASE'S GOAL (Aurora's ruling, 20 Sep 2026) — a
             small mark on the story card, icon only (R93's visual-accompanies-
             text is about a categorical field's own colour/icon riding beside
@@ -967,7 +969,10 @@ export function StoriesScreen({
     id: status,
     title: KANBAN_STATUS_LABEL[status],
     dot: storyStatusDotTone(status),
-    cards: filteredRows.filter((s) => s.status === status).map(boardCard),
+    // "TO DO" HOLDS ONLY AN OPEN STORY WHOSE OWN PHASE IS ACTIVE TODAY (see
+    // this section's own header): every other open story is a Backlog
+    // story and this board has no column for it.
+    cards: filteredRows.filter((s) => storyBelongsOnKanbanColumn(s, status)).map(boardCard),
   }))
 
   // THE BOARD — BY SPRINT (Planned only). Columns are the sprints actually
@@ -1062,7 +1067,7 @@ export function StoriesScreen({
           options: storySortOptions(t),
           value: sortField,
           onValueChange: (v) => {
-            const next = v === "deadline" ? "deadline" : v === "moscow" ? "moscow" : "rank"
+            const next = v === "deadline" ? "deadline" : "rank"
             setSortField(next)
             setSortDir("asc")
           },

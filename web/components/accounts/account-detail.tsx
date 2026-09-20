@@ -74,6 +74,7 @@ import { type SavingsView } from "@shared/workers/savings"
 import { RecordCover, RecordMark } from "@shared/web/record-mark"
 import { AccountFormDialog, type AccountFormValues } from "@/components/accounts/account-form-dialog"
 import { ContactsPanel, type PanelActions } from "@/components/accounts/account-detail-panels"
+import { CollectionCard } from "@/components/deep-link/screen-bits"
 import {
   ContactCreateDialog,
   ContactLinkDialog,
@@ -788,21 +789,36 @@ export function AccountDetailScreen({
                     do it. Every contact ACROSS every account has its own page
                     now — see `/contacts` (web/lib/screens.ts). */}
                 {canSeeContacts && (
-                  <div className="rounded-[var(--radius)] bg-surface-panel p-4">
-                    <p className="text-muted-foreground mb-2 text-micro uppercase">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-muted-foreground text-micro uppercase">
                       {t("Contacts")}
                     </p>
-                    <ContactsPanel
-                      accountName={account.name}
-                      links={links}
-                      canCreate={canLinkContacts}
-                      canCreatePerson={canCreateContacts}
-                      canArchive={canUnlinkContacts}
-                      actions={actions}
-                      onAdd={() => setLinkOpen(true)}
-                      onNew={() => setNewContactOpen(true)}
-                      onOpen={openAccount}
-                    />
+                    {/* THE REAL CARD, NOT A HAND-ROLLED `rounded-[var(--radius)]
+                        bg-surface-panel p-4` LOOKALIKE (Aurora, 21 Sep 2026:
+                        "review sping aboe toolbar everyhwere. f.e. in app /
+                        phases its completey off"). The lookalike painted the
+                        same tone and radius but carried no `data-slot="card"`
+                        at all, so neither `web/app/globals.css`'s R83 rules
+                        nor `CollectionCard`'s own now-corrected default lead
+                        (`screen-bits.tsx`) could ever reach the toolbar
+                        inside it: a flat, unresponsive `p-4` (16px) above
+                        `<ContactsPanel>`'s own `<ToolbarRow>`, never this
+                        law's 10px. `CollectionCard` is the one component every
+                        other nested collection in this app already stands on
+                        for exactly this reason. */}
+                    <CollectionCard>
+                      <ContactsPanel
+                        accountName={account.name}
+                        links={links}
+                        canCreate={canLinkContacts}
+                        canCreatePerson={canCreateContacts}
+                        canArchive={canUnlinkContacts}
+                        actions={actions}
+                        onAdd={() => setLinkOpen(true)}
+                        onNew={() => setNewContactOpen(true)}
+                        onOpen={openAccount}
+                      />
+                    </CollectionCard>
                   </div>
                 )}
               </div>

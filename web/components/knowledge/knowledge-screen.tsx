@@ -65,7 +65,7 @@ import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-car
 import { GlossaryList } from "@/components/knowledge/glossary-list"
 import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shape"
 import { LoadMore } from "@/components/records/load-more"
-import { PagedFind } from "@/components/records/paged-find"
+import { PagedFind, invalidateFindsOf } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { accountFacetOption, translatedFacets } from "@/lib/collection-filters"
 import { content as contentApi } from "@/lib/api"
@@ -200,7 +200,23 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
     contentApi
       .seedGlossary()
       .then((r) => {
-        if (r.created > 0) invalidate(knowledgeKey(teamId))
+        // THE BUG THIS GUARDS: `fixed={{ kind: "glossary" }}` a few lines below
+        // makes `<PagedFind>`'s own `active` TRUE the whole time this tab is
+        // open (paged-find.tsx's own `T3654` note — any non-empty `fixed`
+        // folds into `query`, so `active` never falls back to the resting
+        // read here). That means the rows on screen always come from the
+        // FOUND cache, `find:${knowledgeKey(teamId)}:kind=glossary`, never
+        // from `knowledgeKey(teamId)` itself — so invalidating only the plain
+        // list key left the tab reading its own pre-seed (empty) answer for
+        // the rest of the session, on a team whose door had just written 54
+        // rows. `invalidateFindsOf` is the exact seam `paged-find.tsx` built
+        // for this shape; call it beside the plain invalidate (kept for the
+        // "All"/other tabs' own resting reads and for `restingEmpty`, which
+        // still read off `knowledgeKey(teamId)` directly).
+        if (r.created > 0) {
+          invalidate(knowledgeKey(teamId))
+          invalidateFindsOf(knowledgeKey(teamId))
+        }
       })
       .catch(() => {
         // A failed seed is silent and retryable: leaving the ref cleared means

@@ -353,8 +353,9 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   optionalText(body.appId, "App", TEXT_LIMITS.short)
   optionalText(body.moduleId, "Module", TEXT_LIMITS.short)
   optionalText(body.raisedByContactId, "Raised by", TEXT_LIMITS.short)
+  optionalText(body.assigneeId, "Assignee", TEXT_LIMITS.short)
   const scope = await callerScope(cfg, guard)
-  const accountId = await updateTicket(cfg, guard, scope, actor, id, body)
+  const accountId = await updateTicket(env, cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
   // withFacets: help-detail.tsx's editTicket primes help-by-type/status/account
   // off this reply's byType/byStatus/byAccount.
@@ -590,8 +591,9 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
 /** POST /api/content/help/reply/update, change a reply already sent (help:read,
  * the same open `postHelpReply` uses: any member who can see the ticket may
  * open the door, and the FENCE that decides whether THIS reply is theirs to
- * change lives one level down, in `updateReply`/`assertMayChangeReply`,
- * lib/help.ts). Aurora's 20 Sep 2026 ruling, the Edit half (p1's placement, a
+ * change lives one level down, in `updateReply`/`assertMayEditReply`,
+ * lib/help.ts, author only as of Aurora's 21 Sep 2026 ruling, see that
+ * function's own header). Aurora's 20 Sep 2026 ruling, the Edit half (p1's placement, a
  * control beside the bubble, hidden until hover, and p4's contents, a menu:
  * edit / copy / delete), now shipped as `TicketThread`'s `actions` prop (kit
  * v1.2.139), and her follow-up ruling the SAME day ("open the edit as slide
@@ -670,9 +672,9 @@ export async function postHelpReplyUpdate(request: Request, env: Env): Promise<R
 }
 
 /** POST /api/content/help/reply/delete — take a reply back out of the thread
- * (help:read, the SAME open and the SAME fence `postHelpReplyUpdate` uses,
- * immediately above — one function decides "may this caller touch this one
- * reply" for both doors, `assertMayChangeReply`, lib/help.ts).
+ * (help:read, the SAME open `postHelpReplyUpdate` uses, immediately above;
+ * the FENCE differs from Edit's own as of Aurora's 21 Sep 2026 ruling, the
+ * author or anyone holding help:update, `assertMayDeleteReply`, lib/help.ts).
  *
  * NOTHING ON A TICKET IS EVER REMOVED: `deleteReply` moves `deactivated_at`,
  * never a row. The thread this door's own response reads back

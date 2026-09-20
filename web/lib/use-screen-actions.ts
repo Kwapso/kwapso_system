@@ -27,6 +27,7 @@ import {
   tasksKey,
   totalKey,
 } from "@/lib/live-resources"
+import { invalidateFindsOf } from "@/components/records/paged-find"
 import { invalidate, mergePage, primeCache, readCache, removeFromPage } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { Translate } from "@shared/web/format"
@@ -398,6 +399,12 @@ export function useScreenActions(teamId: string | null) {
       if (!teamId) return
       await contentApi.createGlossaryWord({ title: values.word, body: values.definition })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
+      // THE GLOSSARY TAB READS THE FOUND CACHE, NOT THIS ONE — its own
+      // `<PagedFind>` always carries `fixed={{ kind: "glossary" }}`
+      // (knowledge-screen.tsx), so priming `knowledgeKey(teamId)` above
+      // refreshes the "All" tab and nothing the Glossary tab is showing.
+      // Same fix as the seed effect and `GlossaryList`'s own delete.
+      invalidateFindsOf(knowledgeKey(teamId))
       toast.success(t('"{word}" was added to the glossary.', { word: values.word }))
     },
     [teamId, t]
@@ -416,6 +423,10 @@ export function useScreenActions(teamId: string | null) {
         const cur = readCache<KnowledgeSource[]>(knowledgeKey(teamId))
         if (cur) primeCache(knowledgeKey(teamId), cur.map((s) => (s.id === id ? source : s)))
         invalidate(recordActivityKey("knowledge_sources", id))
+        // THE GLOSSARY TAB'S OWN FOUND CACHE — see `createGlossaryWord`'s note
+        // just above; this patches the plain list row but the tab is reading
+        // the `find:` one.
+        invalidateFindsOf(knowledgeKey(teamId))
       }
       toast.success(t("Word updated."))
     },

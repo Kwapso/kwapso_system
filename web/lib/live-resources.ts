@@ -1702,7 +1702,18 @@ export const TEAM_RESOURCES: Record<
     //   (`sliceKey`, work-panels.tsx), the Knowledge tab's own `<PagedFind>`
     //   list cache. A ping cannot name which app a row concerns either, so it
     //   drops by prefix exactly as the shape and the map already do.
-    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX, "knowledge-app-of:"],
+    //
+    //   EVERY KIND TAB'S OWN FOUND CACHE (20 Sep 2026) — `find:knowledge:…`
+    //   (paged-find.tsx's `findKeyFor`). The kind-tab strip's `fixed={{ kind:
+    //   activeTab }}` (knowledge-screen.tsx) makes `<PagedFind>`'s own
+    //   `active` true for as long as ANY kind tab (Glossary included) is
+    //   open, so the rows on screen always come from this FOUND key, never
+    //   from `knowledgeKey(teamId)` itself — a ping that only dropped the
+    //   plain key (the branch below, `invalidate(r.key(teamId))`) left every
+    //   open kind tab reading a stale answer until reload. Proved live: 54
+    //   glossary rows seeded, the tab open on the request that seeded them,
+    //   stayed empty for the rest of the session.
+    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX, "knowledge-app-of:", "find:knowledge:"],
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

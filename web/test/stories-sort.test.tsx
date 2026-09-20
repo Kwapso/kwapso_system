@@ -88,6 +88,7 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
     startsOn: null,
     dueOn: null,
     sprintEndsOn: null,
+    sprintStartsOn: null,
     closedAt: null,
     closingNote: null,
     storyType: "Feature",
@@ -184,5 +185,88 @@ describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)
     // seventh column here (R82's six-column ceiling) — it is a card tag and
     // a toolbar filter/sort instead (`MOSCOW_DOT_TONE`/facet, same file).
     expect(headers).toEqual(["ID", "Story", "Type", "Category", "Status", "Phase"])
+  })
+})
+
+// R96, THE ID CHIP IS BLACK — the three sites `web/test/id-chip-is-black.test.ts`
+// can only prove statically (a `render` callback's actual output is not source
+// text). These render the real screen and read the DOM: the Backlog's own
+// standalone ID column, `storyLead()`'s chip (Completed, where `leadingRef` is
+// true) and `ReviewsQueue()`'s own card chip all draw `<Badge variant="inverse">`
+// — `bg-surface-inverse text-ink-on-inverse`, `shared/ui/components/badge/
+// badge.tsx` — never the plain `variant="secondary"` chip this screen used to
+// build by hand.
+describe("Stories — R96, the id chip is black", () => {
+  it("the Backlog ID column draws the reference as the black chip, not bare text", async () => {
+    const rows = [story({ id: "s1", title: "Chip row", rank: "a0", ref: "B0007" })]
+    renderBacklog(rows)
+    await screen.findByText(/Chip row/)
+    const idCell = document.querySelectorAll("tbody tr")[0]?.querySelectorAll("td")[0]
+    const chip = idCell?.querySelector(".bg-surface-inverse")
+    expect(chip?.textContent).toBe("B0007")
+  })
+
+  it("storyLead()'s own chip (Completed tab's Story cell) is the black chip", async () => {
+    const teamId = `team-${++team}`
+    const rows = [story({ id: "s1", title: "Completed chip", rank: "a0", ref: "B0008", status: "done" })]
+    door.stories = rows
+    primeCache(storiesKey(teamId, "completed"), rows)
+    primeCache(`members:${teamId}`, [])
+    primeCache(`accounts:${teamId}`, [])
+    primeCache(`selectable:${teamId}`, [])
+    render(
+      <StoriesScreen
+        teamId={teamId}
+        recipe={BASE_RECIPES["stories.list"]}
+        rights={{ work: { read: true, create: true, update: true } } as never}
+        total={rows.length}
+        counts={{ now: 0, planned: 0, backlog: 0, completed: rows.length, all: 0, reviews: 0 }}
+        view="completed"
+        onViewChange={() => {}}
+        canCreate
+        onAction={() => {}}
+        onIntent={() => {}}
+      />
+    )
+    await screen.findByText(/Completed chip/)
+    const nameCell = document.querySelectorAll("tbody tr")[0]?.querySelectorAll("td")[0]
+    const chip = nameCell?.querySelector(".bg-surface-inverse")
+    expect(chip?.textContent).toBe("B0008")
+  })
+
+  it("ReviewsQueue()'s own card chip is the black chip", async () => {
+    const teamId = `team-${++team}`
+    const rows = [
+      story({
+        id: "s1",
+        title: "Review chip",
+        rank: "a0",
+        ref: "B0009",
+        status: "done",
+        closedAt: "2026-09-20T00:00:00.000Z",
+      }),
+    ]
+    door.stories = rows
+    primeCache(storiesKey(teamId, "reviews"), rows)
+    primeCache(`members:${teamId}`, [])
+    primeCache(`accounts:${teamId}`, [])
+    primeCache(`selectable:${teamId}`, [])
+    render(
+      <StoriesScreen
+        teamId={teamId}
+        recipe={BASE_RECIPES["stories.list"]}
+        rights={{ work: { read: true, create: true, update: true } } as never}
+        total={0}
+        counts={{ now: 0, planned: 0, backlog: 0, completed: 0, all: 0, reviews: rows.length }}
+        view="reviews"
+        onViewChange={() => {}}
+        canCreate
+        onAction={() => {}}
+        onIntent={() => {}}
+      />
+    )
+    await screen.findByText(/Review chip/)
+    const chip = document.querySelector("ul li .bg-surface-inverse")
+    expect(chip?.textContent).toBe("B0009")
   })
 })

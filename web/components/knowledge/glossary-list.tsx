@@ -35,6 +35,7 @@ import { useLanguage } from "@shared/web/language"
 
 import { content } from "@/lib/api"
 import { knowledgeKey } from "@/lib/live-resources"
+import { invalidateFindsOf } from "@/components/records/paged-find"
 import { invalidate } from "@shared/web/store"
 import type { KnowledgeSource } from "@shared/types"
 
@@ -52,7 +53,16 @@ export function GlossaryList({
   onEdit: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
-  const { ask, dialog } = useConfirm(() => teamId && invalidate(knowledgeKey(teamId)))
+  // BOTH KEYS, THE SAME REASON `knowledge-screen.tsx`'s OWN SEED EFFECT NOW
+  // NAMES: this tab's `<PagedFind>` always carries `fixed={{ kind: "glossary" }}`,
+  // so its rows read from the FOUND cache (`find:${knowledgeKey(teamId)}:…`),
+  // never from `knowledgeKey(teamId)` alone — taking a word away has to drop
+  // both or the row keeps showing until a reload.
+  const { ask, dialog } = useConfirm(() => {
+    if (!teamId) return
+    invalidate(knowledgeKey(teamId))
+    invalidateFindsOf(knowledgeKey(teamId))
+  })
   // DEFENSIVE, NOT LOAD-BEARING. The door already returns these sorted by
   // title (the tab's own `defaultSort`); re-sorting a loaded page of ~50
   // rows costs nothing and keeps the list alphabetical even on the resting

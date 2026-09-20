@@ -461,6 +461,94 @@ describe("the list answers with a page and an exact total (R14 + R16)", () => {
   })
 })
 
+// THE TWO VIRTUAL STATUS WORDS. Aurora's ruling, 21 Sep 2026, verbatim:
+// "Backlog, To Do: nono, to do means its scheduled in an active phase."
+// `status=to_do`/`status=backlog` are never stored (`stories.status` stays
+// `open`); the door tells them apart by whether the story's own phase's
+// dates contain today (`OpenStoryFacetStatus`, lib/stories.ts).
+describe("the two virtual status words: status=to_do/backlog narrow an open story by its own phase", () => {
+  const today = new Date().toISOString().slice(0, 10)
+  function addDays(iso: string, n: number): string {
+    const d = new Date(iso)
+    d.setDate(d.getDate() + n)
+    return d.toISOString().slice(0, 10)
+  }
+
+  async function makeSprint(startsOn: string | null, endsOn: string | null): Promise<string> {
+    await call(IDS.staffUser, "POST /api/content/sprints", {
+      name: `Sprint ${startsOn ?? "none"}-${endsOn ?? "none"}`,
+      accountId: IDS.victimAccount,
+      startsOn: startsOn ?? undefined,
+      endsOn: endsOn ?? undefined,
+    })
+    return (
+      db()
+        .prepare(`SELECT id FROM sprints ORDER BY created_at DESC LIMIT 1`)
+        .get() as { id: string }
+    ).id
+  }
+
+  it("an open story in a phase whose dates contain today matches status=to_do, not status=backlog", async () => {
+    const activeSprint = await makeSprint(addDays(today, -5), addDays(today, 5))
+    await addStory({ title: "Scheduled now", sprintId: activeSprint })
+
+    const toDo = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=to_do")
+    ).json()) as { stories: { title: string }[]; total: number }
+    expect(toDo.stories.map((s) => s.title)).toContain("Scheduled now")
+
+    const backlog = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=backlog")
+    ).json()) as { stories: { title: string }[] }
+    expect(backlog.stories.map((s) => s.title)).not.toContain("Scheduled now")
+  })
+
+  it("an open story with no phase matches status=backlog, not status=to_do", async () => {
+    await addStory({ title: "Nothing planned yet" })
+
+    const backlog = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=backlog")
+    ).json()) as { stories: { title: string }[] }
+    expect(backlog.stories.map((s) => s.title)).toContain("Nothing planned yet")
+
+    const toDo = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=to_do")
+    ).json()) as { stories: { title: string }[] }
+    expect(toDo.stories.map((s) => s.title)).not.toContain("Nothing planned yet")
+  })
+
+  it("an open story in a FUTURE phase matches status=backlog, not status=to_do", async () => {
+    const futureSprint = await makeSprint(addDays(today, 10), addDays(today, 20))
+    await addStory({ title: "Not yet due", sprintId: futureSprint })
+
+    const backlog = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=backlog")
+    ).json()) as { stories: { title: string }[] }
+    expect(backlog.stories.map((s) => s.title)).toContain("Not yet due")
+
+    const toDo = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=to_do")
+    ).json()) as { stories: { title: string }[] }
+    expect(toDo.stories.map((s) => s.title)).not.toContain("Not yet due")
+  })
+
+  it("an in_progress story matches neither virtual word", async () => {
+    const activeSprint = await makeSprint(addDays(today, -5), addDays(today, 5))
+    const id = await addStory({ title: "Under way", sprintId: activeSprint })
+    await call(IDS.staffUser, "POST /api/content/stories/status", { id, status: "in_progress" })
+
+    const toDo = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=to_do")
+    ).json()) as { stories: { title: string }[] }
+    expect(toDo.stories.map((s) => s.title)).not.toContain("Under way")
+
+    const backlog = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, "?status=backlog")
+    ).json()) as { stories: { title: string }[] }
+    expect(backlog.stories.map((s) => s.title)).not.toContain("Under way")
+  })
+})
+
 describe("a sprint is the block of work sold", () => {
   it("carries a whole-cent price, its own reference, and the counts of the work in it", async () => {
     await call(IDS.staffUser, "POST /api/content/sprints", {

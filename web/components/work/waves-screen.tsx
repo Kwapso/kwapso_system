@@ -65,7 +65,7 @@ import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/t
 import { WaveFormDialog } from "@/components/work/wave-form-dialog"
 import { useSprintTypes } from "@/components/work/sprint-form-dialog"
 import { AppMark } from "@/components/apps/app-tiles"
-import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
+import { SprintTypeGlyph, sprintTypeHasGlyph } from "@/lib/sprint-type-icon"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { waves as wavesApi, wavesKey } from "@/lib/api/waves"
 import { companiesKey, totalKey, sprintsKey, appsKey, listFetch } from "@/lib/live-resources"
@@ -74,6 +74,7 @@ import { usePermissions } from "@/lib/perms"
 import type { Account, AppRow, Sprint } from "@shared/types"
 import type { Wave } from "@shared/waves"
 import { sprintState } from "@shared/sprint-state"
+import { waveStage, type PhaseWindow } from "@shared/wave-stage"
 import { formatDate, formatDayMonth } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
@@ -91,6 +92,62 @@ export function waveDates(
 ): string {
   if (wave.startsOn && wave.endsOn) return `${formatDate(wave.startsOn, lang)} → ${formatDate(wave.endsOn, lang)}`
   return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No phases planned yet")
+}
+
+/** A WAVE'S OWN STAGE, DRAWN. Aurora's ruling, 21 Sep 2026, verbatim: "stage
+ * wave: read the active pahse that sit." `shared/wave-stage.ts`'s own
+ * `waveStage` decides WHICH of a wave's phases the stage reads off (the one
+ * active today, or the earliest upcoming one, or neither); this is only the
+ * icon-and-word it is drawn as, through the phase TYPE's own pill
+ * (`SprintTypeGlyph`, the identical icon every phase already wears on the
+ * wave's own Sprints list), icon only, no colour, her own words from the
+ * first phase-type ruling this one reads the same way. */
+export function WaveStageMark({
+  phases,
+  t,
+  className,
+  /** "text" (the default): a quiet second line, for the List row and the
+   * timeline's own sublabel. "chip": the same icon+word Badge every phase
+   * type pill already draws (the wave head, beside the other chips). */
+  variant = "text",
+}: {
+  phases: readonly (PhaseWindow & { sprintType?: string | null })[]
+  t: (s: string) => string
+  className?: string
+  variant?: "text" | "chip"
+}): React.ReactNode {
+  const stage = waveStage(phases)
+  if (variant === "chip") {
+    if (stage.kind === "none" || stage.kind === "complete")
+      return (
+        <Badge variant="secondary" size="pill" className={className}>
+          {t(stage.kind === "none" ? "No phases yet" : "Complete")}
+        </Badge>
+      )
+    const type = stage.phase.sprintType ?? null
+    return (
+      <Badge
+        variant="secondary"
+        size="pill"
+        className={className}
+        icon={sprintTypeHasGlyph(type) ? <SprintTypeGlyph type={type} /> : undefined}
+      >
+        {type ? t(type) : ""}
+      </Badge>
+    )
+  }
+  const base = "text-muted-foreground flex min-w-0 items-center gap-1 text-xs"
+  if (stage.kind === "none")
+    return <span className={cn(base, className)}>{t("No phases yet")}</span>
+  if (stage.kind === "complete")
+    return <span className={cn(base, className)}>{t("Complete")}</span>
+  const type = stage.phase.sprintType ?? null
+  return (
+    <span className={cn(base, className)}>
+      {sprintTypeHasGlyph(type) && <SprintTypeGlyph type={type} size={12} className="shrink-0" />}
+      <span className="min-w-0 truncate">{type ? t(type) : ""}</span>
+    </span>
+  )
 }
 
 /* ============================================================================
@@ -230,7 +287,12 @@ export function buildWaveTimelineRows(
   window_: WaveWeekWindow,
   basePath: string,
   lang: Language,
-  apps: AppRow[] = []
+  apps: AppRow[] = [],
+  /** Optional. The caller's own `t()`, read only for the row's stage
+   * subline (`WaveStageMark`, below). Omitted draws the row exactly as
+   * before 21 Sep 2026 (no stage line), which is what every existing test
+   * that does not pass one still gets. */
+  t?: (s: string) => string
 ): TimelineRow[] {
   const windowStart = new Date(window_.weekStarts[0] ?? isoDay(new Date()))
   const count = window_.weeks.length
@@ -322,8 +384,18 @@ export function buildWaveTimelineRows(
       ),
       // The wave's own name, only where the top line stopped being it (an app
       // was found) — the fallback already IS the wave's name, and a second
-      // copy of it right below would be the row talking to itself.
-      sublabel: app ? w.name : undefined,
+      // copy of it right below would be the row talking to itself. THE
+      // WAVE'S OWN STAGE (Aurora's ruling, 21 Sep 2026) rides the same line
+      // now, when a translator is in hand, omitted (the exact pre-21-Sep
+      // shape) for a caller that does not pass one.
+      sublabel: t ? (
+        <span className="flex min-w-0 flex-col gap-0.5">
+          {app && <span className="min-w-0 truncate">{w.name}</span>}
+          <WaveStageMark phases={sortedSprints.filter((s) => s.active)} t={t} />
+        </span>
+      ) : app ? (
+        w.name
+      ) : undefined,
       segments,
       onSelectLabel: () => softNavigate(`${basePath}/${w.id}`),
     })
@@ -526,19 +598,27 @@ export function waveListRows(
         </span>
       ),
       sprints: (
-        <span className="flex items-center gap-2">
-          <span className="tabular-nums">{w.sprintCount}</span>
-          {ws.length > 0 ? (
-            <span className="flex items-center gap-1">
-              {ws.slice(0, 5).map((s) => (
-                <span
-                  key={s.id}
-                  aria-hidden="true"
-                  className={cn("size-1.5 rounded-pill", SPRINT_DOT_TONE[sprintState(s, today)])}
-                />
-              ))}
-            </span>
-          ) : null}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex items-center gap-2">
+            <span className="tabular-nums">{w.sprintCount}</span>
+            {ws.length > 0 ? (
+              <span className="flex items-center gap-1">
+                {ws.slice(0, 5).map((s) => (
+                  <span
+                    key={s.id}
+                    aria-hidden="true"
+                    className={cn("size-1.5 rounded-pill", SPRINT_DOT_TONE[sprintState(s, today)])}
+                  />
+                ))}
+              </span>
+            ) : null}
+          </span>
+          {/* THE WAVE'S OWN STAGE. Aurora's ruling, 21 Sep 2026 (see
+              `WaveStageMark`'s own header). A second, muted line under the
+              count, the same primary-plus-subline shape the Account cell
+              already draws for its own second fact (R82's own fix), never a
+              seventh column. */}
+          <WaveStageMark phases={ws.filter((s) => s.active)} t={t} />
         </span>
       ),
       start: formatDate(w.startsOn, lang) || "",
@@ -802,7 +882,7 @@ export function WaveCollection({
   // it is actually on screen.
   const weekWindow = view === "timeline" ? waveWeekWindow(weekOffset, t, lang) : null
   const timelineRows =
-    weekWindow ? buildWaveTimelineRows(rows, sprints, weekWindow, basePath, lang, apps) : []
+    weekWindow ? buildWaveTimelineRows(rows, sprints, weekWindow, basePath, lang, apps, t) : []
 
   const calendarEntries = view === "calendar" ? buildWaveCalendarEntries(rows, sprints, t) : []
   const listRows = view === "list" ? waveListRows(rows, sprints, t, lang, apps) : []

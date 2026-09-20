@@ -224,11 +224,37 @@ export function CollectionCard({ children }: { children: React.ReactNode }) {
     <Card
       className={
         `${PINNED_INSET_MARK} ` +
-        "[--pinned-lead:var(--space-4)] lg:[--pinned-lead:var(--space-7)] " +
+        // THE LEAD IS THE LAW'S TOKEN NOW, NOT THE OLD 16/32 LADDER (R49/R83,
+        // Ruling 7, 21 Sep 2026: "the 10pc above and below, both in main and
+        // details"). This was `[--pinned-lead:var(--space-4)]
+        // lg:[--pinned-lead:var(--space-7)]`, the card's own DEFAULT,
+        // consumed only where none of the three ancestor rules in
+        // `web/app/globals.css` (strip-adjacency, nested-tab-pane,
+        // heading-led) reach this card, e.g. Account detail's Contacts
+        // section. A card reached through a fourth flow shape got the stale
+        // 16/32px ladder instead of the law's flat 10px, the exact gap the
+        // R83 registry entry named as a known, still-open miss. `--space-2h`
+        // is `--toolbar-lead-gap` itself (10px), flat, no `lg:` step: Ruling
+        // 7 retargeted the token to one number at every width, so the
+        // default agrees with every ancestor rule that overrides it rather
+        // than falling back to a second, older number when none of them do.
+        "[--pinned-lead:var(--toolbar-lead-gap)] " +
         "[--pinned-inset-x:var(--space-4)] lg:[--pinned-inset-x:var(--space-7)]"
       }
     >
-      <CardContent className="p-4">{children}</CardContent>
+      {/* THE REAL PADDING READS THE SAME TOKEN THE CUSTOM PROPERTY DOES, NOT A
+          SECOND, HAND-TYPED NUMBER. `p-4` used to be the literal, unresponsive
+          16px every CollectionCard rendered at rest regardless of
+          `--pinned-lead`. A card an ancestor rule reaches gets its
+          `padding-top` overridden explicitly (globals.css's own
+          `> [data-slot="card-content"] { padding-top: … }` pairs), but a card
+          NOTHING reaches rendered whatever `p-4` said, which could disagree
+          with `--pinned-lead` above it. Reading `--pinned-lead` for
+          `padding-top` here means the two can never drift: the DEFAULT above
+          is the DEFAULT here, and an ancestor override of one is only ever
+          real once the other pair (globals.css's `padding-top` declaration)
+          exists too, which every one of those rules already writes. */}
+      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)]">{children}</CardContent>
     </Card>
   )
 }

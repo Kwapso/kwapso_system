@@ -73,6 +73,7 @@ function story(overrides: Partial<Story>): Story {
     startsOn: null,
     dueOn: null,
     sprintEndsOn: null,
+    sprintStartsOn: null,
     closedAt: null,
     closingNote: null,
     rank: null,

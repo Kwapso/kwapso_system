@@ -244,12 +244,19 @@ const FEEDS_NO_TABLE = [
  * Pinned findings, rot-checked both ways below — the shape this repo already
  * uses for `GONE_ON_PURPOSE` (R58) and `TOOLBAR_EXEMPT` (R48): a line that no
  * longer matches anything is deleted, and this file goes red until it is. */
-const PEER_OWNED_FINDINGS = [
-  {
-    needle: "status: STORY_STATUS_LABEL[s.status]",
-    why: 'the List table\'s own Status column draws bare text off STORY_STATUS_LABEL, no <Badge variant="status" dot={…}> — item 9\'s exact shape, in the one file this lane\'s brief withholds (a parallel session owns stories-screen.tsx).',
-  },
-]
+// THE ONE PINNED FINDING WAS FIXED, 21 SEP 2026. Not by this file's own
+// rule (item 9, the coloured dot), but as a side effect of the peer session's
+// own brief that day: Aurora's ruling ("Backlog, To Do: nono, to do means
+// its scheduled in an active phase") replaced `STORY_STATUS_LABEL[s.status]`
+// on this exact line with `storyStatusWord(s.status, …)`
+// (`shared/story-status-word.ts`), so the bare-text needle below no longer
+// matches, deleted per this file's own header ("a line that no longer
+// matches anything is deleted"). The underlying item 9 defect (bare text,
+// still no dotted `<Badge>`) is UNCHANGED and still real; it simply has no
+// pinned needle to track it by any more, since the exact text this list
+// matched on is gone. A fresh finding, if this rule is ever run against that
+// line again, would need a new needle of its own.
+const PEER_OWNED_FINDINGS: { needle: string; why: string }[] = []
 
 /** Column keys a file's own `TableColumn[]`/`field(key, label)` calls declare —
  * never hand-typed, so a column renamed at the call site is what this reads,

@@ -105,6 +105,7 @@ type StoryRow = {
   starts_on: string | null
   due_on: string | null
   sprint_ends_on?: string | null
+  sprint_starts_on?: string | null
   closed_at: string | null
   closing_note: string | null
   story_type: string | null
@@ -156,7 +157,11 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
   -- \`dueOn\` — the column keeps what anybody typed before the change (a column
   -- dropped is the one migration you cannot take back) — and every screen reads
   -- the inherited date beside it.
-  (SELECT sp.ends_on FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_ends_on`
+  (SELECT sp.ends_on FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_ends_on,
+  -- THE SPRINT'S OWN START DATE, joined beside its end date. 21 Sep 2026, so a
+  -- screen can ask "is this story's own phase active today" without a second
+  -- read (\`shared/story-status-word.ts\`).
+  (SELECT sp.starts_on FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_starts_on`
 
 /** THE COLUMNS A LIST CARRIES — everything except the words of the work itself.
  *
@@ -224,6 +229,7 @@ function toStory(r: StoryRow): Story {
     startsOn: r.starts_on,
     dueOn: r.due_on,
     sprintEndsOn: r.sprint_ends_on ?? null,
+    sprintStartsOn: r.sprint_starts_on ?? null,
     closedAt: r.closed_at,
     closingNote: r.closing_note,
     storyType: r.story_type,
@@ -279,10 +285,19 @@ export const STORY_SORTS: SortMenu<StoryRow> = {
   assignee: { expr: "s.assignee_name", dir: "asc", key: (r) => r.assignee_name },
 }
 
+/** THE TWO VIRTUAL WORDS for an OPEN story (Aurora's ruling, 21 Sep 2026:
+ * "to do means its scheduled in an active phase"), never a fifth/sixth
+ * stored status, `shared/story-status-word.ts`'s own header. `"to_do"` narrows
+ * to `open` stories whose own phase is active today; `"backlog"` narrows to
+ * `open` stories whose phase is not (none, a future phase, or one that has
+ * ended), the facet this door offers maps to THESE, not to the one stored
+ * `open` value both derive from. */
+export type OpenStoryFacetStatus = "to_do" | "backlog"
+
 /** The facets the list door parses. Declared as a type so the route, the tool
  * and this file cannot drift about what a filter IS (R19). */
 export type StoryFilter = {
-  status?: StoryStatus
+  status?: StoryStatus | OpenStoryFacetStatus
   ticketId?: string
   sprintId?: string
   /** THE WORK ON ONE SYSTEM. A story hangs off an app ALWAYS and a sprint only
@@ -390,6 +405,21 @@ function storyViewSql(view: StoryViewName): { sql: string | null; todayCount: nu
   return { sql: "s.status <> 'done'", todayCount: 0 }
 }
 
+/** A STORY'S OWN PHASE IS ACTIVE TODAY. `shared/wave-stage.ts`'s own
+ * `phaseState(phase) === "active"` (started, and not yet ended), read the
+ * same way from SQL `storySprintRunningSql`/`storySprintUpcomingOrNoneSql`
+ * above already are, and asking the identical dates `shared/story-status-
+ * word.ts` reads off `Story.sprintStartsOn`/`sprintEndsOn` when it answers
+ * the same question in the browser. A no-end-date phase counts as still
+ * running, never as a guess. TWO `?`s (today, today). */
+function storyPhaseActiveSql(): string {
+  return `(s.sprint_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM sprints sp WHERE sp.id = s.sprint_id
+      AND sp.starts_on IS NOT NULL AND sp.starts_on <= ?
+      AND (sp.ends_on IS NULL OR sp.ends_on >= ?)
+  ))`
+}
+
 function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
   const parts: string[] = []
   const params: string[] = []
@@ -398,7 +428,16 @@ function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
     parts.push(view.sql)
     for (let i = 0; i < view.todayCount; i++) params.push(todayIso())
   }
-  if (filter.status) {
+  // THE TWO VIRTUAL WORDS, never a fifth/sixth stored status (see
+  // `OpenStoryFacetStatus`'s own header). Both narrow to `open`; the phase
+  // predicate is what tells them apart.
+  if (filter.status === "to_do") {
+    parts.push(`s.status = 'open' AND ${storyPhaseActiveSql()}`)
+    params.push(todayIso(), todayIso())
+  } else if (filter.status === "backlog") {
+    parts.push(`s.status = 'open' AND NOT ${storyPhaseActiveSql()}`)
+    params.push(todayIso(), todayIso())
+  } else if (filter.status) {
     parts.push("s.status = ?")
     params.push(filter.status)
   }

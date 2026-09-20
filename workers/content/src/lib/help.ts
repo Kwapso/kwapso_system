@@ -72,6 +72,11 @@ import { rankAtTop, rankBetween } from "@shared/workers/rank"
 // tenancy, so it moved out of this worker entirely (2026-08-31 ruling).
 import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 import { inOrder } from "@shared/workers/parallel"
+import type { Env } from "../env"
+// WHO A TICKET'S ASSIGNEE ID RESOLVES TO, the same read `stories.ts`'s own
+// `memberOrThrow` and `todos.ts` already use for exactly this question
+// ("whose name goes beside the id"), imported rather than re-derived.
+import { teamMemberNames } from "./notify"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -104,6 +109,15 @@ type TicketRow = {
   module_mark: string | null
   raised_by_contact_id: string | null
   raised_by_contact_name: string | null
+  /** WHO IS ON IT, the ticket's own, team migration 0111. See
+   * `shared/types.ts`'s `assigneeId`/`assigneeName` for the ruling and the
+   * redaction. */
+  assignee_id: string | null
+  assignee_name: string | null
+  /** THE APP'S OWN ANSWER, when this ticket has none, a correlated
+   * subselect off `app_staff.is_lead`, exactly like `app_logo` two lines up,
+   * never a stored column. See `shared/types.ts`'s `appAssigneeId`. */
+  app_assignee_id: string | null
   validated_at: string | null
   ref: string | null
   rank: string | null
@@ -163,6 +177,14 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
   // Ours = the agency's. A portal caller learns nothing about our side of it.
   const hideRaiser = scope.kind === "portal" && r.raiser_is_client !== 1
   const hideEditor = scope.kind === "portal" && r.editor_is_client !== 1
+  // UNCONDITIONAL, unlike the two above: there is no self-view exception to
+  // carve, because an assignee is ALWAYS staff (R54's agency-staff-only
+  // pickers; `web/lib/members.ts`'s `assignableMembers` never offers a
+  // client), so "is the assignee a client" is a question with one answer.
+  // SCOPE ch.06: "the portal shows work status but never which staff member
+  // is doing it", the exact sentence `storyCount`'s own comment already
+  // stands on below.
+  const hideAssignee = scope.kind === "portal"
   return {
     id: r.id,
     helpType: r.help_type,
@@ -245,6 +267,12 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     appLogo: r.app_logo,
     raisedByContactId: r.raised_by_contact_id,
     raisedByContactName: r.raised_by_contact_name,
+    // WHO IS ON IT (Aurora, 21 Sep 2026), the ticket's own answer, redacted
+    // unconditionally to a client login (`hideAssignee`, above), and the
+    // app's own answer beside it for the page's inheritance line.
+    assigneeId: hideAssignee ? null : r.assignee_id,
+    assigneeName: hideAssignee ? null : r.assignee_name,
+    appAssigneeId: hideAssignee ? null : r.app_assignee_id,
     validatedAt: r.validated_at,
   }
 }
@@ -284,13 +312,20 @@ function toMessage(r: ReplyRow, fromClient: boolean): HelpMessage {
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, raised_as_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
-  account_id, app_id, module_id, raised_by_contact_id, validated_at,
+  account_id, app_id, module_id, raised_by_contact_id, assignee_id, assignee_name, validated_at,
   ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, resolver_id, resolver_name, created_at, updated_at,
   (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
   -- R35: the App column's own face (client ruling 2026-09-15), off the same
   -- row app_name already reads — one correlated subselect, not a second one.
   (SELECT ap.logo_url FROM apps ap WHERE ap.id = help.app_id) AS app_logo,
+  -- THE APP'S OWN ANSWER for "who is on it" (Aurora, 21 Sep 2026), when this
+  -- ticket names no assignee of its own -- the app's LEAD (app_staff.is_lead,
+  -- team migration 0030), never a second column on apps (see this column's
+  -- own note on TicketRow, above, and team migration 0111's own header).
+  (SELECT ast.user_id FROM app_staff ast
+    WHERE ast.app_id = help.app_id AND ast.is_lead = 1 AND ast.deactivated_at IS NULL
+    LIMIT 1) AS app_assignee_id,
   -- R35: a module shown on a ticket carries its OWN face — the name AND the
   -- emoji beside it, on the same read as the row, so a list never renders a bare
   -- id and never pays a second round trip to find out what it is looking at.
@@ -1870,6 +1905,15 @@ export type TicketInput = {
    * linked to the client this ticket belongs to. Proved to be exactly that, so
    * "raised by" can never name a stranger. */
   raisedByContactId?: string
+  /** WHO IS ON IT (Aurora, 21 Sep 2026), a member of THIS team, proved the
+   * same way `stories.ts`'s own assignee is (`teamMemberNames`). STAFF ONLY:
+   * ignored outright for a portal caller, the same "ignored, not refused"
+   * shape `accountId` above already takes, because an assignee is a fact
+   * about our side of the fence and a client's own edit never reaches it.
+   * Left out means "leave it alone", the same rule `appId`/`moduleId`/
+   * `raisedByContactId` already follow, a person only ever sends this when
+   * they are actually choosing somebody. */
+  assigneeId?: string
 }
 
 /** WHICH APP IS THIS REQUEST ABOUT? Null is allowed and common (the agency's own
@@ -2156,6 +2200,7 @@ function refuseIfLocked(scope: AccountScope, row: TicketRow, what: string): void
  * the editor audit block + updated_at (which also re-sorts it to the top).
  * Returns the account the ticket belongs to, for the live ping. */
 export async function updateTicket(
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
@@ -2220,6 +2265,21 @@ export async function updateTicket(
   const raisedBy =
     (await contactForTicket(cfg, guard, input.raisedByContactId, accountAfter)) ??
     before.raised_by_contact_id
+  // WHO IS ON IT (Aurora, 21 Sep 2026: "both on story detail and ticket
+  // detail we need to see to whom it's assigned"). STAFF ONLY: ignored
+  // outright for a portal caller, `input.assigneeId` is never even read for
+  // one, the same "ignored, not refused" shape `accountId` above already
+  // takes, because an assignee is a fact about our side of the fence.
+  // Absent means "leave it alone", the same rule `appId`/`moduleId`/
+  // `raisedBy` above already follow, a person only sends this when they
+  // are actually choosing somebody.
+  const assigneeId =
+    scope.kind === "portal" ? undefined : optionalText(input.assigneeId, "Assignee", TEXT_LIMITS.short)
+  const assignee = assigneeId
+    ? ((await teamMemberNames(env, guard.teamId)).find((m) => m.userId === assigneeId) ?? null)
+    : null
+  if (assigneeId && !assignee)
+    throw new GuardError(400, "invalid_input", "That person isn't on the team any more.")
 
   const now = new Date().toISOString()
   // The fence rides the UPDATE as well as the read above — same sentence, same
@@ -2255,6 +2315,7 @@ export async function updateTicket(
     guard.databaseId,
     `UPDATE help SET help_type = ?, description = ?, screen_recording_link = ?, source_screen = ?,
        title_de = ?, title_en = ?, app_id = ?, module_id = ?, raised_by_contact_id = ?,
+       assignee_id = ?, assignee_name = ?,
        account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?${lockSet}
      WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}${ownership} RETURNING id`,
     [
@@ -2273,6 +2334,11 @@ export async function updateTicket(
       appId,
       moduleId,
       raisedBy,
+      // Absent (undefined, a portal caller, or nobody chosen) keeps whatever
+      // the ticket already carried, the same fallback `appId`/`moduleId`/
+      // `raisedBy` above already take.
+      assigneeId ?? before.assignee_id,
+      assignee?.name ?? before.assignee_name,
       accountAfter,
       now,
       actor.id,
@@ -2303,6 +2369,7 @@ export async function updateTicket(
       hideValues: true,
     },
     { label: "Source", from: before.source_screen, to: optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null },
+    { label: "Assignee", from: before.assignee_name, to: assignee ? assignee.name : before.assignee_name },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket edited",
@@ -2910,29 +2977,62 @@ async function replyOrThrow(
   return rows[0]
 }
 
-/** MAY THIS CALLER CHANGE THIS ONE REPLY? — the fence `updateReply`/`deleteReply`
- * share, and the whole of Aurora's 20 Sep 2026 ruling's permission half.
+/** MAY THIS CALLER EDIT THIS ONE REPLY? `updateReply`'s own fence, and the
+ * Edit half of Aurora's 21 Sep 2026 ruling, verbatim: "who may edit: A author
+ * onñy", read as offered to her (A: the author may edit and delete their own
+ * reply; a person holding the ticket edit right may DELETE any reply but
+ * never edit someone else's words; a client from the portal may only touch
+ * their own).
  *
- * THE AUTHOR ALWAYS MAY. Changing your own words needs no separate grant — the
+ * THE AUTHOR ALWAYS MAY. Changing your own words needs no separate grant, the
  * same reasoning `updateTicket`'s own portal branch states for the ticket's
  * wording one table up.
  *
+ * PAST THAT, NOBODY. `help:update` reaches DELETE (see `assertMayDeleteReply`
+ * below) and stops there now: holding the ticket edit right lets a colleague
+ * take a reply back out, it never lets them rewrite words that were not
+ * theirs to begin with. Before this ruling the door read the same as delete's;
+ * the split is deliberate and narrower than it used to be.
+ *
+ * A CLIENT LOGIN reaches only the first branch above (their own reply): the
+ * portal message is kept distinct from the staff one so "that one isn't yours"
+ * still reads as a portal fact rather than the general refusal every other
+ * non-author now gets too. */
+async function assertMayEditReply(
+  guard: MemberGuard,
+  scope: AccountScope,
+  row: Pick<ReplyRow, "creator_id">
+): Promise<void> {
+  if (row.creator_id === guard.userId) return
+  if (scope.kind === "portal")
+    throw new GuardError(403, "not_yours", "That one isn't yours to change.")
+  throw new GuardError(403, "forbidden", "Only the person who wrote it can change it.")
+}
+
+/** MAY THIS CALLER DELETE THIS ONE REPLY? `deleteReply`'s own fence, and the
+ * Delete half of the same 21 Sep 2026 ruling. Unchanged from the single fence
+ * this file carried before the split (see `assertMayEditReply`, immediately
+ * above, for the ruling itself and why Edit narrowed while this did not).
+ *
+ * THE AUTHOR ALWAYS MAY, the same as Edit.
+ *
  * PAST THAT, help:update — "the ticket edit right", the SAME right the ticket's
  * own Edit button and status stepper already gate on (`canEdit`, the app's own
- * `usePermissions` client-side) — reaches every OTHER member's reply too. One
- * right, the one already governing the rest of this ticket, rather than a
- * second permission nobody would remember exists or think to grant.
+ * `usePermissions` client-side), reaches every OTHER member's reply too, for
+ * deletion only. One right, the one already governing the rest of this
+ * ticket, rather than a second permission nobody would remember exists or
+ * think to grant.
  *
  * A CLIENT LOGIN NEVER REACHES THE SECOND HALF. The portal surface grants no
- * help:update right to begin with — no role a contact can hold carries it — so
+ * help:update right to begin with, no role a contact can hold carries it, so
  * this is provably already true without the branch below. It is asserted
  * anyway rather than left to fall out of a `hasRight` lookup that would simply
  * always answer false for a portal caller: a rule this load-bearing ("a client
- * login cannot edit staff replies") earns its own sentence, the same call
+ * login cannot delete staff replies") earns its own sentence, the same call
  * `postHelpReply`'s own mention refusal makes for the identical reason, not an
  * inference from a permissions table a future role change could quietly grow a
  * hole in. */
-async function assertMayChangeReply(
+async function assertMayDeleteReply(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
@@ -2996,7 +3096,7 @@ export async function updateReply(
   changes: ReplyChanges
 ): Promise<{ helpId: string; accountId: string | null }> {
   const row = await replyOrThrow(cfg, guard, scope, id)
-  await assertMayChangeReply(cfg, guard, scope, row)
+  await assertMayEditReply(guard, scope, row)
   const ticket = await ticketOrThrow(cfg, guard, scope, row.help_id)
   const now = new Date().toISOString()
 
@@ -3099,7 +3199,7 @@ export async function deleteReply(
   id: string
 ): Promise<{ helpId: string; accountId: string | null }> {
   const row = await replyOrThrow(cfg, guard, scope, id)
-  await assertMayChangeReply(cfg, guard, scope, row)
+  await assertMayDeleteReply(cfg, guard, scope, row)
   const ticket = await ticketOrThrow(cfg, guard, scope, row.help_id)
   const now = new Date().toISOString()
   // R17: idempotent by construction, not only by `replyOrThrow`'s own fence

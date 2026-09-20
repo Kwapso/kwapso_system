@@ -20,6 +20,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { GlossaryList } from "@/components/knowledge/glossary-list"
 import { GlossaryFormDialog } from "@/components/knowledge/glossary-form-dialog"
+import { PagedFind, type FindQuery } from "@/components/records/paged-find"
 import type { KnowledgeSource } from "@shared/types"
 
 afterEach(cleanup)
@@ -186,6 +187,31 @@ describe("the Glossary tab is wired into the Knowledge screen (source-read proof
     expect(src).toMatch(/contentApi\s*\n?\s*\.seedGlossary\(\)/)
   })
 
+  // BUG (a): "54 rows in the database, tab still empty." The seed effect used
+  // to invalidate only `knowledgeKey(teamId)` — but `fixed={{ kind: "glossary" }}`
+  // a few lines below makes `<PagedFind>`'s own `active` true for the whole
+  // time this tab is open (paged-find.tsx's T3654 note), so the rows on
+  // screen come from the FOUND cache, never the plain list key. A seed that
+  // only invalidated the plain key left the tab reading its own pre-seed
+  // (empty) answer until a reload. `invalidateFindsOf` is the seam
+  // paged-find.tsx exports for exactly this shape.
+  it("invalidates the found cache too, not only the plain list, so a first seed shows up without a reload", () => {
+    const src = readKnowledgeScreen()
+    const seedAt = src.indexOf(".seedGlossary()")
+    expect(seedAt, "the seed call itself").toBeGreaterThan(-1)
+    const thenBlock = src.slice(seedAt, seedAt + 1400)
+    expect(thenBlock, "the plain list still refreshes (the All tab, restingEmpty)").toMatch(
+      /invalidate\(knowledgeKey\(teamId\)\)/
+    )
+    expect(
+      thenBlock,
+      "and the found cache the Glossary tab is ACTUALLY reading from is dropped too"
+    ).toMatch(/invalidateFindsOf\(knowledgeKey\(teamId\)\)/)
+    expect(src).toMatch(
+      /import\s*\{\s*PagedFind,\s*invalidateFindsOf\s*\}\s*from\s*"@\/components\/records\/paged-find"/
+    )
+  })
+
   it("the search box narrows to the glossary, the same toolbar every collection draws (R48)", () => {
     const src = readKnowledgeScreen()
     expect(src).toMatch(/placeholder=\{t\("Search sources…"\)\}/)
@@ -211,5 +237,129 @@ describe("the Glossary tab is wired into the Knowledge screen (source-read proof
     // header says why) rather than repeating the panel/module check inline.
     expect(panelsSrc).toMatch(/const glossaryEditing = query\.panel === "edit" && query\.module === "knowledge-glossary"/)
     expect(panelsSrc).toMatch(/open=\{glossaryEditing && !!knowledgeEditRow && can\("knowledge", "update"\)\}/)
+  })
+})
+
+// BUG (d), REPRODUCED AT RENDER TIME: on a team with thousands of other
+// sources, `knowledgeQ`'s own resting read (the "All" tab's first page,
+// `scope.knowledgeQ.data`/`loadedSources` in knowledge-screen.tsx) never
+// carries a glossary row past page one — the Kwapso team alone has 2087+
+// tickets. If the Glossary tab ever fell back to filtering THAT array by
+// kind (the resting branch `rows.filter((s) => s.kind === "glossary")`,
+// knowledge-screen.tsx), it would read empty forever on a team that size,
+// while the Smoke team (small enough that the whole base fits on page one)
+// never showed the bug. `<PagedFind>` is the real mechanism knowledge-screen
+// renders through, so this drives it directly, the same technique
+// knowledge-search-restored.test.tsx uses for this same screen, and proves
+// the two things the fix promises: the door is asked `kind=glossary`
+// directly, and what renders is the door's answer, never a client-side
+// narrowing of a huge unrelated page.
+describe("cause (d): the glossary tab must ask the door for kind=glossary directly", () => {
+  function makeTicketMirror(i: number): KnowledgeSource {
+    return {
+      id: `T${i}`,
+      kind: "ticket",
+      originTable: "help",
+      originRowId: `H${i}`,
+      compartment: "agency",
+      accountId: null,
+      appId: null,
+      ticketId: `H${i}`,
+      sprintId: null,
+      recordDate: null,
+      title: `Ticket mirror ${i}`,
+      summary: null,
+      body: null,
+      bodyBytes: 0,
+      bodyTruncated: false,
+      sourceUrl: null,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      fileBytes: 0,
+      fileNote: null,
+      visibility: "team",
+      ownerUserId: null,
+      visibleToAppId: null,
+      visibleToAppName: null,
+      indexedAt: null,
+      chunkCount: 0,
+      indexedChunks: 0,
+      indexError: null,
+      active: true,
+      createdAt: "2026-09-20T00:00:00.000Z",
+      creatorName: null,
+      editorName: null,
+      updatedAt: null,
+      accounts: [],
+      apps: [],
+      sharedWith: "agency",
+      generatedOnly: false,
+      sightingsCount: 0,
+    }
+  }
+
+  it("renders the door's 54 glossary rows, never a client-side filter of a large, glossary-free first page", async () => {
+    // THE RESTING "ALL" PAGE — the shape `loadedSources` has on a big team:
+    // 200 stand-ins for the 2087+ tickets, none of them kind "glossary".
+    const bigFirstPage: KnowledgeSource[] = Array.from({ length: 200 }, (_, i) => makeTicketMirror(i))
+    const doorGlossaryRows = [
+      makeWord({ id: "W1", title: "Wave" }),
+      makeWord({ id: "W2", title: "Ticket" }),
+    ]
+
+    let askedQuery: FindQuery | undefined
+    const fetchPage = async (query: FindQuery, _cursor: string | null) => {
+      askedQuery = query
+      // THE DOOR'S OWN ANSWER, never derived from `bigFirstPage` — the same
+      // separation `listSources`'s SQL `kind = ?` makes server-side
+      // (workers/content/src/lib/knowledge.ts).
+      return {
+        rows: query.kind === "glossary" ? doorGlossaryRows : [],
+        nextCursor: null,
+        total: query.kind === "glossary" ? doorGlossaryRows.length : 0,
+      }
+    }
+
+    render(
+      <PagedFind<KnowledgeSource>
+        listKey="knowledge:team-big"
+        placeholder="Search sources…"
+        matches={{ none: "No sources match", one: "1 source matches", many: "{count} sources match" }}
+        // THE REAL CALL SITE'S OWN SHAPE (knowledge-screen.tsx): the glossary
+        // tab is never the `undefined` branch of `fixed`.
+        fixed={{ kind: "glossary" }}
+        restingEmpty={bigFirstPage.length === 0}
+        fetchPage={fetchPage}
+      >
+        {(found) => {
+          // THE EXACT LOGIC knowledge-screen.tsx's own glossary branch runs.
+          const rows = found.active ? found.rows : bigFirstPage
+          if (rows === null) return <div data-testid="loading" />
+          const glossaryRows = found.active ? rows : rows.filter((s) => s.kind === "glossary")
+          return (
+            <div data-testid="rows">
+              {glossaryRows.map((s) => (
+                <span key={s.id}>{s.title}</span>
+              ))}
+            </div>
+          )
+        }}
+      </PagedFind>
+    )
+
+    await vi.waitFor(() => expect(askedQuery).toBeTruthy())
+    expect(askedQuery?.kind, "the door is asked kind=glossary directly, not filtered client side").toBe(
+      "glossary"
+    )
+    await vi.waitFor(() => {
+      expect(screen.getByText("Wave")).toBeTruthy()
+      expect(screen.getByText("Ticket")).toBeTruthy()
+    })
+    // NONE OF THE 200 TICKET MIRRORS LEAKED IN, and none of them hid the
+    // glossary rows either — the huge, glossary-free page never entered the
+    // decision at all.
+    expect(screen.queryByText("Ticket mirror 0")).toBeNull()
+    expect(screen.queryByText("Ticket mirror 199")).toBeNull()
   })
 })
