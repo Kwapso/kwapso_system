@@ -325,6 +325,21 @@ const Title = React.forwardRef<HTMLDivElement, TitleProps>(
               data-slot="title-heading"
               className={cn(
                 titleHeadingVariants({ size }),
+                /* `text-balance` — added 2026-09-22, alongside RecordDetail's
+                   own titleSize default moving to h2 · 32 (see that file's
+                   header). A heading that DOES wrap — a record's name past
+                   one line, a long collection heading — breaks evenly across
+                   its lines instead of leaving a short orphan word on the
+                   last one, the same utility `article-body.tsx` already
+                   applies to its own h2/h3/h4. It changes nothing about
+                   WHETHER a wrap happens or how much room the head takes:
+                   every caller of this component (`RecordDetail`,
+                   `CollectionFrame`, `ScreenShell`, `ScreenRenderer`) already
+                   stacks its regions in a plain `flex-col` with token gaps,
+                   so a taller, wrapped heading pushes whatever sits below it
+                   — a tab strip included — down in normal flow. This class
+                   only makes the wrap itself read better. */
+                "text-balance",
                 // 6 under the eyebrow, and nothing at all without one.
                 eyebrow !== undefined && eyebrow !== null && "mt-[var(--space-1h)]",
               )}

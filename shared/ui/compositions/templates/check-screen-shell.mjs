@@ -523,6 +523,147 @@ console.log(
 );
 
 /* ============================================================================
+   THE 22 SEP 2026 RECORD-TITLE 32PX REGISTER CHECK — live audit on staging,
+   app detail A0002 ("PORTAL SMOKE · another system"), 1440×900. The record
+   title was computing at h1 · 44 (`RecordDetail`'s own default, since
+   2026-09-08), wrapping to two lines at that width, and its second line sat
+   under the tab strip drawn directly below it. The client's standing
+   typography ruling caps every screen AND record title at 32px — this app
+   already carries that ruling for a screen's own name through
+   `SHAPE_HEADING_SIZE` (states.tsx), but `RecordDetail`'s default answered a
+   different question and had drifted past it. Fixed at the source:
+   `RecordDetail`'s own `titleSize` default is `h2` · 32 now, so every
+   record — through this component directly or through `RecordChrome`, which
+   passes no `titleSize` of its own — draws its name at the client's register
+   with no override needed anywhere above it. See `record-detail.tsx`'s own
+   `titleSize` doc for the full account, including the app-side descendant
+   selector this repository does not own and cannot remove from here.
+
+   TWO THINGS ARE PINNED, NOT ONE — the register alone would have caught this
+   exact regression, but not a future one shaped the other way: a title
+   restored to a larger step with the LAYOUT then patched to "fit" it by
+   giving the head a fixed height, floating the strip out with `absolute`, or
+   pulling it up with a negative margin, rather than by simply letting flow
+   layout push the strip down. All three are also how `Title`'s own header
+   comment says this kind of overlap tends to ship (a hand patch that treats
+   the symptom at the exact spot a screenshot was taken). So this check reads
+   the SAME two wrapper elements the body-hosted-title check above already
+   isolates — record-detail.tsx's header region and its sticky-strip wrapper
+   — for a bare fixed-height utility, a negative margin, or `absolute`
+   positioning, none of which this composition has ever needed: it is a plain
+   `flex-col` with token gaps end to end, and a title that wraps simply makes
+   its own flex item taller, which the strip below it already follows in
+   normal flow with no help from either wrapper. */
+const recordTitleRegisterFindings = [];
+
+const RECORD_DETAIL_TITLE_DEFAULT_PATTERN = /titleSize\s*=\s*"h2"/;
+if (!RECORD_DETAIL_TITLE_DEFAULT_PATTERN.test(recordDetailSrc)) {
+  recordTitleRegisterFindings.push(
+    `${recordDetailRel} no longer defaults titleSize to "h2" (32px, the client's standing register) — ` +
+      "a record's own name has drifted off the ceiling this check exists to hold.",
+  );
+}
+
+// The strip wrapper `record-detail.tsx` renders as `data-slot="record-detail-strip"`
+// (region 2). Its className is a cn(...) call; only `sticky`/`top-0`/`z-10` and the
+// TABS_STRIP_GAP padding token belong there — no fixed height, no negative margin,
+// no `absolute`.
+const RECORD_DETAIL_STRIP_BLOCK = /data-slot="record-detail-strip"[\s\S]{0,300}?className=\{cn\(([^)]*)\)\}/;
+const recordDetailStripMatch = recordDetailSrc.match(RECORD_DETAIL_STRIP_BLOCK);
+if (!recordDetailStripMatch) {
+  recordTitleRegisterFindings.push(
+    `${recordDetailRel} does not have a data-slot="record-detail-strip" wrapper with a cn(...) className to check.`,
+  );
+} else {
+  const stripClass = recordDetailStripMatch[1];
+  if (/(?<!min-)(?<!max-)\bh-\[/.test(stripClass)) {
+    recordTitleRegisterFindings.push(
+      `${recordDetailRel}'s sticky-strip wrapper (data-slot="record-detail-strip") carries a fixed h-[…] height ` +
+        `("${stripClass.trim()}") — a fixed head/strip height is exactly what stops a wrapped title from pushing ` +
+        "the strip down instead of under it.",
+    );
+  }
+  if (/(?:^|[\s"'`])-m[a-z]{0,2}-(?:\[|\d)/.test(stripClass)) {
+    recordTitleRegisterFindings.push(
+      `${recordDetailRel}'s sticky-strip wrapper (data-slot="record-detail-strip") carries a negative margin ` +
+        `("${stripClass.trim()}") — the exact shape that pulls a strip back up over a title's own wrapped line.`,
+    );
+  }
+  if (/\babsolute\b/.test(stripClass)) {
+    recordTitleRegisterFindings.push(
+      `${recordDetailRel}'s sticky-strip wrapper (data-slot="record-detail-strip") is positioned absolute — ` +
+        'it must stay in normal flow ("sticky", never "absolute") so a taller header pushes it down.',
+    );
+  }
+}
+
+// The header band itself (region 1, already isolated above for pt-/px-) gets the
+// same three forbidden shapes checked here, so one place answers "can this region
+// ever overlap the strip below it" rather than splitting the question in two.
+if (recordDetailHeaderMatch) {
+  const headerClass = recordDetailHeaderMatch[1];
+  if (/(?<!min-)(?<!max-)\bh-\[/.test(headerClass)) {
+    recordTitleRegisterFindings.push(
+      `${recordDetailRel}'s header region (data-record-region="header") carries a fixed h-[…] height ` +
+        `("${headerClass.trim()}") — a title that wraps needs the region to grow with it, not clip against a cap.`,
+    );
+  }
+  if (/(?:^|[\s"'`])-m[a-z]{0,2}-(?:\[|\d)/.test(headerClass)) {
+    recordTitleRegisterFindings.push(
+      `${recordDetailRel}'s header region (data-record-region="header") carries a negative margin ` +
+        `("${headerClass.trim()}") — that is the other shape that can pull the strip back up over a wrapped title.`,
+    );
+  }
+}
+
+// `Title`'s own heading keeps `text-balance` — 2026-09-22, alongside the h2
+// default above, so a wrapped title (a record's, or a long collection heading
+// through the same component) breaks evenly across its lines.
+if (!/["'`]text-balance["'`]/.test(titleSrc)) {
+  recordTitleRegisterFindings.push(
+    `${titleRel}'s heading no longer carries text-balance — a wrapped record or collection title will break ` +
+      "unevenly across its lines again.",
+  );
+}
+
+// THE COLLECTION HEAD GETS THE SAME LAYOUT GUARD. `CollectionFrame` already
+// defaults its own `headingSize` to `Title`'s own default (h2 · 32 — see that
+// prop's doc in collection-frame.tsx), so there is no second register to pin
+// here; what this checks is that a long module title wrapping in that heading
+// still cannot overlap the tabs below it, the same way a record's cannot.
+const COLLECTION_FRAME_STACK_BLOCK = /data-slot="collection-frame-stack"[\s\S]{0,60}?className="([^"]*)"/;
+const collectionFrameStackMatch = collectionFrameSrc.match(COLLECTION_FRAME_STACK_BLOCK);
+if (!collectionFrameStackMatch) {
+  recordTitleRegisterFindings.push(
+    `${collectionFrameRel} does not have a data-slot="collection-frame-stack" wrapper with a plain className to check.`,
+  );
+} else {
+  const stackClass = collectionFrameStackMatch[1];
+  if (/(?<!min-)(?<!max-)\bh-\[/.test(stackClass) || /\babsolute\b/.test(stackClass)) {
+    recordTitleRegisterFindings.push(
+      `${collectionFrameRel}'s tab stack (data-slot="collection-frame-stack") carries a fixed height or absolute ` +
+        `position ("${stackClass.trim()}") — the collection heading above it needs to stay in normal flow to push ` +
+        "this stack down when it wraps.",
+    );
+  }
+}
+
+if (recordTitleRegisterFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell record-title-register check (the 22 Sep 2026 A0002 fix):\n" +
+      recordTitleRegisterFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell record-title-register check: record-detail.tsx's titleSize default stays h2 (32px, the " +
+    "client's register), its header region and sticky-strip wrapper stay free of a fixed height, a negative " +
+    "margin and absolute positioning so a wrapped title always pushes the strip down in flow, title.tsx's own " +
+    "heading keeps text-balance, and collection-frame.tsx's tab stack carries the same layout guard.",
+);
+
+/* ============================================================================
    THE 17 SEP 2026 EVENING CONTENT-INSET CHECK — RULING 2, CORRECTED THE SAME
    EVENING. Client, verbatim: "can you make the overall full content inside
    this container wider, not only the toolbar, but everything?... the margin

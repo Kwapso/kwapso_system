@@ -352,32 +352,44 @@ export interface RecordDetailProps
    * 2026-09-08 the WHOLE of it (56 / 44 / 32 / 24 / 20) rather than its
    * bottom three rungs.
    *
-   * THE DEFAULT MOVED, AND IT MOVED BECAUSE THE SCALE ALREADY NAMED IT.
-   * This prop defaulted to `h3` (24), and the reason recorded here was that
-   * "the kit's 24.6 draws 18, which is not a rung on that ladder, so the
-   * nearest page-level rung is the default" (GAPS-COL3 REC-3). That reading
-   * was doing the best it could with a ladder whose top was 32: the rung the
-   * kit's own type-scale table names **"Record heading"** is h1 · 44, and 44
-   * was not reachable from this file until `Title` grew the rung. So the
-   * default was never a choice between 24 and 44 — it was 24 or nothing.
+   * THE DEFAULT IS h2 · 32, THE CLIENT'S STANDING TYPOGRAPHY RULING, NOT h1 ·
+   * 44 — CORRECTED 2026-09-22, live audit on staging (app detail A0002,
+   * 1440×900). Between 2026-09-08 and this fix the default briefly sat at
+   * `h1`, on the reasoning that the scale table names h1 · 44 "Record
+   * heading" and that role fits this component exactly. It does, in the
+   * table's own vocabulary — and the client's separate, standing ruling
+   * overrides the table for THIS app: every screen and record title is
+   * capped at 32px, the register the consuming app already enforces for a
+   * SCREEN's own name through `SHAPE_HEADING_SIZE` (comfortable → h2,
+   * `compositions/states/states.tsx`) but, until this fix, never carried
+   * through to a RECORD's name, because this file's default answers a
+   * different question than `SHAPE_HEADING_SIZE` does. The live fault: a
+   * long record title ("PORTAL SMOKE · another system") set at 44 wrapped to
+   * two lines (83.5px tall) at 1440px, and its second line sat under the
+   * tab strip drawn directly beneath it — real text behind real tabs. `h2`
+   * is the fix at the source: every call site that draws a record through
+   * this component (or through `RecordChrome`, which passes no `titleSize`
+   * of its own) now gets the client's 32px register with no override needed
+   * anywhere above it.
    *
-   * 24.6's 18 IS NOT OVERRULED BY THIS AND IS WORTH SAYING OUT LOUD, because
-   * the two sources genuinely disagree and a later reader will find both. The
-   * chapter DRAWS a band at 18. The scale table NAMES a rung "Record
-   * heading" at 44. A drawing sets a specimen; the table assigns a role to a
-   * step, and this component IS that role — it is the band that carries the
-   * one record a detail screen is about. Where a drawing and a role name
-   * disagree about a step, the role name is the one that generalises to the
-   * next screen, and 18 was in any case not a rung either way.
+   * THE APP'S OWN WORKAROUND IS NOT THIS FILE'S TO REMOVE. The consuming
+   * app has been reaching around this component's default since 2026-08-31
+   * with a descendant selector on `Title`'s own data-slot
+   * (`RECORD_TITLE_SIZE`, `shared/web/record-heading.tsx`, forcing
+   * `text-4xl`/44 from outside), written when `Title`'s own ladder had no
+   * h1 rung to ask for at all. That selector still exists on the app side
+   * after this change and still outweighs whatever step this file draws —
+   * removing it is an app-side edit, out of scope for this repository, and
+   * is filed as follow-up work rather than done here.
    *
-   * WHAT THIS COSTS AND WHY IT IS STILL RIGHT. Every existing call site that
-   * passed nothing now sets its record's name two rungs larger. That is the
-   * change: the consuming app has been reaching around this default since
-   * 2026-08-31 with a descendant selector on `Title`'s own data-slot, applied
-   * at every detail call site and policed by a law of its own, because its
-   * client's correction — "title on main screens still way too small! it's
-   * currently smaller than in detail screens" — could not be answered from
-   * inside the kit. A default that every consumer overrides is not a default.
+   * `Title`'s heading also takes `text-balance` now (see `title.tsx`), so a
+   * title that DOES wrap breaks evenly across its lines rather than leaving
+   * a short orphan word on the second — cosmetic only: the layout that pushes
+   * the tab strip down when a title wraps was already correct flow (this
+   * component's four regions are a plain `flex-col` with token gaps, no
+   * fixed head height and no negative margin anywhere between the header
+   * band and the strip), and stays that way; `check-screen-shell.mjs` now
+   * pins both the register and the absence of a fixed head height.
    */
   titleSize?: TitleStep;
 
@@ -702,7 +714,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       mark,
       actions,
       actionsVisible = true,
-      titleSize = "h1",
+      titleSize = "h2",
       stages,
       currentStage = 0,
       onStageSelect,

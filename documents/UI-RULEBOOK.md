@@ -1999,13 +1999,23 @@ config shape.
 
 ### D11: every detail screen wears the same title treatment, and it comes from one constant
 
-**The rule.** The record heading's step (h1, 44px) and the 80% title-to-actions split are
-ONE exported string, `RECORD_TITLE_TREATMENT` in `shared/web/record-heading.tsx`. This app
+**The rule.** The 80% title-to-actions split and the head's own container query are ONE
+exported string, `RECORD_TITLE_TREATMENT` in `shared/web/record-heading.tsx`. This app
 draws a record detail two ways — the hand-composed `*-detail.tsx` screens through
 `RecordScreen` (`web/components/records/record-chrome.tsx`) and the recipe-driven ones
 through `renderDetail` (`shared/web/screen-engine/screen-renderer.tsx`) — and **both** apply
 that exact constant and import it from that file. No call site passes a `titleSize` of its
 own.
+
+**AMENDED 2026-09-22 — the title's SIZE stopped living here, kit v1.2.150.** Until this date
+`RECORD_TITLE_TREATMENT` also carried `RECORD_TITLE_SIZE`, a descendant selector forcing the
+h1/44 step from outside, because the kit's `Title` primitive had no h1 rung for
+`RecordDetail`'s `titleSize` to ask for directly. The client's later, standing typography
+ruling caps every screen and record title at 32px, and the kit moved `RecordDetail`'s own
+`titleSize` default from h1 to h2 (32px) at the source, so the override's one reason to exist
+— reaching a step the kit's default could not reach — was gone; keeping it would have been a
+second, competing answer to a question the kit now answers correctly. `RECORD_TITLE_SIZE` is
+removed, and `RECORD_TITLE_TREATMENT` carries only the split and the container query below.
 
 **Why a constant and not a class.** The 44px title was a real fix for a real correction
 (*"title on main screens still way too small!"*) and it was written as a PRIVATE constant
@@ -2069,10 +2079,13 @@ is what draws it, through `RecordMark`/`AppMark` exactly as every list row and t
 does (G3).
 
 **Title height is unchanged, by construction, not by eye.** The mark's own box is sized to
-the title's line box — `calc(var(--text-4xl) * var(--text-4xl--line-height))`, the same two
-tokens [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant)'s
-`RECORD_TITLE_TREATMENT` already points the kit's rendered heading at — never a pixel figure
-picked to look right on one screen. The row is `items-center gap-3` (the kit's `--space-3`),
+the title's line box — `calc(var(--text-3xl) * var(--text-3xl--line-height))`, the h2 step's
+own two tokens, the step the kit's `RecordDetail` renders a record's title at by default
+since kit v1.2.150 (2026-09-22; this box tracked `--text-4xl`, the h1 step, until then, back
+when the app forced h1/44 from outside through the app-side `RECORD_TITLE_SIZE` override,
+since removed — [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant)'s
+own section has the account) — never a pixel figure picked to look right on one screen. The
+row is `items-center gap-3` (the kit's `--space-3`),
 so the row's own height is the title's line-box height and nothing taller sits beside it to
 push it open. [D13](#d13-member-detail-head-carries-a-role-chip-above-the-title-with-one-pencil-for-change)'s
 role chip stays exactly where it was: above the title, untouched — the mark sits beside the
@@ -2085,15 +2098,17 @@ title itself, one level down from the chip row, never merged into it.
 only draws when a caller hands it a real node, never a string — the discriminator
 `RecordScreen`'s own doc comment on the prop explains in full.
 
-Evidence: the artifact's own Reference section computes the title's line-box height as the
-sum of the kit's stack (breadcrumb, band inset, pill row, gap, `--text-4xl` line box) and
-checks every B1 frame against that same line — the account, the app and the team-member
-mocks all land on it.
+Evidence: the artifact's own Reference section, built when the title still sat at h1/44,
+computed the title's line-box height as the sum of the kit's stack (breadcrumb, band inset,
+pill row, gap, `--text-4xl` line box) and checked every B1 frame against that same line — the
+account, the app and the team-member mocks all landed on it. That arithmetic is history now
+that the title itself sits at h2/32 (see the amendment above); the live construction is
+identical, only the two tokens it reaches for moved with the title.
 
 **Law.** Not yet a registry check. Enforced by `web/test/record-head-mark.test.tsx`
 (the title's own wrapper carries an identical class with or without a mark; the mark is a
 sibling inside the title's own row, never a row of its own; the box is read off source as
-derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value; a string
+derived from `--text-3xl`/`--text-3xl--line-height`, never a literal pixel value; a string
 `mark` stays inert).
 
 **AMENDED 18 Sep 2026 — the chip row above the title moves in, her pick is C2 (8px).** The

@@ -676,19 +676,30 @@ const FOOTER_TO_BOTTOM =
  * `FOOTER_TO_BOTTOM` would have drawn instead. */
 const HEAD_ONLY = "flex-none"
 
-/* THE RECORD'S OWN TITLE STEP (h1/44) AND THE TITLE/ACTIONS SPLIT (80%) BOTH
-   MOVED OUT OF THIS FILE, 2026-09-06 — they are `RECORD_TITLE_TREATMENT` in
-   `shared/web/record-heading.tsx` now, which carries the whole reasoning for
-   each (the kit's `Title` has no h1 rung; the client's "reserve a % on the
-   left for the buttons") verbatim.
+/* THE TITLE/ACTIONS SPLIT (80%) MOVED OUT OF THIS FILE, 2026-09-06 — it is
+   part of `RECORD_TITLE_TREATMENT` in `shared/web/record-heading.tsx` now,
+   which carries the client's own "reserve a % on the left for the buttons"
+   reasoning verbatim.
 
-   WHY THEY LEFT. Both were PRIVATE constants here, and this file is only ONE
-   of the two ways this app draws a record detail. The other —
+   THE RECORD TITLE'S OWN SIZE STEP USED TO TRAVEL WITH IT (`RECORD_TITLE_SIZE`,
+   forcing h1/44 from outside because the kit's `Title` had no h1 rung to ask
+   for), AND IS REMOVED, 2026-09-22 — kit v1.2.150 moved `RecordDetail`'s own
+   `titleSize` default to `h2`/32, the client's standing typography ruling
+   that every screen and record title is capped at 32px. The override's whole
+   reason to exist was reaching a step the kit's default could not reach; once
+   the default already lands there, keeping the override would be a second,
+   competing answer to the same question, exactly the drift R52 exists to
+   catch. Neither call site passes a `titleSize` of its own — see
+   `shared/web/record-heading.tsx`'s own note where the constant used to sit,
+   and `RECORD_MARK_BOX` below, re-derived off the h2 step's own tokens so the
+   mark still matches the title's real line height.
+
+   WHY THE SPLIT LEFT. It was a PRIVATE constant here, and this file is only
+   ONE of the two ways this app draws a record detail. The other —
    `renderDetail` in `shared/web/screen-engine/screen-renderer.tsx`, which
    draws `team.detail`, `members.detail`, `invites.detail`, `brand.detail` and
-   `purposes.detail` on both front doors — could not see either of them, so it
-   fell through to the kit's own `titleSize = "h3"` and drew record names at
-   24px where the thirteen screens below drew them at 44px. `team.detail` is
+   `purposes.detail` on both front doors — could not see it, so it fell
+   through to the kit's own default split. `team.detail` is
    the app's own landing screen. R52 is the law that now censuses both paths
    against the one constant, so the next patch to a record's title line cannot
    land on one path and miss the other.
@@ -820,17 +831,18 @@ const IDENTITY_ROW =
 
 /** THE MARK'S OWN BOX — B1 (client ruling, 2026-09-15, quoted in full on the
  * `mark` prop above). Sized to the TITLE'S OWN LINE BOX, never a magic
- * number: `--text-4xl` is the h1 step's font-size and `--text-4xl--line-
+ * number: `--text-3xl` is the h2 step's font-size and `--text-3xl--line-
  * height` its own unitless multiplier (tokens.css) — the exact two tokens
- * `RECORD_TITLE_SIZE` (shared/web/record-heading.tsx) already points the
- * kit's own rendered heading at, via the same "reach the kit's font-size
- * bridge" route that file's own comment explains (`@theme inline` ties
- * font-size, line-height and letter-spacing to one Tailwind step). So the
- * mark is exactly as tall as the line of text beside it, BY CONSTRUCTION —
- * not tuned to match it once and left to drift the next time the root scale
- * or the heading step moves — and the artifact's own arithmetic (Reference
- * section) adds this same product as the title's line-box height on the
- * exact stack this file renders.
+ * the kit's own rendered heading resolves to now that `RecordDetail`'s
+ * `titleSize` default is `h2` (kit v1.2.150, 2026-09-22; this box tracked
+ * `--text-4xl`/the h1 step until then, back when the app forced h1/44 from
+ * outside through the now-removed `RECORD_TITLE_SIZE` override — see this
+ * file's own note above `HEAD_ONLY`'s neighbour), reached via the same
+ * "reach the kit's font-size bridge" route `shared/web/record-heading.tsx`'s
+ * own comment explains (`@theme inline` ties font-size, line-height and
+ * letter-spacing to one Tailwind step). So the mark is exactly as tall as
+ * the line of text beside it, BY CONSTRUCTION — not tuned to match it once
+ * and left to drift the next time the root scale or the heading step moves.
  *
  * REACHED THROUGH TO THE CALLER'S OWN MARK, NOT PASSED AS A SIZE PROP. The
  * derived value has no rung on `RecordMark`'s `size` ladder
@@ -848,7 +860,7 @@ const IDENTITY_ROW =
  * (or any other) for a sane fallback-letter font-size and this box still
  * wins the actual box dimensions. */
 const RECORD_MARK_BOX =
-  "size-[calc(var(--text-4xl)*var(--text-4xl--line-height))] shrink-0 " +
+  "size-[calc(var(--text-3xl)*var(--text-3xl--line-height))] shrink-0 " +
   "[&>span]:size-full"
 
 export function RecordScreen({

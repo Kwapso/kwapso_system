@@ -505,20 +505,21 @@ function RecordChrome({
            no extra markup written here. */
         title={title}
         mark={mark}
-        /* NO `titleSize`, SINCE 2026-09-08 — and the line that was here is
-           worth naming rather than quietly deleting, because it was the same
-           conflation `Title`'s ladder change fixed one level down. It read
-           `titleSize={SHAPE_HEADING_SIZE[measure]}`: the SCREEN'S per-door
-           step, handed to a RECORD'S heading. Those are two roles and the
-           kit's own type scale names them separately — "Page title" and
-           "Record heading" — so a record's name is not a page title measured
-           at whichever door it happens to be behind. `RecordDetail`'s own
-           default IS the record-heading rung now, so the right amount of
-           typography for this file to write is none, which is also this
-           folder's own law — and dropping the prop drops the import with it,
-           so this file no longer reads the screen's heading record at all.
-           `SHAPE_SHELL`, the shape's own measure, is a different record and
-           is still read below. */
+        /* STILL NO `titleSize`, THROUGH THE 2026-09-22 32PX FIX TOO. The line
+           that used to sit here read `titleSize={SHAPE_HEADING_SIZE[measure]}`:
+           the SCREEN'S per-door step, handed to a RECORD'S heading — two
+           different roles, and the reason it was deleted on 2026-09-08 still
+           holds. What changed underneath, that same date in this file's own
+           history and again on 2026-09-22, is only what `RecordDetail`'s own
+           default RESOLVES TO — h1 · 44 for a fortnight, then h2 · 32 once the
+           client's standing ruling ("every screen and record title, 32px") was
+           traced to this exact default overshooting it and wrapping a long
+           record title into the tab strip below (live audit, app detail
+           A0002). Neither change touched this file: the right amount of
+           typography for `RecordChrome` to write is still none, so the record
+           heading tracks whatever `RecordDetail` decides its own rung is
+           without this file's own edit. `SHAPE_SHELL`, the shape's own
+           measure, is a different record and is still read below. */
         meta={metaLine}
         actions={actions}
         actionsVisible={actionsVisible}

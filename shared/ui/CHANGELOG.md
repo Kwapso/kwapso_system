@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed - record title at the 32px register, the strip follows the head - v1.2.150 - 2026-09-22
+
+`RecordDetail`'s `titleSize` default moves from h1 · 44 to h2 · 32 (`Title`'s own ladder, the client's standing typography ruling), so a long record name no longer wraps under the tab strip drawn directly beneath it (live audit, app detail A0002); `Title`'s heading also takes `text-balance`, and `check-screen-shell.mjs` now pins the 32px register plus the absence of a fixed head height, negative margin or absolute strip position on both the record and collection heads.
+
 ### Changed - The minimal pass: plain by default, board lanes, air, footer row - v1.2.149 - 2026-09-21
 
 The client, verbatim, in one sitting: *"i really loev the dircteion in which

@@ -18,12 +18,14 @@
 //      title's OWN box changes when a mark appears;
 //   2. the mark is a SIBLING inside the title's own row (`items-center`,
 //      `gap-3` — the kit's `--space-3`), never a second row stacked above it,
-//      and that row's mark box is DERIVED off the same two tokens
-//      `RECORD_TITLE_SIZE` (shared/web/record-heading.tsx) already points the
-//      kit's own rendered heading at — read off record-chrome.tsx's source,
-//      never off a hard-coded pixel figure, which is what makes "the same
-//      line-height" a fact about the tokens agreeing rather than two numbers
-//      that happen to match today.
+//      and that row's mark box is DERIVED off the same two tokens the kit's
+//      own rendered heading resolves to at its default step (h2/32,
+//      `--text-3xl`/`--text-3xl--line-height`, since kit v1.2.150,
+//      2026-09-22 — the app forced h1/44 from outside until then, through
+//      the now-removed `RECORD_TITLE_SIZE`, shared/web/record-heading.tsx) —
+//      read off record-chrome.tsx's source, never off a hard-coded pixel
+//      figure, which is what makes "the same line-height" a fact about the
+//      tokens agreeing rather than two numbers that happen to match today.
 //
 // A THIRD THING, not about geometry: the ruling names three record kinds, not
 // "everywhere", and `mark`'s own doc comment on `RecordScreen` explains the
@@ -48,8 +50,10 @@ const read = (p: string) => readFileSync(join(ROOT, ...p.split("/")), "utf8")
 
 /** The title-text wrapper is the innermost `min-w-0 break-words` span —
  * the same node `record-heading-clamps.test.tsx` pins `clampRecordHeading`
- * onto — found inside the `<h1>` the kit's own heading step renders
- * (`RECORD_TITLE_SIZE`, shared/web/record-heading.tsx). */
+ * onto — found inside the `<h1>` the kit's own heading step renders (the
+ * kit's `RecordDetail` default, h2/32 since kit v1.2.150; jsdom still
+ * renders `Title`'s heading as an `<h1>` element regardless of its own
+ * `size` step, so the query below is unaffected by which rung is current). */
 function titleTextSpan(container: HTMLElement): HTMLElement {
   const heading = container.querySelector("h1")
   expect(heading, "the record heading is drawn").toBeTruthy()
@@ -78,9 +82,10 @@ describe("the record head's mark, B1 (client ruling 2026-09-15)", () => {
     const markedSpan = titleTextSpan(withMark)
 
     // SAME CLASSES, NOT JUST "STILL THERE" — the title's own type step
-    // (RECORD_TITLE_SIZE reaches the kit's heading node, not this span, but
-    // this span's own `min-w-0 break-words` is the whole of what record-
-    // chrome.tsx itself puts on the title text) is untouched by the mark
+    // (the kit's own `RecordDetail` default, h2/32, reaches the kit's
+    // heading node, not this span, but this span's own `min-w-0 break-words`
+    // is the whole of what record-chrome.tsx itself puts on the title text)
+    // is untouched by the mark
     // sitting beside it.
     expect(markedSpan.className).toBe(bareSpan.className)
   })
@@ -161,12 +166,12 @@ describe("the record head's mark, B1 (client ruling 2026-09-15)", () => {
 
   it("the mark's box is DERIVED off the title's own type tokens, never a magic pixel number", () => {
     const src = read("web/components/records/record-chrome.tsx")
-    // The exact two tokens `RECORD_TITLE_SIZE` (shared/web/record-heading.tsx)
-    // already points the kit's own rendered heading at — read here rather
-    // than asserted from a comment, so a hard-coded `size-11` swapped in
-    // later turns this red.
+    // The exact two tokens the kit's own rendered heading resolves to at its
+    // default step (h2/32, `--text-3xl`/`--text-3xl--line-height`, since kit
+    // v1.2.150) — read here rather than asserted from a comment, so a
+    // hard-coded `size-11` swapped in later turns this red.
     expect(src, "RECORD_MARK_BOX exists").toMatch(/RECORD_MARK_BOX/)
-    expect(src).toMatch(/calc\(var\(--text-4xl\)\s*\*\s*var\(--text-4xl--line-height\)\)/)
+    expect(src).toMatch(/calc\(var\(--text-3xl\)\s*\*\s*var\(--text-3xl--line-height\)\)/)
     // And the row it renders into really is `items-center gap-3` — not
     // reasoned about only in prose above.
     expect(src).toMatch(/items-center gap-3/)

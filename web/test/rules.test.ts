@@ -5289,7 +5289,7 @@ describe("RULES — the laws of the base", () => {
     const unwired = sites.filter((s) => !s.props.includes("RECORD_TITLE_TREATMENT"))
     expect(
       unwired.map((s) => s.rel),
-      "R52 — these draw a record detail without `RECORD_TITLE_TREATMENT` in their className, so their record titles fall back to the kit's own `titleSize = \"h3\"` (24px) while every other detail screen is at 44px. Apply the constant from shared/web/record-heading.tsx — do NOT retype the class"
+      "R52 — these draw a record detail without `RECORD_TITLE_TREATMENT` in their className, so their title/actions split and head container query fall back to the kit's own bare row. Apply the constant from shared/web/record-heading.tsx — do NOT retype the class"
     ).toEqual([])
 
     const unimported = sites.filter(
@@ -5301,40 +5301,79 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
 
     // iii · AND NONE OF THEM ARGUES WITH IT. `titleSize` is the kit's own prop
-    // for this exact question; a call site passing one is a second answer.
+    // for this exact question; a call site passing one is a second answer —
+    // and, since 2026-09-22, the ONLY way a record title's size could drift
+    // from the kit's own h2/32 default at all, now that neither
+    // `RECORD_TITLE_TREATMENT` nor either call site names a size of its own.
     const competing = sites.filter((s) => /\btitleSize\s*=/.test(s.props))
     expect(
       competing.map((s) => s.rel),
-      "R52 — these pass their own `titleSize` to a detail component. That is the kit's own answer to the same question `RECORD_TITLE_TREATMENT` answers, and two answers is how the two paths drifted apart in the first place. If the kit's `Title` has finally grown an h1 rung, change the CONSTANT and both paths follow"
+      "R52 — these pass their own `titleSize` to a detail component, overriding the kit's own h2/32 default (the client's standing typography ruling, kit v1.2.150) with a competing answer. Let the kit's default stand"
     ).toEqual([])
 
-    // iv · THE CONSTANT ITSELF IS STILL THE THING. Every assertion above is
-    // satisfied by an identifier; this is the one that says what the identifier
-    // has to BE. Matched as the whole declaration, not as a substring search
-    // for "text-4xl" — that string appears in this repo's prose and in other
-    // components, so a bare `includes` would stay green over an emptied
-    // constant.
-    const heading = readFileSync(join(ROOT, "shared/web/record-heading.tsx"), "utf8")
+    // iv · NO APP-SIDE SIZE OVERRIDE SURVIVES. `RECORD_TITLE_SIZE` — the
+    // `[&_[data-slot=title-heading]]:text-4xl` descendant selector that used
+    // to force the h1/44 step from outside — is REMOVED, 2026-09-22 (kit
+    // v1.2.150 moved `RecordDetail`'s own `titleSize` default to h2/32, the
+    // client's standing 32px cap on every screen and record title, so the
+    // override's one reason to exist is gone). Checked two ways: the
+    // identifier itself must not be declared in shared/web/record-heading.tsx
+    // any more, and `text-4xl` (the h1 step's own Tailwind utility) must not
+    // appear ANYWHERE in this app's own source reaching for a record's title
+    // step — a fresh override under a different name would defeat the point
+    // exactly as a resurrected `RECORD_TITLE_SIZE` would.
+    //
+    // COMMENTS STRIPPED FIRST — this file's own note where the constant used
+    // to sit names `RECORD_TITLE_SIZE` in prose, on purpose, to explain why
+    // it is gone; on raw text that narrative would keep this check red for
+    // ever. `stripComments` is the same tool `detailCallSites()` above
+    // already uses for the identical reason.
+    const heading = stripComments(readFileSync(join(ROOT, "shared/web/record-heading.tsx"), "utf8"))
     expect(
-      /export const RECORD_TITLE_SIZE\s*=\s*"\[&_\[data-slot=title-heading\]\]:text-4xl"/.test(heading),
-      "R52 — `RECORD_TITLE_SIZE` must stay the h1/44 step reached through the kit's OWN `data-slot=title-heading` hook: `[&_[data-slot=title-heading]]:text-4xl`. The kit's `Title` has no h1 rung (h2/32, h3/24, h4/20 only), so this descendant selector is the only way to the step the design kit names \"Record heading\" without hand-editing the vendored file (R39)"
+      /\bRECORD_TITLE_SIZE\b/.test(heading),
+      "R52 — `RECORD_TITLE_SIZE` must stay removed: the kit's own `RecordDetail` default (h2/32, kit v1.2.150) is the record title's size now, and an app-side override — under this name or any other — is a second, competing answer to a question the kit already answers"
+    ).toBe(false)
+    // Neither detail-path FILE (not merely the JSX props window a call site
+    // hands the component) reaches for `text-4xl` on its own — a fresh
+    // descendant-selector override, wherever declared and however wired in,
+    // would defeat the point exactly as a resurrected `RECORD_TITLE_SIZE`
+    // would. Deduped by file: `detailCallSites()` can find several call
+    // sites in one file, and this only needs to read each file once.
+    const detailFiles = [...new Set(sites.map((s) => s.rel))]
+    for (const rel of detailFiles) {
+      const src = stripComments(readFileSync(join(ROOT, rel), "utf8"))
+      expect(
+        /text-4xl/.test(src),
+        `R52 — ${rel} reaches for \`text-4xl\` (the h1/44 step) somewhere in its own source. The kit's \`RecordDetail\` default is h2/32; nothing here may force a record's title back to h1 from outside`
+      ).toBe(false)
+    }
+
+    // v · `RECORD_TITLE_TREATMENT` IS STILL THE THING. Every assertion above
+    // is satisfied by an identifier; this is the one that says what the
+    // identifier has to BE — matched as the whole declaration, not a
+    // substring search, so the law cannot be satisfied by an identifier that
+    // has been quietly emptied.
+    expect(
+      /export const RECORD_TITLE_TREATMENT\s*=\s*`\$\{TITLE_ACTIONS_SPLIT\}\s\$\{RECORD_HEAD_CONTAINER\}`/.test(heading),
+      "R52 — `RECORD_TITLE_TREATMENT` must be built from exactly `TITLE_ACTIONS_SPLIT` and `RECORD_HEAD_CONTAINER`, in that order, now that `RECORD_TITLE_SIZE` is gone. Both travel as ONE string on purpose: they are one decision about one row (how much of its row a title may claim before the buttons wrap under it, and whether the row can host a `shared/web/head-actions.tsx` fold), and a call site that could apply a subset is a call site that will"
     ).toBe(true)
-    // AMENDED 18 Sep 2026 — Aurora's ruling, "h3, and aign the menu to the
-    // chips": `RECORD_HEAD_CONTAINER` joined the string as a THIRD piece,
-    // never a substitute for the two above. It changes nothing about the two
-    // this law already pins (the h1 step, the 80% split) — it only turns the
-    // kit's own `[data-slot=title]` row into a `@container`, so every screen
-    // already wearing `RECORD_TITLE_TREATMENT` (this law's own guarantee)
-    // gets a query container for free the day it wires a
-    // `shared/web/head-actions.tsx` fold onto it. Still ONE string, still
-    // built from the SAME two pieces plus this one — a call site cannot pick
-    // any subset of the three any more than it could pick one of the
-    // original two.
+  })
+
+  /** R52's OWN SIZE CLAUSE, SINCE THE APP-SIDE OVERRIDE LEFT: the kit's
+   * `RecordDetail` — the ONE component both detail paths draw through — must
+   * itself default a record's title to `h2` (32px, the client's standing
+   * typography cap). A census over the census: the test above proves the app
+   * asks for nothing of its own; this proves what it gets by default is
+   * still the right rung, read straight off the vendored source rather than
+   * trusted from a comment or a CHANGELOG entry. */
+  it("record-title-treatment: the kit's own RecordDetail defaults a record's title to h2/32 (R52)", () => {
+    const src = readFileSync(
+      join(ROOT, "shared/ui/components/record-detail/record-detail.tsx"),
+      "utf8"
+    )
     expect(
-      /export const RECORD_TITLE_TREATMENT\s*=\s*`\$\{RECORD_TITLE_SIZE\}\s\$\{TITLE_ACTIONS_SPLIT\}\s\$\{RECORD_HEAD_CONTAINER\}`/.test(
-        heading
-      ),
-      "R52 — `RECORD_TITLE_TREATMENT` must still be built from `RECORD_TITLE_SIZE`, `TITLE_ACTIONS_SPLIT` and `RECORD_HEAD_CONTAINER`, in that order. All three travel as ONE string on purpose: they are one decision about one row (how big the record's name is set, how much of its row it may claim before the buttons wrap under it, and whether the row can host a `shared/web/head-actions.tsx` fold), and a call site that could apply a subset is a call site that will"
+      /titleSize\s*=\s*"h2"/.test(src),
+      "R52 — shared/ui/components/record-detail/record-detail.tsx must default `titleSize` to \"h2\" (32px, kit v1.2.150). Neither app-side detail path passes its own `titleSize` any more (this law's own census, above), so a default that drifts off h2 ships to every record screen in both front doors unnoticed"
     ).toBe(true)
   })
 
