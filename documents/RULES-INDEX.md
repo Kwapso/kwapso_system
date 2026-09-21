@@ -65,7 +65,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R46 | enforced | `component-coverage` | `web/test/rules.test.ts` |
 | R48 | enforced | `toolbar-shows-search` | `web/test/rules.test.ts`<br>`web/test/tickets-dashboard-no-toolbar.test.tsx` |
 | R49 | enforced | `toolbar-content-gap` | `web/test/rules.test.ts` |
-| R50 | enforced | `empty-toolbar` | `web/test/contacts-screen-gallery.test.tsx`<br>`web/test/rules.test.ts` |
+| R50 | enforced | `empty-toolbar` | `web/test/contacts-screen-gallery.test.tsx`<br>`web/test/processes-screen.test.tsx`<br>`web/test/rules.test.ts` |
 | R51 | enforced | `aside-collapse` | `web/test/rules.test.ts` |
 | R52 | enforced | `record-title-treatment` | `web/test/rules.test.ts` |
 | R53 | enforced | `toolbar-slot-set` | `web/test/contacts-screen-gallery.test.tsx`<br>`web/test/rules.test.ts` |
@@ -94,7 +94,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R85 | enforced | `rail-labels-one-word` | `web/test/rail-labels-one-word.test.ts` |
 | R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/contacts-are-a-table.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |
 | R87 | enforced | `title-length` | `web/test/title-length.test.ts` |
-| R88 | enforced | `empty-state-single-door` | `web/test/empty-state-single-door.test.ts` |
+| R88 | enforced | `empty-state-single-door` | `web/test/empty-state-single-door.test.ts`<br>`web/test/processes-screen.test.tsx` |
 | R89 | enforced | `footer-on-the-edge` | `web/test/footer-on-the-edge.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx`<br>`web/test/ticket-thread-composer-gap.test.tsx` |
 | R90 | enforced | `faces-in-choices` | `web/test/faces-in-choices.test.ts` |
 | R91 | enforced | `no-nested-scroll` | `web/test/no-nested-scroll.test.ts` |

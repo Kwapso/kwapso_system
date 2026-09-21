@@ -48,6 +48,7 @@ import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { PAPER_ON_PURPOSE } from "@shared/rules/registry"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { CollectionCard, CollectionEmptyBody, EmptyGatedPanel } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 import { Panel } from "@/components/tickets/tickets-dashboard"
 import { PagedFind, type FindQuery } from "@/components/records/paged-find"
@@ -370,6 +371,71 @@ describe("CollectionEmptyBody (rulebook L43, the empty body's own paper on a pla
     )
     expect(document.querySelector('[data-slot="collection-empty-body"]'), "the empty body still renders").toBeTruthy()
     expect(document.querySelectorAll('[data-slot="card"]').length, "no second, nested Card").toBe(1)
+  })
+})
+
+// `CollectionEmptyState` (shared/web/screen-engine/collection-frame.tsx) — the
+// R62 register itself — PAPERS ITSELF NOW, reading the identical
+// `CollectionCardSurfaceContext` `CollectionEmptyBody` reads, rather than
+// leaning on a `CollectionEmptyBody` wrap a call site has to remember. Fixed
+// after a live audit found bare empty states on /meetings and /inputs
+// Overdue (both `CollectionEmptyState` called directly inside a plain
+// `CollectionCard`, with no wrap at all) and, on a second pass, on /waves and
+// the brand library — bare with no `CollectionCard`/kit `CollectionFrame`
+// provider above them at all. The validated design keeps EVERY collection
+// empty state on soft paper, so `"plain"` is the context's own default:
+// a genuine plain frame wraps, a call site with no known frame above it AT
+// ALL reads the identical default and wraps too, and a double wrap stays
+// single — the boxed-frame case (the one way out) is already covered above
+// (the same context, the same component wrapping this one).
+describe("CollectionEmptyState papers itself on a plain frame (rulebook L43, R62)", () => {
+  it('a bare CollectionEmptyState inside a plain CollectionCard renders inside one data-variant="default" card', () => {
+    render(
+      <CollectionCard>
+        <CollectionEmptyState title="Nothing here yet." />
+      </CollectionCard>
+    )
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
+    expect(emptyBody, "the register itself must still render").toBeTruthy()
+    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
+    expect(paper, "the register must sit inside its own default-variant Card").toBeTruthy()
+    expect(
+      document.querySelectorAll('[data-slot="card"][data-variant="default"]').length,
+      "exactly one paper card"
+    ).toBe(1)
+    const outer = document.querySelector('[data-surface="plain"]')
+    expect(outer, "the frame itself is still the plain, transparent Card").toBeTruthy()
+    expect(outer!.getAttribute("data-variant")).toBe("plain")
+  })
+
+  it("a CollectionEmptyState already wrapped in CollectionEmptyBody still renders exactly one paper card", () => {
+    render(
+      <CollectionCard>
+        <CollectionEmptyBody>
+          <CollectionEmptyState title="Nothing here yet." />
+        </CollectionEmptyBody>
+      </CollectionCard>
+    )
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
+    expect(emptyBody, "the register still renders").toBeTruthy()
+    expect(
+      document.querySelectorAll('[data-slot="card"][data-variant="default"]').length,
+      "the outer CollectionEmptyBody wrap and the register's own self-wrap must not stack into two cards"
+    ).toBe(1)
+  })
+
+  it('a CollectionEmptyState rendered outside any CollectionCard/CollectionFrame — no provider at all, /waves and the brand library\'s own shape — still renders inside one data-variant="default" card', () => {
+    render(<CollectionEmptyState title="Nothing here yet." />)
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
+    expect(emptyBody, "the register still renders").toBeTruthy()
+    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
+    expect(
+      paper,
+      "no provider above it reads the same as `\"plain\"` — the context's own default — so the register still papers itself"
+    ).toBeTruthy()
+    expect(document.querySelectorAll('[data-slot="card"][data-variant="default"]').length, "exactly one paper card").toBe(
+      1
+    )
   })
 })
 

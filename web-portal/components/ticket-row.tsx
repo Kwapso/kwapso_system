@@ -113,7 +113,21 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-surface-panel p-4"
+      // THE ROW IS `bg-surface-panel` BY HAND, NOT A KIT `Card`: its single
+      // flex-wrap row (ref + description on one side, the caret on the
+      // other, wrapping as a unit) does not decompose into Card's own
+      // header/content/footer column shape without breaking the wrap
+      // behaviour, so this stays the hand-rolled fallback the kit's own
+      // `Card` doc names for exactly this case: "setting the same custom
+      // property on the row wrapper." `[--badge-quiet-fill:var(--surface-
+      // raised)]` is the identical rebind `Card variant="default"` carries
+      // (card.tsx), measured live, 19 Sep 2026: with nothing rebinding it
+      // here the status Badge (variant="secondary") resolved to this row's
+      // OWN `bg-surface-panel`, contrast 1.000, for "With us"/"Looked
+      // at"/"Booked in". Off-beige is the other paper tone from this row's
+      // own soft paper, the same alternation `Card`'s `default` variant
+      // draws for a badge nested inside it.
+      className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-surface-panel p-4 [--badge-quiet-fill:var(--surface-raised)]"
     >
       <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-2">
         {/* THE NUMBER LEADS WHAT WAS ASKED — the same black chip, from the same

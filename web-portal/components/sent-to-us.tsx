@@ -155,7 +155,14 @@ export function SentToUs() {
           const fileLink = safeHref(todo.fileUrl)
           const FileGlyph = fileTypeIcon(todo.fileName)
           return (
-            <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
+            <li
+              key={todo.id}
+              // Same hand-rolled `bg-surface-panel` row as ticket-row.tsx and
+              // waiting-on-you.tsx, the same rebind for the same reason: a
+              // Badge dropped into this row must not paint the row's own
+              // colour.
+              className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4 [--badge-quiet-fill:var(--surface-raised)]"
+            >
               <div className="min-w-0">
                 {/* The number leads the title, as the black chip — see the
                     same note in waiting-on-you.tsx. */}

@@ -44,6 +44,7 @@ import {
   AccordionTrigger,
 } from "@shared/ui/components/accordion/accordion"
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Separator } from "@shared/ui/components/separator/separator"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Comments } from "@shared/ui/components/comments/comments"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -250,42 +251,24 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
         </p>
       </div>
 
-      {/* ── THE HEADLINE, AND IT IS CONTAINED NOW. THIS FILE ARGUED ITSELF OUT
-          OF R67 AND WAS OVERRULED ON 2026-09-11. ─────────────────────────────
+      {/* THE HEADLINE, PLAIN AGAIN, 21 SEP 2026, RULEBOOK L43.
 
-          THE ARGUMENT IT MADE, KEPT VERBATIM because it is the record of what
-          was traded away and it is not a bad argument:
-
-            "THE HEADLINE, BARE ON THE PAGE. It is a label, a number and the
-             sentence that makes the number honest — not a collection of two or
-             more rows and not a form of two or more fields, so it never earned
-             a container (N6). A 3xl figure with `gap-6` round it is found by
-             the eye without a box drawn to point at it, and on the screen a
-             client is most likely to show somebody else, one fewer drawn line
-             is worth having."
-
-          WHY IT LOSES. Every clause of it is true and none of it is the
-          question. The client has now said one sentence five times in three
-          days — "nothing on top of white background, its a rule!", "once again,
-          nothing shoudl sit on the white, everything contained! (make this a
-          law)", "remember in settings modules card, needs container
-          background.", "remove the text directly on white background.",
-          "inside the container … always" — and what she is buying with it is
-          ONE rule with no local exceptions. A screen that exempts itself in its
-          own comment is exactly the pattern each of those five rulings
-          overturned somewhere else: every one of them was a screen where
-          somebody had decided, locally and reasonably, that this particular
-          thing did not need a box.
-
-          WHAT IT COSTS, STATED RATHER THAN WAVED OFF: one more drawn line on
-          the screen a client is most likely to show somebody else. That is a
-          real cost and it is the price of the rule being a rule.
-
-          MEASURED, BOTH PALETTES, because the portal's page ground is the same
-          #FFFEF9 that has fooled this law once already: soft paper on page is
-          1.103 in light and 1.079 in dark. `bg-card` here would have measured
-          1.000 in light — a container that is not one. */}
-      <section className="flex flex-col gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
+          UNTIL TODAY THIS SECTION WAS BOXED, and the comment it carried argued
+          against its own box in writing and lost the argument on 2026-09-11:
+          that history is worth a line rather than a silent deletion, because
+          it is the record of what "contained, always" cost this file once
+          already. That ruling is OVERTURNED now, app wide, by a bigger one:
+          Aurora, on the Minimal Kit page, 21 Sep 2026: "board A / space 6 / go
+          an implement this appwide, do think a lot about each component,
+          what this minimalising means so that it still works." Plain is the
+          default everywhere now (`shared/rules/registry.ts`'s own `R67`
+          entry), and this headline is exactly the shape the ruling names: a
+          label, a figure and the sentence that makes it honest, never a
+          collection of rows or a form of fields (N6), so it drops the box
+          rather than re-earning an exemption for it. LABEL, THEN FIGURE, NO
+          BOX: the same rhythm the figure always had, minus the fill and the
+          inset that used to draw it. */}
+      <section className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-3xl font-medium">
           {hoursText(data.savedSecondsPerMonth)}
@@ -295,14 +278,11 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
         <p className="text-muted-foreground text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
       </section>
 
-      {/* WHAT YOU BOUGHT — only when we were sent it. No flag on this side. */}
+      {/* WHAT YOU BOUGHT — only when we were sent it. No flag on this side.
+          PLAIN, 21 Sep 2026 (rulebook L43): the same rhythm as the headline
+          above it, heading then sentence, no box. */}
       {data.prices && (
-        /* CONTAINED, AND THE TITLE IS INSIDE IT — the same ruling as the
-           headline above and the same shape the agency's settings sections took
-           the same day: the heading sits inside the box, above what it names,
-           and there is no sentence under it. This section was an `<h2>` and one
-           line on the page ground. */
-        <section className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4">
+        <section className="flex flex-col gap-4">
           <h2 className="text-lg font-medium">{t("What you bought")}</h2>
           {/* A RATE-CARD PANEL SAT UNDER THIS LINE until 10 Sep 2026 — one row
               per kind of work, the label and what it cost an hour. The card was
@@ -337,71 +317,70 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
             reason this whole file is built around — a step that got slower is
             information, and no filter on this screen hides one. The zero line and
             the axis are on for exactly that: a bar going the wrong way has to be
-            readable as such. */}
-        {appChart.length > 1 && (
-          // R67 (2026-09-14) — CONTAINED, the same ruling this file already
-          // took above for "What you bought": N6 ("a block earns a container
-          // only when it holds a collection of two or more rows or a form of
-          // two or more fields") would call a single chart bare on purpose,
-          // but this file's own history is the reason that argument does not
-          // win here a second time — its OWN comment made an identical
-          // "this one doesn't need a container" case for the heading above,
-          // in writing, and the client overruled it: "a screen that argues
-          // itself out of a law in its own comment is the pattern five
-          // rulings in three days have each overturned somewhere else …
-          // ONE rule with no local exceptions is what she has been buying
-          // all week" (`UNCONTAINED_SECTION_OK`'s own account of this file).
-          // The corrected R67 census (narrower `isOverlay`, so
-          // `AppSavingsChart` is no longer mistaken for a modal) reaches
-          // this body for the first time and finds exactly that shape again.
-          <div className="rounded-[var(--radius)] bg-surface-panel p-4">
-            <AppSavingsChart rows={appChart} label={t("Hours a month")} />
-          </div>
-        )}
+            readable as such.
 
-        <Accordion type="multiple" className="rounded-[var(--radius)] bg-surface-panel px-4">
-          {data.apps.map((app) => (
-            <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
-              <AccordionTrigger>
-                <span className="flex w-full items-baseline justify-between gap-2 pr-2">
-                  <span className="truncate">{app.name}</span>
-                  <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                    {hoursText(app.savedSecondsPerMonth)} {t("a month")}
+            PLAIN, 21 Sep 2026 (rulebook L43): the panel this chart used to sit
+            in is gone; the chart keeps only its OWN frame, the axis and the
+            grid it already draws, and stands directly on the page. */}
+        {appChart.length > 1 && <AppSavingsChart rows={appChart} label={t("Hours a month")} />}
+
+        {/* PLAIN, 21 Sep 2026 (rulebook L43). The wrapping box and the kit's
+            own per-item card (`AccordionItem`'s default `bg-card`) are both
+            gone: a rule between two plain sections is `Separator`
+            (`shared/ui/components/record-detail/record-detail.tsx`'s own
+            `RecordSections` draws the identical seam between plain sections
+            for the identical reason), never a border utility. Each
+            `AccordionItem` below is stripped back to `bg-transparent`/
+            `rounded-none`/no inset, so the hairline between two rows is the
+            `Separator` sitting between them, not a box edge. */}
+        <Accordion type="multiple">
+          {data.apps.map((app, appIndex) => (
+            <React.Fragment key={app.appId}>
+              {appIndex > 0 && <Separator />}
+              <AccordionItem value={app.appId} className="rounded-none bg-transparent px-0 py-0">
+                <AccordionTrigger>
+                  <span className="flex w-full items-baseline justify-between gap-2 pr-2">
+                    <span className="truncate">{app.name}</span>
+                    <span className="text-muted-foreground shrink-0 text-xs font-normal">
+                      {hoursText(app.savedSecondsPerMonth)} {t("a month")}
+                    </span>
                   </span>
-                </span>
-              </AccordionTrigger>
-              <AccordionContent>
-                <Accordion type="multiple" className="pl-2">
-                  {app.processes.map((process) => (
-                    <AccordionItem
-                      key={process.processId}
-                      value={process.processId}
-                      className="last:border-b-0"
-                    >
-                      <AccordionTrigger onClick={() => setOpenProcessId(process.processId)}>
-                        <span className="flex w-full items-baseline justify-between gap-2 pr-2">
-                          <span className="truncate">{process.name}</span>
-                          <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                            {hoursText(process.savedSecondsPerMonth)} {t("a month")}
-                          </span>
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="pl-2">
-                          {process.steps.map((step) => (
-                            <StepLine key={step.stepKey} step={step} />
-                          ))}
-                        </div>
-                        <ProcessConversation
-                          processId={process.processId}
-                          open={openProcessId === process.processId}
-                        />
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </AccordionContent>
-            </AccordionItem>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Accordion type="multiple" className="pl-2">
+                    {app.processes.map((process, processIndex) => (
+                      <React.Fragment key={process.processId}>
+                        {processIndex > 0 && <Separator />}
+                        <AccordionItem
+                          value={process.processId}
+                          className="rounded-none bg-transparent px-0 py-0"
+                        >
+                          <AccordionTrigger onClick={() => setOpenProcessId(process.processId)}>
+                            <span className="flex w-full items-baseline justify-between gap-2 pr-2">
+                              <span className="truncate">{process.name}</span>
+                              <span className="text-muted-foreground shrink-0 text-xs font-normal">
+                                {hoursText(process.savedSecondsPerMonth)} {t("a month")}
+                              </span>
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pl-2">
+                              {process.steps.map((step) => (
+                                <StepLine key={step.stepKey} step={step} />
+                              ))}
+                            </div>
+                            <ProcessConversation
+                              processId={process.processId}
+                              open={openProcessId === process.processId}
+                            />
+                          </AccordionContent>
+                        </AccordionItem>
+                      </React.Fragment>
+                    ))}
+                  </Accordion>
+                </AccordionContent>
+              </AccordionItem>
+            </React.Fragment>
           ))}
         </Accordion>
       </section>

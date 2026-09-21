@@ -190,15 +190,29 @@
 // shape a fresh load or a server ping already produces. Nothing is sent
 // anywhere: discarding a draft that was never saved has no door to call.
 //
-// THE BAR SITS ABOVE THE TOOLBAR, INSIDE THE SAME COLUMN. `TeamPanel` is the
-// container this file already owns end to end (unlike `AppearancePanel`,
-// which sits inside the kit's own `SettingsSection` and deliberately stays
-// outside its padded box — see that file's header), so the pin rides inside
-// `TeamPanel`'s own flow rather than beside it. `ground` is left at
+// THE BAR SITS ABOVE THE TOOLBAR, INSIDE THE SAME COLUMN. `ground` is left at
 // `UnsavedChangesBar`'s own default (`"bare"`): the `PINNED_TOOLBAR` wrapper
-// already paints `--pinned-ground`, resolved off `TeamPanel`'s own paper the
+// already paints `--pinned-ground`, resolved off the plain page ground the
 // same way every other pinned row in this app leaves its own fill to the
 // wrapper.
+//
+// AMENDED 21 SEP 2026 — THE BAR AND THE TOOLBAR MOVED OUT OF `TeamPanel`'S
+// OWN PADDING. A staging audit measured this tab's toolbar sitting 32px
+// under the tab strip and 32px in from the pane edge, while every other
+// toolbar in the app sits 10px under its strip and flush with the pane edge
+// (R83). The cause was `TeamPanel`'s own `p-6 lg:p-[var(--space-7)]` inset
+// (paid above 45rem, see `team-panel.tsx`'s own comment) surrounding the
+// pinned bar and the `<ToolbarRow>` along with the matrix — a box built to
+// give the kit's narrow `PermissionMatrix` fallback its required soft paper
+// was also, as a side effect, padding the one thing on this tab that must
+// never carry a caller's own padding. Fixed by moving the pin and the row
+// out of `TeamPanel` entirely: they are now direct children of the
+// `<CollectionCard>` this return opens with (the app's own R83 seam —
+// `screen-bits.tsx`, plain by default, publishes `--toolbar-lead-gap` on
+// itself so its first content sits 10px under the strip and flush with the
+// pane), and `TeamPanel narrowGround={false}` now wraps ONLY the deactivated
+// list and the matrix below — the paper the kit's own narrow fallback still
+// needs, and nothing else.
 //
 // ── THE HEADER BECAME A REAL `<ToolbarRow>`, 2026-09-14 ─────────────────────
 //
@@ -267,7 +281,7 @@ import { Headline } from "@shared/ui/components/typography/typography"
 import { Plus, Power } from "@shared/ui/foundations/icons"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
-import { ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { UnsavedChangesBar } from "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { cn } from "@shared/ui/lib/utils"
@@ -855,15 +869,19 @@ export function RolesMatrix({
 
   return (
     /* THE CONTAINER — "nothing on top of white background, its a rule!"
-       (client, 2026-09-09), the same rule and the same box the members gallery
-       above takes, so the two sections on this tab agree. `narrowGround={false}`
-       is the one asymmetry and it is the kit's, not ours: below 45rem
-       `PermissionMatrix` swaps to a stack of hard-coded `bg-surface-panel`
-       module cards, which on a soft-paper panel would measure 1.000 — the very
-       fault this container exists to fix. team-panel.tsx carries the whole
-       argument, the measured contrast in both palettes, and the upstream ask
-       that would delete this prop. */
-    <TeamPanel narrowGround={false}>
+       (client, 2026-09-09). AMENDED 21 SEP 2026: the outer box is now
+       `<CollectionCard>` (`@/components/deep-link/screen-bits`), the app's
+       own R83 seam — plain by default, it publishes `--toolbar-lead-gap` on
+       itself so the first thing inside it sits 10px under the tab strip and
+       flush with the pane edge, exactly like every other toolbar in the app.
+       `TeamPanel narrowGround={false}` moved DOWN, below the toolbar, and
+       wraps only the deactivated list and the matrix now — see that
+       component's own comment for why the kit's narrow `PermissionMatrix`
+       fallback still needs the soft paper it provides. The two sections on
+       this tab still agree with members-gallery.tsx's own container; only
+       the toolbar's position relative to it changed. */
+    <CollectionCard>
+      <div className="flex min-w-0 flex-col">
       {/* THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
           "remove members and roles titles too", the same call that took the
           visible "Members" heading next door. Both sections stand inside
@@ -881,15 +899,14 @@ export function RolesMatrix({
       </Headline>
 
       {/* THE PINNED BAR — see this file's header, "THE PINNED BAR, AND ROLES
-          FINALLY GETS A DISCARD". `pb-4 -mb-4` is `TeamPanel`'s own `gap-4`
-          between this and the toolbar column below, paid INSIDE the pinned
-          box and given back — the identical pair every other `PINNED_TOOLBAR`
-          call site in this app spends, so the gap is still painted rather
-          than a hole the rows scroll through once this bar is stuck (R63,
-          the exact bug `STICKY_FOLDER_TABS` was fixed out of). Gated on
-          `canSave` too: a viewer who cannot save can never make `dirty` true
-          in the first place (every cell is `disabled`), so this is belt and
-          braces, not a second gate doing real work. */}
+          FINALLY GETS A DISCARD". `pb-4 -mb-4` is the outer column's own
+          gapless flow given back — the identical pair every other
+          `PINNED_TOOLBAR` call site in this app spends, so the gap is still
+          painted rather than a hole the rows scroll through once this bar is
+          stuck (R63, the exact bug `STICKY_FOLDER_TABS` was fixed out of).
+          Gated on `canSave` too: a viewer who cannot save can never make
+          `dirty` true in the first place (every cell is `disabled`), so this
+          is belt and braces, not a second gate doing real work. */}
       {canSave && dirty && (
         <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4 -mb-4")}>
           <UnsavedChangesBar
@@ -905,17 +922,6 @@ export function RolesMatrix({
         </div>
       )}
 
-      {/* R49 — GAPLESS, ON PURPOSE, the same shape members-gallery.tsx wraps
-          its own <ToolbarRow> in and for the identical reason: `TeamPanel`
-          (team-panel.tsx) is `flex flex-col gap-4`, and the row already pays
-          its own trailing margin (`mb-[var(--toolbar-content-gap)]`,
-          screen-bits.tsx). Making the row a direct child of `TeamPanel` would
-          double-spend that gap on whatever renders after it — exactly what
-          `toolbar-content-gap` (R49, web/test/rules.test.ts) caught here.
-          The Deactivated disclosure and the grid below keep their OWN
-          `gap-4` rhythm between EACH OTHER, in the nested column below,
-          which is a second, deeper decision from this one. */}
-      <div className="flex min-w-0 flex-col">
       {/* A REAL `<ToolbarRow>`, 2026-09-14 — client: "In Team Rules [Roles]
           at the toolbar with search and the add button." This file's header
           carries the full account of every slot; the short version is in
@@ -1003,10 +1009,17 @@ export function RolesMatrix({
         }
       />
 
+      {/* THE PAPER MOVES DOWN HERE — `TeamPanel narrowGround={false}` no
+          longer wraps the toolbar above (21 Sep 2026, this file's header).
+          It wraps only what still needs it: the kit's `PermissionMatrix`
+          swaps to a stack of hard-coded `bg-surface-panel` module cards
+          below 45rem, which on a soft-paper panel would measure 1.000 — see
+          team-panel.tsx's own comment for the full argument and the
+          measured contrast in both palettes. */}
+      <TeamPanel narrowGround={false}>
       {/* THE PANEL'S OWN RHYTHM, KEPT BETWEEN THESE TWO AND NOWHERE ELSE —
           `gap-4`, the same number `TeamPanel` spends on its own children,
-          read one level down so it never touches the row above (see the
-          R49 comment on the outer wrapper). */}
+          read one level down so it never touches the row above. */}
       <div className="flex min-w-0 flex-col gap-4">
 
       {/* THE DEACTIVATED ROLES, IN PLACE — the button above reveals them
@@ -1281,6 +1294,7 @@ export function RolesMatrix({
         </div>
       )}
       </div>
+      </TeamPanel>
       </div>
 
       <RoleFormDialog
@@ -1369,6 +1383,6 @@ export function RolesMatrix({
           else void setActive(role, true)
         }}
       />
-    </TeamPanel>
+    </CollectionCard>
   )
 }

@@ -26,7 +26,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { CaretRight, Palette, PencilSimple } from "@shared/ui/foundations/icons"
+import { CaretRight, Palette } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 
@@ -34,7 +34,6 @@ import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { LegalDetailsDialog } from "@/components/team/legal-details-dialog"
-import { TeamEditDialog } from "@/components/team/team-edit-dialog"
 import { OverviewList } from "@/components/records/overview-list"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { brandAssetsKey, listFetch } from "@/lib/live-resources"
@@ -79,15 +78,6 @@ export function KwapsoScreen({
     initialTab ? initialTab : typeof remembered === "string" ? remembered : undefined
   )
   const [editOpen, setEditOpen] = React.useState(false)
-  // THE TEAM'S OWN NAME AND LOGO — CLIENT RULING, 2026-09-09. They were edited
-  // on the team overview at `/t/<teamId>`, and she deleted that screen ("This
-  // overview about the team should not even exist"). This page is where they
-  // belong now and arguably always did: it is titled with the team's name, it
-  // is gated on the same `teams:update`, and its whole subject is "who we are".
-  // A SECOND quiet control rather than a second pencil beside the first — one
-  // control per thing it edits, each next to what it edits, which is also what
-  // keeps this header at UI-RULEBOOK B1's two-actions maximum.
-  const [identityOpen, setIdentityOpen] = React.useState(false)
 
   if (!team || !teamId) return <Skeleton variant="list" lines={4} />
 
@@ -156,6 +146,22 @@ export function KwapsoScreen({
           if (panel.value === "brand")
             return <BrandPanel teamId={teamId} canRead={can("brand_assets", "read")} />
           return (
+            /* ONE DOOR, NOT TWO — client finding, 21 Sep 2026: this screen
+               offered "Edit name and logo" twice, the head pencil beside the
+               gear (R100, centred on `team.name`) and this tab body's own
+               button underneath. R88's spirit ("empty-state single door")
+               reaches past a literally empty section to the same shape here:
+               a second, body-drawn control duplicating a head-mounted one.
+               The button (and the `identityOpen`/`<TeamEditDialog>` pair it
+               alone triggered in this file — CLIENT RULING, 2026-09-09,
+               originally kept deliberately SEPARATE from the head pencil to
+               stay under UI-RULEBOOK B1's two-actions header cap) is gone;
+               the head pencil is the one remaining door. Editing the team's
+               name and logo is not lost app-wide — `write-panels.tsx` still
+               opens the identical `<TeamEditDialog>` off `?panel=edit&module=
+               team`, this screen's own deep-link write panel — only the
+               second, in-body trigger is gone. The tab's body is the plain
+               fact list now, nothing under it. */
             <div className="flex flex-col gap-4">
               <OverviewList
                 items={[
@@ -169,29 +175,10 @@ export function KwapsoScreen({
                   { label: t("Phone"), value: team.phone || undefined },
                 ]}
               />
-              {can("teams", "update") && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="self-start"
-                  onClick={() => setIdentityOpen(true)}
-                >
-                  <PencilSimple className="size-3.5" />
-                  {t("Edit name and logo")}
-                </Button>
-              )}
             </div>
           )
         })({ value: tab })}
       </div>
-
-      <TeamEditDialog
-        open={identityOpen}
-        onOpenChange={setIdentityOpen}
-        team={team}
-        draftKey={`kwapso:identity:${teamId}`}
-        onSaved={active.refresh}
-      />
 
       <LegalDetailsDialog
         open={editOpen}

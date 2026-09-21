@@ -772,7 +772,14 @@ export function TriageQueue({
          transparent frame instead — measured live, the only one of the
          three that did — because it is drawn by THIS component rather than
          by the PagedFind branch that already carries the fix. A no-op on a
-         boxed frame, which is already paper. */
+         boxed frame, which is already paper.
+
+         KEPT EXPLICIT (21 Sep 2026), rather than leaning on
+         `CollectionEmptyState`'s own new generic self-wrap: R63 keeps
+         `--pinned-lead` — the exact inset this wrap matches — nameable in
+         exactly two files, and the register's own generic self-wrap reads
+         the kit's plain default padding instead, which would have been a
+         visible, unvalidated regression on this module's tuned lead. */
       <CollectionEmptyBody>
         <CollectionEmptyState
           title={t("Nothing waiting.")}

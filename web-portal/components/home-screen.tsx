@@ -27,6 +27,7 @@ import * as React from "react"
 import Link from "next/link"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ArrowRight, Plus } from "@shared/ui/foundations/icons"
 
@@ -66,17 +67,33 @@ function TimeGivenBack() {
   const t = useT()
   const { data } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   if (!data || data.apps.length === 0 || data.savedSecondsPerMonth <= 0) return null
-  // A card that is a link — one of the three things motion.css §13 allows to
+  // A CARD THAT IS A LINK: one of the three things motion.css §13 allows to
   // gain elevation on hover, and `motion-hover-lift` is how it is spelt.
+  //
+  // 21 SEP 2026 AUDIT: THROUGH THE KIT'S OWN `Card` NOW, not a hand-rolled
+  // `bg-surface-panel p-6` box: the kit is the only UI input, and this is a
+  // single METRIC TILE, the same register `web/components/work/effort-
+  // card.tsx`'s three Effort tiles already read, in Aurora's own words:
+  // "this is a metric, like in kit" (`PAPER_ON_PURPOSE`, `shared/rules/
+  // registry.ts`). `variant="default"` is the identical soft-paper fill the
+  // hand-rolled box painted; `interactive` is the kit's own named hover-and-
+  // lift skin (`--accent` plus `motion-hover-lift`) in place of the
+  // `hover:bg-muted/40` this file wrote by hand. The `<Link>` still carries
+  // the href: `Card`'s own doc is explicit that it does not make itself
+  // clickable, the call site wraps it in a real anchor.
   return (
-    <Link href="/impact" className="hover:bg-muted/40 motion-hover-lift rounded-[var(--radius)] bg-surface-panel p-6">
-      <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
-      <p className="text-3xl font-medium">{hoursText(data.savedSecondsPerMonth)}</p>
-      <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
-      <span className="text-muted-foreground mt-3 flex items-center gap-1 text-sm">
-        {t("See where it comes from")}
-        <ArrowRight className="size-3.5" />
-      </span>
+    <Link href="/impact" className="block">
+      <Card variant="default" interactive>
+        <CardContent className="flex flex-col">
+          <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
+          <p className="text-3xl font-medium">{hoursText(data.savedSecondsPerMonth)}</p>
+          <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
+          <span className="text-muted-foreground mt-3 flex items-center gap-1 text-sm">
+            {t("See where it comes from")}
+            <ArrowRight className="size-3.5" />
+          </span>
+        </CardContent>
+      </Card>
     </Link>
   )
 }
@@ -139,7 +156,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
          * the portal renders a count — not the length of the three rows below. */}
         {/* "Your company's", for the reason tickets-screen.tsx gives at its own
          * heading: this list holds colleagues' tickets too, now. */}
-        <CollectionHeading label={t("Your company's tickets")} total={total} />
+        <CollectionHeading label={t("Your company's tickets")} total={total} level="section" />
 
         {error && !tickets ? (
           <ErrorPanel

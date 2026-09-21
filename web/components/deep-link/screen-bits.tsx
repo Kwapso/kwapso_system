@@ -58,7 +58,7 @@ import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning 
 import { Headline } from "@shared/ui/components/typography/typography"
 import { SortControl, type SortOption } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
-import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { CollectionCardSurfaceContext, CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import { PINNED_INSET_MARK, PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
@@ -281,22 +281,34 @@ export function LoadError({ what }: { what: string }) {
 // inside it — so a piece of content nested arbitrarily deep (the empty body,
 // past the toolbar and a render-prop callback PagedFind composes, never a
 // direct child) can ask "am I sitting on a plain, transparent frame?" without
-// a runtime DOM lookup. Defaults to `"plain"` since 21 Sep 2026, following
-// `CollectionCard`'s own default: content that never renders inside a
-// `CollectionCard` at all (a test, a bespoke panel) reads the same answer the
-// app's own frames now give it, which is "the page is the ground; draw your
-// own paper if you need one." The empty body is the one thing that does.
-const CollectionCardSurfaceContext = React.createContext<"boxed" | "plain">("plain")
-
-/* THE HOOK THAT READ THIS CONTEXT IS GONE, AND THE CONTEXT IS NOT.
-   `useCollectionCardSurface()` was exported here so `paged-find.tsx`'s own
-   hand-rolled toolbar pill could key its painted register off the frame it
-   stood in. That pill has no painted register any more (rulebook L43 went app
-   wide on 21 Sep 2026 and every frame is plain), so the hook had no caller and
-   was deleted rather than kept as a door nothing opens. The Provider stays,
-   because `CollectionEmptyBody` below still reads it: the empty state is the
-   one body that keeps its paper on a plain frame, and it has to learn that
-   from the frame rather than from a prop threaded past a render-prop callback. */
+// a runtime DOM lookup.
+//
+// MOVED TO `shared/web/screen-engine/collection-frame.tsx`, 21 Sep 2026 —
+// imported here rather than declared here. `CollectionEmptyState` (that
+// file) needed to read the identical answer, from dozens of call sites this
+// file has never heard of, so the context now lives beside the register that
+// reads it most widely and `CollectionCard` below is one of two publishers
+// (the other is that file's own `useKitPanel` branch). See its own doc
+// comment there for the full account.
+//
+// THE DEFAULT IS STILL `"plain"`, AND STAYS THAT WAY ON PURPOSE — a second
+// audit found `/waves` and the brand library rendering their empty states
+// bare with no `CollectionCard` provider above them anywhere, and the
+// validated design keeps EVERY collection empty state on soft paper, not
+// only the ones a provider can prove sit inside a `CollectionCard`. So "no
+// provider above me" reads the same as `"plain"`, for `CollectionEmptyBody`
+// below exactly as it always has, and now for `CollectionEmptyState`'s own
+// dozens of call sites app wide too. `"boxed"` is the one way out, published
+// only where a real `Card` is genuinely already the ground.
+//
+// THE HOOK THAT READ THIS CONTEXT IS GONE, AND THE CONTEXT IS NOT.
+// `useCollectionCardSurface()` was exported here so `paged-find.tsx`'s own
+// hand-rolled toolbar pill could key its painted register off the frame it
+// stood in. That pill has no painted register any more (rulebook L43 went app
+// wide on 21 Sep 2026 and every frame is plain), so the hook had no caller and
+// was deleted rather than kept as a door nothing opens. The Provider stays,
+// because `CollectionEmptyBody` below still reads it, and now so does every
+// `CollectionEmptyState` call site app wide.
 
 export function CollectionCard({ children, surface = "plain" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
   if (surface === "plain") {
@@ -408,7 +420,16 @@ export function CollectionEmptyBody({ children }: { children: React.ReactNode })
   if (surface !== "plain") return <>{children}</>
   return (
     <Card variant="default">
-      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">{children}</CardContent>
+      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">
+        {/* IDEMPOTENT ON PURPOSE — a `CollectionEmptyState` nested inside this
+            wrap (or a second `CollectionEmptyBody`) must not get papered
+            again. The ground for whatever is now INSIDE this real `Card` is
+            genuinely `"boxed"`, so publishing that answer downward is not a
+            special-cased guard flag, it is just the true fact — the same
+            reading `CollectionCard`'s own boxed branch already gives its
+            children. */}
+        <CollectionCardSurfaceContext.Provider value="boxed">{children}</CollectionCardSurfaceContext.Provider>
+      </CardContent>
     </Card>
   )
 }

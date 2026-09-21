@@ -32,7 +32,8 @@ import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
+import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
 import { useSessionUserId } from "@/lib/use-active-team"
@@ -206,6 +207,22 @@ export function ProcessesScreen({
             .processes({ ...query, cursor })
             .then((r) => ({ rows: r.processes, nextCursor: r.nextCursor, total: r.total }))
         }
+        // THE CREATE DOOR — this toolbar's own `actions` slot (R50/R84),
+        // never a second row above it. Live audit, 21 Sep 2026: this screen
+        // used to publish the create act through `SectionWithCreate` while
+        // ALSO rendering the recipe engine's own `useKitPanel` chrome, which
+        // draws its OWN toolbar (with its own copy of the "+" button) below
+        // this one — two toolbars stacked, ~126px of empty white before the
+        // first row. `<PagedFind>`'s own `restingEmpty` already withdraws
+        // this WHOLE row the moment the collection holds no rows, so a
+        // genuinely-empty team never reaches this closure — only
+        // `CollectionCreateActionProvider` below does, and a map needs an
+        // app to belong to, so this door only ever draws once at least one
+        // app already exists.
+        actions={() => (canCreate ? <AddButton label={t("Map a process")} onClick={() => setAddOpen(true)} /> : null)}
+        // THE ONE CARD — toolbar, then rows, the same join every other
+        // `<PagedFind>` call site draws (contacts-screen.tsx, meetings-screen.tsx).
+        wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
       >
         {(found) => {
           // `processesLoading ? null : loaded` — the resting read is still on
@@ -220,29 +237,32 @@ export function ProcessesScreen({
           // both zeros' words now, chosen by `narrowedOutside` below.
           const listRecipe = withDataDrivenCollection(recipe, data.rows)
           return (
-            <>
-              {/* A map lives inside an app, so a team with no apps yet has to be able to
-                  record one from here — otherwise this screen is a dead end with a
-                  create button that cannot be pressed. */}
-              <SectionWithCreate
-                show={canCreate && apps.length > 0}
-                label={t("Map a process")}
-                icon="plus"
-                secondary={{ show: canCreate, label: t("Record an app"), onClick: () => setAppOpen(true) }}
-                onCreate={() => setAddOpen(true)}
-                useKitPanel
-              >
-                <ScreenRenderer
-                  recipe={listRecipe}
-                  data={data}
-                  rights={rights}
-                  onAction={onAction}
-                  onIntent={onIntent}
-                  useKitPanel
-                  /* R62 — the door above owns the search. */
-                  narrowedOutside={found.active}
-                />
-              </SectionWithCreate>
+            // R88 — THE EMPTY REGISTER'S ONE DOOR. A map lives inside an app,
+            // so a team with zero apps cannot be offered "Map a process" at
+            // all — this publishes "Record an app" in its place, the same
+            // word and handler the toolbar's own `actions` above never draws
+            // in that state (zero apps means zero processes too, so
+            // `<PagedFind>`'s `restingEmpty` has already withdrawn the
+            // toolbar). Once an app exists this reverts to the ordinary
+            // "Map a process" act — the two are never both on offer.
+            <CollectionCreateActionProvider
+              action={
+                !canCreate
+                  ? null
+                  : apps.length > 0
+                    ? { label: t("Map a process"), onCreate: () => setAddOpen(true) }
+                    : { label: t("Record an app"), onCreate: () => setAppOpen(true) }
+              }
+            >
+              <ScreenRenderer
+                recipe={listRecipe}
+                data={data}
+                rights={rights}
+                onAction={onAction}
+                onIntent={onIntent}
+                /* R62 — the door above owns the search. */
+                narrowedOutside={found.active}
+              />
 
               {/* R14: every app of every client grows maps, and none is ever deleted —
                   the list pages. */}
@@ -251,7 +271,7 @@ export function ProcessesScreen({
                 label={t("Load more processes")}
                 fetchPage={found.fetchPage}
               />
-            </>
+            </CollectionCreateActionProvider>
           )
         }}
       </PagedFind>

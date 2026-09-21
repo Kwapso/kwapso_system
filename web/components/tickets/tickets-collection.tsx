@@ -1667,7 +1667,15 @@ export function TicketsCollection({
                          draws above (line ~1604) — a no-op on any boxed
                          CollectionCard, which is already paper. The toolbar
                          above is OUTSIDE this wrapper, so it stays flush on
-                         the page either way. */
+                         the page either way. Kept explicit here (rather than
+                         leaning on `CollectionEmptyState`'s own generic
+                         self-wrap, added 21 Sep 2026) because R63 keeps
+                         `--pinned-lead` — the exact inset this wrap matches —
+                         nameable in exactly two files, `pinned-chrome.ts` and
+                         `screen-bits.tsx`; the register's own generic
+                         self-wrap reads the kit's plain default padding
+                         instead, and would have been a visible, unvalidated
+                         regression on this module's own tuned lead. */
                       <CollectionEmptyBody>
                         <CollectionEmptyState
                           filtered={found.active}

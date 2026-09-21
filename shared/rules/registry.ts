@@ -2780,6 +2780,8 @@ export const PAPER_ON_PURPOSE: Record<string, string> = {
     "two cards, neither a grouping section. The first is the REQUEST itself - the reference, the state and what the client wrote - a per-record card standing for the one record the page is about. The second is the composer, the portal's own half of \"the conversation card stays a card\".",
   "web-portal/components/ticket-rating.tsx":
     "the \"How did we do?\" ask - a row of faces and nothing else, a control cluster the reader presses rather than a region they read. It is also the one thing on the portal's ticket page that appears only after the work is finished, so it has to read as an object arriving rather than as part of the page's structure.",
+  "web-portal/components/home-screen.tsx":
+    "the TimeGivenBack tile - a single metric link tile to /impact, routed through the kit's own Card (21 Sep 2026 audit, replacing a hand-rolled bg-surface-panel box). Aurora's own words, reused from the identical Effort-tile ruling: \"this is a metric, like in kit\" - the same register web/components/work/effort-card.tsx's three tiles already read, a per-record object a reader presses rather than a page region they read.",
   // ── shared/web/ ─────────────────────────────────────────────────────────
   "shared/web/appearance-tab-preview.tsx":
     "a DRAWING of a card, not a card. This is the Appearance tab's live preview of the shell, and the card inside it stands for `ScreenShell`'s own card at miniature scale - painting it plain would make the preview stop showing the thing it exists to show.",
@@ -6070,11 +6072,6 @@ export const BUTTON_SIZE_EXEMPT: ButtonSizeExempt[] = [
     file: "web/components/records/translate-human-text.tsx",
     contains: "onClick={translation.toggle}",
     why: "A standalone picker/utility control (a chip, a pagination button, a nav trigger, an inline aid), not a toolbar, a page head, a card header or a form foot.",
-  },
-  {
-    file: "web/components/screens/kwapso-screen.tsx",
-    contains: "onClick={() => setIdentityOpen(true)}",
-    why: "An inline capture row (a compact add/edit affordance beside its own input, not routed through FormShell), not one of the four named surfaces. Pending her word on whether an inline capture row is a form foot.",
   },
   {
     file: "web/components/shell/error-boundary.tsx",

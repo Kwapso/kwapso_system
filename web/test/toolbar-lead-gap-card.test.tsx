@@ -1022,6 +1022,21 @@ describe("R83 generalised -- the census of <CollectionHeading> call sites the he
       "web/components/knowledge/knowledge-screen.tsx"
     )
 
+    // PROCESSES-SCREEN.TSX JOINED THE COVERED SET, 21 Sep 2026 -- a live
+    // audit of /processes found its `<CollectionHeading>` followed by TWO
+    // stacked toolbars (`<SectionWithCreate useKitPanel>` around a
+    // `<ScreenRenderer useKitPanel>`, drawing its own "+" below `<PagedFind>`'s
+    // own search/filter/sort row) rather than one, ~126px of empty white
+    // above the first process row. Fixed by moving the create act into
+    // `<PagedFind>`'s own `actions` slot, the same seam accounts-screen.tsx
+    // and meetings-screen.tsx already use, with `wrap={(inner) =>
+    // <CollectionCard>{inner}</CollectionCard>}` and no `tabs` prop -- the
+    // exact shape `siblingIsCard` reads as a real card sibling, so this
+    // heading is reached by the rule now instead of drawing no card at all.
+    expect(coveredRels, `covered call sites: ${coveredRels.join(", ")}`).toContain(
+      "web/components/process/processes-screen.tsx"
+    )
+
     // THE OTHER <CollectionHeading> CALL SITES THIS LANE CHECKED AND FOUND
     // NOT TO MATCH THE SAME SHAPE -- present regardless of unrelated work
     // landing elsewhere the same day (this repo runs more than one lane on
@@ -1034,9 +1049,6 @@ describe("R83 generalised -- the census of <CollectionHeading> call sites the he
     //     strip+card column, never the card alone.
     //   · time-screen.tsx -- followed by `<HoursByWeekCard>`, a bare
     //     `<section>` (pulse.tsx), never the kit's `Card` at all.
-    //   · processes-screen.tsx -- followed by `<PagedFind>` with no `wrap`
-    //     prop; this screen draws no `CollectionCard` around its toolbar yet,
-    //     so there is no card here for any rule to reach.
     //   · accounts-screen.tsx, knowledge-screen.tsx -- both followed by
     //     `<PagedFind wrap={...} tabs={...}>`: `wrap` fills a card, but
     //     `tabs` means the strip drawn inside `PagedFind` sits between the
@@ -1046,7 +1058,6 @@ describe("R83 generalised -- the census of <CollectionHeading> call sites the he
       expect.arrayContaining([
         "web/components/work/stories-screen.tsx",
         "web/components/work/time-screen.tsx",
-        "web/components/process/processes-screen.tsx",
         "web/components/accounts/accounts-screen.tsx",
         "web/components/knowledge/knowledge-screen.tsx",
       ])

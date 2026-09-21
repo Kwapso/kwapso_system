@@ -101,7 +101,7 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
 
       <section>
         {/* R16: the door's exact server total, not the number of rows on screen. */}
-        <CollectionHeading label={t("Contacts")} total={linksTotal} />
+        <CollectionHeading label={t("Contacts")} total={linksTotal} level="section" />
         {/* THE KIT'S ROW, not our own. `variant="rows"` is the standalone
             rounded row this screen was drawing by hand — same shape, and it
             brings the hover, the 56px floor and the empty register with it. The

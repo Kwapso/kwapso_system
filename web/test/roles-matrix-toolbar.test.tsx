@@ -298,3 +298,88 @@ describe("RolesMatrix, rendered — sort, the module icon, and the retired lock 
     for (const m of MODULE_ROWS) expect(keys.has(m.key), `"${m.key}" is not a real TEAM_MODULES key`).toBe(true)
   })
 })
+
+// ============================================================================
+// PART THREE — THE CONTAINER, READ OFF THE SOURCE. Finding, 21 Sep 2026: this
+// toolbar sat 32px under the tab strip and 32px in from the pane edge, both
+// caused by `<TeamPanel narrowGround={false}>` wrapping the pinned bar AND
+// `<ToolbarRow>` inside its own `p-6 lg:p-[var(--space-7)]` inset — every
+// OTHER toolbar in the app sits 10px under its strip and flush with the pane
+// edge (R83). Fixed by moving the toolbar OUT of `TeamPanel`'s padding: the
+// outer box is `<CollectionCard>` now (the app's own R83 seam), and
+// `TeamPanel narrowGround={false}` moved down, wrapping only the deactivated
+// list and the matrix — the paper the kit's narrow `PermissionMatrix`
+// fallback still needs. A static census, the same discipline this file's own
+// Part One already uses: the structural claim is a source-position fact, not
+// a rendered pixel, so it is read off the file rather than measured through
+// jsdom (which applies no CSS/media queries at all).
+// ============================================================================
+
+describe("the toolbar sits outside TeamPanel's own padded box (finding, 21 Sep 2026)", () => {
+  it("opens on <CollectionCard>, not <TeamPanel> — the toolbar's own container carries no padding", () => {
+    const src = source()
+    expect(
+      src,
+      "roles-matrix.tsx must import CollectionCard from screen-bits.tsx, the app's own R83 seam"
+    ).toMatch(/import \{[^}]*\bCollectionCard\b[^}]*\}\s*from\s*"@\/components\/deep-link\/screen-bits"/)
+
+    const returnIdx = src.indexOf("return (")
+    expect(returnIdx, "this file's return statement must be findable").toBeGreaterThan(-1)
+    const collectionCardIdx = src.indexOf("<CollectionCard>", returnIdx)
+    expect(
+      collectionCardIdx,
+      "the return must open on <CollectionCard>, the padding-free container"
+    ).toBeGreaterThan(-1)
+  })
+
+  it("draws the sr-only heading, the pinned bar and <ToolbarRow> BEFORE <TeamPanel narrowGround={false}> opens", () => {
+    const src = source()
+    const headlineIdx = src.indexOf('<Headline as="h2" size="h4" className="sr-only">')
+    const toolbarIdx = src.search(/<ToolbarRow\b/)
+    const teamPanelOpenIdx = src.indexOf('<TeamPanel narrowGround={false}>')
+
+    expect(headlineIdx, "the sr-only Roles heading must still be drawn").toBeGreaterThan(-1)
+    expect(toolbarIdx, "the toolbar must still be drawn").toBeGreaterThan(-1)
+    expect(
+      teamPanelOpenIdx,
+      "TeamPanel narrowGround={false} must still wrap the matrix"
+    ).toBeGreaterThan(-1)
+
+    expect(
+      headlineIdx,
+      "the heading must come before the toolbar"
+    ).toBeLessThan(toolbarIdx)
+    expect(
+      toolbarIdx,
+      "<ToolbarRow> must open, and its whole call must sit, BEFORE <TeamPanel narrowGround={false}> — " +
+        "the toolbar is no longer inside TeamPanel's own padded box"
+    ).toBeLessThan(teamPanelOpenIdx)
+  })
+
+  it("wraps <TeamPanel narrowGround={false}> exactly once, around the deactivated list and the matrix only", () => {
+    const src = source()
+    const opens = src.match(/<TeamPanel narrowGround=\{false\}>/g) ?? []
+    expect(opens.length, "exactly one TeamPanel call — a second one would mean the fix duplicated the wrapper instead of moving it").toBe(1)
+
+    const teamPanelOpenIdx = src.indexOf('<TeamPanel narrowGround={false}>')
+    const teamPanelCloseIdx = src.indexOf("</TeamPanel>", teamPanelOpenIdx)
+    const collectionCardCloseIdx = src.lastIndexOf("</CollectionCard>")
+
+    expect(teamPanelCloseIdx, "TeamPanel must still close").toBeGreaterThan(-1)
+    expect(collectionCardCloseIdx, "the return must close on </CollectionCard>").toBeGreaterThan(-1)
+    expect(
+      teamPanelCloseIdx,
+      "</TeamPanel> must close before </CollectionCard> — TeamPanel is nested inside the card, not the other way round"
+    ).toBeLessThan(collectionCardCloseIdx)
+
+    // AND THE DEACTIVATED LIST + THE MATRIX ARE INSIDE IT — the paper
+    // PermissionMatrix's own narrow fallback still needs (team-panel.tsx's
+    // own comment carries the full argument).
+    const deactivatedIdx = src.indexOf("deactivatedOpen &&", teamPanelOpenIdx)
+    const permissionMatrixIdx = src.indexOf("<PermissionMatrix", teamPanelOpenIdx)
+    expect(deactivatedIdx, "the deactivated-roles disclosure must still be inside TeamPanel").toBeGreaterThan(teamPanelOpenIdx)
+    expect(deactivatedIdx).toBeLessThan(teamPanelCloseIdx)
+    expect(permissionMatrixIdx, "the matrix itself must still be inside TeamPanel").toBeGreaterThan(teamPanelOpenIdx)
+    expect(permissionMatrixIdx).toBeLessThan(teamPanelCloseIdx)
+  })
+})

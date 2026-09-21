@@ -172,7 +172,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
       {/* R16: the door's exact total, in the one place the portal renders a
        * count. No action beside it — the two buttons live under the list, where
        * they have room to say what they do on a phone (B5). */}
-      <CollectionHeading label={t("Files and links")} total={total} />
+      <CollectionHeading label={t("Files and links")} total={total} level="section" />
 
       {listQ.loading && !listQ.data ? (
         <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
@@ -181,18 +181,23 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
           {t("Nothing attached yet. A screenshot often explains it faster than a paragraph.")}
         </p>
       ) : (
-        // K5: one container, rows separated by a hairline — never a box each.
+        // 21 SEP 2026 AUDIT: EVERY OTHER PORTAL LIST GIVES EACH ROW ITS OWN
+        // PAPER TILE ON THE PLAIN PAGE; THIS WAS THE ONE THAT BOXED THE WHOLE
+        // LIST INSTEAD. `ticket-row.tsx`, `waiting-on-you.tsx`,
+        // `sent-to-us.tsx` and `deliverables-screen.tsx` all draw
+        // `rounded-[var(--radius)] bg-surface-panel` PER ROW on the page's own
+        // ground; this file was the outlier, one shared box with `divide-y`
+        // hairlines between rows instead, the K5 shape this comment used to
+        // argue for, before the rest of the portal moved past it. Made the
+        // same as its siblings: the `<ul>` drops the fill, and each `<li>`
+        // takes the tile.
         //
-        // `divide-border`, because until now that sentence was not true. Bare
-        // `divide-y` sets a WIDTH and a STYLE and no colour, and Tailwind v4's
-        // preflight leaves the colour at `currentColor` — so these rows were
-        // separated by a 1px line in the ink the row was written in, not by a
-        // hairline. The other thirty `divide-y` sites across both front doors
-        // all name the token; this was the one that did not. Found while
-        // adopting the kit's boundary law, which names `divide-*` as the one
-        // clause it deliberately does not carry (kit borders.mjs header) — so
-        // no check would have said a word about this line either way.
-        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        // `[--badge-quiet-fill:var(--surface-raised)]` rides along with the
+        // tile for the same reason the other four rows carry it (`shared/
+        // rules/registry.ts`, `web-portal/test/badge-quiet-fill-rows.test.ts`):
+        // a badge dropped into this row later must not paint the row's own
+        // colour.
+        <ul className="flex flex-col gap-2">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? fileTypeIcon(a.label) : LinkSimple
@@ -203,7 +208,10 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
               .filter(Boolean)
               .join(" · ")
             return (
-              <li key={a.id} className="flex items-start gap-2 p-4">
+              <li
+                key={a.id}
+                className="flex items-start gap-2 rounded-[var(--radius)] bg-surface-panel p-4 [--badge-quiet-fill:var(--surface-raised)]"
+              >
                 <Glyph className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   {isFollowable(a.url) ? (

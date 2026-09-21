@@ -166,7 +166,11 @@ export function DeliverablesScreen({ ready }: { ready: PortalReady }) {
                     return (
                       <li
                         key={d.id}
-                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] bg-surface-panel p-4"
+                        // Same hand-rolled `bg-surface-panel` row as ticket-
+                        // row.tsx, waiting-on-you.tsx and sent-to-us.tsx, the
+                        // same rebind for the same reason: a Badge dropped
+                        // into this row must not paint the row's own colour.
+                        className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] bg-surface-panel p-4 [--badge-quiet-fill:var(--surface-raised)]"
                       >
                         {/* An eighteenth hand-rolled answer to "what to draw
                             when there is no picture" — the square, the radius,

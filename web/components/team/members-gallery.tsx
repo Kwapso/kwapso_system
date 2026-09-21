@@ -202,7 +202,7 @@ import { useCached, invalidate, primeCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
 import type { Invite, TeamMember, TeamRole } from "@shared/types"
-import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { ConfirmAction, type ConfirmKind } from "@/components/deep-link/confirm-action"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { InviteDialog } from "@/components/team/invite-dialog"
@@ -409,22 +409,30 @@ export function MembersGallery({
 
   return (
     /* THE CONTAINER — "nothing on top of white background, its a rule!"
-       (client, 2026-09-09). The heading, the toolbar and the wall are all
-       inside it, the way `CollectionFrame`'s one panel holds the toolbar, the
-       rows and the pager rather than banding them separately. The wall itself
-       therefore keeps `CardGrid`'s default `tone="bare"`: the ground is already
-       paid for one level up and a second `bg-surface-panel` inside this one
-       would be the 1.000 all over again. team-panel.tsx carries the argument
-       and the measured contrast in both palettes.
+       (client, 2026-09-09). AMENDED 21 SEP 2026 — the same finding, and the
+       same fix, `roles-matrix.tsx` carries in full: this tab's toolbar sat
+       32px under the tab strip and 32px in from the pane edge, because
+       `<TeamPanel>` (default `narrowGround`, always soft paper) wrapped the
+       heading, the toolbar AND the wall together inside its own
+       `p-6 lg:p-[var(--space-7)]` inset — every OTHER toolbar in the app
+       sits 10px under its strip and flush with the pane edge (R83). The
+       outer box is `<CollectionCard>` now (plain, the app's own R83 seam —
+       it publishes `--toolbar-lead-gap` on itself), and `<TeamPanel>` moved
+       DOWN, wrapping only the wall of member cards (and the invites
+       disclosure above it) — the soft paper those `raised` cards genuinely
+       need for contrast, unchanged from what this comment always argued.
+       The wall itself still keeps `CardGrid`'s default `tone="bare"`: the
+       ground is paid for one level down now instead of one level up, and a
+       second `bg-surface-panel` inside THAT panel would still be the 1.000
+       team-panel.tsx's own header measures against.
 
        NO `className="relative"` HERE ANY MORE — that was the positioning
        context for a gear docked to this card's own corner, 2026-09-14 to
        2026-09-14. The gear moved INTO `<ToolbarRow>`'s own `actions` slot the
        same day (see the comment beside `<ModuleSettingsGear>` below), so this
        section has nothing absolutely positioned left inside it and needs no
-       positioning context of its own. `TeamPanel` still forwards `className`;
-       nothing in team-panel.tsx changed. */
-    <TeamPanel>
+       positioning context of its own. */
+    <CollectionCard>
       {/* THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
           "remove members and roles titles too". Both this section and Roles
           below sit inside ONE tab panel already named "Team" (Radix's own
@@ -598,6 +606,13 @@ export function MembersGallery({
             }
           />
 
+          {/* THE PAPER MOVES DOWN HERE — `<TeamPanel>` no longer wraps the
+              toolbar above (21 Sep 2026, this file's header). It wraps only
+              what still needs it: the invites disclosure and the wall of
+              `raised` member cards, which measure 1.000 against the plain
+              page ground without a soft-paper band under them (team-panel.tsx
+              carries the full argument and the measured contrast). */}
+          <TeamPanel>
           {/* THE PANEL'S OWN RHYTHM, KEPT BETWEEN THESE THREE AND NOWHERE ELSE
               — `gap-4`, the number `TeamPanel` spends on its children, which
               they were getting from it directly until this column took it over.
@@ -774,6 +789,7 @@ export function MembersGallery({
               </CardGrid>
             )}
           </div>
+          </TeamPanel>
         </div>
       )}
 
@@ -817,6 +833,6 @@ export function MembersGallery({
           }
         }}
       />
-    </TeamPanel>
+    </CollectionCard>
   )
 }

@@ -33,7 +33,7 @@ import { EditPenButton } from "@shared/web/edit-pen-button"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
-import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
+import { RecordFooterBand, RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
@@ -345,6 +345,28 @@ export function KnowledgeDetailScreen({
   }
 
   return (
+    /* THE BAND MOVED TO ITS OWN, FLUSH COMPOSITION — 21 Sep 2026. This screen
+       used to hand `activity`/`onAddNote`/`notePlaceholder` straight to
+       `<RecordScreen>` and let ONE combined `<RecordDetail>` call draw the
+       head, the tabs, the panel AND the footer together (`footerVisible`
+       left at its default, `true`). That combined call's own footer region
+       carries none of the escape `RecordFooterBand` (record-chrome.tsx) pulls
+       for itself — the `-mx-[var(--pane-inset-x,0px)]` that reaches the
+       pane's own edge — so the band sat inset inside the panel's ordinary
+       padding: 24px short of the pane's bottom at 1440, 6px at 760, against
+       the ticket and story pages' flush 0px. Both of THOSE pages draw the
+       band through `<RecordFooterBand>` itself, called a SECOND time as a
+       sibling of a `<RecordScreen panelVisible={false} footerVisible={false}
+       >` (see help-detail.tsx's `<TicketDetailBody>` and story-detail.tsx's
+       `<RecordDetailBody>` for the two-column shape this screen does not
+       need — a knowledge source has no side column, one tabbed body only).
+       Rebuilt the same way, without either shared file: `RecordScreen` draws
+       the head alone, and the body below is this file's own single-column
+       sibling — `flex-1 flex-col gap-6`, `RecordFooterBand` as its `mt-auto`
+       last child, the identical root shape `record-detail-body.tsx`'s own
+       comment proves against `ticket-detail-body.tsx`, minus the `lg` grid
+       neither column needs here. */
+    <>
     <RecordScreen
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
@@ -378,24 +400,10 @@ export function KnowledgeDetailScreen({
         // ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon").
         canEdit && <EditPenButton onClick={() => setEditingOpen(true)} label={t("Edit")} />
       }
-      // THE ONE DETAIL THAT NEVER PASSED THIS, and the tab is why. Twelve of the
-      // thirteen bespoke details already hand `RecordScreen` their feed for the
-      // ink footer's Latest activity column; this one showed its history only in
-      // the Activity tab, so when the tab went (client, 2026-09-06) a source's
-      // history would have had nowhere left to be read at all. Same hook, same
-      // rows, the place every other record already puts them.
-      activity={activity}
-      // `onAddNote` — the missing half of the pairing above. A source's own
-      // door (`activityAction`, record-chrome.tsx) only draws when its exact
-      // total is nonzero (`hasActivityDoor`), so a source with no logged
-      // history yet — nothing indexed, nothing corrected — drew a footer with
-      // NEITHER an audit column (a source has no creator/editor either) nor an
-      // activity one: the same empty-footer shape `member-screen.tsx` shipped
-      // with, one screen over. Every other bespoke detail already pairs
-      // `activity` with `onAddNote` for exactly this reason.
-      onAddNote={can("knowledge", "create") ? activity.addNote : undefined}
-      notePlaceholder={t("Add a note")}
-    >
+      panelVisible={false}
+      footerVisible={false}
+    />
+    <div data-slot="knowledge-detail-body" className="flex min-w-0 flex-1 flex-col gap-6">
       <TabsView
         className={STICKY_TABS}
         config={tabsConfig}
@@ -537,7 +545,21 @@ export function KnowledgeDetailScreen({
                       {t("Stop using this")}
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => void useAgain()} disabled={busyActive} className="gap-1">
+                    // NOT MANGO ANY MORE (R84) — this button used to sit inside
+                    // <RecordScreen>'s own children, which the census's ancestor
+                    // walk read as "inside a title component" by accident; now
+                    // that the body is RecordScreen's own SIBLING (this file's
+                    // own header, the flush-footer fix), the walk correctly
+                    // finds it outside one, and a bare row action was never
+                    // meant to be the screen's one mango button anyway.
+                    // `variant="secondary"`, matching its sibling above. THE
+                    // `size="sm"` IS UNCHANGED AND STILL R98's OWN
+                    // `BUTTON_SIZE_EXEMPT` ENTRY (registry.ts) — kept on one
+                    // line so that entry's `contains` (an exact substring of
+                    // this tag) still matches; reformatting it across lines
+                    // would silently break the exemption's own match rather
+                    // than fix anything.
+                    <Button variant="secondary" size="sm" onClick={() => void useAgain()} disabled={busyActive} className="gap-1">
                       {busyActive ? <Spinner /> : <Power className="size-3.5" />}
                       {t("Use this again")}
                     </Button>
@@ -553,6 +575,19 @@ export function KnowledgeDetailScreen({
           )
         }}
       />
+      {/* THE BAND — the SAME data the old single call handed `<RecordScreen>`
+          (see this function's own header note above), built here instead so
+          this `<div>`'s own `mt-auto` reaches the true bottom of the page. No
+          `audit`: a knowledge source has no creator/editor (unchanged; see
+          the comment this replaced for why). */}
+      <div data-slot="record-footer-band" className="flex-none mt-auto w-full">
+        <RecordFooterBand
+          activity={activity}
+          onAddNote={can("knowledge", "create") ? activity.addNote : undefined}
+          notePlaceholder={t("Add a note")}
+        />
+      </div>
+    </div>
 
       <KnowledgeFormDialog
         open={editingOpen}
@@ -592,6 +627,6 @@ export function KnowledgeDetailScreen({
       />
 
       {stopDialog}
-    </RecordScreen>
+    </>
   )
 }
