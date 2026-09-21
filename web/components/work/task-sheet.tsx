@@ -28,8 +28,15 @@
 // detail screen can be read at any pane width. A sheet cannot: it is a fixed
 // `clamp(26.25rem,34vw,40rem)` column (the same width `FormShellDialog`
 // already settled on, 2026-08-31's own note), so there is only ever one
-// shape to draw — Start and Done stand on their own, and Edit/Delete live in
-// one `RecordActionsMenu`, always visible, never folded.
+// shape to draw — Start and Done stand on their own, and Delete lives in one
+// `RecordActionsMenu`, always visible, never folded.
+//
+// THE "…" MENU SITS ON THE TITLE ROW NOW, NOT THE CHIPS ROW — Aurora's
+// ruling, 22 Sep 2026, verbatim: "on slide in detail pages, the ... button
+// must be aligned with title, not with pills." And Edit is OUT of that menu
+// entirely, its own icon button (`size="icon"`, R98) beside the "…", same
+// ruling: "bring the pencil icon out of the ..., next to it." The menu keeps
+// only Delete.
 //
 // THE PRIORITY CHIP REPLACES STATUS IN THE TITLE ROW, on Aurora's own words
 // above. `PriorityChip` is DEFINED HERE (moved off `tasks-screen.tsx`, which
@@ -38,10 +45,13 @@
 // same import, never a second copy.
 //
 // THE SHEET SCROLLS AS ONE REGION (R91's own sheet exception) — chip row,
-// title, Start/Done, Assigned to, Priority/Deadline, Description, Effort and
-// the dark footer band all sit inside the one scrolling body, the same shape
-// the design proposal drew (nothing pinned inside the sheet itself, only the
-// sheet's OWN edge is fixed against the viewport).
+// title, Start/Done, Assigned to, Deadline, Description, Effort and the dark
+// footer band all sit inside the one scrolling body, the same shape the
+// design proposal drew (nothing pinned inside the sheet itself, only the
+// sheet's OWN edge is fixed against the viewport). Assigned to, Deadline and
+// Description are three cards of ONE design now (Aurora, 22 Sep 2026), the
+// same `TicketSidePanel` shape the ticket's own side panels draw — see this
+// file's own body for the account.
 //
 // EFFORT IS THE SHARED `EffortCard` NOW (web/components/work/effort-card.tsx)
 // — the same card the story page and the ticket page draw (title "Effort"
@@ -60,7 +70,7 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { CardTitle } from "@shared/ui/components/card/card"
 import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/sheet"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
@@ -69,6 +79,7 @@ import { Check, ArrowUUpLeft, PencilSimple, Trash } from "@shared/ui/foundations
 import { RecordActionsMenu, RecordFooterBand, type RecordAction } from "@/components/records/record-chrome"
 import { OverviewList } from "@/components/records/overview-list"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
+import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 import { EffortCard } from "@/components/work/effort-card"
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
 import { useTaskFormOptions } from "@/lib/use-task-form-options"
@@ -244,26 +255,20 @@ export function TaskSheet({
     })
   }
 
-  const actions: RecordAction[] = [
-    // EDIT, FIRST — the same order the "…" menu's own convention takes
-    // everywhere else in the app (ordinary acts before the destructive one).
-    // A DONE task has no edit door (task-detail.tsx's own reasoning:
-    // "a ticked task is a record of something that happened").
-    ...(canEdit && !done
-      ? [{ key: "edit", label: t("Edit"), icon: <PencilSimple className="size-3.5" />, onSelect: () => setEditing(true) }]
-      : []),
-    ...(canEdit
-      ? [
-          {
-            key: "delete",
-            label: t("Delete"),
-            icon: <Trash className="size-3.5" />,
-            destructive: true,
-            onSelect: confirmDeleteTask,
-          } as RecordAction,
-        ]
-      : []),
-  ]
+  // DELETE ONLY — Edit left this menu 22 Sep 2026 (Aurora's ruling, this
+  // file's own header) for its own icon button beside the "…" on the title
+  // row.
+  const actions: RecordAction[] = canEdit
+    ? [
+        {
+          key: "delete",
+          label: t("Delete"),
+          icon: <Trash className="size-3.5" />,
+          destructive: true,
+          onSelect: confirmDeleteTask,
+        },
+      ]
+    : []
 
   const assigneeName = task ? staffNameFromSnapshot(task.assigneeName) : null
   const FileGlyph = task ? fileTypeIcon(task.fileName) : null
@@ -288,16 +293,36 @@ export function TaskSheet({
             <div data-slot="task-sheet-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
               <div className="flex flex-col gap-6">
                 {/* TITLE ROW — priority chip, never status (Aurora, 21 Sep
-                    2026), and the "…" menu, always visible (this sheet has
-                    no width to fold at). */}
+                    2026), on its own line; the title, the Edit pencil and
+                    the "…" menu share the line below it, the pencil and menu
+                    aligned WITH THE TITLE, never with the chip (Aurora, 22
+                    Sep 2026, this file's own header). Always visible, no
+                    fold — this sheet has no width to fold at. */}
                 <div className="flex flex-col gap-3" data-slot="task-sheet-title-row">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
                     <PriorityChip level={task.priority} t={t} />
-                    <RecordActionsMenu actions={actions} />
                   </div>
-                  <SheetTitle className="text-2xl font-bold text-foreground">
-                    {clampRecordHeading(task.title)}
-                  </SheetTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <SheetTitle className="min-w-0 flex-1 text-2xl font-bold text-foreground">
+                      {clampRecordHeading(task.title)}
+                    </SheetTitle>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {/* A DONE task has no edit door (task-detail.tsx's own
+                          reasoning: "a ticked task is a record of something
+                          that happened"). */}
+                      {canEdit && !done && (
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          aria-label={t("Edit")}
+                          onClick={() => setEditing(true)}
+                        >
+                          <PencilSimple className="size-4" />
+                        </Button>
+                      )}
+                      <RecordActionsMenu actions={actions} />
+                    </div>
+                  </div>
                 </div>
 
                 {/* START, LEFT — DONE, RIGHT (mango). Aurora, 21 Sep 2026,
@@ -336,12 +361,25 @@ export function TaskSheet({
                   )}
                 </div>
 
-                {/* ASSIGNED TO — the Stakeholders-style tile
-                    (`help-stakeholders.tsx`'s `StakeholderTile`), read-only:
-                    editing the assignee is the form's own field now
-                    (`task-form-dialog.tsx`), reached through Edit above. */}
-                <Card variant="raised" data-slot="task-assignee-card">
-                  <CardContent className="flex flex-col gap-2 px-4 py-3 lg:py-3">
+                {/* ASSIGNED TO, DESCRIPTION AND DEADLINE — three sections of
+                    ONE design (Aurora, 22 Sep 2026, this file's own header:
+                    "assigned to needs a background, same description, same
+                    deadline" / "description and deadline same design"): each
+                    a kit `Card` standing on the panel background, a small
+                    title, the content — the exact `TicketSidePanel` shape
+                    the ticket's own side panels already draw
+                    (`ticket-detail-body.tsx`), reused rather than
+                    reinvented, the same seam `story-detail.tsx` and
+                    `help-stakeholders.tsx` already stand on. */}
+
+                {/* ASSIGNED TO — read-only: editing the assignee is the
+                    form's own field now (`task-form-dialog.tsx`), reached
+                    through the pencil above. It keeps its own eyebrow tile
+                    (the Stakeholders-style `PersonCard`,
+                    `help-stakeholders.tsx`'s `StakeholderTile`) inside the
+                    card, Aurora's own words. */}
+                <div data-slot="task-assignee-card">
+                  <TicketSidePanel title={t("Assigned to")}>
                     <PersonCard
                       orientation="horizontal"
                       size="row"
@@ -354,46 +392,53 @@ export function TaskSheet({
                         </CardTitle>
                       }
                     />
-                  </CardContent>
-                </Card>
+                  </TicketSidePanel>
+                </div>
 
-                {/* PRIORITY AND DEADLINE — fact rows, the same
-                    `OverviewList` every other record's own fields draw
-                    through. The file (when the task carries one) rides
-                    along here too — R40 pins its render to THIS file now
-                    that task-detail.tsx is gone. */}
-                <OverviewList
-                  items={[
-                    { id: "priority", label: t("Priority"), value: <PriorityChip level={task.priority} t={t} /> },
-                    { id: "deadline", label: t("Deadline"), value: task.dueOn ? formatDate(task.dueOn, lang) : "" },
-                    ...(task.fileUrl
-                      ? [
-                          {
-                            id: "file",
-                            label: t("File"),
-                            value: (
-                              <a
-                                href={safeHref(task.fileUrl) ?? undefined}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                className="text-primary flex w-fit max-w-full flex-wrap items-center gap-2 underline-offset-2 hover:underline"
-                              >
-                                {FileGlyph && <FileGlyph className="size-4 shrink-0" />}
-                                <span className="min-w-0 truncate">{task.fileName || t("Open the file")}</span>
-                              </a>
-                            ),
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
+                {/* DEADLINE — its own card now, the priority fact row it
+                    used to sit beside is GONE (the title row's own priority
+                    chip already says it, Aurora: "priority is already a
+                    chip, remove it from above deadline"). */}
+                <div data-slot="task-deadline-card">
+                  <TicketSidePanel title={t("Deadline")}>
+                    <p className="text-sm text-foreground">
+                      {task.dueOn ? formatDate(task.dueOn, lang) : t("No deadline set.")}
+                    </p>
+                  </TicketSidePanel>
+                </div>
 
-                {/* DESCRIPTION — its own section, the way the design's
-                    exhibit draws it, not folded into the fact list. */}
+                {/* THE FILE — when the task carries one. R40 pins its render
+                    to THIS file now that task-detail.tsx is gone. Not one of
+                    the three named cards, so it keeps the plain
+                    `OverviewList` fact-row shape it always had. */}
+                {task.fileUrl && (
+                  <OverviewList
+                    items={[
+                      {
+                        id: "file",
+                        label: t("File"),
+                        value: (
+                          <a
+                            href={safeHref(task.fileUrl) ?? undefined}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="text-primary flex w-fit max-w-full flex-wrap items-center gap-2 underline-offset-2 hover:underline"
+                          >
+                            {FileGlyph && <FileGlyph className="size-4 shrink-0" />}
+                            <span className="min-w-0 truncate">{task.fileName || t("Open the file")}</span>
+                          </a>
+                        ),
+                      },
+                    ]}
+                  />
+                )}
+
+                {/* DESCRIPTION — the third of the three matching cards. */}
                 {task.detail && (
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-bold text-foreground">{t("Description")}</h3>
-                    <RichText html={task.detail} />
+                  <div data-slot="task-description-card">
+                    <TicketSidePanel title={t("Description")}>
+                      <RichText html={task.detail} />
+                    </TicketSidePanel>
                   </div>
                 )}
 

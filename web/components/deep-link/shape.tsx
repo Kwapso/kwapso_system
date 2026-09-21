@@ -1122,14 +1122,17 @@ export type ChoiceGroupHome = {
  * filter "Active" and "Protected" as if a row could be excluded from one by
  * matching the other, which the invariant above makes impossible.
  *
- * STATUS STOPPED BEING ITS OWN COLUMN ON 21 SEP 2026. K59, Aurora: "ok split
- * the who and date added in 2 columns." Splitting Added into Added by/Added
- * on put this table one past R82's six-column ceiling, and the status chip
- * built here now folds into the Value cell instead (`valueCell`'s own
- * comment below has the fold itself; settings-choices-panel.tsx's header has
- * the full accounting for why THIS fold over another). `statusText` and
- * `statusState` are unchanged, still plain fields off the same derivation;
- * only the chip's OWN seat moved.
+ * STATUS IS BACK TO BEING ITS OWN COLUMN, 22 SEP 2026. K59, Aurora,
+ * verbatim: *"ok, but keep status as its own column!"* The 21 Sep 2026
+ * reading one paragraph up folded the status chip into the Value cell to
+ * hold the table at R82's six-column ceiling once Added by/Added on split
+ * out of one cell into two; this reading undoes exactly that fold and picks
+ * Details instead — Details already reads as an honest empty cell on most
+ * rows (this file's own header, "THE DETAILS COLUMN"), which is a worse
+ * place to hide a fact every row carries than Status ever was. `statusText`
+ * and `statusState` are unchanged, still plain fields off the same
+ * derivation; the chip (`status`, `valueCell`'s own comment below) is a
+ * column cell again rather than a child of `value`.
  *
  * ── THE DETAILS COLUMN — 16 SEP 2026 EVENING ────────────────────────────────
  *
@@ -1170,7 +1173,14 @@ export type ChoiceGroupHome = {
  *   • Every other type (Department, Industry, Country, Brand asset
  *     category, Deliverable kind, and the three "labels" groups) carries
  *     nothing beyond its word — an honest empty cell, no dash, no hint
- *     (R81's own rule, read here for a table cell rather than a form). */
+ *     (R81's own rule, read here for a table cell rather than a form).
+ *
+ * DETAILS STOPPED BEING ITS OWN COLUMN ON 22 SEP 2026, the same reading that
+ * restored Status above (this file's own header, "STATUS IS BACK TO BEING
+ * ITS OWN COLUMN"). The cell this function builds is unchanged; only where
+ * it renders moved, onto the Value cell's own second line — `valueCell`'s
+ * own comment below has the fold, the same technique `tickets-collection.tsx`
+ * stacks a resolver's name over their date in the Closed column. */
 function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>): React.ReactNode {
   if (v.type === PHASE_TYPE_GROUP) {
     const hasIcon = phaseTypeIcon(v.value) !== ""
@@ -1260,30 +1270,35 @@ export function shapeChoicesTable(
       // a database that could still disagree: a protected row is never
       // inactive, so there is no case this ordering hides.
       const statusWord = v.isDefault ? t("Protected") : v.active ? t("Active") : t("Inactive")
-      // THE STATUS CHIP, FOLDED INTO THE VALUE CELL. K59, Aurora, 21 Sep
-      // 2026: "ok split the who and date added in 2 columns." Splitting the
-      // old one-cell "Added" into "Added by"/"Added on" (below) put this
-      // table at seven, one past R82's ceiling, so STATUS (its own column
-      // until now) folds into the Value cell instead. Settings-choices-
-      // panel.tsx's own header has the full R82 accounting for why this fold
-      // was chosen over another. Same word, same D17 dot this cell always
-      // drew on its own column, see the AMENDED 17 Sep 2026 note this
-      // replaces one screen up in this file's history, just sitting beside
-      // the value's own name now rather than in a seventh slot.
-      const statusChip = (
-        <Badge variant="status" dot={AUTOMATION_STATUS_DOT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
-          {statusWord}
-        </Badge>
-      )
+      // THE DETAILS CELL, FOLDED UNDER THE VALUE. K59, Aurora, 22 Sep 2026,
+      // the same reading that put Status back above: restoring Status put
+      // this table at seven again once Added by/Added on stayed split, so
+      // Details (its own column since 16 Sep 2026 evening) is what folds
+      // this time — `choiceDetailsCell`'s own header has the full R82
+      // accounting for why Details over another column. Computed once here
+      // so the SAME node both rides the Value cell's second line, below, and
+      // still answers `rows[i].details` for a reader that wants the fact on
+      // its own (web/test/shape.test.ts's own census reads it that way).
+      const detailsNode = choiceDetailsCell(v, t)
+      // THE VALUE CELL — the record's own mark and name on the first line,
+      // Details (above) as a MUTED SECOND LINE beneath it when there is one,
+      // the same stacking `tickets-collection.tsx`'s Closed column already
+      // uses for a resolver's name over their date (`flex flex-col gap-0.5`,
+      // the second line at `text-xs` — the surrounding `text-muted-
+      // foreground` on the column cell does the colour, same as that column).
+      // `null` draws nothing beneath, never an empty line — the same "carries
+      // nothing" answer Details has always given a type with nothing to say.
       const valueCell = (
-        <span className={REF_LEADS_NAME}>
-          {colour ? (
-            <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
-          ) : icon ? (
-            <Icon name={icon} className="text-muted-foreground size-4 shrink-0" />
-          ) : null}
-          <span className="min-w-0 truncate">{v.value}</span>
-          {statusChip}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className={REF_LEADS_NAME}>
+            {colour ? (
+              <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
+            ) : icon ? (
+              <Icon name={icon} className="text-muted-foreground size-4 shrink-0" />
+            ) : null}
+            <span className="min-w-0 truncate">{v.value}</span>
+          </span>
+          {detailsNode && <span className="text-muted-foreground text-xs">{detailsNode}</span>}
         </span>
       )
       // ADDED BY / ADDED ON. K59, Aurora, 21 Sep 2026: "ok split the who
@@ -1330,13 +1345,36 @@ export function shapeChoicesTable(
         // "Status", …), so a reader can narrow to every group that fills the
         // same kind of field across every module at once.
         whereField: fieldWord ?? "",
+        // THE STATUS CELL, ITS OWN COLUMN AGAIN. K59, Aurora, 22 Sep 2026,
+        // verbatim: "ok, but keep status as its own column!" Same word, same
+        // D17 dot this cell has drawn all along (see the AMENDED 17 Sep 2026
+        // note one screen up in this file's history) — only its seat moved,
+        // back to its own `status` column cell rather than a child of
+        // `value` (this function's own header, "STATUS IS BACK TO BEING ITS
+        // OWN COLUMN", has the accounting). Inline, never a variable read
+        // back in — `web/test/ticket-list-face-and-status.test.ts`'s own
+        // census reads THIS property's own text for `<Badge … dot=`, the
+        // same reason `shapeAccountsList`'s own `status` cell, one screen up
+        // in this file, writes its Badge inline rather than through a named
+        // constant.
+        status: (
+          <Badge variant="status" dot={AUTOMATION_STATUS_DOT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
+            {statusWord}
+          </Badge>
+        ),
+        statusText: statusWord,
+        // THE FACET'S OWN PLAIN FIELD, SAME THREE-WAY DERIVATION AS THE CHIP
+        // ABOVE. One flag pair read once, not a second source of truth. See
+        // this function's own header for why Protected is no longer a
+        // separate facet beside this one.
+        statusState: v.isDefault ? "protected" : v.active ? "active" : "inactive",
         // THE ADDED BY CELL: the record's own face (R90's own "no photo
         // field yet" shape: `SelectableValue` carries no picture, so
         // `RecordMark` draws the initials tile alone off the name, the same
         // gap the work-logs panel's own Logged-by filter already carries)
         // over the first name. `null`, never an empty wrapper, for a value
         // with no audit block, the same "carries nothing" answer the
-        // Details column already gives R81.
+        // Details cell already gives R81.
         addedBy: addedByName ? (
           <span className="flex min-w-0 items-center gap-2">
             <RecordMark name={addedByName} shape="round" size="choice" />
@@ -1354,16 +1392,13 @@ export function shapeChoicesTable(
         // type.test.ts`'s own law: a sortable date column compares the fact,
         // never the words shaped for a reader).
         createdAtRaw: v.createdAt,
-        // THE DETAILS COLUMN — see this function's own header, "THE DETAILS
-        // COLUMN". `null` for every type with nothing beyond its word, which
-        // `record-table.tsx` renders as a genuinely empty cell, not a dash.
-        details: choiceDetailsCell(v, t),
-        statusText: statusWord,
-        // THE FACET'S OWN PLAIN FIELD, SAME THREE-WAY DERIVATION AS THE CHIP
-        // ABOVE. One flag pair read once, not a second source of truth. See
-        // this function's own header for why Protected is no longer a
-        // separate facet beside this one.
-        statusState: v.isDefault ? "protected" : v.active ? "active" : "inactive",
+        // THE DETAILS FACT, OFF ITS OWN COLUMN NOW — see this function's own
+        // header, "THE DETAILS COLUMN", and `choiceDetailsCell`'s own header
+        // for where it draws instead (the Value cell's second line, above).
+        // Same node, computed once as `detailsNode`, never a second call.
+        // `null` for every type with nothing beyond its word, which draws no
+        // second line at all, not an empty one.
+        details: detailsNode,
       }
     }),
   }

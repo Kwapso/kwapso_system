@@ -673,13 +673,15 @@ describe("shapeChoicesTable", () => {
     expect(React.isValidElement(rows?.[0].details)).toBe(true)
   })
 
-  // THE STATUS CHIP, FOLDED INTO VALUE. Client ruling, 17 Sep 2026, verbatim:
-  // "Dots like everywhere else"; folded into the Value cell 21 Sep 2026 (K59,
-  // "ok split the who and date added in 2 columns", see settings-choices-
-  // panel.tsx's own header for the R82 accounting for why Status is the fold
-  // that moved). Read alongside D17's tone table (`shared/status-tones.ts`'s
-  // own palette, applied here through `AUTOMATION_STATUS_DOT`): Active → shipped
-  // (green), Protected → building (charcoal), Retired/Inactive → archived (grey).
+  // THE STATUS CHIP, ITS OWN COLUMN AGAIN. Client ruling, 17 Sep 2026,
+  // verbatim: "Dots like everywhere else"; folded into the Value cell 21 Sep
+  // 2026 (K59, "ok split the who and date added in 2 columns"), then restored
+  // to its own `status` cell 22 Sep 2026 (K59, "ok, but keep status as its
+  // own column!" — see settings-choices-panel.tsx's own header for the R82
+  // accounting for why Details is the fold that moved instead). Read
+  // alongside D17's tone table (`shared/status-tones.ts`'s own palette,
+  // applied here through `AUTOMATION_STATUS_DOT`): Active → shipped (green),
+  // Protected → building (charcoal), Retired/Inactive → archived (grey).
   // Protected OUTRANKS active/inactive (this function's own header, "PROTECTED
   // OUTRANKS ACTIVE/INACTIVE"), so a row with both `isDefault: true` and
   // `active: true` still reads Protected/building, never Active/shipped — the
@@ -688,7 +690,7 @@ describe("shapeChoicesTable", () => {
   // `success` / `secondary`), so a regression back to `AUTOMATION_STATUS_VARIANT`
   // fails here even if shape.tsx's own import census (automations.test.ts) is
   // ever weakened.
-  it("draws a status dot with the D17 tone per state, inside the Value cell, never a filled pill", () => {
+  it("draws a status dot with the D17 tone per state, in its own status cell, never a filled pill", () => {
     const cases: Array<{
       over: Partial<SelectableValue> & { id: string; type: string; value: string }
       tone: "shipped" | "building" | "archived"
@@ -700,16 +702,78 @@ describe("shapeChoicesTable", () => {
     ]
     for (const { over, tone, word } of cases) {
       const rows = shapeChoicesTable([selectableValue(over)], choicesGroupHome, "en").rows
-      const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
-      expect(React.isValidElement(value), `${word} row's Value cell must be a node`).toBe(true)
-      const chip = React.Children.toArray(value!.props.children).find(
-        (c): c is React.ReactElement<{ variant?: string; dot?: string }> =>
-          React.isValidElement(c) && (c.props as { variant?: string }).variant === "status"
-      )
-      expect(chip, `${word} row's Value cell must carry its status chip`).toBeDefined()
+      const chip = rows?.[0].status as React.ReactElement<{ variant?: string; dot?: string }> | undefined
+      expect(React.isValidElement(chip), `${word} row's status cell must be a node`).toBe(true)
+      expect(chip!.props.variant, `${word} row's chip must be the D17 dot variant`).toBe("status")
       expect(chip!.props.dot, `${word} row's dot must read D17's "${tone}" tone`).toBe(tone)
       expect(rows?.[0].statusText, `${word} row's plain-text status word`).toBe(word)
     }
+  })
+
+  // THE VALUE CELL NO LONGER CARRIES THE STATUS CHIP — the one thing worth a
+  // reader not re-adding without reading this test first: the chip moved to
+  // its own `status` cell (the test above), so the Value cell's own children
+  // are the mark/icon and the name alone, plus Details (below) when the row
+  // has one.
+  it("does not carry the status chip inside the Value cell any more", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "s4", type: "Industry", value: "A row", active: true, isDefault: false })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.isValidElement(value)).toBe(true)
+    // `value`'s own DOM has no descendant carrying `variant="status"` — walked
+    // recursively rather than just the immediate children, since the fold
+    // moved this cell from a flat `<span>` to a `flex-col` wrapper.
+    function hasStatusChip(node: React.ReactNode): boolean {
+      if (!React.isValidElement(node)) return false
+      const props = node.props as { variant?: string; children?: React.ReactNode }
+      if (props.variant === "status") return true
+      return React.Children.toArray(props.children).some(hasStatusChip)
+    }
+    expect(hasStatusChip(value)).toBe(false)
+  })
+
+  // DETAILS, FOLDED UNDER VALUE AS A MUTED SECOND LINE — K59, Aurora, 22 Sep
+  // 2026 (this function's own header, "DETAILS STOPPED BEING ITS OWN COLUMN
+  // ON 22 SEP 2026"): the value on the first line, Details beneath it, the
+  // same stacking `tickets-collection.tsx`'s Closed column uses for a
+  // resolver's name over their date. A Phase (sprint) type row carries both
+  // an icon and a duration badge in Details, so it is a real, non-null second
+  // line to prove the fold against.
+  it("folds the Details cell under the Value cell as a muted second line", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "p2", type: "Phase type", value: "Build", standardDays: 5 })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.isValidElement(value)).toBe(true)
+    const [nameLine, detailsLine] = React.Children.toArray(value!.props.children) as React.ReactElement<{
+      className?: string
+      children?: React.ReactNode
+    }>[]
+    expect(React.isValidElement(nameLine), "the value's own name is the first line").toBe(true)
+    expect(React.isValidElement(detailsLine), "Details rides the second line").toBe(true)
+    expect(detailsLine.props.className, "the second line is muted, sized down").toContain("text-muted-foreground")
+    // `rows[i].details` still answers on its own, unchanged in content — only
+    // where it renders moved (this function's own header).
+    expect(React.isValidElement(rows?.[0].details), "details still answers off the row too").toBe(true)
+  })
+
+  // A ROW WITH NOTHING FOR DETAILS TO SAY draws no second line at all, not an
+  // empty one — the Value cell's own single child is the name line.
+  it("draws no second line under Value for a type Details has nothing to say about", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "i2", type: "Industry", value: "Hospitality" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.isValidElement(value)).toBe(true)
+    const children = React.Children.toArray(value!.props.children)
+    expect(children.length, "no second line when Details is null").toBe(1)
   })
 
   // K59 (documents/UI-RULEBOOK.md), Aurora, 21 Sep 2026: "in settibsg sticket:

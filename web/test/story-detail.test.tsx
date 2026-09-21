@@ -536,39 +536,52 @@ describe("Category — derived, shown as a read-only fact (B43)", () => {
 })
 
 describe("Effort — the metrics AND the rows, no add door (B44 amended)", () => {
-  it("carries the total hours as a count beside the Effort title, the same register as Stakeholders", async () => {
+  // AMENDED, 22 Sep 2026 — Aurora, verbatim: "next to effort show the count
+  // of record, not the total hours (that has a metric on itself)." The
+  // title's own count is now the NUMBER of time log records, never hours.
+  it("carries the record count beside the Effort title, the same register as Stakeholders", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
     openStory()
     await screen.findByText("Cycle time")
-    // The title row itself: "Effort" then its own count, "6.5h" — the same
-    // `<h3>{title}{count}</h3>` shape `help-stakeholders.tsx`'s own
-    // "Stakeholders 4" register renders through (`TicketSidePanel`).
+    // The title row itself: "Effort" then its own count, "1" — one WORK_LOG
+    // fixture row — the same `<h3>{title}{count}</h3>` shape
+    // `help-stakeholders.tsx`'s own "Stakeholders 4" register renders
+    // through (`TicketSidePanel`).
     const heading = await screen.findByRole("heading", { name: /^Effort/ })
-    expect(heading.textContent).toBe("Effort6.5h")
+    expect(heading.textContent).toBe("Effort1")
   })
 
-  it("reads 'Not started' and 'No time log' before any work is logged, with '0h' beside the title", async () => {
+  it("reads 'Not started' and 'No time log' before any work is logged, with the record count beside the title", async () => {
     api.story = story({})
     api.metrics = NO_METRICS
     openStory()
     await screen.findByText("Cycle time")
     expect(await screen.findByText("Not started")).toBeTruthy()
     expect(await screen.findByText("No time log")).toBeTruthy()
+    // The one WORK_LOG fixture row is still logged even though the metrics
+    // door has nothing to say yet — the title's own count answers a
+    // different question from the tiles now, and does so honestly.
     const heading = await screen.findByRole("heading", { name: /^Effort/ })
-    expect(heading.textContent).toBe("Effort0h")
+    expect(heading.textContent).toBe("Effort1")
   })
 
-  it("renders the door's own cycle time, effort and flow efficiency, count said twice", async () => {
+  // AMENDED, 22 Sep 2026 — Aurora, verbatim: "make the metrics cards inside
+  // the container, like in the metrics artifact you did for me!" The three
+  // lines are real `<StatGrid>` tiles now, and the middle one reads "Effort
+  // hours" (not "Effort") since the title's own count answers "Effort" on
+  // its own now — the figure is said once, not twice.
+  it("renders the door's own cycle time, effort hours and flow efficiency as stat tiles", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
     openStory()
     // 183600s = 51h = 2d 3h; 23400s = 6.5h; 41%.
     expect(await screen.findByText("2d 3h")).toBeTruthy()
+    expect(await screen.findByText("Effort hours")).toBeTruthy()
     expect(await screen.findByText("41%")).toBeTruthy()
-    // "6.5h" appears twice on purpose — the title's own count and the
-    // body's own "Effort" line, the same figure said two ways (B44).
-    expect(screen.getAllByText("6.5h").length).toBe(2)
+    // "6.5h" appears once now — the tile's own figure, the title carries the
+    // record count instead of repeating it (B44 amended, 22 Sep 2026).
+    expect(screen.getAllByText("6.5h").length).toBe(1)
   })
 
   // AURORA, 21 SEP 2026, THE SAME ROUND: "ok, but i still want to see the
@@ -611,20 +624,25 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     expect(row!.textContent).toContain("P")
   })
 
-  // R88 — the card's own single door, now genuinely a collection again: at
-  // zero rows the header (title + count) drops entirely and the body reads
-  // one sentence, no door — never "Add the first" (there is nothing here to
-  // add FROM any more).
-  it("drops the header and reads 'No time logged yet.' — no door — once the record has no time at all", async () => {
+  // AMENDED, 22 Sep 2026 — Aurora, from the task review, verbatim: "if no
+  // time logged yet, hide that component." Stricter than R88's own
+  // header-only drop: at zero rows the card renders NOTHING at all, not
+  // even the body's own "No time logged yet." sentence — the head's own
+  // Start/Stop timer button is the one way in.
+  it("renders nothing at all — no card, no sentence — once the record has no time at all", async () => {
     api.story = story({})
     api.metrics = NO_METRICS
     api.workLogs = []
-    openStory()
+    const { container } = openStory()
     await screen.findByText("Add saved filters to the backlog board")
-    expect(await screen.findByText("No time logged yet.")).toBeTruthy()
-    // No "Effort" heading at all while empty (R88's whole header drops).
+    // The rest of the page still settles (a neighbouring panel proves the
+    // page did not simply fail to render).
+    await screen.findByText("Phase and wave")
+    expect(screen.queryByText("No time logged yet.")).toBeNull()
     expect(screen.queryByRole("heading", { name: /^Effort/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
+    // No Effort card at all on the page — not even an empty shell.
+    expect(container.querySelector('ul[class*="divide-y"]')).toBeNull()
   })
 
   // AURORA, THE SAME ROUND: "in effort card inside stories or tickets,
@@ -640,15 +658,22 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
   })
 
-  it("a row's own pencil corrects it through the same door WorkLogsPanel used", async () => {
+  // AMENDED, 22 Sep 2026 — Aurora, verbatim: "remove the pencil. when
+  // clicking one detail in slide in, and there have the option to edit."
+  // No pencil icon any more: the row itself is the button.
+  it("draws no pencil — clicking a row opens the slide-in sheet and corrects it through the same door WorkLogsPanel used", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
     const { container } = openStory()
     await screen.findByText("Cycle time")
-    const edit = container.querySelector('ul[class*="divide-y"] li button')
-    expect(edit, "the row's own edit pencil").toBeTruthy()
-    fireEvent.click(edit!)
+    const row = container.querySelector('ul[class*="divide-y"] li button')
+    expect(row, "the row itself is a button now, not a pencil beside it").toBeTruthy()
+    fireEvent.click(row!)
     const dialog = await screen.findByRole("dialog")
     expect(dialog).toBeTruthy()
+    expect(within(dialog).getByRole("heading", { name: "Correct this time" })).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole("button", { name: /submit/i }))
+    await waitFor(() => expect(api.updateWorkLog).toHaveBeenCalled())
+    expect(api.updateWorkLog.mock.calls[0][0].id).toBe(WORK_LOG.id)
   })
 })

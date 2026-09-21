@@ -591,35 +591,36 @@ export function SettingsChoicesPanel({
   // what she is asking for here, and it puts the table at SEVEN, one past the
   // ceiling, so something else has to fold.
   //
-  // THE FOLD THAT STAYS UNDER SEVEN IS STATUS, INTO VALUE. Her own
-  // suggestion, over a small chip beside the value's own name
-  // (`shapeChoicesTable`'s `valueCell`, deep-link/shape.tsx), the identical
-  // TECHNIQUE the tickets list already uses for its own Closed column
-  // (`tickets-collection.tsx`'s `closed` cell, "FOLDED INTO THIS ONE CELL
-  // RATHER THAN GIVEN A COLUMN OF ITS OWN … R82's own prescription for a fact
-  // that arrives once a table is already at the ceiling is 'fold the extra
-  // fact onto an existing column's own second line'"), read here as "onto an
-  // existing column's own second SLOT", since a status chip sits beside a
-  // name rather than under one. STATUS is the one column here with a real
-  // alternative reader, worth naming rather than picking by elimination:
+  // STATUS IS BACK, ITS OWN COLUMN — K59, documents/UI-RULEBOOK.md, Aurora,
+  // 22 Sep 2026, verbatim: "ok, but keep status as its own column!" The 21
+  // Sep 2026 reading above (splitting Added into Added by/Added on) had
+  // folded Status into Value to hold the table at R82's six-column ceiling;
+  // her follow-up reading undoes exactly that and asks for Status back at
+  // the header row. Something still has to fold to stay at six, and this
+  // time it is DETAILS, into Value — the identical TECHNIQUE the tickets
+  // list already uses for its own Closed column (`tickets-collection.tsx`'s
+  // `closed` cell, "FOLDED INTO THIS ONE CELL RATHER THAN GIVEN A COLUMN OF
+  // ITS OWN … R82's own prescription for a fact that arrives once a table is
+  // already at the ceiling is 'fold the extra fact onto an existing column's
+  // own second line'"), read here exactly as written: the value's own name
+  // on the first line, Details as a muted second line beneath it
+  // (`shapeChoicesTable`'s `valueCell`, deep-link/shape.tsx). DETAILS is the
+  // column that folds rather than STATUS, for the reasons the 21 Sep reading
+  // named for the opposite pairing, read the other way round:
   //
   //   • Details already carries NOTHING for most rows (this function's own
   //     header, "THE DETAILS COLUMN": Industry, Country, the three "labels"
-  //     groups and more draw an honest empty cell), so folding Status there
-  //     would read as blank on every type Details already has nothing to
-  //     say about, exactly the rows Status most needs to be visible on.
-  //   • Where is full on every row (module + field, "Work: Type") and a
-  //     third fact stacked into it would crowd two SEPARATE dimensions
-  //     (location and state) into one cell, the confusion R82's own "fold
-  //     the extra fact" line is written against, not for.
-  //   • Value already carries a leading mark (a swatch or an icon, when the
-  //     group has one) and a status chip is the same shape one step along,
-  //     a small, trailing mark beside the row's own name, so nothing new is
-  //     asked of the cell, only one more child in the row it already draws.
+  //     groups and more draw an honest empty cell), so a reader loses
+  //     nothing that was reliably there — unlike Status, which fills a real
+  //     word on every row.
   //   • Status still filters: the toolbar's own three-way facet
-  //     (`statusState`, below) is untouched, so nothing a reader could DO
-  //     with the old Status column is lost, only its own seat at the header
-  //     row.
+  //     (`statusState`, below) is untouched either way, so nothing a reader
+  //     could DO with either column is lost by this fold, only Details' own
+  //     seat at the header row.
+  //   • Value already carries a leading mark (a swatch or an icon, when the
+  //     group has one); a muted second line under the name is the same shape
+  //     one step further, and it is the exact stacking the tickets list
+  //     already puts a raised-on-style date under a raiser's name.
   //
   // The Module-into-Where fold below is unaffected and unrelated: two
   // different facts folded into two different columns for two different
@@ -636,15 +637,19 @@ export function SettingsChoicesPanel({
       sortKey: (r) => r.whereText,
       defaultDir: "asc",
     },
-    // THE DETAILS COLUMN — client ruling, 16 Sep 2026 evening: "add … an
-    // in-between column with details or info or whatever, and include this
-    // from each case." `shapeChoicesTable` (deep-link/shape.tsx) is what
-    // decides what a row's own type carries; this column only draws the
-    // cell it already built. No `sort`/`searchKey` — the same shape the
-    // `actions` column below takes, and for the same reason: the cell is a
-    // decoration (an icon, a dot, a duration), never a fact this table
-    // orders or searches by.
-    { key: "details", label: t("Details") },
+    // THE STATUS COLUMN, RESTORED — see above. `statusText` (the plain
+    // three-way word — Protected/Active/Inactive) is the sort key and the
+    // search key, since the cell itself (`status`) is a node, a `Badge`, not
+    // text, the same reason `value`/`where` above read a sibling `*Text`
+    // field rather than their own key.
+    {
+      key: "status",
+      label: t("Status"),
+      sort: "status",
+      searchKey: "statusText",
+      sortKey: (r) => r.statusText,
+      defaultDir: "asc",
+    },
     // ADDED BY: the creator's face and first name. `shapeChoicesTable`'s own
     // `addedByText` (the plain name, R54-trimmed) is both the sort key and
     // the search key, since the cell itself (`addedBy`) is a node, not text,

@@ -210,13 +210,16 @@ describe("the task sheet -- one persistent \"…\" menu carries both Edit and De
   })
 
   it("the one menu's own `actions` carries Edit and Delete once each, never two definitions", () => {
-    expect(src).toMatch(/const actions: RecordAction\[\] = \[/)
-    expect(src).toMatch(/key:\s*"edit"/)
+    // Aurora's decision 22 Sep 2026: bring the pencil icon out of the ..., next to it.
+    // Edit is now a separate icon button with aria-label, Delete stays in the menu.
+    expect(src).toMatch(/const actions:\s*RecordAction\[\]\s*=/)
     expect(src).toMatch(/key:\s*"delete"/)
+    expect(src).toMatch(/aria-label=\{t\("Edit"\)\}/)
+    expect(src).toMatch(/onClick=\{\(\)\s*=>\s*setEditing\(true\)/)
     const deleteMentions = src.match(/key:\s*"delete"/g) ?? []
     expect(deleteMentions.length).toBe(1)
-    const editMentions = src.match(/key:\s*"edit"/g) ?? []
-    expect(editMentions.length).toBe(1)
+    const editKeyMentions = src.match(/key:\s*"edit"/g) ?? []
+    expect(editKeyMentions.length).toBe(0)
   })
 
   it("behaviourally: the same shape task-sheet.tsx builds renders a More button whose opened menu lists Edit and Delete", async () => {

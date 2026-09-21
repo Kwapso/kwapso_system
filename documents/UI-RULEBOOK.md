@@ -5050,6 +5050,36 @@ above) both holding the line, still no `TABLE_COLUMN_BUDGET_EXEMPT` entry needed
 read for the PATTERN here rather than enforced on this cell, its own census is scoped to
 `<Select>`, never a table column, and R54 (first name only) still governs `addedByText`.
 
+**AMENDED AGAIN, 22 Sep 2026: Status is back to its own column, and Details folds into
+Value instead.** Aurora's ruling, verbatim: *"ok, but keep status as its own column!"* The
+fold one paragraph up did not survive either: the `<Badge variant="status" dot={…}>` chip
+moves back off the Value cell and onto its own `status` column cell, restoring the header
+row Value/Where/Status/Added by/Added on/Actions carried before the 21 Sep 2026 evening
+reading. Something still has to fold to hold R82's six-column ceiling now that Status has
+its seat back, and this time it is **Details** — its own column since 16 Sep 2026 evening —
+folding onto the Value cell's own SECOND LINE, muted, rather than beside the name: the value
+on the first line, Details underneath it when the row has one, the identical stacking
+`tickets-collection.tsx` uses to put a resolver's name over their date in its own Closed
+column (and, before her 20 Sep 2026 ruling retired it from that one call site, the way the
+same table stacked a raised-on date under the raiser). Details reads as an honest empty cell
+on most rows already (this rule's own "shape" paragraph, and `shapeChoicesTable`'s own
+header, "THE DETAILS COLUMN") — Sprint type and Story type draw an icon, App stage a dot
+tone, and every other seeded type (Industry, Country, the three "labels" groups, and more)
+draws nothing at all — so folding it under Value costs a reader less than folding Status
+ever did: Status fills a real, filterable word on every row, and Details mostly does not.
+The toolbar's own three-way Status facet (`statusState`) is unaffected either way, exactly as
+the 21 Sep 2026 fold left it.
+
+**Law, re-run again.** R82: value (with details folded beneath) + where + status + added by +
+added on + actions is six columns again — Details' fold (into Value's own second line) and
+Module's fold (into Where, unchanged since the first ruling) both holding the line, still no
+`TABLE_COLUMN_BUDGET_EXEMPT` entry needed. `sorted-columns-declare-their-type.test.ts`:
+Status's restored column reads `sort: "status"` / `searchKey: "statusText"` / `sortKey: (r) =>
+r.statusText` — a plain-text comparison, no `sortType` needed, the same shape the column held
+before the 21 Sep 2026 fold ever moved it. Tests: `web/test/shape.test.ts` (the status cell
+its own node again, and the Value cell's own second line proven present for a type Details
+has something to say and absent for one it does not).
+
 ---
 
 ### K60: every timer-start button reads "Start", with the stopwatch icon
@@ -7225,6 +7255,61 @@ count and the missing add button.
 exemption this time), R50 (empty-toolbar, the reasoned entries retired), R14 (paged rows,
 `<LoadMore>`), R35/R90 (a record's own face, on every row), R16 (the one count register).
 
+**Amended a third time, 22 Sep 2026 (reviewing the deployed card again).** Aurora, verbatim:
+*"remove the pencil. when clicking one detail in slide in, and there have the option to
+edit. make the metrics cards inside the container, like in the metrics artifact you did for
+me! next to effort show the count of record, not the total hours (that has a metric on
+itself)."* And, the same round, from the task review: *"if no time logged yet, hide that
+component. when time logged, as i said before, i want to see the avatar in each row."*
+
+**What changed, this round.** Four things, on `EffortCard` alone:
+
+1. **The title's own count is a record count now, not an hour total** — "6", never "6.5h".
+   The hours already have a tile of their own (below), so the same figure said twice was
+   exactly what her parenthetical objects to. Read off the SAME `workLogs` list door this
+   card already calls for its rows — the door's own exact `total` (R14's `pagedJson`, a real
+   `COUNT(*)`) — primed into `workLogsTotalKey` (`work-logs-panel.tsx`), the identical
+   sidecar a Time tab badge on this record would already read. `recordTimeSummaryKey`'s own
+   separate aggregate read is gone from this file: nothing here needs a second door for a
+   fact the first one already carried.
+2. **The three metric lines are stat tiles now**, drawn through the kit's own `<StatGrid>`
+   (`shared/ui/components/stat-grid/stat-grid.tsx`) rather than the hand-rolled three-column
+   `font-mono` grid this file drew by hand before — the same primitive
+   `work-logs-panel.tsx`'s own Numbers band and `pulse.tsx`'s dashboard already call, read
+   off the Delivery Metrics artifact's own tile wording. The middle tile reads "Effort
+   hours", not "Effort": the title's own count already answers "Effort" (point 1), so the
+   tile answers a different question beside it instead of repeating the word.
+   `COUNT_REGISTER_EXEMPT`'s own entry for this file (`shared/rules/registry.ts`) moves from
+   "pending her word" to settled — she has now explicitly asked for these three as tiles,
+   which R97's own ruling names as the one way out ("unless explicitly said").
+3. **No pencil.** A row is a real `<button>` (keyboard reachable): clicking one opens the
+   SAME slide-in sheet a pencil used to open — `TimeFormDialog`, already built on
+   `FormShellDialog`'s own `Sheet` (R59), the row's own fields, Save/Cancel — through the
+   identical `correct()` call the pencil used to make. A row still needs `work:update`
+   (`canEdit`) plus a settled, non-discarded entry to be a button at all; correcting a
+   still-running or already-discarded row was never offered before and is not being offered
+   now, only the door into a correction moved from a small icon onto the row itself.
+4. **Zero records draws nothing.** Not `EmptyGatedPanel`'s own header-only drop — the WHOLE
+   card, no sentence, no card, nothing at all. The head's own Start/Stop timer button is the
+   one way in, and a card that says "No time logged yet." beside a Start button that already
+   says the same thing is the component her words ask to hide.
+
+The face on every row (R35/R90) and the load-more door (R14) are unchanged from the previous
+amendment; her second sentence this round ("when time logged... i want to see the avatar in
+each row") restates what was already shipped rather than asking for something new.
+
+**Status: amended and shipped, 22 Sep 2026.** `EffortCard` updated alone (its test files, and
+`TimeFormDialog` reused unmodified); `web/test/story-detail.test.tsx` and
+`web/test/ticket-detail-no-tabs.test.tsx` updated for the record count, the stat tiles, the
+missing pencil, and the stricter zero-records case.
+
+**Law.** Governed by R88 (amended again by this round, stricter than the shell's own
+contract — the whole card, not only its header, drops at zero rows), R97 (a count never gets
+its own card — `COUNT_REGISTER_EXEMPT` settled for this file), R35/R90 (a face on every row,
+unchanged), R59 (a form slides in, never centres — the row opens the existing sheet rather
+than a new modal), R16 (the one count register, now the title's own record count rather than
+an hour total).
+
 ---
 
 ### B45: backlog tabs reordered, Everyone's renamed to All
@@ -7416,6 +7501,36 @@ exception), R99 (no record closes while its own clock runs, mirrored in the Done
 button's tooltip), R84 (mango lives only in the screen's own title action slot — Done
 keeps it, Start is `variant="secondary"`), R98 (the kit's own button sizes, never
 `size="sm"`) and K19a (the priority chip's own four colours).
+
+**Amended, 22 Sep 2026.** Aurora, verbatim, reading the sheet back: *"on slide in detail
+pages, the ... button must be aligned with title, not with pills. priority is already a
+chip, remove it from above deadline. assigned to needs a background, same description,
+same deadline. description and deadline same design. bring the pencil icon out of the
+..., next to it. if no time logged yet, hide that component. when time logged, as i said
+before, i want to see the avatar in each row."*
+
+Five changes to `task-sheet.tsx`. (1) The "…" menu moves off the chips row onto the
+title row, right of the title text and vertically centred with it, never with the
+priority pill above. (2) Edit leaves the menu for its own icon button (`size="icon"`,
+R98), `variant="secondary"`, beside the "…" on that same row — the menu now carries only
+Delete. (3) The Priority fact row is gone from the `OverviewList` below: the title row's
+own priority chip already says it. (4) Assigned to, Description and Deadline become
+three sections of ONE design — each a kit `Card` standing on the panel background, a
+small title, the content — the exact shape `TicketSidePanel`
+(`web/components/tickets/ticket-detail-body.tsx`) already draws for the ticket's own
+side panels, reused here rather than rebuilt; Assigned to keeps its own eyebrow tile
+(the Stakeholders-style `PersonCard`) inside its card, and Deadline moves out of the
+fact-row list into its own matching card, with "No deadline set." as its own fallback
+sentence. (5) The Effort card's own emptiness and its per-row avatar are the shared
+`EffortCard`'s (`web/components/work/effort-card.tsx`) own job, owned by another lane —
+the sheet only mounts it, unchanged, exactly as before.
+
+**Status: amended and shipped, 22 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`:
+the title row holds the title, the Edit pencil and the "…" menu, in that order, aligned
+with the title rather than the chips row; the "…" menu opens on Delete alone, no Edit
+item; no Priority fact row renders anywhere on the sheet; Assigned to, Deadline and
+Description render as three cards of the one `TicketSidePanel` shape, in that order; and
+the Effort section is absent when the task carries no logged time.
 
 ---
 

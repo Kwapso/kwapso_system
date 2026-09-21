@@ -4536,6 +4536,12 @@ export const SEED: Catalogue = {
   "Inherited from": { de: "Übernommen von", es: "Heredado de", ca: "Heretat de" },
   "Choose someone": { de: "Jemanden auswählen", es: "Elige a alguien", ca: "Tria algú" },
 
+  /* ── The task slide-in's own Deadline card (Aurora's ruling, 22 Sep 2026):
+   * "assigned to needs a background, same description, same deadline" —
+   * Deadline moved off the fact-row list into its own card, which needed a
+   * fallback sentence for a task carrying no due date at all. ──────────── */
+  "No deadline set.": { de: "Keine Frist festgelegt.", es: "Sin fecha límite.", ca: "Sense data límit." },
+
   /* ── The Assigned to card's own eyebrow, redesigned as the Stakeholders
    * card's twin (Aurora, 21 Sep 2026, verbatim: "I wanted the 'Assigned to'
    * to be like this: the count and the horizontal card. Redesign it."). The
@@ -4574,6 +4580,10 @@ export const SEED: Catalogue = {
   "None": { de: "Keine", es: "Ninguno", ca: "Cap" },
   "Cycle time": { de: "Durchlaufzeit", es: "Tiempo de ciclo", ca: "Temps de cicle" },
   "Not started": { de: "Noch nicht begonnen", es: "Sin empezar", ca: "Sense començar" },
+  // AMENDED, 22 Sep 2026, B44 amended a third time — the middle stat tile's
+  // own label, distinct from the title's own "Effort" now that the title
+  // carries the record count instead of the hour total.
+  "Effort hours": { de: "Aufwandsstunden", es: "Horas de esfuerzo", ca: "Hores d'esforç" },
   "Flow efficiency": { de: "Flusseffizienz", es: "Eficiencia de flujo", ca: "Eficiència de flux" },
   "No time log": { de: "Keine Zeiterfassung", es: "Sin registro de tiempo", ca: "Sense registre de temps" },
   // THE EFFORT CARD'S OWN EMPTY STATE (Aurora's ruling, 21 Sep 2026, B44

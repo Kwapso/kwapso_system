@@ -11,20 +11,12 @@
 // THE ROUND BEFORE THIS ONE HAD ALREADY FOLDED THE THREE METRIC LINES (Cycle
 // time / Effort / Flow efficiency) INTO THIS CARD AND DROPPED THE PER-LOG
 // ROWS — `WorkLogsPanel`'s own list, story-detail.tsx's own header carries
-// that account. This round puts the rows BACK, with a face on every one
-// (R35/R90), and takes the "Log time" door back OUT: the head's own
+// that account. That round put the rows BACK, with a face on every one
+// (R35/R90), and took the "Log time" door back OUT: the head's own
 // Start/Stop timer button (`RecordTimerButton`) is the one way a new row is
 // ever written from either of these two pages now — correcting a row ALREADY
-// written stays (the pencil), because correcting one is not adding one.
-//
-// R88 — EMPTY-STATE SINGLE DOOR, and now for real: while this card drew no
-// rows at all, "could this ever be empty" had an honest "no" (three metric
-// lines are always something to say — `EMPTY_TOOLBAR_EXEMPT`'s own retired
-// entry for this file argued exactly that). With the rows back, the card is
-// an ordinary collection again, so it is `EmptyGatedPanel` once more: at zero
-// logged entries the header (title, count) drops entirely and the body reads
-// one sentence, no door — "No time logged yet." (never "Add the first": there
-// is nothing here to add from).
+// written stayed (a pencil beside it), because correcting one is not adding
+// one.
 //
 // THE METRICS ARE HANDED IN, NOT READ HERE. A story's three figures come off
 // `getStoryMetrics` (`POST /api/content/stories/metrics`) and a ticket's off
@@ -36,14 +28,56 @@
 //
 // `metrics` IS OPTIONAL — a task carries neither a cycle-time clock nor a
 // status-event trail, so there is no third door to hand in. Left off (task
-// sheet, 21 Sep 2026), the three-line grid (Cycle time / Effort / Flow
-// efficiency) does not draw at all, never three placeholder sentences for a
-// concept the record does not have. The title's own hour count still needs a
-// real server total rather than a sum of whatever page of rows happens to be
-// loaded (R16, and this file's own rows are a LoadMore page) — so without a
-// caller-supplied `metrics.effortSeconds` it falls back to the same generic
-// `workLogSummary` aggregate `WorkLogsPanel`'s own Numbers band already
-// reads, fetched only when there is no metrics prop to read it from instead.
+// sheet), the three-tile row (Cycle time / Effort hours / Flow efficiency)
+// does not draw at all, never three placeholder tiles for a concept the
+// record does not have.
+//
+// AMENDED, 22 SEP 2026 — Aurora, verbatim, reviewing the deployed card:
+// "remove the pencil. when clicking one detail in slide in, and there have
+// the option to edit. make the metrics cards inside the container, like in
+// the metrics artifact you did for me! next to effort show the count of
+// record, not the total hours (that has a metric on itself)." And, the same
+// round, from the task review: "if no time logged yet, hide that component.
+// when time logged, as i said before, i want to see the avatar in each row."
+//
+// FOUR CHANGES, THIS ROUND:
+//
+//   1. THE TITLE'S OWN COUNT IS A RECORD COUNT NOW, not an hour total — "6",
+//      never "6.5h": the hours already have their own tile (2), so the same
+//      figure said twice was exactly what her sentence in parentheses
+//      objects to. Read off the SAME `workLogs` list door this card already
+//      calls for its rows — the door's own exact `total` (R14/R16,
+//      `pagedJson`'s own COUNT(*)) — primed into `workLogsTotalKey`
+//      (`work-logs-panel.tsx`), the identical sidecar a Time tab badge on
+//      this record would already read. Never a second door: the row-count
+//      question and the row-list question are one fetch, which is also why
+//      `recordTimeSummaryKey`'s own separate aggregate read is gone from
+//      this file — nothing here needs it any more.
+//   2. THE THREE METRIC LINES ARE STAT TILES NOW, drawn through the kit's own
+//      `<StatGrid>` (`shared/ui/components/stat-grid/stat-grid.tsx`) rather
+//      than the hand-rolled three-column grid this file used to draw by
+//      hand — the same primitive `work-logs-panel.tsx`'s own Numbers band
+//      and `pulse.tsx`'s dashboard already call. The middle tile reads
+//      "Effort hours" rather than "Effort": the title's own count already
+//      answers "Effort" (change 1), so the tile answers the different
+//      question beside it instead of repeating the word. See
+//      `COUNT_REGISTER_EXEMPT` (`shared/rules/registry.ts`) for why R97 (a
+//      count never gets its own card) does not forbid this — she has now
+//      explicitly asked for these three as tiles.
+//   3. NO PENCIL. A row is a real `<button>` (keyboard reachable): clicking
+//      one opens the SAME slide-in sheet a pencil used to open
+//      (`TimeFormDialog`, already `FormShellDialog`-built on the kit's own
+//      `Sheet`, R59 — the row's own fields, Save/Cancel), through the
+//      identical `correct()` call. A row still needs `work:update`
+//      (`canEdit`) plus a settled, non-discarded entry to be a button at
+//      all — correcting a still-running or already-discarded row was never
+//      offered before and is not being offered now; only the door into a
+//      correction moved from a small icon onto the row itself.
+//   4. ZERO RECORDS DRAWS NOTHING — not `EmptyGatedPanel`'s own header-only
+//      drop, the WHOLE card, no sentence, no card, nothing at all: the
+//      head's own Start/Stop timer button is the one way in, and a card
+//      that says "No time logged yet." beside a Start button that already
+//      says the same thing is the component her words ask to hide.
 //
 // THE ROWS THEMSELVES are the one thing genuinely shared at the data layer
 // too: `recordTimeKey(targetTable, targetId)` is the SAME cache key
@@ -55,19 +89,20 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { RecordMark } from "@shared/web/record-mark"
-import { EditPenButton } from "@shared/web/edit-pen-button"
 import { EmptyGatedPanel } from "@/components/deep-link/screen-bits"
-import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { LoadMore } from "@/components/records/load-more"
 import { TimeFormDialog, type TimeFormValues } from "@/components/work/time-form-dialog"
+import { workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { content as contentApi } from "@/lib/api"
-import { cursorKey, recordTimeKey, recordTimeSummaryKey } from "@/lib/live-resources"
+import { cursorKey, recordTimeKey } from "@/lib/live-resources"
 import { memberFace } from "@/components/tickets/tickets-collection"
-import type { TeamMember, WorkLog, WorkLogSummary } from "@shared/types"
+import type { TeamMember, WorkLog } from "@shared/types"
 import { staffNameFromSnapshot } from "@shared/staff-name"
-import { invalidate, primeCache, useCached } from "@shared/web/store"
+import { formatCount } from "@shared/web/format-count"
+import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 
 /** THE SAME SHAPE `StoryMetrics`/`TicketMetrics` CARRY (shared/types.ts) —
@@ -79,10 +114,7 @@ export type EffortMetrics = {
   flowEfficiency: number | null
 }
 
-/** Whole seconds → "3.5h", "0h" — the same rounding the title's own count and
- * the Effort line share, kept local rather than shared for the reason
- * `story-detail.tsx`'s own former copy of this gave: two call sites is not
- * yet a seam. */
+/** Whole seconds → "3.5h", "0h" — the Effort hours tile's own figure. */
 function hoursLabel(seconds: number): string {
   const hours = Math.round((seconds / 3600) * 10) / 10
   return `${hours}h`
@@ -115,8 +147,8 @@ export function EffortCard({
 }: {
   targetTable: "stories" | "help" | "tasks"
   targetId: string
-  /** `work:update` — gates the row's own correction pencil (never an add
-   * door: there is none left on this card). */
+  /** `work:update` — gates whether a row opens as an EDITABLE slide-in sheet
+   * (never an add door: there is none left on this card). */
   canEdit: boolean
   /** For the row's own face (R35/R90) — `memberFace(members, userId)`. */
   members: TeamMember[] | undefined
@@ -128,22 +160,21 @@ export function EffortCard({
   const { t } = useLanguage()
   const listKey = recordTimeKey(targetTable, targetId)
 
+  // THE TITLE'S OWN COUNT — the exact record total the SAME list door below
+  // already answers (R14's `pagedJson`), primed into the identical sidecar a
+  // Time tab badge on this record would already read (`workLogsTotalKey`,
+  // R15/R16 — one COUNT(*), one place it is kept). Never a second door: the
+  // row-count question and the row-list question are one fetch.
+  const countKey = workLogsTotalKey(targetTable, targetId)
+  const recordCount = useCachedValue<number>(countKey)
+
   const logsQ = useCached<WorkLog[]>(listKey, () =>
     contentApi.workLogs({ filter: { targetTable, targetId } }).then((r) => {
       primeCache(cursorKey(listKey), r.nextCursor)
+      primeCache(countKey, r.total)
       return r.logs
     })
   )
-
-  // THE FALLBACK HOUR TOTAL, for a caller with no metrics door of its own —
-  // fetched only then, never alongside a caller-supplied `metrics` (a second
-  // read of the same fact would be `TWO_READS_ONE_DOOR` territory for
-  // nothing this card draws).
-  const summaryKey = recordTimeSummaryKey(targetTable, targetId)
-  const summaryQ = useCached<WorkLogSummary>(metrics === undefined ? summaryKey : null, () =>
-    contentApi.workLogSummary({ targetTable, targetId })
-  )
-  const effortSeconds = metrics ? metrics.effortSeconds : (summaryQ.data?.totalSeconds ?? 0)
 
   const [editingLog, setEditingLog] = React.useState<WorkLog | null>(null)
 
@@ -151,7 +182,8 @@ export function EffortCard({
     invalidate(listKey)
   }
 
-  /** CORRECT A ROW ALREADY WRITTEN — the one write this card still owns. The
+  /** CORRECT A ROW ALREADY WRITTEN — the one write this card still owns, now
+   * opened by clicking the row itself rather than a pencil beside it. The
    * identical door `WorkLogsPanel`'s own `correct()` calls. */
   async function correct(values: TimeFormValues) {
     if (!editingLog) return
@@ -168,62 +200,85 @@ export function EffortCard({
   }
 
   const rows = logsQ.data
-  // R88/R50 — CONFIRMED empty, never merely "still loading" (`EmptyGatedPanel`'s
-  // own doc comment): `false` until the resting list actually answers.
+  // R88 — CONFIRMED empty, never merely "still loading": `false` until the
+  // resting list actually answers.
   const empty = rows !== undefined && rows.length === 0
+
+  // ZERO RECORDS DRAWS NOTHING (22 Sep 2026 amendment) — not even
+  // `EmptyGatedPanel`'s own header-only drop: the head's own Start/Stop
+  // timer button is the one way in, and a sentence on this card saying so
+  // again would be the same thing said twice.
+  if (empty) return null
 
   return (
     <>
-      <EmptyGatedPanel title={t("Effort")} count={!empty ? hoursLabel(effortSeconds) : undefined} empty={empty}>
+      <EmptyGatedPanel title={t("Effort")} count={formatCount(recordCount)} empty={false}>
         {rows === undefined ? (
           <Skeleton variant="list" lines={3} />
-        ) : empty ? (
-          // WORDS ONLY — no door here: there is nothing to add FROM on this
-          // card any more, only time the timer itself writes.
-          <CollectionEmptyState title={t("No time logged yet.")} description="" />
         ) : (
           <>
-            {/* THE THREE-LINE GRID — only for a caller that HAS a metrics
+            {/* THE THREE STAT TILES — only for a caller that HAS a metrics
                 door (a story or a ticket). Omitted rather than drawn with
-                placeholder sentences when there is no such concept for the
-                record (a task) — see this file's own header. */}
+                placeholder tiles when there is no such concept for the
+                record (a task) — see this file's own header. Drawn through
+                the kit's own `<StatGrid>` now, the same primitive
+                `work-logs-panel.tsx`'s own Numbers band and `pulse.tsx`'s
+                dashboard already call (Aurora, 22 Sep 2026: "make the
+                metrics cards inside the container, like in the metrics
+                artifact you did for me!"). */}
             {metrics && (
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs uppercase">{t("Cycle time")}</span>
-                  <span className="font-mono text-sm font-semibold">
-                    {metrics.cycleTimeSeconds !== null ? cycleTimeLabel(metrics.cycleTimeSeconds) : t("Not started")}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs uppercase">{t("Effort")}</span>
-                  <span className="font-mono text-sm font-semibold">{hoursLabel(metrics.effortSeconds)}</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs uppercase">{t("Flow efficiency")}</span>
-                  <span className="font-mono text-sm font-semibold">
-                    {metrics.flowEfficiency !== null ? `${Math.round(metrics.flowEfficiency)}%` : t("No time log")}
-                  </span>
-                </div>
-              </div>
+              <StatGrid
+                items={[
+                  {
+                    id: "cycle",
+                    label: t("Cycle time"),
+                    value:
+                      metrics.cycleTimeSeconds !== null
+                        ? cycleTimeLabel(metrics.cycleTimeSeconds)
+                        : t("Not started"),
+                  },
+                  {
+                    // "Effort hours", not "Effort" — the title's own count is
+                    // the record count now, so the tile answers a different
+                    // question beside it rather than repeating the word.
+                    id: "effort",
+                    label: t("Effort hours"),
+                    value: hoursLabel(metrics.effortSeconds),
+                  },
+                  {
+                    id: "flow",
+                    label: t("Flow efficiency"),
+                    value:
+                      metrics.flowEfficiency !== null
+                        ? `${Math.round(metrics.flowEfficiency)}%`
+                        : t("No time log"),
+                  },
+                ]}
+              />
             )}
 
             {/* THE INDIVIDUAL RECORDS OF TIME, newest first (the door's own
-                default order) — who, their face, when, how long, and what they
-                wrote, the same eight-fact-minus-two row `WorkLogsPanel`'s own
-                list draws, with a face added (R35/R90) and no add door beside
-                it. */}
+                default order) — a face, who, when, how long, and what they
+                wrote. NO PENCIL: a settled (`endedAt`), non-discarded row a
+                reader may correct (`canEdit`) is itself a real `<button>`
+                (keyboard reachable); clicking it opens the same slide-in
+                sheet a pencil used to. A row that fails any of those three
+                stays a plain, non-interactive row — a still-running or
+                already-discarded entry was never offered for correction
+                before, and a reader without `work:update` still cannot open
+                one now. */}
             <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
               {rows.map((l) => {
                 const name = staffNameFromSnapshot(l.userName) || t("Someone who has left")
-                return (
-                  <li
-                    key={l.id}
-                    className={`flex flex-wrap items-center gap-2 px-3 py-2 ${l.discarded ? "opacity-60" : ""}`}
-                  >
+                const editable = canEdit && !!l.endedAt && !l.discarded
+                const rowContent = (
+                  <>
                     <RecordMark picture={memberFace(members, l.userId)} name={name} shape="round" size="choice" />
                     <span className="min-w-0 flex-1 truncate text-sm">
                       {[name, l.startedAt.slice(0, 10)].join(" · ")}
+                    </span>
+                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                      {l.endedAt ? durationLabel(l.seconds) : t("running")}
                     </span>
                     {l.note && (
                       <span className="text-muted-foreground min-w-0 basis-full truncate text-xs sm:basis-auto">
@@ -235,11 +290,20 @@ export function EffortCard({
                         {t("Discarded")}
                       </Badge>
                     )}
-                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                      {l.endedAt ? durationLabel(l.seconds) : t("running")}
-                    </span>
-                    {canEdit && l.endedAt && !l.discarded && (
-                      <EditPenButton onClick={() => setEditingLog(l)} label={t("Edit")} />
+                  </>
+                )
+                return (
+                  <li key={l.id} className={l.discarded ? "opacity-60" : ""}>
+                    {editable ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingLog(l)}
+                        className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-start hover:bg-accent"
+                      >
+                        {rowContent}
+                      </button>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-2">{rowContent}</div>
                     )}
                   </li>
                 )

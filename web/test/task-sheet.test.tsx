@@ -10,12 +10,31 @@
 //   · a deep link (the sheet already open on mount, no click at all) opens it
 //     too;
 //   · the section order top to bottom: title row, Start/Done, Assigned to,
-//     Priority/Deadline, Description, Work logs, the dark footer band last;
+//     Deadline, Description, Effort, the dark footer band last;
 //   · the priority chip renders and no status chip does;
 //   · Start sits left of Done in the actions row;
 //   · Done is disabled, with "Stop the timer first." (R99's mirror), while a
 //     timer runs on the task;
 //   · Delete lives in the "…" menu.
+//
+// AMENDED 22 Sep 2026 — Aurora, verbatim, reading the sheet back: "on slide
+// in detail pages, the ... button must be aligned with title, not with
+// pills. priority is already a chip, remove it from above deadline.
+// assigned to needs a background, same description, same deadline.
+// description and deadline same design. bring the pencil icon out of the
+// ..., next to it. if no time logged yet, hide that component. when time
+// logged, as i said before, i want to see the avatar in each row." So:
+//
+//   · the title row holds the title, the Edit pencil (its own icon button)
+//     and the "…" menu, in that order, never the chips row;
+//   · the "…" menu carries only Delete now — Edit left it;
+//   · no Priority fact row renders anywhere (the title row's own chip is
+//     enough);
+//   · Assigned to, Deadline and Description each draw as one of three
+//     matching `TicketSidePanel` cards;
+//   · the Effort section (the shared `EffortCard`, another lane's own empty/
+//     avatar behaviour, unmodified here) is absent when the task carries no
+//     logged time.
 
 import * as React from "react"
 import { readFileSync } from "node:fs"
@@ -23,10 +42,11 @@ import { join } from "node:path"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { primeCache } from "@shared/web/store"
+import { invalidate, primeCache } from "@shared/web/store"
 import { RememberedScreen } from "@shared/web/remembered"
 import { BASE_RECIPES } from "@/lib/screens"
 import { TasksScreen } from "@/components/work/tasks-screen"
+import { recordTimeKey, recordTimeSummaryKey } from "@/lib/live-resources"
 import type { Task, TeamMember, WorkLog } from "@shared/types"
 
 const ROOT = join(__dirname, "..", "..")
@@ -350,8 +370,8 @@ describe("Done refuses while the task's own timer runs (R99's mirror)", () => {
   })
 })
 
-describe("Delete lives in the \"…\" menu", () => {
-  it("opens on the trigger and lists Edit and Delete", async () => {
+describe("Delete lives in the \"…\" menu, alone", () => {
+  it("opens on the trigger and lists Delete, never Edit", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
@@ -360,38 +380,60 @@ describe("Delete lives in the \"…\" menu", () => {
     fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
     fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
     fireEvent.click(trigger)
-    expect(await waitFor(() => screen.getByRole("menuitem", { name: "Edit" }))).toBeTruthy()
-    const deleteItem = screen.getByRole("menuitem", { name: "Delete" })
+    const deleteItem = await waitFor(() => screen.getByRole("menuitem", { name: "Delete" }))
     expect(deleteItem.className).toMatch(/text-destructive/)
+    expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull()
+  })
+})
+
+describe("the title row holds the title, the pencil and the More button (Aurora, 22 Sep 2026)", () => {
+  it("the \"…\" button sits beside the title, not the priority chip above it", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    const titleRow = document.querySelector('[data-slot="task-sheet-title-row"]') as HTMLElement
+    const heading = within(titleRow).getByRole("heading", { level: 2 })
+    const editButton = within(titleRow).getByRole("button", { name: "Edit" })
+    const moreButton = within(titleRow).getByRole("button", { name: "More actions" })
+    // The priority chip sits above this line — the "…" and the pencil must
+    // come AFTER the title in DOM order, on its own row, never beside the
+    // chip.
+    expect(heading.compareDocumentPosition(editButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(editButton.compareDocumentPosition(moreButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("the pencil opens the same edit form the old menu item used to", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    const titleRow = document.querySelector('[data-slot="task-sheet-title-row"]') as HTMLElement
+    fireEvent.click(within(titleRow).getByRole("button", { name: "Edit" }))
+    expect(await screen.findByDisplayValue(TASK.title)).toBeTruthy()
   })
 })
 
 describe("the order of sections, top to bottom", () => {
-  it("title row, Start/Done, Assigned to, Priority, Deadline, Description, Effort, then the footer band, last", async () => {
+  it("title row, Start/Done, Assigned to, Deadline, Description, Effort, then the footer band, last", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
 
-    // Scoped to the sheet's own scroller — TasksScreen's toolbar (behind the
-    // sheet) carries its own "Priority" sort/filter option text, which a
-    // page-wide text query would collide with.
     const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
     const titleRow = document.querySelector('[data-slot="task-sheet-title-row"]') as HTMLElement
     const actionsRow = document.querySelector('[data-slot="task-sheet-actions"]') as HTMLElement
     const assigneeCard = document.querySelector('[data-slot="task-assignee-card"]') as HTMLElement
-    const priorityLabel = within(sheet).getByText("Priority")
-    const deadlineLabel = within(sheet).getByText("Deadline")
-    const descriptionHeading = within(sheet).getByText("Description")
+    const deadlineCard = document.querySelector('[data-slot="task-deadline-card"]') as HTMLElement
+    const descriptionCard = document.querySelector('[data-slot="task-description-card"]') as HTMLElement
     // The Effort card's own title (`EmptyGatedPanel`) only draws once the
     // card's own work-log read settles, so this one waits.
     const effortHeading = await within(sheet).findByText("Effort")
     const footerBand = document.querySelector('[data-record-region="footer"]') as HTMLElement
 
-    for (const el of [titleRow, actionsRow, assigneeCard, priorityLabel, deadlineLabel, descriptionHeading, effortHeading, footerBand]) {
+    for (const el of [titleRow, actionsRow, assigneeCard, deadlineCard, descriptionCard, effortHeading, footerBand]) {
       expect(el, "every section must be on the page").toBeTruthy()
     }
 
-    const order = [titleRow, actionsRow, assigneeCard, priorityLabel, deadlineLabel, descriptionHeading, effortHeading, footerBand]
+    const order = [titleRow, actionsRow, assigneeCard, deadlineCard, descriptionCard, effortHeading, footerBand]
     for (let i = 0; i < order.length - 1; i++) {
       const a = order[i] as HTMLElement
       const b = order[i + 1] as HTMLElement
@@ -401,6 +443,33 @@ describe("the order of sections, top to bottom", () => {
         `element ${i} must come before element ${i + 1}`
       ).toBeTruthy()
     }
+  })
+
+  it("no Priority fact row renders — the title row's own chip is enough (Aurora, 22 Sep 2026)", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
+    // The priority WORD ("Important") still shows, in the title row's own
+    // chip — only the fact row's own "Priority" LABEL is gone.
+    expect(within(sheet).queryByText("Priority")).toBeNull()
+  })
+
+  it("Assigned to, Deadline and Description each draw as their own matching card", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    for (const slot of ["task-assignee-card", "task-deadline-card", "task-description-card"]) {
+      const card = document.querySelector(`[data-slot="${slot}"]`) as HTMLElement
+      expect(card, `${slot} must render`).toBeTruthy()
+      // Every one of the three wraps the kit's own panel-background Card —
+      // `TicketSidePanel`'s own `data-slot="card"` — the same design.
+      expect(card.querySelector('[data-slot="card"]'), `${slot} must be a Card`).toBeTruthy()
+    }
+    const deadlineCard = document.querySelector('[data-slot="task-deadline-card"]') as HTMLElement
+    expect(within(deadlineCard).getByText("Deadline")).toBeTruthy()
+    const descriptionCard = document.querySelector('[data-slot="task-description-card"]') as HTMLElement
+    expect(within(descriptionCard).getByText("Description")).toBeTruthy()
   })
 
   it("the footer band is the sheet's own last element", async () => {
@@ -419,17 +488,17 @@ describe("the order of sections, top to bottom", () => {
 // "Work logs" wrapper heading of this file's own (see task-sheet.tsx's own
 // header for the swap).
 describe("the Effort section draws the shared EffortCard", () => {
-  it("the title reads 'Effort' with the total hours beside it (5400s = 1.5h)", async () => {
+  it("carries the record count beside the Effort title", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
     const heading = await within(sheet).findByText("Effort")
-    // The hour count sits beside the title, inside the same `<h3>` — a task
-    // has no metrics door of its own, so this figure comes off the card's
-    // own generic `workLogSummary` read rather than a caller-supplied one
-    // (this file's own header for the reason).
-    expect(within(heading.closest("h3") as HTMLElement).getByText("1.5h")).toBeTruthy()
+    // The record count sits beside the title, inside the same `<h3>` — one WORK_LOG
+    // fixture row — the same `<h3>{title}{count}</h3>` shape
+    // `help-stakeholders.tsx`'s own "Stakeholders 4" register renders
+    // through (`TicketSidePanel`).
+    expect(heading.closest("h3")?.textContent).toBe("Effort1")
   })
 
   it("no Cycle time / Flow efficiency grid draws — a task has neither concept", async () => {
@@ -475,5 +544,42 @@ describe("the Effort section draws the shared EffortCard", () => {
     // sheet mounts now has no toolbar and no such door at all.
     expect(within(sheet).queryByText("Log time")).toBeNull()
     expect(within(sheet).queryByRole("button", { name: /log time/i })).toBeNull()
+  })
+})
+
+// EFFORT IS HIDDEN ENTIRELY WHEN THE TASK HAS NO TIME LOGGED — Aurora, 22 Sep
+// 2026, this file's own header: "if no time logged yet, hide that
+// component." The hiding is `EffortCard`'s OWN job (another lane's change,
+// `web/components/work/effort-card.tsx`, not touched here) — the sheet just
+// mounts the card exactly as it always has. This test proves the SHEET
+// carries no trace of the card once it has nothing to show, whichever file
+// ends up making that true.
+describe("the Effort section is absent when the task has no time logged", () => {
+  it("draws neither the 'Effort' title nor an empty-state card", async () => {
+    const savedLogs = door.workLogs
+    door.workLogs = []
+    // EVERY OTHER TEST IN THIS FILE OPENS THE SAME TASK (`t1`), and
+    // `EffortCard`'s own read keys (`recordTimeKey`/`recordTimeSummaryKey`)
+    // carry no teamId — target table + target id only (R56, one door). So a
+    // fresh `teamId` from `warmTeam` is not enough here: without this, the
+    // card would resolve the SHARED cache entry an earlier test already
+    // filled with Ana's one log, never noticing `door.workLogs` changed.
+    invalidate(recordTimeKey("tasks", "t1"))
+    invalidate(recordTimeSummaryKey("tasks", "t1"))
+    try {
+      const teamId = warmTeam([TASK])
+      render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+      await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+      const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
+      // Give the card's own work-log read a turn to settle before asserting
+      // its absence — the same wait every other Effort test in this file
+      // gives it to assert its PRESENCE.
+      await waitFor(() => {
+        expect(within(sheet).queryByText("Effort")).toBeNull()
+        expect(within(sheet).queryByText("No time logged yet.")).toBeNull()
+      })
+    } finally {
+      door.workLogs = savedLogs
+    }
   })
 })
