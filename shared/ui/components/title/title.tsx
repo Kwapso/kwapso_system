@@ -32,6 +32,28 @@
    · The actions are pushed with `ms-auto` — margin-inline-start — not with
      the kit's own physical `margin-left: auto`, which would leave the buttons
      stranded on the wrong side of an Arabic page.
+   · THE ROW IS CENTRED ON THE CROSS AXIS, NOT BASELINE — CORRECTED 21 SEP
+     2026, CLIENT RULING, VERBATIM: "EVERYWHERE (not only tickets) align the
+     gear settinsvvutton to middle horozotnal of title": the module settings
+     gear — the round icon button at the actions end of a screen's title
+     line — must sit on the title's own vertical centre, in both apps, on
+     every screen (CHANGELOG v1.2.146). Chapter 13's drawing was
+     `align-items: flex-end` — "baseline-of-the-block" — which puts the
+     BOTTOM of the actions cluster level with the BOTTOM of the heading
+     (or, with an eyebrow, the bottom of the whole eyebrow-plus-heading
+     stack): correct for two lines of TEXT sharing a visual baseline, wrong
+     for a round icon button beside 32px type, whose OWN centre needs to
+     land on the heading's centre, not its foot. `items-center` on this row
+     is the fix, and it is this component's own root row that draws it,
+     below — ONE component, so every screen this file's own header already lists
+     (`RecordDetail`, `ScreenRenderer`, `ScreenShell`, plus
+     `CollectionFrame`, `PortalHome`, `SearchResults`, every caller that
+     passes `actions`) inherits it with no prop and no call-site change.
+     NOT the whole head block: a caller that stacks a description, an
+     identity row or a tab strip UNDER this title (`ScreenShell`'s own band,
+     `record-detail.tsx`) wraps `Title` in ITS OWN `flex-col` column outside
+     this row (see those files), so centring here never reaches past the
+     eyebrow-and-heading pair this row actually holds.
    · Focus is ONE global rule (tokens.css §8). The actions are Buttons and
      carry it themselves.
    · Every user-facing string is the caller's. This file holds none at all:
@@ -271,9 +293,10 @@ const Title = React.forwardRef<HTMLDivElement, TitleProps>(
         ref={ref}
         data-slot="title"
         className={cn(
-          // Chapter 13: baseline-of-the-block alignment, 16 between the
+          // CENTRED ON THE CROSS AXIS, not `flex-end` — see the header's
+          // "THE ROW IS CENTRED" note (21 Sep 2026 ruling). 16 between the
           // heading group and the actions, wrapping on a narrow row.
-          "flex flex-wrap items-end gap-4",
+          "flex flex-wrap items-center gap-4",
           // 14 under the row, then the heavy section rule.
           /* ch01's "Hairline 20% — section rules", drawn as an inset shadow
              rather than a border (review 1A · fix 2). */

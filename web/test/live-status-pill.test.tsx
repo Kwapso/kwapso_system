@@ -159,7 +159,7 @@ describe("--live-status-band-clear is gone; --live-status-tab-clear is measured,
   // German and Catalan (see portal-shell.tsx's own comment above its
   // `<nav>`), which no flat number could track either. Fixed the same way
   // `--pinned-chrome-h` already was: a `ResizeObserver` on the bar itself.
-  it("app-shell.tsx derives --live-status-tab-clear from the tab bar's own measured height", () => {
+  it("app-shell.tsx derives --live-status-tab-clear from the tab bar's own measured height only (no +16)", () => {
     const src = readFileSync(join(REPO_ROOT, "web", "components", "shell", "app-shell.tsx"), "utf8")
     expect(src).not.toMatch(/\[--live-status-tab-clear:6rem\]/)
     expect(src).toMatch(/new ResizeObserver/)
@@ -167,13 +167,23 @@ describe("--live-status-band-clear is gone; --live-status-tab-clear is measured,
     // The observed node is the bottom tab bar itself, not a second, bigger
     // guess dressed up as a measurement.
     expect(src).toMatch(/<nav ref={tabBarRef}/)
+    // The published value is the tab bar's height only. The gutter is supplied
+    // by the base phone offset (--space-4, 16px), so the formula is:
+    // bottom = space-4 + height (mobile) or space-7 + 0 (desktop, bar hidden).
+    expect(src).toMatch(/height > 0 \? `\$\{height\}px` : "0px"/)
+    expect(src).not.toMatch(/\$\{height \+ 16\}/)
   })
 
-  it("portal-shell.tsx derives --live-status-tab-clear from the tab bar's own measured height", () => {
+  it("portal-shell.tsx derives --live-status-tab-clear from the tab bar's own measured height only (no +16)", () => {
     const src = readFileSync(join(REPO_ROOT, "web-portal", "components", "portal-shell.tsx"), "utf8")
     expect(src).not.toMatch(/\[--live-status-tab-clear:6rem\]/)
     expect(src).toMatch(/new ResizeObserver/)
     expect(src).toMatch(/setProperty\(\s*"--live-status-tab-clear"/)
     expect(src).toMatch(/<nav ref={tabBarRef}/)
+    // The published value is the tab bar's height only. The gutter is supplied
+    // by the base phone offset (--space-4, 16px), so the formula is:
+    // bottom = space-4 + height (at all widths here).
+    expect(src).toMatch(/height > 0 \? `\$\{height\}px` : "0px"/)
+    expect(src).not.toMatch(/\$\{height \+ 16\}/)
   })
 })

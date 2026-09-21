@@ -108,14 +108,17 @@
 // own ground rule (`ticket-detail-body.tsx`'s header) is that a panel standing
 // DIRECTLY on the page takes the soft-paper tone, and a raised card would
 // repeat the exact "raised standing on its own ground" bug that file spent a
-// full pass fixing, one level up. Everything else about the card is
-// unchanged: the same horizontal `PersonCard`, the same `size="row"`, the
-// same padding override, the muted "Inherited from <app>" line
-// (`shared/effective-assignee.ts`'s `effectiveAssignee`), the pen opening the
-// kit `Select` (R90 faces), and the "Nobody yet." words when there is truly
-// nobody to show. `HelpStakeholders` below carries none of this any more, no
-// props, no state, no render, "a different card from stakeholders" taken
-// literally.
+// full pass fixing, one level up. Everything else about the card was
+// unchanged at the time: the same horizontal `PersonCard`, the same
+// `size="row"`, the same padding override, the muted "Inherited from <app>"
+// line (`shared/effective-assignee.ts`'s `effectiveAssignee`), the pen
+// opening the kit `Select` (R90 faces), and the "Nobody yet." words when
+// there is truly nobody to show. `HelpStakeholders` below carries none of
+// this any more, no props, no state, no render, "a different card from
+// stakeholders" taken literally. THE TILE ITSELF IS SUPERSEDED, 21 SEP 2026:
+// see `StakeholderTile`'s own header, above, for the chip shape ("same with
+// assigned to (chiplike)") that replaced `size="row"` and the padding
+// override with the loop's own `size="choice"` and no card around it.
 //
 // THE WAY BACK TO THE APP'S LEAD IS A SEPARATE ACTION, NOT A "NOBODY" ROW,
 // reverted 20 Sep 2026. A 21 Sep 2026 pass had put a "Nobody, inherit from
@@ -155,17 +158,24 @@ import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
  * pill row. */
 export type AssignableMember = { id: string; name: string; photo?: string | null }
 
-/** ONE HORIZONTAL FACE+NAME TILE, the shape Raised by defined (this file's
- * header above, "RAISED BY IS HORIZONTAL TOO NOW") and Assigned to now
- * shares, reused rather than copied so the two tiles cannot drift the way
- * this file's own header warns two hand-rolled copies always do. A `Card
- * variant="raised"` holding one `PersonCard orientation="horizontal"
- * size="row"`, the same `py-3`/`lg:py-3` override that keeps the card ≈60px
- * at every width (this file's header, "SMALLER, TOO"). `action` is an
- * optional trailing control beside the face+name column: Assigned to's own
- * edit pen sits exactly where Raised by's used to, before it was retired
- * (this file's header, "THE EDIT PEN IS GONE FROM THIS CARD"); Raised by
- * itself passes none, its own pen is gone for good. */
+/** ONE FACE+NAME CHIP, THE LOOP'S OWN SHAPE — Aurora's ruling, 21 Sep 2026,
+ * verbatim, reviewing the ticket detail whose side sections are now plain
+ * (transparent) cards: "stakeholders raised by design like in the loop (chip
+ * like)" and "same with assigned to (chiplike)." RETIRES the paragraph this
+ * one replaces (a `Card variant="raised"` tile, `PersonCard
+ * orientation="horizontal" size="row"`, the chip drawn INSIDE the
+ * `PersonCard` as its own overline): the loop is the reference and does not
+ * change (its own `data-slot="loop-card"` `Card variant="raised"` stays
+ * exactly as it is, below), and Raised by / Assigned to now draw the same
+ * shape the loop draws each person with — `PersonCard orientation="horizontal"
+ * size="choice"`, the loop's own face size, no raised tile standing around
+ * it. The eyebrow ("Raised by" / "Assigned to" / "From the app") sits where
+ * the loop keeps its own "On the loop" label: a plain line ABOVE the chip
+ * row, never the `PersonCard`'s own `chip` slot any more — the same relative
+ * position, read outside the card instead of stacked inside it. `action` is
+ * kept, unused today by either caller (the pen was retired 20/21 Sep 2026),
+ * as the one trailing-control seam a future caller can still reach without a
+ * second tile. */
 function StakeholderTile({
   dataSlot,
   picture,
@@ -186,26 +196,23 @@ function StakeholderTile({
   action?: React.ReactNode
 }) {
   return (
-    <Card data-slot={dataSlot} variant="raised">
-      {/* STILL 102px ON STAGING, NOT 60px: see this file's header, "SMALLER,
-          TOO", for why `lg:py-3` (not only the base `py-3`) is what the kit's
-          own `lg:py-[var(--space-7)]` needs to lose to. */}
-      <CardContent className="flex flex-col gap-2 px-4 py-3 lg:py-3">
-        <div className="flex min-w-0 items-start justify-between gap-2">
-          <PersonCard
-            orientation="horizontal"
-            size="row"
-            picture={picture}
-            mark={mark}
-            markName={markName}
-            chip={chip}
-            title={title}
-            secondary={secondary}
-          />
-          {action}
-        </div>
-      </CardContent>
-    </Card>
+    <div data-slot={dataSlot} className="flex flex-col gap-2">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        {chip}
+        {action}
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <PersonCard
+          orientation="horizontal"
+          size="choice"
+          picture={picture}
+          mark={mark}
+          markName={markName}
+          title={title}
+          secondary={secondary}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -251,19 +258,16 @@ export function HelpStakeholders({
         <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
       ) : (
         <>
-          {/* RAISED BY — ONE TILE, A PLAIN FACT NOW (Aurora, 20 Sep 2026: no pen
-              here any more — see this file's header). No `onClick`, no
-              `cursor-pointer`: editing `raised_by_contact_id` is reached from the
-              ticket's own edit screen (`help-form-dialog.tsx`'s "Raised by"
-              field) instead.
-
-              SMALLER, TOO — Aurora, 20 Sep 2026: "Make 'Raised by' smaller — less
-              height." `size="row"` (36px, one `RecordMark` step down from this
-              `PersonCard`'s own "band" default of 56/72px) and a tighter, still
-              token-based vertical inset (`py-3` = 0.75rem/12px a side, down from
-              `p-4`'s 1rem/16px) — both spacing steps, not hand-picked pixels.
-              BEFORE (band + p-4): 2 × 16px padding + a 72px face ≈ 104px.
-              AFTER (row + py-3): 2 × 12px padding + a 36px face = 60px. */}
+          {/* RAISED BY — A CHIP NOW, LIKE THE LOOP (Aurora, 21 Sep 2026: "stakeholders
+              raised by design like in the loop (chip like)"). No pen, no
+              `onClick`, no `cursor-pointer`: editing `raised_by_contact_id` is
+              reached from the ticket's own edit screen (`help-form-dialog.tsx`'s
+              "Raised by" field) instead. SUPERSEDES the 20 Sep 2026 "SMALLER, TOO"
+              shape this comment used to describe (`size="row"`, a `py-3`/`lg:py-3`
+              override on a `Card variant="raised"`, ≈60px tall) — that raised tile
+              is gone; the face is `size="choice"` now, the loop's own step, drawn
+              with no card around it at all (`StakeholderTile`'s own header,
+              above). */}
           {(raiser || raisedByContactId) && (
             <StakeholderTile
               dataSlot="stakeholder-card"

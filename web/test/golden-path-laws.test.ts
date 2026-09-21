@@ -33,8 +33,19 @@ const goldenPath = () => readFileSync(join(ROOT, "documents", "BUILD-A-MODULE.md
 
 /** Every R-number the document names, however it names it — a heading, a
  * checklist line, a parenthesis. The question is whether a reader following this
- * page is TOLD about the law, not where. */
-const named = () => new Set([...goldenPath().matchAll(/\bR\d{1,2}\b/g)].map((m) => m[0]))
+ * page is TOLD about the law, not where.
+ *
+ * `\d{1,2}` UNTIL 21 SEP 2026, WHEN R100 MINTED THE FIRST THREE-DIGIT LAW. A
+ * capped digit count is exactly the silent-rot shape this file's own header
+ * warns about elsewhere in this repo ("a green check may measure nothing"):
+ * the day the ninety-ninth law's successor landed, this extraction would have
+ * gone on reporting a clean pass forever, having quietly stopped being able to
+ * SEE the one id most likely to be missing from a document written before it
+ * existed. `doc-claims.test.ts`'s own equivalent extraction already reads
+ * `\bR\d+\b`, unbounded, for the same "the other direction" check — this
+ * matches it rather than inventing a second cap that could drift from it
+ * again at R1000. */
+const named = () => new Set([...goldenPath().matchAll(/\bR\d+\b/g)].map((m) => m[0]))
 
 describe("BUILD-A-MODULE.md names every law in the registry", () => {
   it("the registry and the document are both being read", () => {

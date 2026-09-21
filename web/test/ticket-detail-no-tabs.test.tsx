@@ -927,30 +927,39 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
 // VERTICAL shape — see help-stakeholders.tsx's own header for the full
 // account. `help-stakeholders.test.tsx` proves the component in isolation;
 // this describe block proves it renders horizontally on the real page too.
-describe("the raised-by tile is a horizontal card (19 Sep 2026 ruling)", () => {
-  it("draws the raiser's face on the left, 'Raised by' over the name on the right", async () => {
+// SUPERSEDED 21 Sep 2026 — Aurora, verbatim, reviewing the ticket detail whose
+// side sections are now plain cards: "stakeholders raised by design like in
+// the loop (chip like)." The 19 Sep 2026 horizontal-card shape this describe
+// block used to prove (the eyebrow drawn INSIDE `PersonCard`'s own column) is
+// gone: Raised by is a face+name chip now, the loop's own shape, with the
+// eyebrow sitting OUTSIDE the chip, above it — see help-stakeholders.tsx and
+// web/test/help-stakeholders.test.tsx for the full account.
+describe("the raised-by tile is a face+name chip, like the loop (21 Sep 2026 ruling)", () => {
+  it("draws the raiser's face and name as a chip, with 'Raised by' as a label above it, no raised tile around it", async () => {
     api.stakeholders = [STAKEHOLDER, RAISER]
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const chipEl = await screen.findByText("Raised by")
-    // `PersonCard`'s own horizontal branch (shared/web/person-card.tsx) wraps
-    // chip+title in a column marked `items-start` — the vertical/band branch
-    // this tile drew until 19 Sep marks the same column `items-center`
-    // instead, so this is the one class that tells the two shapes apart.
-    const column = chipEl.parentElement as HTMLElement
-    expect(column.className).toContain("items-start")
-    expect(column.className).not.toContain("items-center")
-    // Scoped to the column itself — "Marta Bergman" also appears as the
+    const tile = chipEl.closest('[data-slot="stakeholder-card"]') as HTMLElement
+    expect(tile).toBeTruthy()
+    expect(tile.getAttribute("data-variant")).toBeNull()
+    expect(tile.querySelector('[data-slot="card"]')).toBeNull()
+    // Scoped to the tile itself — "Marta Bergman" also appears as the
     // thread's own message-sender name, elsewhere on the page.
-    const nameEl = within(column).getByText("Marta Bergman")
-    expect(column.contains(nameEl), "the name sits under the chip, in the same column").toBe(true)
-    // Chip above name, top line over bottom line.
-    const children = Array.from(column.children)
-    const chipIndex = children.indexOf(chipEl)
-    const nameIndex = children.findIndex((c) => c.contains(nameEl))
-    expect(chipIndex).toBeGreaterThan(-1)
-    expect(nameIndex).toBeGreaterThan(-1)
-    expect(chipIndex).toBeLessThan(nameIndex)
+    const nameEl = within(tile).getByText("Marta Bergman")
+    expect(tile.contains(nameEl), "the name sits in the same tile as the eyebrow").toBe(true)
+    // The eyebrow is no longer stacked inside the name's own PersonCard
+    // column — it sits above the chip row, the loop's own "On the loop"
+    // position.
+    const nameColumn = nameEl.parentElement as HTMLElement
+    expect(nameColumn.contains(chipEl)).toBe(false)
+    // Eyebrow row above chip row, top over bottom.
+    const children = Array.from(tile.children)
+    const eyebrowRowIndex = children.findIndex((c) => c.contains(chipEl))
+    const chipRowIndex = children.findIndex((c) => c.contains(nameEl))
+    expect(eyebrowRowIndex).toBeGreaterThan(-1)
+    expect(chipRowIndex).toBeGreaterThan(-1)
+    expect(eyebrowRowIndex).toBeLessThan(chipRowIndex)
   })
 })
 

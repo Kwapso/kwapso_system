@@ -138,7 +138,7 @@ import { PagedFind } from "@/components/records/paged-find"
 // thing — with the tab's answer silently losing on whichever prop forgot.
 import { translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
-import { AddButton, CollectionCard, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, CollectionEmptyBody, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TriageStrip } from "@/components/tickets/triage-strip"
 import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
@@ -1650,10 +1650,18 @@ export function TicketsCollection({
                          directly above this, which is where the client ruled it
                          belongs ("that button belongs in the right of the
                          toolbar, part of the toolbar"). */
-                      <CollectionEmptyState
-                        filtered={found.active}
-                        title={t("No tickets here yet.")}
-                      />
+                      /* CollectionEmptyBody (screen-bits.tsx) gives this its
+                         own paper on the plain frame this PagedFind's `wrap`
+                         draws above (line ~1604) — a no-op on any boxed
+                         CollectionCard, which is already paper. The toolbar
+                         above is OUTSIDE this wrapper, so it stays flush on
+                         the page either way. */
+                      <CollectionEmptyBody>
+                        <CollectionEmptyState
+                          filtered={found.active}
+                          title={t("No tickets here yet.")}
+                        />
+                      </CollectionEmptyBody>
                     ) : facet === OPEN && openView === "board" ? (
                       <OpenBoard
                         teamId={teamId}
@@ -2433,10 +2441,14 @@ export function TicketRowsTable<T extends TicketFace>({
  * the vocabulary fails this file's own type check instead of a board quietly
  * growing a column with no name.
  *
- * NO DOT ON ANY OF THEM — the same ruling `OpenBoard` carries at length below
- * ("remove the color from the status header!", 2026-09-09): a column head on
- * a ticket board carries no colour, full stop, and that did not narrow when a
- * second board joined the file. */
+ * THIS MAP NAMES ONLY THE TITLE, NEVER THE DOT — a stage's colour comes from
+ * `helpStatusDotTone` (shared/status-tones.ts), the one function every ticket
+ * surface reads for it, so a board's own `dot:` line calls that directly
+ * rather than this map growing a second column of tones to keep in step with
+ * it. `OpenBoard`'s own header carries the full ruling history: no dot from
+ * 2026-09-09, the dot back from 21 Sep 2026 ("bring abck the color on t stage
+ * in board view", UI-RULEBOOK.md L43) — and both readings of that history
+ * apply identically to every caller of this map. */
 export function ticketStatusColumnTitles(t: (s: string, vars?: Vars) => string): Record<HelpStatus, { title: string }> {
   return {
     new: { title: t("New") },
@@ -2654,7 +2666,27 @@ function OpenBoard({
    * name nobody names (web/test/dead-exports.test.ts), which is the seam left
    * half-wired rather than the seam left honest. The MEANING it carried is not
    * lost and was never a colour: `waitingClause` (workers/content/src/lib/help.ts)
-   * is what decides who is waiting, and the column below says so in words. */
+   * is what decides who is waiting, and the column below says so in words.
+   *
+   * ── AND THE DOT RETURNS, 21 SEP 2026 — THE 09-09 RULING IS OVERRULED ─────
+   *
+   * Aurora, reviewing the deployed tickets module, verbatim: *"bring abck the
+   * color on t stage in board view"* (UI-RULEBOOK.md L43's "her review of the
+   * live tickets pages" list). This is a ruling about THE STAGE, her own word,
+   * and it reverses the 2026-09-09 one two paragraphs above rather than
+   * refining it — "the status header should have no color" is precisely the
+   * sentence this new one contradicts. The whole essay above stays, because
+   * the next reader needs the full account of why the dot was removed AND
+   * that the removal is no longer the standing rule, not a trimmed history
+   * that looks like nothing ever changed.
+   *
+   * THE FOUR STAGE COLUMNS below carry `dot: helpStatusDotTone(stage)` again
+   * — the identical seam the 2026-09-07 pass first wired and the 2026-09-09
+   * one un-wired, so "Triaged" is orange on the Status filter, the ticket's
+   * own chip and this column head all at once, never a second table. THE
+   * WAITING COLUMN (the fifth, below) stays dot-less: it is a PREDICATE, not
+   * a stage, and her sentence named the stage — see that column's own note
+   * for the argument, otherwise unchanged by this reversal. */
   // READ OFF THE SHARED SIX rather than a four-entry literal of its own since
   // 17 Sep 2026, the day `AllBoard` below needed the identical titles for the
   // other two stages — one map, `ticketStatusColumnTitles` above, so "Ready"
@@ -2775,12 +2807,21 @@ function OpenBoard({
         ...OPEN_TAB_STATUSES.map((stage) => ({
           id: stage,
           title: COLUMN[stage].title,
-          /* NO `dot`, AND THAT IS THE WHOLE OF THE 2026-09-09 RULING — "remove
-             the color from the status header!" / "column header should have no
-             color". The kit's prop is optional and its two draw sites are gated
-             on `!== undefined`, so omitting it is the supported way to say this
-             and no kit change is needed. The argument, and the 2026-09-07 one it
-             replaces, are written out at `COLUMN` above. */
+          /* THE DOT IS BACK — Aurora's ruling, 21 Sep 2026, verbatim, reviewing
+             the deployed tickets module: "bring abck the color on t stage in
+             board view" (UI-RULEBOOK.md L43). This REVERSES the 2026-09-09
+             ruling this comment used to carry ("remove the color from the
+             status header!" / "column header should have no color") — read
+             `COLUMN` above for that ruling's own long account, kept for the
+             record rather than deleted, since the next reader needs to know it
+             was live and is no longer.
+             ONE TONE, NOT A SECOND TABLE — `helpStatusDotTone` is the exact
+             function the ticket's own chip reads (`Badge variant="status"
+             dot={helpStatusDotTone(ticket.status)}`, help-detail.tsx) and the
+             Status filter six inches above this board already reads
+             (`helpFacets`), so a stage can never wear one colour on its chip
+             and a different one on this column head. */
+          dot: helpStatusDotTone(stage),
           count: narrowed ? undefined : counts?.[stage],
           /* A PARTITION, NOT A NARROWING, and the difference is the whole of
              R16 on this screen. Two censuses forbid a paged screen from
@@ -2836,14 +2877,20 @@ function OpenBoard({
                once on this screen (R16). The footnote says all of this in the
                reader's own words, because a fifth column beside four is read as
                a fifth bucket unless something says otherwise.
-           NO DOT ON THIS HEAD EITHER, AND IT IS THE SAME RULING — client,
-           2026-09-09: "remove the color from the status header!" … "column
-           header should have no color". This column is the one that could most
-           plausibly argue for an exception, because it is not a status and a
-           colour would be the only thing marking it out from the four beside
-           it. It gets none: the FOOTNOTE under the board is what says this
-           column repeats cards from the four before it, in words, and a reader
-           who needs that sentence is not served by a poppy dot instead of it.
+           STILL NO DOT ON THIS HEAD, EVEN AFTER THE 21 SEP 2026 REVERSAL
+           ABOVE. Aurora's later ruling ("bring abck the color on t stage in
+           board view", UI-RULEBOOK.md L43) restored `dot` on the four STAGE
+           columns above, in the exact word she used — a stage — and this
+           column is deliberately not one: it is a PREDICATE over a ticket
+           already sitting in one of those four stages, the whole argument this
+           paragraph makes below. Nothing in her 21 Sep review named Waiting,
+           and the reason a colour would have been misleading here on
+           2026-09-09 is unchanged by a ruling about stage colour returning —
+           the FOOTNOTE under the board is still what says this column repeats
+           cards from the four before it, in words, and a reader who needs that
+           sentence is not served by a poppy dot instead of it. If she asks for
+           one here too, it is a new, separate ruling to record, not an
+           extension of this one.
            WHAT WENT WITH IT. Until 2026-09-09 this line read
            `dot: waitingDotTone()` — a named seam added on 2026-09-07 so the
            column would stop borrowing the tone of `awaiting_validation`, a stage
@@ -3003,9 +3050,13 @@ function AllBoard({
       columns={HELP_STATUSES.map((stage) => ({
         id: stage,
         title: COLUMN[stage].title,
-        // NO `dot` — the same 2026-09-09 ruling `OpenBoard` carries ("column
-        // header should have no color"), and it did not narrow when a second
-        // board joined the file.
+        // THE DOT IS BACK — the same 21 Sep 2026 reversal `OpenBoard` carries
+        // ("bring abck the color on t stage in board view", UI-RULEBOOK.md
+        // L43; `OpenBoard`'s own header has the full account), and it did not
+        // narrow when a second board joined the file. `helpStatusDotTone` is
+        // the one function every ticket surface reads for a stage's colour —
+        // the chip, the filter, and now both boards.
+        dot: helpStatusDotTone(stage),
         count: narrowed ? undefined : counts?.[stage],
         // A PARTITION OF THE WHOLE LIVE VOCABULARY, not a narrowing — see the
         // header above. `OpenBoard`'s own `FIND_NARROWING_OK` exemption for

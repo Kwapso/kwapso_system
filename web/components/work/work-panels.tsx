@@ -85,6 +85,7 @@ import { HELP_STATUS, ticketStatusCell } from "@/components/deep-link/shape"
 import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
 import { memberFace, ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
 import { ticketTitle } from "@shared/web/ticket-chips"
+import { helpStatusDotTone } from "@shared/status-tones"
 
 /** A row in one of these lists, faded when the record is switched off or
  * finished. Nothing here is ever hidden for being done: "finished" is a state,
@@ -1550,6 +1551,14 @@ function AppTicketsBoard({
       columns={HELP_STATUSES.map((stage) => ({
         id: stage,
         title: COLUMN[stage].title,
+        // THE STAGE'S OWN COLOUR — Aurora's ruling, 21 Sep 2026: "bring abck
+        // the color on t stage in board view" (UI-RULEBOOK.md L43), the same
+        // reversal `OpenBoard`/`AllBoard` (tickets-collection.tsx) carry at
+        // length, and this is the third and last board `ticketStatusColumnTitles`
+        // feeds — `helpStatusDotTone` is the one seam every one of them reads,
+        // so a stage cannot wear one colour on the team-wide boards and none
+        // on this app-scoped one.
+        dot: helpStatusDotTone(stage),
         cards: rows.filter((r) => r.status === stage).map(baseCard),
         emptyLabel: t("Nothing at this stage."),
       }))}

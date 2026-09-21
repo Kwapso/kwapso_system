@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed - toolbar search fill, kanban stage mark and board edge, head actions centred - v1.2.146 - 2026-09-21
+
+Four of the client's own rulings, 21 Sep 2026, verbatim, each the kit's to answer against the tickets module's `Card variant="plain"` ground:
+
+1. "the search on toolbar needs to have backhogunrd color" — `SearchInput` painted `bg-[var(--surface-raised)]`, a FIXED address byte-identical to `--background` in light, so it read invisible on a `plain` ground while the toolbar's own Filter/Sort buttons (`bg-[var(--btn-secondary-fill)]`, the RELATIONAL token) did not. Repointed at `bg-surface-lift`, tokens.css §4's own name for "a raised thing, relative to its ground" — the same §8 rebind `--btn-secondary-fill` already rides, byte-identical to the old fill everywhere it already looked right, and no longer invisible where it didn't. No prop, no call-site change.
+
+2. "bring abck the color on t stage in board view" — already a prop, not a gap: `KanbanColumn.dot` (`KanbanColumnDot`, kanban.tsx) draws the small coloured mark before a column's title off the identical `--dot-*` token family `Badge`'s own `dot` (`BadgeDot`) reads. Documented in place; a board with no colour is a caller not passing it.
+
+3. "on board view the acrds need some kind of border/shape (i like what you did in the artofact)" — `BoardCard` (`Card variant="raised"`) now carries `card.tsx`'s own `--hairline` token as a second shadow layer alongside its `--shadow-rest`, composed rather than substituted, whenever ANY `Card variant="plain"` ancestor stands over it — detected off `Card`'s own `group/card` + `data-variant` marker (`group-data-[variant=plain]/card:`), the identical mechanism `CardHeader`/`CardContent`/`CardFooter` already use for their own shell, aimed further up the tree instead of one level down. No new prop.
+
+4. "EVERYWHERE (not only tickets) align the gear settinsvvutton to middle horozotnal of title" — `Title`'s own row (`components/title/title.tsx`, the screen-head composition `CollectionFrame`, `RecordDetail`, `ScreenShell`, `PortalHome` and `SearchResults` all draw their actions slot through) took `align-items: flex-end`, chapter 13's baseline-of-the-block drawing — correct for two lines of text, wrong for a round icon button beside 32px type. Now `items-center`, so the actions cluster's own centre lands on the title's line-box centre in every head this component draws, with no call-site change. Scoped to `Title`'s OWN row, not the caller's whole head block: a caller stacking a description or a tab strip under the title wraps `Title` in its own column outside this row, untouched.
+
 ### Added - Card gains a sixth variant, `plain`, a box that draws no box - v1.2.145
 
 The client's ruling, 21 Sep 2026, verbatim: "only the containers like the

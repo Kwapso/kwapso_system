@@ -31,8 +31,14 @@ export function CollectionHeading({
   action?: React.ReactNode
 }) {
   const count = formatCount(total)
+  // CENTRED ON THE TITLE LINE — the agency app's own CollectionHeading carries
+  // the full ruling (Aurora, 21 Sep 2026: "EVERYWHERE (not only tickets) align
+  // the gear settinsvvutton to middle horozotnal of title"). `items-baseline`
+  // aligned `action` to the title text's own baseline rather than the middle of
+  // its line box; `items-center` is the same fix this law asks for everywhere
+  // else a head draws an action beside its title.
   return (
-    <div className="mb-4 flex items-baseline justify-between gap-2">
+    <div className="mb-4 flex items-center justify-between gap-2">
       {/* display-m — CLIENT CORRECTION, 2026-08-31, verbatim: "title on main
           screens still way too small! it's currently smaller than in detail
           screens. makes no sense." This used to sit at h3 (24, matching

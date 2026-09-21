@@ -133,8 +133,15 @@ export function CollectionHeading({
   // before `action` existed, so the fourteen screens that do not take a door out
   // are not asked to pay a div for a prop they never use.
   if (!action) return heading
+  // CENTRED ON THE TITLE LINE — Aurora's ruling, 21 Sep 2026, verbatim:
+  // "EVERYWHERE (not only tickets) align the gear settinsvvutton to middle
+  // horozotnal of title." `items-start` top-aligned the gear against the
+  // title's own line box; `heading` here is a single line (the `<h1>` plus its
+  // inline count badge, never a stacked title-and-subtitle), so centring the
+  // row centres the action on the title itself with nothing else to miscentre
+  // against.
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex items-center justify-between gap-3">
       {heading}
       {action}
     </div>

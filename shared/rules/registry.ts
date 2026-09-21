@@ -867,6 +867,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "no-close-while-timer-runs",
     status: "enforced",
   },
+  {
+    id: "R100",
+    dimension: "ui",
+    law: "EVERYWHERE (NOT ONLY TICKETS), THE GEAR SETTINGS BUTTON ALIGNS TO THE MIDDLE HORIZONTAL OF THE TITLE. Aurora, verbatim, 21 Sep 2026, reviewing the deployed tickets module (UI-RULEBOOK.md L43, her fifth listed item): \"EVERYWHERE (not only tickets) align the gear settinsvvutton to middle horozotnal of title.\" Read at L43 as a NEW rule for all modules, not the no-containers experiment. Every screen head that draws an action (a module settings gear, an edit pencil, or any other head-mounted control) BESIDE its own title is a flex row with `items-center`, never `items-start`/`items-end`/`items-baseline`, so the action sits on the middle of the title's own line box. A head that carries a stacked title-plus-subtitle centres the action against the TITLE ELEMENT ALONE — the title's own row is split out from the subtitle underneath it, never a single row whose `items-center` would centre against the whole two-line block instead. WIRED THE DAY THIS LAW SHIPPED: `web/components/records/collection-heading.tsx` (`items-start` → `items-center` on its `action` row — every `<CollectionHeading action={…}>` caller in the app inherits the fix from the one seam), `web/components/screens/kwapso-screen.tsx` (the title-plus-subtitle head split into its own title row, `items-center`, gear and pencil beside `team.name` alone, subtitle now a sibling underneath), and `web-portal/components/collection-heading.tsx` (`items-baseline` → `items-center`, the portal's own hand-rolled twin of the agency component, found by the same sweep). CHECKED, `web/test/head-actions-centred.test.ts`, a source census over `web/components`, `web-portal/components` and `shared/web`: every `<div>`/`<section>` whose `className` carries `flex` (a row, never `flex-col`) and both a title marker (`<h1`, `<Title`, `<Headline`, a bare `{heading}`/`{title}` expression) and an action marker (`ModuleSettingsGear`, a bare `{action}`/`{actions}` expression, `headActions`) within its own JSX subtree, must also carry `items-center`, or be named in `HEAD_ACTIONS_CENTRED_EXEMPT`, keyed by `{file, contains}`, rot-checked both ways.",
+    why: "THE KIT'S OWN `Title` COMPOSITION ALREADY CENTRES ITS ACTIONS, SINCE v1.2.146 — this law is about the app's OWN hand-rolled rows, the ones that never reached for that composition and drew a title-plus-action line by hand instead. A census that walked every kit-drawn head (RecordDetail/RecordChrome/screen-renderer/collection-frame, all through `Title`) would find nothing to fix and nothing to prove, so the subject here is deliberately narrower: a `div`/`section` an app file wrote itself, carrying both a title and an action marker in one JSX subtree. `items-center` rather than `items-baseline` is the specific fix, not a synonym for it — baseline aligns the action to the title TEXT's own baseline, which reads close for a single short word but drifts the moment the title wraps or the action is a taller control (a button, a gear) than the text beside it; `items-center` is what centres the action on the title's actual line box regardless of either.",
+    checkId: "head-actions-centred",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -2579,12 +2587,22 @@ export const SUBTITLE_OK: Record<string, string> = {
   // instant the file it named stopped containing a `CardTitle`/`CardDescription`
   // pair for the rot check to find, which is precisely the shape this
   // registry's own "the list can only shrink" discipline exists to catch.
-  "web/components/screens/kwapso-screen.tsx":
-    "the agency's own team-area header, `<Headline as=\"h1\">{team.name}</Headline>` followed by " +
-    "\"Who we are: our material, our team, and the details that go on a contract.\" R67's own " +
-    "UNCONTAINED_SECTION_OK carries two live entries for this exact file (`#team`, `#default`), both " +
-    "reasoned \"this screen is the agency's own housekeeping and is mid-change in another lane\" — the " +
-    "same reason applies here rather than restyling a screen another lane is actively editing.",
+  // THE "web/components/screens/kwapso-screen.tsx" ENTRY THAT STOOD HERE IS
+  // GONE, 21 Sep 2026 — R100's own fix (`items-center` on the title row,
+  // "EVERYWHERE (not only tickets) align the gear settinsvvutton to middle
+  // horozotnal of title") split this head's title onto its own row, away
+  // from the subtitle underneath it, so the gear and pencil would centre
+  // against `team.name` alone rather than the whole two-line block. The
+  // subtitle sentence is UNCHANGED and still renders, one level up now: the
+  // outer column's children are the title row, THEN the `<p>`, so the
+  // paragraph is no longer the heading's own immediate sibling inside the
+  // heading's OWN JSX children array (it is a sibling of the row that
+  // CONTAINS the heading) — this census's own header names exactly this
+  // shape a documented blind spot ("a heading drawn inside a component … is
+  // invisible to the sibling census"), and a plain wrapper div earns the
+  // identical blind spot a component does. Deleted rather than left to rot:
+  // this repository's own "the list can only shrink" discipline (this
+  // table's other comment, above) is what the failing rot-check asks for.
   "web/components/apps/app-detail.tsx":
     "a REFUSAL screen, not a titled section: `<Headline as=\"h1\">{app.name}</Headline>` followed by " +
     "\"You're not on this app, so its page is closed. Ask an admin to add you to the team on it.\" The " +
@@ -6292,3 +6310,21 @@ export const BUTTON_SIZE_EXEMPT: ButtonSizeExempt[] = [
     why: "An inline error-state recovery action (a retry/reload button beside or under a failure message), not a toolbar, a page head, a card header or a form foot.",
   },
 ]
+
+// ── head-actions-centred (R100) ─────────────────────────────────────────────
+
+/** A still-open head-actions-centred finding, keyed by `{file, contains}` —
+ * the offending row's own opening-tag `className` text, never a line number,
+ * so the pin cannot rot on an unrelated edit above it, the same shape
+ * `ButtonSizeExempt`/`IdChipExempt` already take. Rot-checked both ways by
+ * `web/test/head-actions-centred.test.ts`. Empty on the day this law
+ * shipped: the three rows the census's own sweep found (the agency and
+ * portal `CollectionHeading`s, and `kwapso-screen.tsx`'s team head) were
+ * fixed, not exempted. */
+export interface HeadActionsCentredExempt {
+  file: string
+  contains: string
+  why: string
+}
+
+export const HEAD_ACTIONS_CENTRED_EXEMPT: HeadActionsCentredExempt[] = []

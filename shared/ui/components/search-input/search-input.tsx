@@ -38,6 +38,45 @@
    leading glyph for the spinner and announces `aria-busy`. Logged as
    GAPS-C.md SRC-1.
 
+   THE FILL IS `--surface-lift`, NOT `--surface-raised` — CORRECTED 21 SEP
+   2026, CLIENT RULING, VERBATIM: "the search on toolbar needs to have
+   backhogunrd color" (a toolbar search box painting no visible fill on the
+   tickets module's `Card variant="plain"` ground, CHANGELOG v1.2.146).
+
+   `--surface-raised` IS `var(--card)`, a FIXED address — correct paper for a
+   pill that always stands on soft paper, wrong for one a caller can drop
+   anywhere. `--card` and `--background` are the SAME colour in light
+   (tokens.css §4's own note on `--surface-lift`: "an element that paints
+   `bg-card` … has NO boundary at all whenever what it stands on is any of
+   those four papers"), so a search pill inside a `plain` `Card` — no fill of
+   its own, the page's own white showing through — painted the identical
+   colour it sat on. 1.000. Invisible, for the same arithmetic reason the
+   `--surface-lift` token exists at all: `Alert` inside a `Sheet`,
+   `StatusStepper`'s pill, the book's own shadow swatch, and now this field.
+
+   `--surface-lift` IS THE KIT'S OWN NAME FOR "A RAISED THING, RELATIVE TO ITS
+   GROUND" (tokens.css §4) — the identical mechanism `--btn-secondary-fill`
+   already gives a `secondary` `Button`, which is why `FilterBar` and
+   `SortControl` (the two controls the client compared this field against,
+   "the Filter and Sort buttons beside it do carry a fill") never went
+   invisible on the same ground: both paint `bg-[var(--btn-secondary-fill)]`,
+   the relational token, never the fixed one. `--surface-lift`'s OWN root
+   default is `var(--card)` — byte-identical to `--surface-raised` wherever
+   nothing rebinds it — so every existing caller of this field, on every
+   ground it already stood on correctly, renders the same pixel it did
+   before. It only starts differing exactly where the bug was: inside a
+   `.bg-background` / `.bg-card` / `[data-ground="page"]` region (tokens.css
+   §8 rebinds it to `--surface-panel`) or a `.bg-surface-panel`
+   region (rebound to `--surface-raised`, i.e. unchanged). No prop, no
+   variant, no call-site change — the toolbar's `SearchInput` already IS this
+   component, so it takes the fix for free the moment the kit is pulled. The
+   named class (`bg-surface-lift`) is used rather than the arbitrary
+   `bg-[var(--surface-lift)]` form for the reason tokens.css states beside
+   `--color-surface-lift`: an arbitrary value paints the colour but matches
+   none of §8's ground selectors, so nothing downstream of it would rebind
+   either — the same freeze the toolbar row's own header comment warns about
+   by name.
+
    RENDERING CONTEXT
    `"use client"`. The clear control needs to know whether there is anything to
    clear, which is state, and clearing an uncontrolled field touches the DOM
@@ -74,7 +113,15 @@ const searchShellVariants = cva(
     // may float" — the floating layer has exactly two tenants and a search
     // box is not one of them. The paper tone against its ground is the whole
     // treatment, which is what "borderless raised pill" already said.
-    "bg-[var(--surface-raised)]",
+    //
+    // `bg-surface-lift`, NOT `bg-[var(--surface-raised)]` — CORRECTED 21 SEP
+    // 2026. See the header note above ("THE FILL IS `--surface-lift`") for
+    // the full argument; in one line, `--surface-raised` is a fixed address
+    // that reads as the identical colour to `--background` on a `plain`
+    // ground, and `--surface-lift` is the kit's own relational token for
+    // exactly that failure, already spent by `Alert`, `StatusStepper` and
+    // the book's shadow swatch.
+    "bg-surface-lift",
     "transition-[background-color,box-shadow,color]",
     "duration-[var(--duration-colour)] ease-kwapso",
   ],

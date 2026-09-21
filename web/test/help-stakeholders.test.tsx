@@ -160,28 +160,46 @@ describe("HelpStakeholders — Raised by, one tile", () => {
     expect(screen.queryByText("Raiser")).toBeNull()
   })
 
-  // CLIENT RULING, 19 Sep 2026, verbatim: "for stakeholder, raised by, use a
-  // horizontal card (avatar on the left, raised by + name on the right one
-  // on top of the other)." Supersedes the 18 Sep vertical/band shape —
-  // see this file's own header and help-stakeholders.tsx's for the account.
-  it("draws the tile as a horizontal PersonCard — avatar on the left, the chip over the name on the right", () => {
+  // CLIENT RULING, 21 Sep 2026, verbatim, reviewing the ticket detail whose
+  // side sections are now plain cards: "stakeholders raised by design like in
+  // the loop (chip like)." Supersedes the 19 Sep "horizontal card, avatar on
+  // the left, raised by + name stacked on the right" shape this test used to
+  // prove (a `Card variant="raised"` with the chip drawn INSIDE the
+  // `PersonCard` as its own overline) — see this file's own header and
+  // help-stakeholders.tsx's for the account.
+  it("draws the tile as a face+name chip, like the loop — the eyebrow sits above the chip row, no raised tile around it", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    const tile = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    // No raised tile around the chip any more — a plain div, no kit `Card`.
+    expect(tile.getAttribute("data-variant")).toBeNull()
+    expect(tile.querySelector('[data-slot="card"]')).toBeNull()
+
     const chipEl = screen.getByText("Raised by")
-    // `PersonCard`'s own horizontal branch (shared/web/person-card.tsx) wraps
-    // chip+title in a column marked `items-start`; the vertical/band branch
-    // marks the same column `items-center` — the one class that tells the
-    // two shapes apart without reaching into PersonCard's own internals.
-    const column = chipEl.parentElement as HTMLElement
-    expect(column.className).toContain("items-start")
-    expect(column.className).not.toContain("items-center")
     const nameEl = screen.getByText("Max Mustermann")
-    expect(column.contains(nameEl), "the name sits in the same column as the chip, under it").toBe(true)
-    const children = Array.from(column.children)
-    const chipIndex = children.indexOf(chipEl)
-    const nameIndex = children.findIndex((c) => c.contains(nameEl))
-    expect(chipIndex).toBeGreaterThan(-1)
-    expect(nameIndex).toBeGreaterThan(-1)
-    expect(chipIndex, "the chip ('Raised by') sits above the name — top line over bottom line").toBeLessThan(nameIndex)
+    expect(tile.contains(chipEl), "the eyebrow sits inside the tile, above the chip row").toBe(true)
+    expect(tile.contains(nameEl)).toBe(true)
+
+    // The eyebrow is OUTSIDE the PersonCard's own column now — the loop's own
+    // position, a label ABOVE the wrapping row, never PersonCard's own `chip`
+    // slot (which would mark its column `items-start`).
+    const nameColumn = nameEl.parentElement as HTMLElement
+    expect(nameColumn.contains(chipEl), "the eyebrow is no longer stacked inside the name's own column").toBe(false)
+
+    // DOM order: the eyebrow row comes before the chip row, top over bottom.
+    const children = Array.from(tile.children)
+    const eyebrowRowIndex = children.findIndex((c) => c.contains(chipEl))
+    const chipRowIndex = children.findIndex((c) => c.contains(nameEl))
+    expect(eyebrowRowIndex).toBeGreaterThan(-1)
+    expect(chipRowIndex).toBeGreaterThan(-1)
+    expect(eyebrowRowIndex, "the eyebrow row sits above the chip row").toBeLessThan(chipRowIndex)
+  })
+
+  it("draws the chip at the loop's own face size (size=\"choice\"), the loop's exact PersonCard shape", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    const raisedByTile = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    const raisedByRow = raisedByTile.querySelector(".flex-wrap") as HTMLElement
+    expect(raisedByRow, "the chip sits inside a flex-wrap row, the loop's own wrapping row shape").toBeTruthy()
+    expect(raisedByRow.className).toContain("gap-3")
   })
 
   it("draws exactly one Raised-by tile, never one per admitted/mentioned/added stakeholder", () => {
@@ -221,21 +239,16 @@ describe("HelpStakeholders — Raised by, one tile", () => {
     expect(content.className).not.toContain("cursor-pointer")
   })
 
-  // Aurora, 20 Sep 2026, from the live measurement: "the Raised by card in
-  // help-stakeholders.tsx measures 102px because CardContent still carries
-  // lg:py-[var(--space-7)] beating py-3; remove the lg override so the card
-  // is ≈60px at every width." The kit's own `CardContent`
-  // (shared/ui/components/card/card.tsx) carries `py-6 lg:py-[var(--space-7)]`
-  // — a call site's own `py-3` only wins at the base breakpoint, sharing no
-  // prefix with `lg:py-…`, so the kit's own padding kept winning above that
-  // width. This locks the app-side override at the SAME breakpoint.
-  it("overrides the kit's lg:py padding on the Raised-by card, not only the base one", () => {
+  // SUPERSEDED 21 Sep 2026 by the chip ruling above: the 20 Sep 2026 "SMALLER,
+  // TOO" padding fix (`py-3`/`lg:py-3` beating the kit's own
+  // `lg:py-[var(--space-7)]`) applied to a `Card`/`CardContent` this tile no
+  // longer renders — there is no raised tile left to carry an lg:py override.
+  // This test now proves the ABSENCE of that whole kit-padding surface,
+  // rather than one particular class winning on it.
+  it("carries no kit CardContent padding at all — there is no raised tile left to override", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    const card = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
-    const content = card.firstElementChild as HTMLElement
-    expect(content.className).toContain("py-3")
-    expect(content.className).toContain("lg:py-3")
-    expect(content.className).not.toContain("lg:py-[var(--space-7)]")
+    const tile = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    expect(tile.querySelector('[data-slot="card-content"]')).toBeNull()
   })
 
   it("takes no LOOP-picker props — StaffPillPicker/onAdd/canAdd/members are gone from its signature", () => {
@@ -491,11 +504,18 @@ describe("AssignedToCard", () => {
   // one that can drift the first time either is touched. Proved on the
   // rendered classes rather than on the source, so a regression that
   // reintroduces a copy with even one different class fails here.
-  it("the assigned-to tile shares the Raised by tile's own classes", () => {
+  //
+  // AND NEITHER CARRIES A RAISED TILE ANY MORE — Aurora's 21 Sep 2026 ruling,
+  // "stakeholders raised by design like in the loop (chip like)" / "same with
+  // assigned to (chiplike)": both are a face+name chip now, no
+  // `data-variant="raised"` `Card` standing around either one.
+  it("the assigned-to tile shares the Raised by tile's own classes, and neither carries a raised Card any more", () => {
     render(<HelpStakeholders stakeholders={[MAX]} />)
     const raisedByTile = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
     const raisedByContent = raisedByTile.firstElementChild as HTMLElement
     const raisedByClasses = raisedByContent.className
+    expect(raisedByTile.getAttribute("data-variant")).toBeNull()
+    expect(raisedByTile.querySelector('[data-slot="card"]')).toBeNull()
 
     cleanup()
 
@@ -504,7 +524,8 @@ describe("AssignedToCard", () => {
     const assignedContent = assignedTile.firstElementChild as HTMLElement
 
     expect(assignedContent.className).toBe(raisedByClasses)
-    expect(assignedTile.getAttribute("data-variant")).toBe(raisedByTile.getAttribute("data-variant"))
+    expect(assignedTile.getAttribute("data-variant")).toBeNull()
+    expect(assignedTile.querySelector('[data-slot="card"]')).toBeNull()
   })
 
   // READ-ONLY. Aurora's ruling, 21 Sep 2026, verbatim, reading the card

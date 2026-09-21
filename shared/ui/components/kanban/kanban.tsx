@@ -190,6 +190,15 @@ export interface KanbanColumn {
    * quiet count. The cards themselves carry no status pill — the column
    * already said it." One of the six `--dot-*` tones; the dot never carries
    * the state alone (ruling 26) — the name in words is beside it.
+   *
+   * THIS IS ALREADY THE COLOURED MARK — CLIENT RULING, 21 SEP 2026, VERBATIM:
+   * "bring abck the color on t stage in board view" (CHANGELOG v1.2.146).
+   * No prop was added for this: `dot` already draws a small filled circle in
+   * the stage's tone before the title, off the SAME `--dot-*` token family
+   * `Badge`'s own `dot` prop reads (`BadgeDot`, badge.tsx — byte-identical
+   * ten-tone map), which is the family the app's stage chips already use. A
+   * board reading no colour is a caller not passing this prop for its
+   * columns, not a gap in the column head.
    */
   dot?: KanbanColumnDot;
   /**
@@ -1103,6 +1112,45 @@ function BoardCard({
         // no duration and no easing is written in this file.
         "motion-drag",
         draggable && "cursor-grab",
+        /* THE BOARD CARD'S OWN EDGE ON A PLAIN GROUND — CLIENT RULING, 21 SEP
+           2026, VERBATIM: "on board view the [cards] need some kind of
+           border/shape (i like what you did in the artofact)" — her reference
+           a pale card, a soft rounded edge and a faint shadow reading clearly
+           on white (CHANGELOG v1.2.146).
+
+           `Card variant="raised"` already draws the radius and
+           `--shadow-rest` (`shadow-sm`'s bridge); what it cannot draw for
+           itself is an edge, because `card.tsx`'s own `hairline` prop is a
+           boolean this file would have to plumb through `KanbanCard` and
+           every call site would have to set — an unruled affordance this
+           component's own law (above, on the chip-order decision) already
+           argues against inventing. So this is not a new border and not a
+           new prop: it is `card.tsx`'s OWN `--hairline` token
+           (`hairline && "shadow-[var(--hairline)]"`, card.tsx), composed
+           here as a SECOND shadow layer alongside the `raised` variant's
+           `--shadow-rest` rather than either one overwriting the other, so
+           the card keeps its lift and gains the edge — never one instead of
+           the other.
+
+           DETECTED OFF `Card`'s OWN ANCESTOR MARKER, NOT A PROP THIS
+           COMPONENT WOULD HAVE TO REPEAT. `Card` unconditionally sets
+           `group/card` on its own root (card.tsx) and `data-variant` beside
+           it; `CardHeader`/`CardContent`/`CardFooter` already read that exact
+           pair (`group-data-[variant=plain]/card:`, card.tsx) to detect
+           their OWN shell's `plain` variant, and this is the identical
+           mechanism aimed one or more levels further up instead of one level
+           down. Tailwind compiles the selector as a plain descendant match —
+           `:where(.group\/card[data-variant="plain"]) &` — which fires for
+           ANY `plain` `Card` ancestor in the tree, not only a direct parent:
+           exactly what a board needs, since `Column` paints no ground of its
+           own (see its "THE COLUMN IS BARE" note, below) and the nearest
+           real ground a card standing in a `plain` collection frame has is
+           several levels up. `BoardCard`'s own `group/card` (every `Card`
+           variant carries it) sits BETWEEN the board and that ancestor but
+           does not block the match — it is not itself `data-variant="plain"`,
+           and a CSS descendant combinator matches any qualifying ancestor,
+           not only the nearest one. */
+        "group-data-[variant=plain]/card:shadow-[var(--shadow-rest),var(--hairline)]",
         // A fill and an ink. Never an opacity, and no hover — a locked card
         // must not look movable.
         card.disabled === true &&

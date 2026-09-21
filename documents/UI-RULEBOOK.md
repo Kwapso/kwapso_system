@@ -1744,6 +1744,21 @@ live: no em dash anywhere a person reads.
 
 **Extended, 21 Sep 2026.** Aurora, verbatim: *"can yo do it also on tickets main?"* The tickets main page follows: the collection frame around the toolbar and the table, board, split or list on every tab, and the Overview chart panels, render plain; the board cards, the rows' washes, the triage well and the error and empty states keep their paper. Still the tickets module only.
 
+**Her review of the live tickets pages, 21 Sep 2026.** Aurora, verbatim:
+
+*"* the search on toolbar needs to have backhogunrd color
+* bring abck the color on t stage in board view
+* stakeholders raised by design like in the loop (chip like)
+* same with assigned to (chiplike)
+* on board view the acrds need some kind of border/shape (i like what you did in the artofact - see in screenshot your artifact)
+* EVERYWHERE (not only tickets) align the gear settinsvvutton to middle horozotnal of title"*
+
+**Reading it.** The toolbar search takes a fill; the board column head carries the stage colour; Raised by and Assigned to are chips like On the loop; board cards take the kit hairline on a plain ground; the module settings gear centres on the title line on every screen in both apps (a new rule for all modules, not the experiment).
+
+**The rule (R100 `head-actions-centred`).** Her fifth item above, read on its own because it is not scoped to tickets or to this experiment: *"EVERYWHERE (not only tickets) align the gear settinsvvutton to middle horozotnal of title."* Every screen head that draws an action (a module settings gear, an edit pencil, or any other head-mounted control) beside its own title sits on the middle of the title's own line box: `items-center` on the row, never `items-start`/`items-end`/`items-baseline`. A head with a stacked title-plus-subtitle centres the action against the title element alone: split the title onto its own row, away from the subtitle underneath it, rather than centring against the whole two-line block. The kit's own `Title` composition already does this for free, since v1.2.146; this is for the app's own hand-rolled rows that never reached for it. Wired the day this law shipped: `web/components/records/collection-heading.tsx` and `web-portal/components/collection-heading.tsx` (both `action` rows, `items-start`/`items-baseline` → `items-center`), and `web/components/screens/kwapso-screen.tsx` (its title row split from the subtitle underneath it).
+
+**Law.** [R100](../RULES.md) (`head-actions-centred`), a source census, `web/test/head-actions-centred.test.ts`, over `web/components`, `web-portal/components` and `shared/web`: every `<div>`/`<section>` whose `className` carries `flex` (a row, never `flex-col`) and both a title marker (`<h1`, `<Title`, `<Headline`, a bare `{heading}`/`{title}` expression) and an action marker (`ModuleSettingsGear`, a bare `{action}`/`{actions}` expression, `headActions`) in one JSX subtree must also carry `items-center`, or be named in `HEAD_ACTIONS_CENTRED_EXEMPT`, keyed by `{file, contains}`.
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order
@@ -10190,6 +10205,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R94 | [L37](#l37-a-records-chips-draw-in-one-fixed-order--id-status-type-main-parent-secondary-parent) | R95 | [L38](#l38-no-em-dash-anywhere-a-person-reads) |
 | R96 | [L39](#l39-the-id-chip-is-black) | R97 | [L40](#l40-a-count-never-gets-its-own-card) |
 | R98 | [L41](#l41-every-button-is-the-kits-own-height) | R99 | [L42](#l42-no-record-closes-while-its-own-clock-is-still-running) |
+| R100 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | | |
 
 ### The seven files that carry most of it
 

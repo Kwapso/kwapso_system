@@ -1441,7 +1441,7 @@ export function AppShell({
     if (!shell || !bar) return
     const publish = () => {
       const height = Math.round(bar.getBoundingClientRect().height)
-      shell.style.setProperty("--live-status-tab-clear", height > 0 ? `${height + 16}px` : "0px")
+      shell.style.setProperty("--live-status-tab-clear", height > 0 ? `${height}px` : "0px")
     }
     publish()
     const observer = new ResizeObserver(publish)

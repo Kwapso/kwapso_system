@@ -102,34 +102,43 @@ export function KwapsoScreen({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div className="flex flex-wrap items-start gap-4">
-        <div className="min-w-0">
+      {/* THE ACTIONS CENTRE ON THE TITLE'S OWN LINE, NEVER ON THE STACK —
+          Aurora's ruling, 21 Sep 2026, verbatim: "EVERYWHERE (not only
+          tickets) align the gear settinsvvutton to middle horozotnal of
+          title." This head carries a title AND a subtitle underneath it, so
+          `items-center` on a row holding both would centre the gear against
+          the whole two-line block instead of the title — the title row is
+          split out on its own now, gear and pencil beside `team.name` alone,
+          with the subtitle a sibling underneath rather than a second line
+          inside the same flex item. */}
+      <div className="flex w-full flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-4">
           {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
               is the kit's own named "Page title" step (56/500), see
               collection-heading.tsx's own note for the full ruling. */}
-          <Headline as="h1" size="display-m">{team.name}</Headline>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {t("Who we are: our material, our team, and the details that go on a contract.")}
-          </p>
+          <Headline as="h1" size="display-m" className="min-w-0">{team.name}</Headline>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
+          {can("teams", "update") && (
+            <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
+              <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />
+              {/* HOUSEKEEPING (R61's gear, R70's page) — the installation's own
+                  nightly work: the clear-out, the growth alarm, the fault report
+                  and the watchdog that notices when the other three have stopped.
+                  It is mounted HERE, on the app's own record, because the estate
+                  belongs to no module and this is the screen about the thing
+                  itself. `/settings/team` is its address for the reason
+                  `MODULE_SETTINGS` gives: `teams` is the permission this base
+                  already treats as "this team's own settings", and it is the one
+                  right that module offers. Nothing on that page is switchable and
+                  the page says why — which is the half of the client's ruling
+                  that is about SEEING rather than about choosing. */}
+              <ModuleSettingsGear teamId={teamId} segment="team" />
+            </div>
+          )}
         </div>
-        {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
-        {can("teams", "update") && (
-          <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />
-            {/* HOUSEKEEPING (R61's gear, R70's page) — the installation's own
-                nightly work: the clear-out, the growth alarm, the fault report
-                and the watchdog that notices when the other three have stopped.
-                It is mounted HERE, on the app's own record, because the estate
-                belongs to no module and this is the screen about the thing
-                itself. `/settings/team` is its address for the reason
-                `MODULE_SETTINGS` gives: `teams` is the permission this base
-                already treats as "this team's own settings", and it is the one
-                right that module offers. Nothing on that page is switchable and
-                the page says why — which is the half of the client's ruling
-                that is about SEEING rather than about choosing. */}
-            <ModuleSettingsGear teamId={teamId} segment="team" />
-          </div>
-        )}
+        <p className="text-muted-foreground text-sm">
+          {t("Who we are: our material, our team, and the details that go on a contract.")}
+        </p>
       </div>
 
       {/* THE STRIP AND ITS PANEL ARE SIBLINGS, R77 (`tab-strips-pin`) — the

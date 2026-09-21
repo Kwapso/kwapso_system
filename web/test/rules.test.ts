@@ -5516,6 +5516,7 @@ describe("RULES — the laws of the base", () => {
       "counts-beside-titles", // R97: web/test/counts-beside-titles.test.ts — every <StatGrid> call site, plus every file repeating the font-mono text-sm font-semibold KPI-tile value styling 2+ times, over web/components + web-portal/components, or named in COUNT_REGISTER_EXEMPT
       "button-sizes", // R98: web/test/button-sizes.test.ts — every <Button>/<IconButton> carrying size="sm" or a custom h-/py-/px- class, over web/ + web-portal/ + shared/web/, or named in BUTTON_SIZE_EXEMPT
       "no-close-while-timer-runs", // R99: web/test/no-close-while-timer-runs.test.ts, every exported function in workers/content/src/lib that compares a status to "done"/"resolved"/"closed"/"completed" and writes a closing column must call refuseWhileTimerRuns(, or be named in the check's own CLOSE_DOOR_EXEMPT, keyed by {file, fn}
+      "head-actions-centred", // R100: web/test/head-actions-centred.test.ts — every div/section in web/components + web-portal/components + shared/web carrying a title marker AND an action marker (ModuleSettingsGear, {action}/{actions}, headActions) in one flex row must carry items-center, or be named in HEAD_ACTIONS_CENTRED_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

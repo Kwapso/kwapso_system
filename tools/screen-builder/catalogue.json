@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.145",
-  "sha": "5222364e8f6ac0085cfded0bdb00f824c28775ca",
+  "tag": "v1.2.146",
+  "sha": "917dfc2af1602e967a4acd40c7523c3b1969c705",
   "syncedAt": "2026-09-21"
  },
- "generatedAt": "2026-09-21T11:12:33.557Z",
+ "generatedAt": "2026-09-21T12:58:42.634Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -6252,8 +6252,8 @@
     {
      "file": "components/search-input/search-input.tsx",
      "name": "searchShellVariants",
-     "line": 59,
-     "base": "flex w-full min-w-0 items-center h-[var(--control-height-input)] px-[var(--space-4h)] gap-[var(--space-2h)] rounded-pill bg-[var(--surface-raised)] transition-[background-color,box-shadow,color] duration-[var(--duration-colour)] ease-kwapso",
+     "line": 98,
+     "base": "flex w-full min-w-0 items-center h-[var(--control-height-input)] px-[var(--space-4h)] gap-[var(--space-2h)] rounded-pill bg-surface-lift transition-[background-color,box-shadow,color] duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
        "name": "state",
@@ -8111,7 +8111,7 @@
     {
      "file": "components/title/title.tsx",
      "name": "titleHeadingVariants",
-     "line": 119,
+     "line": 141,
      "base": "font-[var(--font-weight-medium)]",
      "groups": [
       {

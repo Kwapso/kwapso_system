@@ -1301,6 +1301,19 @@ again, which is the only property that matters here.
   `workers/content/src/lib`; a real, dated reason for skipping one goes in
   the check's own `CLOSE_DOOR_EXEMPT`, keyed by `{file, fn}`, never a line
   number.
+- **R100 `head-actions-centred`**, if your module's screen draws an action
+  (a module settings gear, an edit pencil, any other head-mounted control)
+  beside its own title, put it in a flex row with `items-center`, never
+  `items-start`/`items-end`/`items-baseline` — the kit's own `Title`
+  composition already does this for you; this is only for a row you draw by
+  hand. If the head also carries a subtitle, centre the action against the
+  title element alone (split the title onto its own row, away from the
+  subtitle underneath it), never against the whole stacked block.
+  `web/test/head-actions-centred.test.ts` censuses every `<div>`/`<section>`
+  carrying a title marker and an action marker in one flex row; a real
+  reason for skipping one goes in `HEAD_ACTIONS_CENTRED_EXEMPT`
+  (`shared/rules/registry.ts`), keyed by `{file, contains}`, never a line
+  number.
 
 **The words** (the ones that catch every new module, every time)
 

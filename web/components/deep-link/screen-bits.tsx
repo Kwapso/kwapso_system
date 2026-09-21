@@ -264,12 +264,24 @@ export function LoadError({ what }: { what: string }) {
 // before it ever saw the boxed branch's `--pinned-lead` declaration. `surface`
 // is documented in the block comment above instead. `"boxed"` (the default)
 // is today's markup, byte for byte; `"plain"` is the tickets-main experiment.
+// WHICH SURFACE A `CollectionCard` IS DRAWING, published for whatever renders
+// inside it — so a piece of content nested arbitrarily deep (the empty body,
+// past the toolbar and a render-prop callback PagedFind composes, never a
+// direct child) can ask "am I sitting on a plain, transparent frame?" without
+// a runtime DOM lookup. Defaults to `"boxed"`: content that never renders
+// inside a `CollectionCard` at all (a test, a bespoke panel) reads the same
+// answer a boxed one would have given it, which is "you already have paper,
+// draw nothing extra."
+const CollectionCardSurfaceContext = React.createContext<"boxed" | "plain">("boxed")
+
 export function CollectionCard({ children, surface = "boxed" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
   if (surface === "plain") {
     return (
-      <Card variant="plain" data-surface="plain" className="[--pinned-lead:var(--toolbar-lead-gap)]">
-        <CardContent>{children}</CardContent>
-      </Card>
+      <CollectionCardSurfaceContext.Provider value="plain">
+        <Card variant="plain" data-surface="plain" className="[--pinned-lead:var(--toolbar-lead-gap)]">
+          <CardContent>{children}</CardContent>
+        </Card>
+      </CollectionCardSurfaceContext.Provider>
     )
   }
   return (
@@ -322,6 +334,45 @@ export function CollectionCard({ children, surface = "boxed" }: { children: Reac
           class list at both widths. Fixing it needs the identical `lg:` step
           on THIS side too, reading the same flat token twice rather than a
           second number. */}
+      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">{children}</CardContent>
+    </Card>
+  )
+}
+
+/** THE EMPTY BODY'S OWN PAPER, ON A PLAIN FRAME (the tickets-main experiment,
+ * `CollectionCard surface="plain"`, rulebook L43). A boxed `CollectionCard`
+ * is already a `Card`, so its empty state (`CollectionEmptyState`,
+ * shared/web/screen-engine/collection-frame.tsx, `data-slot=
+ * "collection-empty-body"`) sits on real paper for free. `surface="plain"`
+ * drops that Card for `variant="plain"` (transparent, no padding of its own)
+ * so the toolbar and the table line up with the page's own edge — but a
+ * facet with zero rows has no table, only the empty body, and that body
+ * landed bare on the white page (measured live: fill `rgba(0, 0, 0, 0)`).
+ * The validated design keeps the empty state on its own soft paper
+ * regardless of which frame it is in, so this wraps it in the SAME default
+ * `Card` variant the boxed frame draws, with the frame's own inner padding —
+ * `px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]`, the
+ * identical class string `CollectionCard`'s own boxed branch reads, spelled
+ * by hand a second time rather than shared through a JS constant: a shared
+ * identifier would stop reading as a literal class list to whatever source
+ * census goes looking for one (`web/test/toolbar-lead-gap-card.test.tsx`'s
+ * own R83 self-check does exactly that to `CollectionCard`'s copy) — while
+ * the toolbar above stays flush, because this component wraps only what the
+ * call site puts INSIDE it, never the toolbar beside it.
+ *
+ * READS THE SURFACE FROM CONTEXT, NOT A DOM LOOKUP — `CollectionCard`
+ * publishes it (above), so this works however deep the call site nests it
+ * (past a render-prop callback, in `tickets-collection.tsx`'s case) and
+ * inside a bare test render with no real page around it. On a boxed frame
+ * (the context's own default, "boxed") it renders `children` untouched: the
+ * boxed `CollectionCard` is already the paper, and a second `Card` nested
+ * inside it would be the card-inside-a-card CLAUDE.md's `useKitPanel` note
+ * already forbids. */
+export function CollectionEmptyBody({ children }: { children: React.ReactNode }) {
+  const surface = React.useContext(CollectionCardSurfaceContext)
+  if (surface !== "plain") return <>{children}</>
+  return (
+    <Card variant="default">
       <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">{children}</CardContent>
     </Card>
   )

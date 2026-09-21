@@ -57,7 +57,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
-import { CollectionCard } from "@/components/deep-link/screen-bits"
+import { CollectionCard, CollectionEmptyBody } from "@/components/deep-link/screen-bits"
 import { Panel } from "@/components/tickets/tickets-dashboard"
 
 afterEach(cleanup)
@@ -197,6 +197,82 @@ describe("CollectionCard surface (rulebook L43, extended to tickets main)", () =
       content!.firstElementChild?.getAttribute("data-slot"),
       "the pinned toolbar is still CardContent's first child on the plain frame too"
     ).toBe("toolbar-row-pin")
+  })
+})
+
+// THE EMPTY BODY'S OWN PAPER, ON A PLAIN FRAME. A plain `CollectionCard`
+// (`surface="plain"`) drops its own Card down to a transparent
+// `variant="plain"`, no inner padding, so the toolbar and the table line up
+// with the page edge — but a facet with zero rows has no table, only the
+// empty body (`CollectionEmptyState`, `data-slot="collection-empty-body"`),
+// which then landed bare on the white page with nothing under it (measured
+// live: fill `rgba(0, 0, 0, 0)`). `CollectionEmptyBody` (screen-bits.tsx)
+// gives it back the SAME soft paper a boxed frame's own Card already is,
+// through context published by `CollectionCard` rather than a DOM lookup —
+// so it works this far from the frame's own JSX, past whatever a caller nests
+// in between (a render-prop callback, on the real tickets-collection.tsx call
+// site). A stand-in rows body proves the OTHER half: a facet that has rows
+// gets no extra card at all, on either frame.
+function EmptyBodyStandIn() {
+  return <div data-slot="collection-empty-body">nothing here yet</div>
+}
+
+function RowsStandIn() {
+  return <div data-slot="rows-stand-in">a row</div>
+}
+
+describe("CollectionEmptyBody (rulebook L43, the empty body's own paper on a plain frame)", () => {
+  it("a plain CollectionCard whose body is the empty state renders the empty body inside a data-variant=\"default\" card", () => {
+    render(
+      <CollectionCard surface="plain">
+        <CollectionEmptyBody>
+          <EmptyBodyStandIn />
+        </CollectionEmptyBody>
+      </CollectionCard>
+    )
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
+    expect(emptyBody, "the empty body itself must still render").toBeTruthy()
+    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
+    expect(paper, "the empty body must sit inside its own default-variant Card").toBeTruthy()
+    // And it is the frame's usual inner padding, the same token the boxed
+    // frame's own CardContent reads — never a second, hand-typed number.
+    const paperContent = paper!.querySelector(':scope > [data-slot="card-content"]')
+    expect(paperContent!.className, "the paper card keeps the frame's own px-4").toMatch(/(^|\s)px-4(\s|$)/)
+    expect(paperContent!.className, "the paper card keeps the frame's own pb-4").toMatch(/(^|\s)pb-4(\s|$)/)
+    // The CollectionCard's OWN card stays plain — the paper belongs to the
+    // empty body alone, never spreads back out to the toolbar/frame.
+    const outer = document.querySelector('[data-surface="plain"]')
+    expect(outer, "the frame itself is still the plain, transparent Card").toBeTruthy()
+    expect(outer!.getAttribute("data-variant")).toBe("plain")
+  })
+
+  it("a plain CollectionCard with rows renders no default card", () => {
+    render(
+      <CollectionCard surface="plain">
+        <RowsStandIn />
+      </CollectionCard>
+    )
+    expect(document.querySelector('[data-slot="rows-stand-in"]'), "the rows still render").toBeTruthy()
+    expect(
+      document.querySelector('[data-slot="card"][data-variant="default"]'),
+      "no default-variant paper card appears around ordinary rows"
+    ).toBeNull()
+  })
+
+  it("on a BOXED CollectionCard, CollectionEmptyBody renders its children untouched (the boxed frame is already the paper)", () => {
+    render(
+      <CollectionCard>
+        <CollectionEmptyBody>
+          <EmptyBodyStandIn />
+        </CollectionEmptyBody>
+      </CollectionCard>
+    )
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
+    expect(emptyBody, "the empty body still renders").toBeTruthy()
+    // Only ONE Card in the tree — CollectionCard's own boxed one. A second,
+    // nested default-variant Card here would be the card-inside-a-card
+    // CLAUDE.md's `useKitPanel` note already forbids.
+    expect(document.querySelectorAll('[data-slot="card"]').length, "no second, nested Card").toBe(1)
   })
 })
 

@@ -500,33 +500,44 @@ describe("the Open tab's board", () => {
     return BOARD.text
   })()
 
-  /* ── "COLUMN HEADER SHOULD HAVE NO COLOR" (client, 2026-09-09) ────────────
+  /* ── "BRING ABCK THE COLOR ON T STAGE IN BOARD VIEW" (client, 21 Sep 2026) ─
 
-     SHE ASKED TWICE, IN TWO SHAPES, WHICH IS WHY THIS IS PINNED. On 2026-09-07
-     she said "grerat but status (th header) have no color associated" and the
-     screen read it as a complaint about WHICH colour — the column heads and the
-     Status filter were tinting the same stage two different ways — so the dot
-     was CORRECTED rather than removed, and a long comment was written defending
-     the corrected tones. On 2026-09-09 she said it in the imperative and again
-     in the same review: "remove the color from the status header!" … "column
-     header should have no color".
+     THIS TEST USED TO ASSERT THE OPPOSITE, AND THAT IS ON PURPOSE, READ TWICE.
+     On 2026-09-09 the client said "remove the color from the status header!" …
+     "column header should have no color", and this test locked that in: zero
+     `dot:` lines anywhere on the board. On 21 Sep 2026, reviewing the deployed
+     tickets module, she reversed it in her own word for the object this board
+     draws — "bring abck the color on t stage in board view" (UI-RULEBOOK.md
+     L43) — which is why `OpenBoard`'s own header (tickets-collection.tsx)
+     keeps BOTH rulings written out in full rather than silently swapping one
+     for the other: the next reader needs to know the removal was real and is
+     no longer the standing rule.
 
-     So the old argument is still readable in this repo's history and is
-     precisely the kind of thing a future reader finds, believes, and acts on.
-     This is the assertion that stops them: no column on this board hands the
-     kit a `dot`, on the FIVE heads together, read off the board's own source.
+     SO THE ASSERTION NOW LOCKS THE REVERSAL, THE SAME WAY: exactly ONE `dot:`
+     line in this board's source — the four STAGE columns share one
+     `OPEN_TAB_STATUSES.map(...)` literal, so one written line covers all four
+     rendered heads — and it reads off `helpStatusDotTone`, the one function
+     the ticket's own chip and the Status filter already read for a stage's
+     colour, never a second table. THE FIFTH COLUMN (Waiting) still carries
+     none: it is a PREDICATE, not a stage, and her sentence named the stage —
+     see the Waiting column's own `it` below for that half, argued rather than
+     assumed.
 
      A SOURCE SCAN FOR THE REASON THE REST OF THIS DESCRIBE IS ONE (see its
      header): the board is not mounted here, and the thing being locked is what
      the screen HANDS the kit rather than what a browser paints. The kit's own
      `dot` is optional and both of its draw sites are gated on `!== undefined`
-     (shared/ui/components/kanban/kanban.tsx), so "passes no dot" IS "draws no
-     dot" — the kit cannot invent one. */
-  it("hands the kit no dot for any column head", () => {
+     (shared/ui/components/kanban/kanban.tsx), so "passes a dot" IS "draws a
+     dot" — the kit cannot drop one it was handed. */
+  it("hands the kit exactly one dot line, shared by the four stage columns, read off helpStatusDotTone", () => {
     expect(
       [...board.matchAll(/\bdot\s*:/g)].length,
-      "a column on the Open board is passing the kit a `dot` again — the client removed the colour from these heads on 2026-09-09 (\"column header should have no color\"), and the 2026-09-07 argument for a CORRECTED dot, still in this file's history, is not a licence to restore one"
-    ).toBe(0)
+      "the Open board's `dot:` line count changed — the four stage columns share ONE `OPEN_TAB_STATUSES.map(...)` literal, so this should stay 1 even though it colours four rendered heads; a second line would mean a second table for the same stage tone"
+    ).toBe(1)
+    expect(
+      /dot:\s*helpStatusDotTone\(stage\)/.test(board),
+      "the Open board's stage columns must read their colour off `helpStatusDotTone`, the one function the ticket's own chip and the Status filter already read — never a second, hand-written tone table"
+    ).toBe(true)
   })
 
   it("touches the loaded rows exactly once, and that touch is a PARTITION", () => {
@@ -608,6 +619,18 @@ describe("the Open tab's board", () => {
       /helpFacetKey\(teamId, "all", WAITING\)/.test(code),
       "the board's waiting cards no longer come from the Waiting tab's own cache key — the column and the tab can now disagree about who is waiting"
     ).toBe(true)
+    // THE WAITING COLUMN CARRIES NO `dot`, EVEN AFTER THE 21 SEP 2026 REVERSAL
+    // ABOVE — its own literal, `{ id: WAITING, title: t("Waiting"), … }`, has
+    // no `dot:` key between here and the closing `]}` of the board's columns
+    // array. Her ruling named "the stage" and Waiting is deliberately not
+    // one (a PREDICATE over a ticket already sitting in one of the four
+    // stages) — see `OpenBoard`'s own header, the Waiting column's paragraph,
+    // for the argument this locks.
+    const waitingLiteral = board.slice(waiting, board.indexOf("]}", waiting))
+    expect(
+      /\bdot\s*:/.test(waitingLiteral),
+      "the Waiting column is now passing the kit a `dot` — her 21 Sep 2026 ruling named the STAGE, and Waiting is a predicate over a ticket already in one, not a stage of its own; see OpenBoard's own header before adding one here"
+    ).toBe(false)
   })
 
   it("repeats cards rather than moving them, and says so where the reader is", () => {
@@ -728,11 +751,21 @@ describe("the All tab's board", () => {
     ).toBe(true)
   })
 
-  it("hands the kit no dot for any column head", () => {
+  // "BRING ABCK THE COLOR ON T STAGE IN BOARD VIEW" (client, 21 Sep 2026,
+  // UI-RULEBOOK.md L43) covers every ticket board in this file, the same way
+  // the 2026-09-09 removal this reverses did — see `OpenBoard`'s equivalent
+  // `it`, above, for the full account. One `dot:` line, shared by all six
+  // rendered heads through the one `HELP_STATUSES.map(...)` literal, read off
+  // `helpStatusDotTone`.
+  it("hands the kit exactly one dot line, shared by the six columns, read off helpStatusDotTone", () => {
     expect(
       [...board.matchAll(/\bdot\s*:/g)].length,
-      "a column on the All board is passing the kit a `dot` — the client's 2026-09-09 ruling against a coloured column head covers every ticket board in this file, not only Open's"
-    ).toBe(0)
+      "the All board's `dot:` line count changed — the six columns share ONE `HELP_STATUSES.map(...)` literal, so this should stay 1"
+    ).toBe(1)
+    expect(
+      /dot:\s*helpStatusDotTone\(stage\)/.test(board),
+      "the All board's columns must read their colour off `helpStatusDotTone`, the same seam OpenBoard and the ticket's own chip read — never a second, hand-written tone table"
+    ).toBe(true)
   })
 
   it("draws no sixth Waiting column — that predicate belongs to Open's board, not a plain status partition", () => {
