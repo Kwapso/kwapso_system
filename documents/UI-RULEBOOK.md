@@ -1759,6 +1759,8 @@ live: no em dash anywhere a person reads.
 
 **Law.** [R100](../RULES.md) (`head-actions-centred`), a source census, `web/test/head-actions-centred.test.ts`, over `web/components`, `web-portal/components` and `shared/web`: every `<div>`/`<section>` whose `className` carries `flex` (a row, never `flex-col`) and both a title marker (`<h1`, `<Title`, `<Headline`, a bare `{heading}`/`{title}` expression) and an action marker (`ModuleSettingsGear`, a bare `{action}`/`{actions}` expression, `headActions`) in one JSX subtree must also carry `items-center`, or be named in `HEAD_ACTIONS_CENTRED_EXEMPT`, keyed by `{file, contains}`.
 
+**Toolbar rhythm on tickets, 21 Sep 2026.** Aurora, verbatim: *"on tickets, reduce space above and under toolbar to 10px"* — on the tickets page the tab strip carries no space of its own below the tabs, so the toolbar sits 10px under the tabs and 10px above the first row.
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order

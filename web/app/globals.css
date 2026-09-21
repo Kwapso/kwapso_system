@@ -272,6 +272,30 @@
 }
 
 /* ============================================================================
+   THE TICKETS STRIP PAYS NO TRAILING GAP OF ITS OWN (R83, tickets-only,
+   21 Sep 2026). Aurora, verbatim: "on tickets, reduce space above and under
+   toolbar to 10px." Measured live at 1440x900: the strip's own trailing
+   `pb-[var(--tab-content-gap)]` (20px, the rule above) stacked on top of the
+   card's own 10px `--toolbar-lead-gap` lead for 30px total above the
+   toolbar. `FolderTabStrip.tight` (shared/web/screen-engine/tabs-view.tsx)
+   drops that trailing padding to zero on the ONE strip that asks for it,
+   marked `.pinned-strip-tight` alongside `.pinned-strip` so no other host of
+   `renderFolderTabs` is touched.
+
+   `--pinned-chrome-h` NEEDS THE SAME CORRECTION, OR ONLY THE RESTING STATE
+   IS FIXED. The rule above computes it off `--tab-content-gap` for every
+   `.pinned-strip` container regardless — so a tight strip's own painted
+   height shrank by 20px while the property a PINNED toolbar reads as its
+   `top` did not, opening a 20px hole between the strip and the toolbar the
+   moment the page scrolls, even though the two sit flush at rest. Keyed to
+   the same tight marker, and MORE SPECIFIC than the rule above (two classes
+   inside `:has()` beat one), so it wins on the one container that carries
+   both without needing source order to do it. */
+*:has(> .pinned-strip.pinned-strip-tight) {
+  --pinned-chrome-h: var(--tab-strip-h);
+}
+
+/* ============================================================================
    THE CARD PAYS THE WHOLE --toolbar-lead-gap, DIRECTLY — NO REMAINDER
    (R83, re-scoped a third time, 18 Sep 2026, RULING 7).
    ============================================================================

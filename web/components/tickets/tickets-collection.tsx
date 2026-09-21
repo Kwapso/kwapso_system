@@ -1411,7 +1411,21 @@ export function TicketsCollection({
             hand. Same three arguments, one seam, and the difference disappears
             rather than being maintained. */}
         <div className="flex flex-col">
-          {renderFolderTabs({ config: tabsConfig, value: facet, onValueChange: (v) => setFacet(v as HelpFacet) })}
+          {/* `tight` — Aurora, 21 Sep 2026: "on tickets, reduce space above
+              and under toolbar to 10px." The strip's own trailing gap (R63
+              part 3, 20px) was stacking on top of the card's 10px lead
+              (R83 ruling 7) for 30px total above the toolbar; `tight` drops
+              the strip's own half to zero so only the ruled 10px remains.
+              Scoped to this one call site (`FolderTabStrip.tight`,
+              shared/web/screen-engine/tabs-view.tsx) — every other
+              `renderFolderTabs` host keeps the ordinary 20px. Covers board
+              and split for free: both render inside this same strip. */}
+          {renderFolderTabs({
+            config: tabsConfig,
+            value: facet,
+            onValueChange: (v) => setFacet(v as HelpFacet),
+            tight: true,
+          })}
 
           {facet === TRIAGE ? (
             <CollectionCard surface="plain">

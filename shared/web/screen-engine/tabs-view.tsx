@@ -291,7 +291,37 @@ export type FolderTabStrip = {
   config: TabsConfig
   value: string
   onValueChange: (value: string) => void
+  /** TICKETS-ONLY, 21 Sep 2026 — Aurora's ruling, verbatim: "on tickets,
+   * reduce space above and under toolbar to 10px." Measured live: the
+   * visible whitespace from the tab underline to the toolbar's own top was
+   * 30px, not 20 (the strip's own trailing `pb-[var(--tab-content-gap)]`,
+   * R63 part 3's tabs-to-container gap) plus 10 (`--toolbar-lead-gap`, R83
+   * ruling 7, paid by the card that follows). The "under" half was already
+   * the ruled 10px at the box level (`--toolbar-content-gap`) — what reads
+   * larger there is the kit `TableHead`'s own vertical centring inside the
+   * fixed 56px row, which is read-only (CLAUDE.md, `shared/ui/` is
+   * vendored).
+   *
+   * So only the ABOVE half moves, and only for the one strip that asked:
+   * `true` drops the strip's own trailing gap to zero, scoped the same way
+   * `CollectionCard`'s own `surface="plain"` is scoped — a flag on the ONE
+   * call site that wants it (`tickets-collection.tsx`), never a new
+   * default, because every other `renderFolderTabs` host still owes R63's
+   * ordinary 20px tabs-to-container gap. Board and split both render inside
+   * the same strip (tickets-collection.tsx draws one `renderFolderTabs`
+   * call outside its view switch), so they inherit the fix for free. */
+  tight?: boolean
 }
+
+/** Worn by a `tight` strip (above) alongside `PINNED_STRIP_MARK`, so
+ * `globals.css` can correct `--pinned-chrome-h` for it too — that property
+ * is computed off `--tab-content-gap` for every `.pinned-strip` container
+ * (R63 part 3, `*:has(> .pinned-strip)` below), and a strip that pays no
+ * trailing gap of its own would leave a 20px hole between the strip and a
+ * PINNED toolbar the moment the page scrolls, even though the gap already
+ * reads right at rest. A plain marker class, not a utility, the identical
+ * shape `PINNED_STRIP_MARK` already is. */
+export const PINNED_STRIP_TIGHT_MARK = "pinned-strip-tight"
 
 /**
  * A COLLECTION SCREEN'S OWN TAB STRIP STAYS VISIBLE ON SCROLL TOO — client
@@ -441,7 +471,14 @@ export function renderFolderTabs(strip: FolderTabStrip | undefined): React.React
   if (!strip) return null
   return (
     <TabsView
-      className={STICKY_FOLDER_TABS}
+      // `cn` (tailwind-merge) drops the earlier `pb-[var(--tab-content-gap)]`
+      // for `pb-0` when `tight` — a JS-level merge, not a hope that the later
+      // class wins in the generated stylesheet's own emission order (PATTERN
+      // §4's own rule, restated at every call site that needs a real
+      // override rather than an additive class). `PINNED_STRIP_TIGHT_MARK`
+      // rides the same element so globals.css can correct `--pinned-chrome-h`
+      // for it (see that constant's own doc).
+      className={cn(STICKY_FOLDER_TABS, strip.tight && `pb-0 ${PINNED_STRIP_TIGHT_MARK}`)}
       config={strip.config}
       value={strip.value}
       onValueChange={strip.onValueChange}
