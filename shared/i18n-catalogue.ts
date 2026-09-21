@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 763 strings · 3 languages · 1538 of the entries below are hand-written seed.
+// 762 strings · 3 languages · 1540 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -585,7 +585,6 @@ export const CATALOGUE: Catalogue = {
   "That file is too big, 10 MB is the most we can take.": { de: "Die Datei ist zu groß, 10 MB ist das Maximum.", es: "Ese archivo es demasiado grande, 10 MB es el máximo que aceptamos.", ca: "Aquest fitxer és massa gran, 10 MB és el màxim que podem acceptar." },
   "That meeting doesn't exist.": { de: "Das Treffen existiert nicht.", es: "Esa reunión no existe.", ca: "Aquesta reunió no existeix." },
   "That member isn't on this team.": { de: "Dieses Mitglied ist nicht in diesem Team.", es: "Ese miembro no está en este equipo.", ca: "Aquesta persona no forma part d'aquest equip." },
-  "That record no longer exists.": { de: "Der Datensatz existiert nicht mehr.", es: "Ese registro ya no existe.", ca: "Aquest registre ja no existeix." },
   "That screen doesn't exist.": { de: "Der Bildschirm existiert nicht.", es: "Esa pantalla no existe.", ca: "Aquesta pantalla no existeix." },
   "That source doesn't exist.": { de: "Die Quelle existiert nicht.", es: "Esa fuente no existe.", ca: "Aquesta font no existeix." },
   "That story no longer exists.": { de: "Die Geschichte existiert nicht mehr.", es: "Esa historia ya no existe.", ca: "Aquesta història ja no existeix." },

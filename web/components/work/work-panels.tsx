@@ -426,11 +426,6 @@ export function StoriesPanel({
     })
   )
 
-  // THE GOAL TOGGLE STOOD HERE. PARKED, 21 Sep 2026 (`work/goal-row-toggle.tsx`,
-  // Aurora's ruling: "Remove the goal from the stories. I don't even know
-  // what that is, but remove it."). `useGoalToggle`/`<GoalRowToggle>` carry
-  // the exact same state and write this panel used to hold inline.
-
   const renderRows = (rows: Story[]) => (
     <RowList>
       {rows.map((s) => (

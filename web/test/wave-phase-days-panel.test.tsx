@@ -1,9 +1,19 @@
-// WAVE PHASE-DAYS SETTINGS PANEL. Aurora's ruling, 20 Sep 2026, verbatim: "on
-// waves i am missing the settings (we'l adjust the duration of pahses in
-// days)." This proves the shape the ruling asks for: seven rows, one per
-// `PHASE_TYPES` name, in PHASE_TYPES order; Save calls the door with only the
-// rows that actually changed; and the panel is read-only for a caller who
-// does not hold the wave update right.
+// WAVE PHASE-DAYS SETTINGS PANEL, AND THE SHEET IT OPENS IN NOW. Aurora's
+// ruling, 20 Sep 2026, verbatim: "on waves i am missing the settings (we'l
+// adjust the duration of pahses in days)." This proves the shape the ruling
+// asks for: seven rows, one per `PHASE_TYPES` name, in PHASE_TYPES order;
+// Save calls the door with only the rows that actually changed; and the
+// panel is read-only for a caller who does not hold the wave update right.
+//
+// UPDATED 21 Sep 2026 FOR THE SHEET. Her very next ruling, verbatim: "missing
+// the settings button in waves to adjust that!!!" The panel no longer draws
+// its own Card or its own "Settings" heading (both moved to the slide-in that
+// now hosts it, `WavePhaseDaysSheet` below, titled by the sheet itself) so
+// nothing here changes: the same seven fields, the same unit, the same
+// explainer line, the same Save/Cancel row this suite already pinned. The
+// second `describe` block below is new, and proves the sheet wrapper itself:
+// its own title, that it draws nothing while closed, and that it will not
+// close mid-save.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -22,7 +32,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
-import { WavePhaseDaysPanel } from "@/components/work/wave-phase-days-panel"
+import { WavePhaseDaysPanel, WavePhaseDaysSheet } from "@/components/work/wave-phase-days-panel"
 import { PHASE_TYPES } from "@shared/sprint-types"
 import type { WavePhaseDay } from "@shared/waves"
 
@@ -99,5 +109,87 @@ describe("WavePhaseDaysPanel, seven rows, in PHASE_TYPES order", () => {
     expect(build.disabled).toBe(true)
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull()
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull()
+  })
+})
+
+describe("WavePhaseDaysSheet, the slide-in the wave head's gear opens", () => {
+  it("draws nothing while closed", () => {
+    render(
+      <WavePhaseDaysSheet
+        open={false}
+        onOpenChange={vi.fn()}
+        teamId="team-1"
+        phaseDays={PHASE_DAYS}
+        canEdit={true}
+        busy={false}
+        onSave={vi.fn()}
+      />
+    )
+    expect(screen.queryByText("Settings")).toBeNull()
+    expect(screen.queryByLabelText("Audit")).toBeNull()
+  })
+
+  it("open: titled 'Settings', the panel's own seven rows and explainer line inside it", async () => {
+    render(
+      <WavePhaseDaysSheet
+        open
+        onOpenChange={vi.fn()}
+        teamId="team-1"
+        phaseDays={PHASE_DAYS}
+        canEdit={true}
+        busy={false}
+        onSave={vi.fn()}
+      />
+    )
+    await screen.findByText("Settings")
+    for (const p of PHASE_TYPES) expect(await screen.findByLabelText(p.name)).toBeTruthy()
+    expect(screen.getByText("Monday to Friday, weekends are not counted")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy()
+  })
+
+  it("a save in flight refuses the backdrop, the same rule FormShellDialog's own close() enforces", async () => {
+    const onOpenChange = vi.fn()
+    render(
+      <WavePhaseDaysSheet
+        open
+        onOpenChange={onOpenChange}
+        teamId="team-1"
+        phaseDays={PHASE_DAYS}
+        canEdit={true}
+        busy={true}
+        onSave={vi.fn()}
+      />
+    )
+    await screen.findByText("Settings")
+    // Portalled to document.body, the same reason
+    // `google-account-match-sheet.test.tsx` looks up the sheet there rather
+    // than the render's own container. `pointerDown`, not `click`: Radix's
+    // dismissable layer (`@radix-ui/react-dismissable-layer`) decides on the
+    // OUTSIDE `pointerdown`, not a click, so a `click`-only press would pass
+    // this case whether or not the busy guard actually works.
+    const overlay = document.body.querySelector('[data-slot="sheet-overlay"]')
+    expect(overlay, "no sheet overlay found to press").toBeTruthy()
+    fireEvent.pointerDown(overlay as Element)
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
+
+  it("not busy: the backdrop closes it", async () => {
+    const onOpenChange = vi.fn()
+    render(
+      <WavePhaseDaysSheet
+        open
+        onOpenChange={onOpenChange}
+        teamId="team-1"
+        phaseDays={PHASE_DAYS}
+        canEdit={true}
+        busy={false}
+        onSave={vi.fn()}
+      />
+    )
+    await screen.findByText("Settings")
+    const overlay = document.body.querySelector('[data-slot="sheet-overlay"]')
+    fireEvent.pointerDown(overlay as Element)
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
 })

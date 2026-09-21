@@ -673,19 +673,22 @@ describe("shapeChoicesTable", () => {
     expect(React.isValidElement(rows?.[0].details)).toBe(true)
   })
 
-  // THE STATUS COLUMN — client ruling, 17 Sep 2026, verbatim: "Dots like
-  // everywhere else." Read alongside D17's tone table (`shared/status-tones.ts`'s
+  // THE STATUS CHIP, FOLDED INTO VALUE. Client ruling, 17 Sep 2026, verbatim:
+  // "Dots like everywhere else"; folded into the Value cell 21 Sep 2026 (K59,
+  // "ok split the who and date added in 2 columns", see settings-choices-
+  // panel.tsx's own header for the R82 accounting for why Status is the fold
+  // that moved). Read alongside D17's tone table (`shared/status-tones.ts`'s
   // own palette, applied here through `AUTOMATION_STATUS_DOT`): Active → shipped
   // (green), Protected → building (charcoal), Retired/Inactive → archived (grey).
   // Protected OUTRANKS active/inactive (this function's own header, "PROTECTED
   // OUTRANKS ACTIVE/INACTIVE"), so a row with both `isDefault: true` and
   // `active: true` still reads Protected/building, never Active/shipped — the
-  // second case below is exactly that row. Each case also asserts the cell is
+  // second case below is exactly that row. Each case also asserts the chip is
   // `variant="status"` rather than the retired filled pill (`inverse` /
   // `success` / `secondary`), so a regression back to `AUTOMATION_STATUS_VARIANT`
   // fails here even if shape.tsx's own import census (automations.test.ts) is
   // ever weakened.
-  it("draws a status dot with the D17 tone per state, never a filled pill", () => {
+  it("draws a status dot with the D17 tone per state, inside the Value cell, never a filled pill", () => {
     const cases: Array<{
       over: Partial<SelectableValue> & { id: string; type: string; value: string }
       tone: "shipped" | "building" | "archived"
@@ -697,10 +700,14 @@ describe("shapeChoicesTable", () => {
     ]
     for (const { over, tone, word } of cases) {
       const rows = shapeChoicesTable([selectableValue(over)], choicesGroupHome, "en").rows
-      const status = rows?.[0].status as React.ReactElement<{ variant?: string; dot?: string }> | undefined
-      expect(React.isValidElement(status), `${word} row's status cell must be a node`).toBe(true)
-      expect(status!.props.variant, `${word} row must draw variant="status" (a dot badge), never the old filled pill`).toBe("status")
-      expect(status!.props.dot, `${word} row's dot must read D17's "${tone}" tone`).toBe(tone)
+      const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+      expect(React.isValidElement(value), `${word} row's Value cell must be a node`).toBe(true)
+      const chip = React.Children.toArray(value!.props.children).find(
+        (c): c is React.ReactElement<{ variant?: string; dot?: string }> =>
+          React.isValidElement(c) && (c.props as { variant?: string }).variant === "status"
+      )
+      expect(chip, `${word} row's Value cell must carry its status chip`).toBeDefined()
+      expect(chip!.props.dot, `${word} row's dot must read D17's "${tone}" tone`).toBe(tone)
       expect(rows?.[0].statusText, `${word} row's plain-text status word`).toBe(word)
     }
   })
@@ -735,10 +742,13 @@ describe("shapeChoicesTable", () => {
     expect(rows?.[0].whereField).toBe("")
   })
 
-  // "in choices also show columns added on and added by" — one cell, name
-  // over date, and the RAW instant riding beside it for the date sort
-  // (`sorted-columns-declare-their-type.test.ts`'s own law).
-  it("the Added cell carries the creator's first name, the formatted date, and the raw instant for sort", () => {
+  // "ok split the who and date added in 2 columns". K59, Aurora, 21 Sep
+  // 2026, splitting the same day's earlier "in choices also show columns
+  // added on and added by" out of its one folded cell into two real columns:
+  // `addedBy` (the creator's face and first name) and `addedOn` (the
+  // formatted date), with the RAW instant riding beside them for the date
+  // sort (`sorted-columns-declare-their-type.test.ts`'s own law).
+  it("the Added by cell carries the creator's face and first name, and the Added on cell carries the date plus the raw instant for sort", () => {
     const rows = shapeChoicesTable(
       [
         selectableValue({
@@ -752,25 +762,29 @@ describe("shapeChoicesTable", () => {
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].added)).toBe(true)
+    expect(React.isValidElement(rows?.[0].addedBy), "Added by draws a node (face + name)").toBe(true)
     // R54: staff are shown by first name only, everywhere.
-    expect(rows?.[0].addedText).toBe("Ana")
+    expect(rows?.[0].addedByText).toBe("Ana")
+    expect(rows?.[0].addedOn, "Added on is the formatted date alone").toBe("May 1, 2026")
     expect(rows?.[0].createdAtRaw, "the sort's own raw value, never the shaped date").toBe(
       "2026-05-01T09:00:00.000Z"
     )
   })
 
   // A value from before the audit columns existed (or a row the fixture just
-  // never set them on) draws an Added cell with nothing to say, not a crash
-  // and not a dash — the same "carries nothing" answer R81 gives elsewhere.
-  it("the Added cell is empty, not broken, for a value with no audit block", () => {
+  // never set them on) draws both cells with nothing to say, not a crash and
+  // not a dash, the same "carries nothing" answer R81 gives elsewhere.
+  // Added by draws `null` (the same empty answer the Details column gives),
+  // never an empty wrapper node, because there is no face to anchor one.
+  it("the Added by and Added on cells are empty, not broken, for a value with no audit block", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "a2", type: "Industry", value: "Retail" })],
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].added)).toBe(true)
-    expect(rows?.[0].addedText).toBe("")
+    expect(rows?.[0].addedBy).toBeNull()
+    expect(rows?.[0].addedByText).toBe("")
+    expect(rows?.[0].addedOn).toBe("")
     expect(rows?.[0].createdAtRaw).toBeNull()
   })
 })

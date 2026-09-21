@@ -109,10 +109,6 @@ export type StoryFormValues = {
    * an empty string means "not set", the same convention every other
    * optional pick on this form already reads. */
   moscow: string
-  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
-   * 2026, paired with the phase's own `goalSummary`.) Only meaningful once a
-   * phase is chosen — the field below hides itself when `sprintId` is blank. */
-  contributesToGoal: boolean
 }
 
 /** "Nothing chosen" as a real Select value: an empty string is not selectable in
@@ -354,7 +350,6 @@ export function StoryFormDialog({
           changesNoStep: false,
           acceptanceCriteria: "",
           moscow: "",
-          contributesToGoal: false,
         },
     open
   )
@@ -554,7 +549,6 @@ export function StoryFormDialog({
         changesNoStep: values.changesNoStep,
         acceptanceCriteria: richTextValue(values.acceptanceCriteria),
         moscow: values.moscow,
-        contributesToGoal: values.contributesToGoal,
       })
       // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `storyId` on an
       // edit, the id the create door just handed back otherwise.
@@ -785,12 +779,6 @@ export function StoryFormDialog({
           (v) => setValues((s) => ({ ...s, sprintId: v }))
         )}
       </Field>
-      {/* THE GOAL CHECKBOX STOOD HERE. PARKED, 21 Sep 2026
-          (`work/goal-field.tsx`, Aurora's ruling: "Remove the goal from the
-          stories. I don't even know what that is, but remove it."). The
-          field itself (`values.contributesToGoal`) still rides the draft
-          untouched — see the draft's own initial values above — only the
-          control that let somebody SET it is unmounted. */}
       {/* NO LONGER CONDITIONALLY REQUIRED (Aurora's ruling, 21 Sep 2026,
           B43) — picking this ticket is what the door now reads to derive
           Client-requested/Enabler, not the other way round. */}

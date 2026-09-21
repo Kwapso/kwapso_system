@@ -64,7 +64,6 @@ function story(partial: Partial<Story> & { id: string; title: string }): Story {
     acceptanceCriteria: null,
     buildNotes: null,
     moscow: null,
-    contributesToGoal: false,
     reviewNote: null,
     reviewFileUrl: null,
     reviewFileName: null,

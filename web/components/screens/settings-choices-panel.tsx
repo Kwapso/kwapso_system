@@ -579,14 +579,53 @@ export function SettingsChoicesPanel({
   // plus the field word `shared/selectable-where.ts` derives off `shared/
   // selectable-homes.ts`.
   //
-  // THE ADDED COLUMN — same ruling: "in choices also show columns added on
-  // and added by." Folded into ONE cell (creator name over the date,
-  // `shapeChoicesTable`'s own `added` field) rather than two columns, which
-  // is what holds this table at six under R82's ceiling: value + where +
-  // details + status + added + actions. The alternative — a seventh column —
-  // is the one R82 explicitly forbids ("squeezed onto the end"), and folding
-  // Module into Where (rather than, say, dropping Details) keeps every
-  // column's own FACT rather than dropping one.
+  // THE ADDED BY / ADDED ON COLUMNS. K59, documents/UI-RULEBOOK.md, Aurora,
+  // 21 Sep 2026, later the same day as the Where ruling above: "ok split the
+  // who and date added in 2 columns." Until this change, "in choices also show
+  // columns added on and added by" (the SAME K59 sentence, a few hours
+  // earlier) had been answered with ONE folded cell: creator name over the
+  // date, `shapeChoicesTable`'s own `added` field, because that was what
+  // held the table at six under R82's ceiling: value + where + details +
+  // status + added + actions. Splitting the fold back into two real columns
+  // (`addedBy` face+first-name, `addedOn` the date alone, both below) is
+  // what she is asking for here, and it puts the table at SEVEN, one past the
+  // ceiling, so something else has to fold.
+  //
+  // THE FOLD THAT STAYS UNDER SEVEN IS STATUS, INTO VALUE. Her own
+  // suggestion, over a small chip beside the value's own name
+  // (`shapeChoicesTable`'s `valueCell`, deep-link/shape.tsx), the identical
+  // TECHNIQUE the tickets list already uses for its own Closed column
+  // (`tickets-collection.tsx`'s `closed` cell, "FOLDED INTO THIS ONE CELL
+  // RATHER THAN GIVEN A COLUMN OF ITS OWN … R82's own prescription for a fact
+  // that arrives once a table is already at the ceiling is 'fold the extra
+  // fact onto an existing column's own second line'"), read here as "onto an
+  // existing column's own second SLOT", since a status chip sits beside a
+  // name rather than under one. STATUS is the one column here with a real
+  // alternative reader, worth naming rather than picking by elimination:
+  //
+  //   • Details already carries NOTHING for most rows (this function's own
+  //     header, "THE DETAILS COLUMN": Industry, Country, the three "labels"
+  //     groups and more draw an honest empty cell), so folding Status there
+  //     would read as blank on every type Details already has nothing to
+  //     say about, exactly the rows Status most needs to be visible on.
+  //   • Where is full on every row (module + field, "Work: Type") and a
+  //     third fact stacked into it would crowd two SEPARATE dimensions
+  //     (location and state) into one cell, the confusion R82's own "fold
+  //     the extra fact" line is written against, not for.
+  //   • Value already carries a leading mark (a swatch or an icon, when the
+  //     group has one) and a status chip is the same shape one step along,
+  //     a small, trailing mark beside the row's own name, so nothing new is
+  //     asked of the cell, only one more child in the row it already draws.
+  //   • Status still filters: the toolbar's own three-way facet
+  //     (`statusState`, below) is untouched, so nothing a reader could DO
+  //     with the old Status column is lost, only its own seat at the header
+  //     row.
+  //
+  // The Module-into-Where fold below is unaffected and unrelated: two
+  // different facts folded into two different columns for two different
+  // reasons, on the same table, is not a pattern straining under its own
+  // rule. R82's own prescription is "fold the extra fact", stated once,
+  // applied here twice because two extra facts arrived.
   const columns: TableColumn[] = [
     { key: "value", label: t("Value"), sort: "value", searchKey: "valueText", sortKey: (r) => r.valueText },
     {
@@ -606,25 +645,31 @@ export function SettingsChoicesPanel({
     // decoration (an icon, a dot, a duration), never a fact this table
     // orders or searches by.
     { key: "details", label: t("Details") },
+    // ADDED BY: the creator's face and first name. `shapeChoicesTable`'s own
+    // `addedByText` (the plain name, R54-trimmed) is both the sort key and
+    // the search key, since the cell itself (`addedBy`) is a node, not text,
+    // the same reason `value`/`where` above read a sibling `*Text` field
+    // rather than their own key.
     {
-      key: "status",
-      label: t("Status"),
-      sort: "status",
-      searchKey: "statusText",
-      sortKey: (r) => r.statusText,
-      defaultDir: "asc",
+      key: "addedBy",
+      label: t("Added by"),
+      sort: "addedBy",
+      searchKey: "addedByText",
+      sortKey: (r) => r.addedByText,
     },
-    // ADDED — creator name over the date. `sortType: "date"` +
+    // ADDED ON: the date alone now, its own column. `sortType: "date"` +
     // `sortKey` reading the RAW instant (`createdAtRaw`, never the shaped
-    // `addedText`) is `sorted-columns-declare-their-type.test.ts`'s own law
-    // for exactly this shape.
+    // `addedOn` string) is `sorted-columns-declare-their-type.test.ts`'s own
+    // law for exactly this shape. No `searchKey`: the cell IS its own plain
+    // text (`shapeChoicesTable`'s `addedOn` field), so the default (search
+    // what is drawn) is already correct.
     {
-      key: "added",
-      label: t("Added"),
-      sort: "added",
+      key: "addedOn",
+      label: t("Added on"),
+      sort: "addedOn",
       sortType: "date",
       sortKey: (r) => r.createdAtRaw,
-      searchKey: "addedText",
+      defaultDir: "asc",
     },
     // NO `label`/`sort` — an actions column is a control, never a fact to
     // order the table by (the same shape `record-table.tsx`'s OWN built-in

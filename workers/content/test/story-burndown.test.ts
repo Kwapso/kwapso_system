@@ -49,10 +49,15 @@ const call = (userId: string, route: string, body?: unknown, query = "") => {
   )
 }
 
+// Tiebreak on `rowid`, matching the production reader (`storyBurndown` in
+// workers/content/src/lib/stories.ts): two events can share a millisecond
+// (a quick reopen, driven through two awaited requests back to back in this
+// suite), and `id` is a ULID whose random suffix does not track insertion
+// order once its millisecond time component ties. `rowid` always does.
 const eventsFor = (storyId: string) =>
   db()
     .prepare(
-      `SELECT from_status, to_status FROM story_status_events WHERE story_id = ? ORDER BY created_at, id`
+      `SELECT from_status, to_status FROM story_status_events WHERE story_id = ? ORDER BY created_at, rowid`
     )
     .all(storyId) as { from_status: string | null; to_status: string }[]
 

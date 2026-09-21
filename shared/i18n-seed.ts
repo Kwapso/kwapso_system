@@ -3479,6 +3479,7 @@ export const SEED: Catalogue = {
   "Nothing on this list yet.": { de: "Noch nichts auf dieser Liste.", es: "Aún no hay nada en esta lista.", ca: "Encara no hi ha res en aquesta llista." },
   "Now": { de: "Jetzt", es: "Ahora", ca: "Ara" },
   "Order": { de: "Reihenfolge", es: "Orden", ca: "Ordre" },
+  "Review": { de: "Prüfung", es: "Revisión", ca: "Revisió" },
   "Stories by status": { de: "Aufgaben nach Status", es: "Historias por estado", ca: "Històries per estat" },
   "Check your connection and try again.": { de: "Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.", es: "Comprueba tu conexión e inténtalo de nuevo.", ca: "Comprova la teva connexió i torna-ho a provar." },
   "Clear the search": { de: "Suche löschen", es: "Borrar la búsqueda", ca: "Esborrar la cerca" },
@@ -4384,7 +4385,6 @@ export const SEED: Catalogue = {
   "Completed by": { de: "Abgeschlossen von", es: "Completado por", ca: "Completat per" },
   "Completed on": { de: "Abgeschlossen am", es: "Completado el", ca: "Completat el" },
   "Done on": { de: "Erledigt am", es: "Hecho el", ca: "Fet el" },
-  "Reviews": { de: "Überprüfungen", es: "Revisiones", ca: "Revisions" },
   "Who did it": { de: "Wer es gemacht hat", es: "Quién lo hizo", ca: "Qui ho va fer" },
   "Acceptance criteria": { de: "Abnahmekriterien", es: "Criterios de aceptación", ca: "Criteris d'acceptació" },
   "What has to be true for this to count as done.": {
@@ -4458,9 +4458,7 @@ export const SEED: Catalogue = {
   "Work inside the running phases": { de: "Arbeit in den laufenden Phasen", es: "Trabajo dentro de las fases en curso", ca: "Feina dins les fases en curs" },
   "e.g. Dispatch, phase 4": { de: "z. B. Dispatch, Phase 4", es: "p. ej. Dispatch, fase 4", ca: "p. ex. Dispatch, fase 4" },
   "phases": { de: "Phasen", es: "fases", ca: "fases" },
-  "Contributes to the phase's goal": { de: "Trägt zum Ziel der Phase bei", es: "Contribuye al objetivo de la fase", ca: "Contribueix a l'objectiu de la fase" },
   "Phase goal": { de: "Phasenziel", es: "Objetivo de la fase", ca: "Objectiu de la fase" },
-  "Goal": { de: "Ziel", es: "Objetivo", ca: "Objectiu" },
   "The one outcome this phase is organized around.": { de: "Das eine Ergebnis, um das diese Phase organisiert ist.", es: "El único resultado alrededor del cual se organiza esta fase.", ca: "L'únic resultat al voltant del qual s'organitza aquesta fase." },
   "Assess the current state and gather requirements before work is scoped.": { de: "Den aktuellen Stand bewerten und Anforderungen sammeln, bevor die Arbeit abgegrenzt wird.", es: "Evaluar el estado actual y recoger los requisitos antes de acotar el trabajo.", ca: "Avaluar l'estat actual i recollir els requisits abans d'acotar la feina." },
   "Scope, prioritize, and schedule the stories for the wave.": { de: "Die Aufgaben für die Wave abgrenzen, priorisieren und einplanen.", es: "Acotar, priorizar y programar las historias de la wave.", ca: "Acotar, prioritzar i programar les històries de la wave." },
@@ -4469,7 +4467,6 @@ export const SEED: Catalogue = {
   "Implement changes and adjustments requested by the account after they have used the release.": { de: "Änderungen und Anpassungen umsetzen, die der Kunde nach der Nutzung der Freigabe angefordert hat.", es: "Implementar los cambios y ajustes que la cuenta pidió después de usar el lanzamiento.", ca: "Implementar els canvis i ajustos que el compte ha demanat després d'utilitzar el llançament." },
   "Release the accepted work to production, includes the release checklist, smoke tests, rollout (phased/canary if needed), release notes, and a rollback plan.": { de: "Die akzeptierte Arbeit in Produktion bringen, einschließlich Freigabe-Checkliste, Smoke-Tests, Rollout (phasenweise/Canary bei Bedarf), Release Notes und einem Rollback-Plan.", es: "Publicar el trabajo aceptado en producción, incluye la checklist de lanzamiento, pruebas de humo, despliegue (por fases/canary si hace falta), notas de la versión y un plan de reversión.", ca: "Publicar la feina acceptada a producció, inclou la checklist de llançament, proves de fum, desplegament (per fases/canary si cal), notes de la versió i un pla de reversió." },
   "A short, intensive support window immediately after deploy where the team closely monitors the release, fixes urgent issues fast, and supports the account during adoption.": { de: "Ein kurzes, intensives Support-Fenster direkt nach dem Deploy, in dem das Team die Freigabe genau beobachtet, dringende Probleme schnell behebt und den Kunden bei der Einführung unterstützt.", es: "Una ventana de soporte breve e intensa justo después del deploy, en la que el equipo vigila de cerca el lanzamiento, corrige rápido los problemas urgentes y apoya a la cuenta durante la adopción.", ca: "Una finestra de suport breu i intensa just després del deploy, en què l'equip vigila de prop el llançament, corregeix ràpid els problemes urgents i dona suport al compte durant l'adopció." },
-  "Couldn't change that story.": { de: "Diese Aufgabe konnte nicht geändert werden.", es: "No se pudo cambiar esa historia.", ca: "No s'ha pogut canviar aquesta història." },
   "Each person decides this for themselves. It is stored against your own account and not the team's. Today the only way to set it is to ask the assistant, which is a gap rather than a design.": { de: "Jede Person entscheidet das für sich selbst. Es wird gegen Ihr eigenes Konto gespeichert und nicht das des Teams. Heute ist der einzige Weg, es einzustellen, den Assistenten zu fragen, was eine Lücke ist und keine Absicht.", es: "Cada persona decide esto por sí misma. Se guarda contra tu propia cuenta y no la del equipo. Hoy la única forma de configurarlo es pedírselo al asistente, lo cual es un vacío y no un diseño.", ca: "Cada persona decideix això per si mateixa. Es desa contra el teu propi compte i no el de l'equip. Avui l'única manera de configurar-ho és demanar-ho a l'assistent, cosa que és un buit i no un disseny." },
   "Nothing happens on its own here. The timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.": { de: "Hier passiert nichts von selbst. Der Timer wird nicht gestoppt und keine Zeit wird geschrieben. Es ist eine Frage, die die App Ihnen stellt, und Sie beantworten sie auf drei Arten.", es: "Aquí nada ocurre por sí solo. El cronómetro no se detiene y no se registra ningún tiempo. Es una pregunta que la app te hace, y la respondes de tres formas.", ca: "Aquí no passa res per si sol. El cronòmetre no s'atura i no es registra cap temps. És una pregunta que l'app et fa, i la respons de tres maneres." },
   "That can be right. It is saved either way. Change a phase's dates if it is not.": { de: "Das kann stimmen. Es wird so oder so gespeichert. Ändern Sie die Daten einer Phase, wenn nicht.", es: "Eso puede ser correcto. Se guarda de todos modos. Cambia las fechas de una fase si no lo es.", ca: "Això pot ser correcte. Es desa de totes maneres. Canvia les dates d'una fase si no ho és." },
@@ -4537,7 +4534,6 @@ export const SEED: Catalogue = {
    * are the four new strings the row itself needed. ─────────────────────── */
   "Nobody yet.": { de: "Noch niemand.", es: "Nadie todavía.", ca: "Ningú encara." },
   "Inherited from": { de: "Übernommen von", es: "Heredado de", ca: "Heretat de" },
-  "Change who is assigned": { de: "Zuständigkeit ändern", es: "Cambiar quién está asignado", ca: "Canvia qui hi ha assignat" },
   "Choose someone": { de: "Jemanden auswählen", es: "Elige a alguien", ca: "Tria algú" },
 
   /* ── The Assigned to card's own eyebrow, redesigned as the Stakeholders
@@ -4549,17 +4545,6 @@ export const SEED: Catalogue = {
    * stays on the existing "Inherited from <app>" line beneath it. ────────── */
   "From the app": { de: "Von der App", es: "De la app", ca: "De l'app" },
 
-  /* ── The Assigned to card's own clear action (Aurora's 16 Sep 2026 ruling:
-   * "Kill the 'nobody' option for staff … This 'nobody', just kill it.",
-   * reverted a 21 Sep 2026 attempt to put a "Nobody, inherit from the app"
-   * row back into the Select). Clearing the ticket's own assignee back to
-   * inherited is this text button now, offered only when the app has a lead
-   * to fall back on. ─────────────────────────────────────────────────── */
-  "Use the app's lead": {
-    de: "Lead der App verwenden",
-    es: "Usar el responsable de la app",
-    ca: "Fer servir el responsable de l'app",
-  },
 
   /* ── THE STORY DETAIL PAGE, ONE PAGE, NO TABS (Aurora's design review, 21
    * Sep 2026, story-detail-design.html): "call it build notes" and "canont
@@ -4591,6 +4576,9 @@ export const SEED: Catalogue = {
   "Not started": { de: "Noch nicht begonnen", es: "Sin empezar", ca: "Sense començar" },
   "Flow efficiency": { de: "Flusseffizienz", es: "Eficiencia de flujo", ca: "Eficiència de flux" },
   "No time log": { de: "Keine Zeiterfassung", es: "Sin registro de tiempo", ca: "Sense registre de temps" },
+  // THE EFFORT CARD'S OWN EMPTY STATE (Aurora's ruling, 21 Sep 2026, B44
+  // amended) — no door, words only.
+  "No time logged yet.": { de: "Noch keine Zeit erfasst.", es: "Aún no hay tiempo registrado.", ca: "Encara no hi ha temps registrat." },
 
   /* ── THE BACKLOG TAB'S OWN STATUS FACET (round 32, stories-screen.tsx) —
    * "In Review", Title Case, the facet's own short label beside Backlog/To
@@ -4617,4 +4605,12 @@ export const SEED: Catalogue = {
    * this in a Tooltip while disabled; `setTaskDone` answers the same
    * sentence in its 409. ─────────────────────────────────────────────── */
   "Stop the timer first.": { de: "Zuerst den Timer stoppen.", es: "Detén primero el temporizador.", ca: "Atura primer el temporitzador." },
+
+  /* THE CHOICES TABLE'S ADDED COLUMN SPLITS (K59, UI-RULEBOOK.md, Aurora, 21
+   * Sep 2026, verbatim: "ok split the who and date added in 2 columns").
+   * Same attribution register "Closed by"/"Closed on" and "Added by Gmail"
+   * already carry (von/por/per for "by", am/el/el for "on" over a date),
+   * applied to the two new settings-choices-panel.tsx column headers. */
+  "Added by": { de: "Hinzugefügt von", es: "Añadido por", ca: "Afegit per" },
+  "Added on": { de: "Hinzugefügt am", es: "Añadido el", ca: "Afegit el" },
 }

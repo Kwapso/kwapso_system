@@ -306,6 +306,7 @@ import {
   type ToolbarViewSlot,
 } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
+import { TaskSheet, PriorityChip, priorityWord } from "@/components/work/task-sheet"
 import { useTaskFormOptions } from "@/lib/use-task-form-options"
 import { content as contentApi } from "@/lib/api"
 import { LoadMore } from "@/components/records/load-more"
@@ -323,21 +324,12 @@ import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
 import type { Language } from "@shared/i18n"
 
-/** THE FOUR PRIORITY LEVELS, IN WORDS — literal `t("…")` calls rather than a
- * `t(PRIORITY_LABEL[level])` lookup, for the exact reason the tickets board's
- * own `COLUMN` map is written the same way (tickets-collection.tsx's
- * `OpenBoard`): a dynamic key looks up words the catalogue does not hold
- * (R28's extraction walk only sees literal `t("…")` positions), so
- * `PRIORITY_LABEL`'s own English strings would ship in English to every reader
- * who chose a different language. Same four words `PRIORITY_LABEL`
- * (shared/departments.ts) names, spelled out here so each is a real catalogue
- * entry. */
-function priorityWord(t: (s: string) => string, level: 1 | 2 | 3 | 4): string {
-  if (level === 1) return t("Whenever")
-  if (level === 2) return t("Urgent")
-  if (level === 3) return t("Important")
-  return t("Do it now")
-}
+// `priorityWord` AND `PriorityChip` MOVED TO `task-sheet.tsx`, 21 Sep 2026 —
+// the task slide-in's own title row needed the chip first, and a caller in
+// THIS file importing it back (below) is a cleaner dependency than
+// `task-sheet.tsx` reaching into this one, which now also needs to mount
+// `<TaskSheet>` itself (the reverse direction would be circular). Both are
+// exported from there unchanged, same words, same tones.
 
 /** THE APP'S OWN PRIORITY ORDER — highest first, reading the way the door's
  * own default sort already does (`TASK_SORTS.priority`,
@@ -345,21 +337,6 @@ function priorityWord(t: (s: string) => string, level: 1 | 2 | 3 | 4): string {
  * board's columns and the priority filter's options both read this list, so
  * neither can silently disagree with the other about which end is "worse". */
 const PRIORITY_ORDER: readonly (1 | 2 | 3 | 4)[] = [4, 3, 2, 1]
-
-
-/** THE PRIORITY CHIP — the client's own words, "Priority (has a color here)".
- * Nothing in the app had ever coloured a task's priority before this (see
- * `PRIORITY_DOT_TONE`'s own header): the shaped row used to fold the plain word
- * into a summary sentence and nothing else read it. `Badge variant="status"
- * dot={…}` is the exact seam a task's own record screen already colours its
- * Open/Done chip through (task-detail.tsx) — reused, not invented. */
-function PriorityChip({ level, t }: { level: 1 | 2 | 3 | 4; t: (s: string) => string }) {
-  return (
-    <Badge variant="status" dot={PRIORITY_DOT_TONE[level]}>
-      {priorityWord(t, level)}
-    </Badge>
-  )
-}
 
 /** THE BOARD CARD'S OWN CHIP — client, 2026-09-15, fourth feedback item:
  * "adding a chip inside the board component with the app, account, or
@@ -632,6 +609,9 @@ export function TasksScreen({
   myUserId,
   onAction,
   onIntent,
+  openTaskId,
+  basePath = "",
+  go = () => {},
 }: {
   teamId: string
   recipe: ScreenRecipe
@@ -659,6 +639,29 @@ export function TasksScreen({
   canCreate: boolean
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
+  /** THE TASK SLIDE-IN'S OWN OPEN RECORD — the URL's own record id
+   * (`ModuleContentCtx.recordId`), so a deep link to `/t/<teamId>/tasks/<id>`
+   * opens the sheet over this SAME list rather than a separate full-page
+   * screen (task-detail.tsx is retired; see task-sheet.tsx's own header).
+   * `null`/`undefined` when the address names no record — the ordinary
+   * collection address, sheet closed. */
+  openTaskId?: string | null
+  /** THIS SCREEN'S OWN ADDRESS, WITHOUT A RECORD — `ModuleContentCtx.
+   * sectionPath`, the collection's own address in whatever nesting it was
+   * opened inside (flat: `/tasks`; team-scoped: `/t/<teamId>/tasks`). Where
+   * closing the sheet goes back to. */
+  basePath?: string
+  /** `ModuleContentCtx.go` — the one place a URL actually changes (deep-
+   * link/use-host-nav.ts). Opening the sheet still goes through `onIntent`
+   * (so Back re-closes it, same as every other record); this is only for
+   * closing it, which needs the LIST's own address rather than the panel-
+   * behind-a-panel address `onIntent({kind:"close"})` was built for.
+   * OPTIONAL, with a no-op default — the one real call site
+   * (`collection-content.tsx`) always passes both this and `basePath`
+   * together; the default only exists so a caller with no reason to open
+   * the sheet at all (a cold-boot render test covering many screens) does
+   * not have to know this prop exists. */
+  go?: (path: string) => void
 }) {
   const { t, lang } = useLanguage()
   const tasksQ = useCached<Task[]>(tasksKey(teamId, view), () => listFetch.tasks(teamId, view))
@@ -1348,6 +1351,22 @@ export function TasksScreen({
         departments={options.departments}
         defaultAssigneeId={myUserId ?? ""}
         onSubmit={addTask}
+      />
+
+      {/* THE TASK SLIDE-IN — driven entirely by the URL's own record id
+          (`openTaskId`), so opening it (a row, a board card, a calendar/week
+          entry, all still call `onIntent({kind:"open",…})` unchanged, above)
+          and closing it are the same one address. `mounted` even with
+          `taskId=null` so its own close animation can play through rather
+          than the panel vanishing mid-slide. */}
+      <TaskSheet
+        teamId={teamId}
+        taskId={openTaskId ?? null}
+        open={!!openTaskId}
+        onOpenChange={(o) => {
+          if (!o) go(basePath)
+        }}
+        onAction={onAction}
       />
     </div>
     </CountedAbove>

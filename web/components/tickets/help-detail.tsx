@@ -129,6 +129,7 @@ import type {
   SelectableValue,
   Story,
   TeamMember,
+  TicketMetrics,
 } from "@shared/types"
 import { helpStatusDotTone, storyStatusDotTone } from "@shared/status-tones"
 import { storyStatusWord } from "@shared/story-status-word"
@@ -169,7 +170,7 @@ import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-
 import { sliceKey } from "@/components/work/work-panels"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { TicketStages } from "@/components/tickets/ticket-stages"
-import { WorkLogsPanel } from "@/components/work/work-logs-panel"
+import { EffortCard } from "@/components/work/effort-card"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
 import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
@@ -469,24 +470,14 @@ export function HelpDetailScreen({
   // no tab at all rather than a tab that refuses.
   const canSeeTime = can("work", "read")
   const canEditTime = can("work", "update")
-  // THE HOURS NO LONGER RIDE THE PANEL'S OWN TITLE — client ruling, 18 Sep
-  // 2026, verbatim: "on work logs, remove the hours just next to the tile,
-  // for that we have the big count. also the + button to the right." The
-  // "big count" is `<WorkLogsPanel>`'s own `Numbers` stat grid, drawn INSIDE
-  // the panel from the identical `recordTimeSummaryKey` read this screen used
-  // to duplicate for the small title-row figure — so the read that used to
-  // live here (`workSummaryQ`) bought nothing the panel was not already
-  // showing, once the small figure it fed was removed. `workLogAddRef`,
-  // below, is what the title row's new "+" reaches for instead.
-  const workLogAddRef = React.useRef<(() => void) | null>(null)
-  // R88 — WHETHER THIS PANEL IS CONFIRMED EMPTY, read from `<WorkLogsPanel>`'s
-  // own `onEmptyChange` (work-logs-panel.tsx) rather than a second, sidecar
-  // door: that panel's doc comment carries the full account of the race a
-  // separate totals cache key opened (the header settling "empty" a render
-  // apart from the body, both doors briefly drawing their own "+"). `false`
-  // until the panel's own resting-list read resolves, so the header never
-  // pops away and back while that read settles.
-  const [workLogsEmpty, setWorkLogsEmpty] = React.useState(false)
+  // THE TICKET'S OWN CYCLE TIME / EFFORT / FLOW EFFICIENCY (`getTicketMetrics`,
+  // `POST /api/content/help/metrics`) — Aurora's ruling, 21 Sep 2026, B44
+  // amended: the Effort card's own three metric lines draw on the ticket page
+  // the same as the story's. Gated the same `have` deterministic gate every
+  // other secondary read on this page already uses.
+  const ticketMetricsQ = useCached<TicketMetrics>(have ? `help:metrics:${helpId}` : null, () =>
+    content.helpMetrics(helpId)
+  )
   // `attachRef`/the composer's Paperclip button STOOD HERE — wired to
   // `HelpAttachmentsPanel`'s own `openRef` (record-attachments.tsx). Gone
   // with the tray it opened: see this file's own header for the 18 Sep 2026
@@ -697,6 +688,9 @@ export function HelpDetailScreen({
     invalidate(`help:${teamId}`)
     invalidate(`help-thread:${helpId}`)
     invalidate(recordActivityKey("help", helpId))
+    // The Effort card's own cycle time counts to the resolved moment —
+    // resolving is the one write on this screen that moves it.
+    invalidate(`help:metrics:${helpId}`)
     toast.success(r.alreadyResolved ? t("Already answered.") : t("Answered, and they've been told."))
   }
 
@@ -734,10 +728,12 @@ export function HelpDetailScreen({
     raisedByContactId?: string
     // WHO IS ON IT (Aurora, 21 Sep 2026), staff only, correctable the same
     // way; the door ignores it outright for a portal caller, which this
-    // screen never is. `null` is an explicit clear, "Nobody, inherit from
-    // the app" (see `help-stakeholders.tsx`'s own Select), never confused
-    // with "leave it alone" (`undefined`), the same distinction the door
-    // itself draws (`workers/content/src/lib/help.ts`'s `assigneeCleared`).
+    // screen never is. `null` is an explicit clear, back to inherited from
+    // the app, never confused with "leave it alone" (`undefined`), the same
+    // distinction the door itself draws (`workers/content/src/lib/help.ts`'s
+    // `assigneeCleared`). Set through `help-form-dialog.tsx`'s own "Assigned
+    // to" field now, which never sends `null` (no clear control, and her
+    // 16 Sep 2026 ruling: once assigned, a ticket keeps a person).
     assigneeId?: string | null
   }) {
     const { tickets, byType, byStatus, byAccount } = await content.updateHelp({ id: helpId, ...input })
@@ -1207,7 +1203,10 @@ export function HelpDetailScreen({
                           itself (17 Sep 2026: "Remove 'Show All' because you
                           need to show them all" — see `storiesPreviewQ`'s
                           own comment, above).
-       · Work logs     → `<WorkLogsPanel>`, unchanged, inside its own panel.
+       · Work logs     → renamed Effort, drawn by the shared `<EffortCard>`
+                          (web/components/work/effort-card.tsx) the story
+                          page also draws (Aurora's ruling, 21 Sep 2026, B44
+                          amended).
        · Files and links → B19's own pattern held until 18 Sep 2026 (the ⋯
                           menu, opened as a sheet); the client then ruled it
                           out entirely ("kill this whole files & links …
@@ -1250,7 +1249,16 @@ export function HelpDetailScreen({
     triageAppStaff,
     ticket.appId,
     myUserId
-  ).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))
+  ).map((m) => ({
+    value: m.id,
+    label: m.name,
+    picture: m.photo,
+    shape: "round" as const,
+    // `face: true` (R90) so a staff member with no photo on file still draws
+    // their own initial rather than a blank row — a person is always a
+    // record with a face, the same flag every staff picker in the app sets.
+    face: true,
+  }))
 
   /* B0294/T3657 — "the close button needs to move to the top." CLOSING IS
    * `help:update`, the right `/help/resolve` itself gates on, and there is
@@ -1790,8 +1798,15 @@ export function HelpDetailScreen({
         // 21 Sep 2026, verbatim: "nono assigned to on the very top, a
         // different card from stakeholders!" `AssignedToCard`
         // (`help-stakeholders.tsx`) reads the SAME ticket/app/member facts
-        // the Stakeholders panel's own call used to hand it, wired through
-        // the same `editTicket` courier.
+        // the Stakeholders panel's own call used to hand it. READ-ONLY as of
+        // her very next ruling the same day, reading the card back: "ok,
+        // but rmeove the edit button (this can be editedfrom dtory edit
+        // screen). rmeove the 'use the apps lead' text." `canEditAssignee`/
+        // `onChangeAssignee` are dropped from this call, the card no
+        // longer opens a picker of its own, and `assigneeId` is now
+        // changed from the ticket's own edit screen instead
+        // (`<HelpFormDialog>`'s own "Assigned to" field, below, still
+        // wired through the same `editTicket` courier).
         assignedTo={
           <AssignedToCard
             assigneeId={ticket.assigneeId}
@@ -1800,10 +1815,6 @@ export function HelpDetailScreen({
             appName={ticket.appName}
             appAssigneeId={ticket.appAssigneeId}
             members={assignableMembers(membersQ.data)}
-            canEditAssignee={canEdit}
-            onChangeAssignee={(assigneeId) =>
-              editTicket({ description: ticket.description, assigneeId })
-            }
           />
         }
         // THE BAND — R89 round 24, 19 Sep 2026. The SAME data the
@@ -2226,59 +2237,29 @@ export function HelpDetailScreen({
           </EmptyGatedPanel>
         }
         time={
-          // WORK LOGS, wherever time can be tracked (CHECKLIST 6.8) — gated on
-          // `work:read`, the right the door itself gates on, exactly as the
-          // tab was: a role without it sees no panel at all rather than one
-          // that refuses.
-          //
-          // NO HOURS ON THE TITLE, "+" FAR RIGHT — client ruling, 18 Sep
-          // 2026, verbatim: "on work logs, remove the hours just next to the
-          // tile (for that we have the big count). also the + button to the
-          // right." Same shape as Related stories, above: `AddButton`
-          // (R84) replaces `<WorkLogsPanel>`'s own inline "Log time"
-          // control on this call site — `showAddButton={false}` turns that
-          // one off so there is one "+" and not two — and reaches its
-          // dialog through `workLogAddRef`, the opener the panel writes
-          // into itself. Every OTHER caller of `WorkLogsPanel` (a story, a
-          // task, a meeting) is untouched: both props default to the old
-          // behaviour.
-          //
-          // R88 — EMPTY-STATE SINGLE DOOR. Her screenshot, verbatim on
-          // `EmptyGatedPanel` (deep-link/screen-bits.tsx): THIS card, empty,
-          // drew "Work logs" with the black "+" beside it AND, in the body,
-          // "No time logged against this yet. [...] Add the first" — two
-          // doors on one zero-row collection. `<EmptyGatedPanel>` replaces
-          // `<TicketSidePanel>` here for the same reason it does on Related
-          // stories, above: at zero logged entries it drops the header
-          // outright (title and "+" together) and `<WorkLogsPanel>`'s own
-          // `CollectionEmptyState` — unchanged, already wired to the same
-          // `workLogAddRef` opener — is the one door.
+          // EFFORT — title with the total hours as its count, the three
+          // metric lines (computed off the ticket's own work logs and its
+          // resolved moment, `getTicketMetrics`), and the individual time
+          // log rows, drawn by the one shared `EffortCard`
+          // (web/components/work/effort-card.tsx) the story page now draws
+          // too (Aurora's ruling, 21 Sep 2026, B44 amended, verbatim: "ok,
+          // but i still want to see the individual records of time og! also
+          // show avatar of perosn. bring back the old cards with the
+          // metrics inside effort" and "in effort card inside stories or
+          // tickets, rmeove the + button (we have the start on top!)"). Gated
+          // on `work:read`, the right the door itself gates on, exactly as
+          // the old Work logs tab was: a role without it sees no panel at
+          // all rather than one that refuses. No "Log time" door on this
+          // card any more — the head's own Start/Stop timer button is the
+          // one way a new row is written.
           canSeeTime ? (
-            <EmptyGatedPanel
-              title={t("Effort")}
-              empty={workLogsEmpty}
-              action={
-                canLogTime ? (
-                  <AddButton
-                    label={t("Log time")}
-                    onClick={() => workLogAddRef.current?.()}
-                    empty={workLogsEmpty}
-                  />
-                ) : undefined
-              }
-            >
-              <WorkLogsPanel
-                targetTable="help"
-                targetId={helpId}
-                recordLabel={[ticket.ref, richTextPlain(ticket.description)].filter(Boolean).join(" · ")}
-                canEdit={canEditTime}
-                canLog={canLogTime}
-                onActivityChanged={() => invalidate(recordActivityKey("help", helpId))}
-                showAddButton={false}
-                addTrigger={workLogAddRef}
-                onEmptyChange={setWorkLogsEmpty}
-              />
-            </EmptyGatedPanel>
+            <EffortCard
+              targetTable="help"
+              targetId={helpId}
+              canEdit={canEditTime}
+              members={membersQ.data}
+              metrics={ticketMetricsQ.data}
+            />
           ) : null
         }
         stakeholders={
@@ -2411,11 +2392,12 @@ export function HelpDetailScreen({
           appId: ticket.appId,
           moduleId: ticket.moduleId,
           raisedByContactId: ticket.raisedByContactId,
+          assigneeId: ticket.assigneeId,
         }}
         onSubmit={editTicket}
         helpId={helpId}
         canAttach={canEdit}
-        // WHO TO KEEP IN THE LOOP — moved here from the page's own
+        // WHO TO KEEP IN THE LOOP, moved here from the page's own
         // Stakeholders panel (client ruling, 17 Sep 2026; see
         // `help-stakeholders.tsx`'s own header and `loopField`'s comment in
         // help-form-dialog.tsx for the quote and the R81 reasoning). Same
@@ -2425,6 +2407,14 @@ export function HelpDetailScreen({
         loopMembers={assignableMembers(membersQ.data)}
         canAddToLoop={can("help", "read")}
         onAddStakeholder={addStakeholder}
+        // ASSIGNED TO, ON THE TICKET'S OWN EDIT SCREEN. Aurora's ruling,
+        // 21 Sep 2026, verbatim, over `AssignedToCard`'s own pen: "ok, but
+        // rmeove the edit button (this can be editedfrom dtory edit
+        // screen)." The one door onto `assigneeId` now, the same
+        // `assignableMembers` list `AssignedToCard` reads for its own face,
+        // and `editTicket` already accepts `assigneeId` (this file's own
+        // note beside its declaration).
+        assigneeMembers={assignableMembers(membersQ.data)}
       />
 
       {archiveDialog}

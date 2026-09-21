@@ -2243,15 +2243,6 @@ export type Story = {
    * backfilled, for `acceptanceCriteria`'s own reason: nobody can honestly
    * say what a pre-existing story's priority WAS. */
   moscow: MoscowValue | null
-  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
-   * 2026, paired with `Sprint.goalSummary`.) A per-story flag, toggled on the
-   * story row inside the phase board and on the story form once a phase is
-   * chosen, shown as a small mark on the story card. Defaults false — most
-   * stories are ordinary backlog work, and a phase with no goal set has
-   * nothing for this to mean, but the flag is stored independently of whether
-   * a goal is set so ticking it early and setting the goal later never loses
-   * the tick. */
-  contributesToGoal: boolean
   accountId: string | null
   createdAt: string
   updatedAt: string | null
@@ -2308,6 +2299,16 @@ export type StoryMetrics = {
    * as "No time log". */
   flowEfficiency: number | null
 }
+
+/** THE TICKET DETAIL PAGE'S OWN THREE FIGURES, THE IDENTICAL SHAPE — computed
+ * in `getTicketMetrics` (workers/content/src/lib/help.ts, `POST /api/content/
+ * help/metrics`), over the ticket's own work logs and its `resolved_at`
+ * moment rather than a story's `story_status_events`. An alias, not a second
+ * declaration: the shared `EffortCard` (web/components/work/effort-card.tsx)
+ * draws both a story's and a ticket's figures through one prop, and a real
+ * type alias is what keeps the two doors from drifting the day one of them
+ * grows a field the other does not. */
+export type TicketMetrics = StoryMetrics
 
 export type StoryBurndown = {
   days: StoryBurndownDay[]

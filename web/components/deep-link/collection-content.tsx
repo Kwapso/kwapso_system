@@ -211,6 +211,15 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         canCreate={can("work", "create")}
         onAction={onAction}
         onIntent={onIntent}
+        // THE TASK SLIDE-IN — `ctx.recordId` is the URL's own task id (present
+        // whether this render came from the `!recordId` early return above or,
+        // now that task-detail.tsx is retired, from module-content.tsx's own
+        // `module === "tasks"` branch with a record in the address); `sectionPath`
+        // is this collection's own address to close back to (`go`, already
+        // destructured above). See task-sheet.tsx's own header.
+        openTaskId={ctx.recordId}
+        basePath={sectionPath}
+        go={go}
       />
     )
   }

@@ -10,7 +10,7 @@
 // TWO SITES DRAW A TIMER-START CONTROL. `useRecordTimerAction`/
 // `RecordTimerButton` (web/components/shell/timer-bar.tsx) is the ONE shared
 // toggle every record head reads (help-detail.tsx, story-detail.tsx,
-// task-detail.tsx, its own header note says so); its "not mine" branch is
+// task-sheet.tsx, its own header note says so); its "not mine" branch is
 // the button this ruling is about, and its default now reads `t("Start")` /
 // `<Timer>` for every caller that does not pass its own override.
 // `StartTimerStrip` (web/components/work/time-panel.tsx) is the second, a
@@ -23,15 +23,16 @@
 // THE STOP CONTROL IS UNCHANGED, on purpose: it draws `StopCircle`, not
 // `Play`, so it was never in the icon family this ruling retired.
 //
-// TASK DETAIL AND TASK FORM ARE SKIPPED HERE, with a dated note: another
-// lane owns `web/components/work/task-detail.tsx` (a 21 Sep 2026 ruling of
-// its own, "beside the mango Done," landed the SAME day, wiring its own
-// `startLabel`/`startIcon` override on `RecordTimerButton`) and
-// `web/components/work/task-form-dialog.tsx`, and renames its own button,
-// this file's CLAUDE.md working agreement. Both already inherit this law's
-// default for free (the override is additive, `web/components/shell/
-// timer-bar.tsx`'s own note says so), so nothing here is unproven for them;
-// this test simply is not the one that pins their copy.
+// TASK FORM IS SKIPPED HERE, with a dated note: another lane owns
+// `web/components/work/task-form-dialog.tsx` and renames its own button,
+// this file's CLAUDE.md working agreement — so this test is not the one
+// that pins its copy. TASK DETAIL LEFT THIS SKIP LIST 21 Sep 2026 with the
+// screen itself: `task-detail.tsx` is deleted, replaced by the task
+// slide-in (`task-sheet.tsx`), which wires NO override at all — it reads
+// `<RecordTimerButton>`'s own default ("beside the mango Done" landed on
+// that default, `web/components/shell/timer-bar.tsx`'s own note says so),
+// so it is an ordinary candidate this census walks and proves like any
+// other, not a reasoned skip.
 //
 // A CENSUS, NOT A HARD-CODED PAIR: every file under `web/`, `web-portal/`
 // and `shared/web/` that actually WIRES a timer-start control (calls
@@ -60,8 +61,7 @@ const ROOTS = [
 
 /** DATED, REASONED, see this file's own header. Relative to `REPO_ROOT`. */
 const SKIP_FILES = new Set([
-  "web/components/work/task-detail.tsx", // 21 Sep 2026, another lane's own button, see above
-  "web/components/work/task-form-dialog.tsx", // 21 Sep 2026, same lane, same reason
+  "web/components/work/task-form-dialog.tsx", // 21 Sep 2026, another lane's own button, see above
 ])
 
 const WIRES_A_TIMER_START = /\.startTimer\(|useRecordTimerAction\(|<RecordTimerButton\b|<StartTimerStrip\b/

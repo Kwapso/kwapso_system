@@ -82,6 +82,7 @@ import type { HelpStakeholder } from "@shared/types"
 import { TITLE_MAX_CHARS } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
+import type { AssignableMember } from "@/components/tickets/help-stakeholders"
 // `NEUTRAL_TYPE_COLOUR`/`ticketTypeColour` USED TO BE IMPORTED HERE, for the
 // dot on the "No type" chip and then for the type row's own swatch. Both
 // readers are gone from this file now — the "No type" chip first (see
@@ -211,6 +212,18 @@ const appField = {
   label: "App",
   required: false,
 }
+// WHO IS ON IT, right after the app (Aurora, 21 Sep 2026, verbatim, placing
+// the field on this very form after removing the pen from `AssignedToCard`'s
+// own tile: "the ticket's edit form gains an 'Assigned to' field ... place
+// it after the ticket's app field"). Optional, and never demanded: leaving
+// it untouched keeps whatever the ticket already had, its own assignee or,
+// failing that, the app's inherited lead (`effectiveAssignee`,
+// `AssignedToCard`'s own seam) with no field on this form forcing a choice.
+const assigneeField = {
+  ...defaultFieldConfig,
+  label: "Assigned to",
+  required: false,
+}
 // WHICH SECTION OF IT (Aurora, 19 Aug 2026). It sits directly under the app
 // because it is meaningless without one, and the hint says so rather than
 // leaving somebody to discover it by finding the list empty.
@@ -311,6 +324,7 @@ export function HelpFormDialog({
   loopMembers,
   canAddToLoop = false,
   onAddStakeholder,
+  assigneeMembers,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -322,6 +336,12 @@ export function HelpFormDialog({
     appId?: string
     moduleId?: string
     raisedByContactId?: string
+    /** WHO IS ON IT (Aurora, 21 Sep 2026). Never `null` from this form: the
+     * "Assigned to" field's own kit `Select` offers no clear control (the
+     * same shape "Raised by" carries, and her 16 Sep 2026 ruling that a
+     * staff picker never offers Nobody), so an untouched field sends
+     * `undefined` (leave it alone) and a picked one sends its id. */
+    assigneeId?: string
     /** RETURNS THE NEW TICKET'S ID on a create, when the caller has one.
      *
      * An attachment needs a ticket to belong to, and on a create there is no
@@ -359,6 +379,7 @@ export function HelpFormDialog({
     appId?: string | null
     moduleId?: string | null
     raisedByContactId?: string | null
+    assigneeId?: string | null
   }
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
@@ -386,6 +407,15 @@ export function HelpFormDialog({
    * form's own `onSubmit`: a stakeholder is a write against a different list,
    * not a field on the ticket row. */
   onAddStakeholder?: (userId: string) => Promise<void>
+  /** WHO THIS TICKET MAY BE ASSIGNED TO, for the "Assigned to" field's own
+   * `Select` (below). Agency staff only, the same list `AssignedToCard`
+   * (help-stakeholders.tsx) reads for its own face, typed off that file's
+   * own exported `AssignableMember` rather than `PickablePerson`
+   * (web/lib/members.ts) on purpose: this field wears the same kit `Select`
+   * `AssignedToCard`'s own (now-retired) assignee picker always wore, not
+   * the pill row `web/test/staff-pill-row.test.ts` (R79) holds a
+   * `PickablePerson[]`-typed list to. */
+  assigneeMembers?: AssignableMember[]
 }) {
   const { t, lang } = useLanguage()
   const isEdit = !!initial
@@ -425,6 +455,7 @@ export function HelpFormDialog({
     appId: initial?.appId || fixedApp?.id || NONE,
     moduleId: initial?.moduleId || NONE,
     raisedByContactId: initial?.raisedByContactId || NONE,
+    assigneeId: initial?.assigneeId || NONE,
   }
   // Per-session draft: restores what you typed if you navigate away and reopen.
   const [values, setValues, clearDraft] = useFormDraft(draftKey, initialValues, open)
@@ -1073,6 +1104,26 @@ export function HelpFormDialog({
   const contactMissing = contactRequired && raisedByValue === NONE
   const contactConfig = contactField(contactRequired)
 
+  /** WHO IS ON IT. Optional (see `assigneeField`), so nothing here mirrors
+   * `contactRequired`/`contactMissing`: leaving the row untouched sends
+   * `undefined` and Submit is never refused over it.
+   *
+   * UNSORTED HERE ON PURPOSE, the same shape `contactOptions` above uses:
+   * the A→Z order (R75) is applied at the <SelectItem> render below
+   * (`sortedOptions(assigneeOptions, lang, …)`), which is also the one
+   * `.map()` the law's own census reads; sorting twice would be wasted
+   * work for the same result. */
+  const assigneeOptions = assigneeMembers ?? []
+  /** THE TRIGGER'S OWN FACE, the identical seam `raisedByFace` above reads,
+   * off `assigneeMembers` rather than `contactOptions` (R90). `undefined`
+   * while nothing is picked, which draws no mark, exactly as `raisedByFace`
+   * does before a choice is made. */
+  const assigneeFace: SelectFace | undefined = (() => {
+    if (values.assigneeId === NONE) return undefined
+    const chosen = assigneeMembers?.find((m) => m.id === values.assigneeId)
+    return chosen ? { src: chosen.photo ?? undefined, name: chosen.name } : undefined
+  })()
+
   /** ONE FILE AT A TIME, and a failure here never fails the ticket.
    *
    * The ticket is already raised by the time this runs. Turning a rejected
@@ -1145,6 +1196,12 @@ export function HelpFormDialog({
         // opened (see `mainContactId`). `undefined` means "don't set one": the
         // door's `optionalText` leaves the stored value alone.
         raisedByContactId: raisedByValue === NONE ? undefined : raisedByValue,
+        // UNTOUCHED MEANS "LEAVE IT ALONE", never a clear: this field's own
+        // `Select` offers no "Nobody" row (see the field's own comment), so
+        // `undefined` here is the ONLY value this form ever sends, sent
+        // whenever nobody has pressed a name, which keeps an already-set
+        // assignee, or an inherited one, exactly where it was.
+        assigneeId: values.assigneeId === NONE ? undefined : values.assigneeId,
       })
       // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `helpId` on an edit,
       // the id the create door just handed back otherwise.
@@ -1412,6 +1469,35 @@ export function HelpFormDialog({
             disabled={busy}
           />
         )}
+      </Field>
+      {/* WHO IS ON IT, right after the app (Aurora, 21 Sep 2026, placing this
+          field on this form after removing the pen from `AssignedToCard`'s
+          own tile). The SAME kit `Select` that tile's own picker always
+          wore (R90 faces, R75 sorted A to Z), people only, no "Nobody"
+          entry, because a staff picker never offers one (her 16 Sep 2026
+          ruling), so there is no clear control here either: leaving the
+          row untouched sends `undefined` and keeps whatever the ticket
+          already had, its own assignee or the app's inherited lead; picking
+          somebody sends their id. `assignableMembers` never narrows to
+          nothing the way a client's contact list can, so the row is
+          disabled only while the caller has not handed any staff at all. */}
+      <Field config={assigneeField} htmlFor="help-assignee" className={fieldSpacing}>
+        <Select
+          value={values.assigneeId === NONE ? "" : values.assigneeId}
+          onValueChange={(assigneeId) => setValues((v) => ({ ...v, assigneeId }))}
+          disabled={busy || assigneeOptions.length === 0}
+        >
+          <SelectTrigger id="help-assignee" face={assigneeFace}>
+            <SelectValue placeholder={t("Choose someone")} />
+          </SelectTrigger>
+          <SelectContent>
+            {sortedOptions(assigneeOptions, lang, (m) => m.name).map((m) => (
+              <SelectItem key={m.id} value={m.id} face={{ src: m.photo ?? undefined, name: m.name }}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Field>
       {/* WHICH SECTION OF IT. Offered only once an app is chosen, because a
           module belongs to one and the door refuses a pair that does not match —

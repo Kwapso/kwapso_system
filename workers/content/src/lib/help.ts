@@ -31,6 +31,7 @@ import {
   type HelpMessageAttachment,
   type HelpStatus,
   type HelpTicket,
+  type TicketMetrics,
 } from "@shared/types"
 import { sprintIsRunning } from "@shared/sprint-state"
 import {
@@ -3253,6 +3254,51 @@ export async function deleteReply(
     relatedRowId: id,
   })
   return { helpId: row.help_id, accountId: ticket.account_id }
+}
+
+/** THE TICKET DETAIL PAGE'S OWN THREE FIGURES — Cycle time / Effort / Flow
+ * efficiency, the same `TicketMetrics` shape (shared/types.ts, an alias of
+ * `StoryMetrics`: the two are computed the identical way, over a different
+ * target table and a different "done" moment) the shared `EffortCard`
+ * (web/components/work/effort-card.tsx) draws on BOTH the story and the
+ * ticket page (Aurora's ruling, 21 Sep 2026, B44 amended).
+ *
+ * MIRRORS `getStoryMetrics`, ABOVE IN stories.ts, WITH ONE DIFFERENCE: a
+ * story's "done" moment is the latest `story_status_events` row reaching
+ * `done` (a story can reopen and close again); a ticket's own resolved
+ * moment is `help.resolved_at` directly — the column `setStatus`'s own
+ * `resolveBlock` already NULLs on a reopen and re-stamps on the next
+ * resolve, so it is always the CURRENT resolution, exactly the "latest,
+ * not first" property the story's own join buys with a second table. No
+ * ticket-existence check: an id that resolves to no rows reads the same as
+ * one that resolves to zero work logs, "Not started" — the honest answer to
+ * a filter that matched nothing, the same choice `getStoryMetrics` makes. */
+export async function getTicketMetrics(cfg: D1Rest, guard: MemberGuard, ticketId: string): Promise<TicketMetrics> {
+  const work = await d1Query<{ first_started: string | null; total_seconds: number | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT MIN(started_at) AS first_started, SUM(seconds) AS total_seconds
+       FROM work_logs WHERE target_table = 'help' AND target_id = ? AND discarded_at IS NULL`, // R14: one aggregate row
+    [ticketId]
+  )
+  const firstStarted = work[0]?.first_started ?? null
+  const effortSeconds = work[0]?.total_seconds ?? 0
+  if (!firstStarted) return { cycleTimeSeconds: null, effortSeconds, flowEfficiency: null }
+
+  const ticketRows = await d1Query<{ resolved_at: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT resolved_at FROM help WHERE id = ?`, // R14: one row by id
+    [ticketId]
+  )
+  const resolvedAt = ticketRows[0]?.resolved_at ?? null
+  // STILL OPEN: cycle time counts to NOW, the same "growing while it runs"
+  // reading `getStoryMetrics` gives an in-flight story.
+  const endMoment = resolvedAt ?? new Date().toISOString()
+  const cycleTimeSeconds = Math.max(0, (Date.parse(endMoment) - Date.parse(firstStarted)) / 1000)
+  const flowEfficiency =
+    effortSeconds > 0 && cycleTimeSeconds > 0 ? (effortSeconds / cycleTimeSeconds) * 100 : null
+  return { cycleTimeSeconds, effortSeconds, flowEfficiency }
 }
 
 /** HOOK (Phase 3) — the AI agent drafts the FIRST reply here, labelled "Drafted by

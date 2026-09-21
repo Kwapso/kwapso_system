@@ -421,6 +421,7 @@ export function RecordPicker({
   leadValue,
   note,
   optionCard = false,
+  autoFocus,
 }: {
   /** the id the Field's label points at */
   id?: string
@@ -520,6 +521,16 @@ export function RecordPicker({
    * this ruling and their resting pill already reads fine against a form's
    * OWN background, never a dialog canvas the same tone as `--card`. */
   optionCard?: boolean
+  /** THE CONTROL LAYOUT'S OWN TRIGGER TAKES FOCUS ON MOUNT — her ruling on the
+   * app form, 21 Sep 2026: "when creating app, first thing should be to
+   * select account." `Button` spreads onto a real `<button>`
+   * (`shared/ui/components/button/button.tsx`), so the native attribute does
+   * the work; this is simply the seam that lets a `role="combobox"` control
+   * take the same `autoFocus` an `<Input>` already can, since a caller has no
+   * other way to reach the element this file renders. CONTROL LAYOUT ONLY —
+   * a `layout="row"` picker has no single trigger to focus, and its own
+   * chips are read left to right rather than tabbed to first. */
+  autoFocus?: boolean
 }) {
   const t = useT()
   const phone = useIsPhone()
@@ -847,33 +858,59 @@ export function RecordPicker({
     )
   }
 
-  // A PERSON IN THEIR OWN RIGHT gets their face on the closed control too, not
-  // only in the open list — a staff Owner/Assignee field or a Contact field,
-  // told apart from a client/app/thing by the same `shape: "round"` the option
-  // already carries (record-mark.tsx's own discriminator). Client-reported:
-  // "every time I have to select a person, add the avatar" — originally drawn
-  // on the RIGHT, beside the chevron, so the label stayed the thing read
-  // first. OVERRIDDEN 2026-08-31: the client's next ruling is a blanket one —
-  // "an avatar next to a name sits on the LEFT of it, never the right, never
-  // above or below" — which this control's own trigger disagreed with. Drawn
-  // before the label now, exactly where the kit's own `Avatar`-then-name
-  // pattern (team-switcher.tsx, the kit's `List`/`ActivityFeed`) already puts
-  // it everywhere else in the app.
-  const personMark = chosenOption?.shape === "round" && (
-    // No size className here either — see the option row's own `RecordMark`
-    // comment above: a `size-6` override was fighting the `size` prop for the
-    // same box. `size="choice"` (24px), for the same reason as the open list:
-    // the closed control and its own open rows are the same record at the
-    // same size, so the closed face follows the list's size down with it.
-    <RecordMark
-      picture={chosenOption.picture}
-      mark={chosenOption.mark}
-      name={chosenOption.label}
-      shape="round"
-      size="choice"
-      className="shrink-0"
-    />
-  )
+  // ANY RECORD WITH A FACE KEEPS IT ON THE CLOSED CONTROL, NOT ONLY IN THE OPEN
+  // LIST — a staff Owner/Assignee field, a Contact field, an account or an app
+  // just as much. Client-reported, first over a person: "every time I have to
+  // select a person, add the avatar" — originally drawn on the RIGHT, beside
+  // the chevron, so the label stayed the thing read first. OVERRIDDEN
+  // 2026-08-31: the client's next ruling is a blanket one — "an avatar next to
+  // a name sits on the LEFT of it, never the right, never above or below" —
+  // which this control's own trigger disagreed with. Drawn before the label
+  // now, exactly where the kit's own `Avatar`-then-name pattern
+  // (team-switcher.tsx, the kit's `List`/`ActivityFeed`) already puts it
+  // everywhere else in the app.
+  //
+  // WIDENED PAST PEOPLE, 21 Sep 2026 — the client's own words, reviewing the
+  // app form's account field with no icon on its closed trigger ("VU
+  // Solutions"): "when I have selected, for example, the app, in the
+  // dropdown I see the icon, but I want to continue seeing it also once it's
+  // selected. This app accounts for people everywhere where I select
+  // something with an avatar or an image. Still show it once it's selected,
+  // or the icon." So this is no longer gated on `shape === "round"` — that
+  // discriminator only ever told a person's circle apart from a client/app's
+  // square (record-mark.tsx), and both shapes carry a face now. The same
+  // precedence the open list's own row draws (`row`, above): a picture, a
+  // glyph or the bare `face` flag is a `RecordMark` in the option's own
+  // shape; failing that, the fourth kind of mark (`icon`, a Phosphor glyph
+  // handed straight in — a ticket's type, say) draws in the identical box.
+  const chosenFace =
+    chosenOption &&
+    (chosenOption.picture || chosenOption.mark || chosenOption.face ? (
+      // No size className here either — see the option row's own `RecordMark`
+      // comment above: a `size-6` override was fighting the `size` prop for the
+      // same box. `size="choice"` (24px), for the same reason as the open list:
+      // the closed control and its own open rows are the same record at the
+      // same size, so the closed face follows the list's size down with it.
+      <RecordMark
+        picture={chosenOption.picture}
+        mark={chosenOption.mark}
+        name={chosenOption.label}
+        shape={chosenOption.shape}
+        size="choice"
+        className="shrink-0"
+      />
+    ) : chosenOption.icon ? (
+      // THE FOURTH KIND OF MARK — see `PickerOption.icon`'s own header and the
+      // open list's identical branch above. Same box a `RecordMark` at
+      // `size="choice"` draws, so the closed face sits at the identical size
+      // and offset as the open row's.
+      <span
+        aria-hidden
+        className="bg-muted text-muted-foreground grid size-[var(--avatar-sm)] shrink-0 place-items-center overflow-hidden rounded-[var(--radius)]"
+      >
+        {chosenOption.icon}
+      </span>
+    ) : null)
 
   const trigger = (
     <Button
@@ -884,6 +921,7 @@ export function RecordPicker({
       role="combobox"
       aria-expanded={open}
       disabled={disabled}
+      autoFocus={autoFocus}
       // THE SHAPE, THE RADIUS AND THE HAIRLINE ARE `shellClass` (top of this
       // file) — one string, because the row layout's locked shell draws the
       // identical control and the client has ruled that the two must look the
@@ -892,7 +930,7 @@ export function RecordPicker({
       className={shellClass(disabled)}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        {personMark}
+        {chosenFace}
         <span className={chosen ? "min-w-0 truncate" : PLACEHOLDER_INK} title={label}>
           {label}
         </span>

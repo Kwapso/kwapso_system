@@ -37,7 +37,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R68 | enforced | `one-identity-per-source` | `workers/content/test/one-identity-per-source.test.ts` |
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
-| R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
+| R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/task-sheet.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
 
 ## UI (62)
 

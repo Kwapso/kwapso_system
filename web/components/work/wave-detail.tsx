@@ -34,7 +34,7 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { PencilSimple, Power, ArrowCounterClockwise, UserMinus } from "@shared/ui/foundations/icons"
+import { PencilSimple, Power, ArrowCounterClockwise, UserMinus, Gear } from "@shared/ui/foundations/icons"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -50,10 +50,11 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { ApiFailure } from "@/lib/api"
 import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
-import { WavePhaseDaysPanel } from "@/components/work/wave-phase-days-panel"
+import { WavePhaseDaysSheet } from "@/components/work/wave-phase-days-panel"
 import { SprintTypeGlyph, sprintTypeHasGlyph } from "@/lib/sprint-type-icon"
 import { content as contentApi } from "@/lib/api/content"
 import { sliceKey } from "@/components/work/work-panels"
@@ -115,6 +116,11 @@ export function WaveDetailScreen({
   const [tab, setTab] = useRemembered("tab", "overview")
   const [planOpen, setPlanOpen] = React.useState(false)
   const [editOpen, setEditOpen] = React.useState(false)
+  // THE SETTINGS SHEET'S OWN OPEN STATE (Aurora, 21 Sep 2026: "missing the
+  // settings button in waves to adjust that!!!"). The gear button in the head's
+  // actions row and its folded twin in `HeadActionsFoldMenu` both open the same
+  // sheet, so there is one flag to drift from rather than two.
+  const [settingsOpen, setSettingsOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   // THE SPRINTS LIST ITSELF, narrowed here — bounded (a wave holds a handful of
   // sprints, never a growing page of them) and already read whole above, so
@@ -310,6 +316,25 @@ export function WaveDetailScreen({
       ]
     : []
 
+  /* THE FOLD, same shape `task-detail.tsx` and `help-detail.tsx` already wear
+   * (`shared/web/head-actions.tsx`): below its own breakpoint, every standalone
+   * control in the wide row (the gear, the "…" overflow trigger) joins the ONE
+   * "…" that moves into the chip row. Settings leads, matching the wide row's
+   * own left-to-right order, with the overflow's own items (Edit, Switch off)
+   * behind it, never a second copy of what either already does. Offered
+   * regardless of `canEdit`, since the sheet itself stays reachable read-only
+   * (`WavePhaseDaysPanel`'s own gate hides only its Save/Cancel row). */
+  const foldedActions: HeadActionItem[] = [
+    {
+      key: "settings",
+      label: t("Settings"),
+      icon: <Gear className="size-3.5" />,
+      disabled: busy,
+      onSelect: () => setSettingsOpen(true),
+    },
+    ...overflow,
+  ]
+
   return (
     <RecordScreen
       leading={<RecordMark name={wave.name} />}
@@ -355,6 +380,10 @@ export function WaveDetailScreen({
               {wave.accountName}
             </RecordChipLink>
           ) : null}
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE, the identical
+              wiring `task-detail.tsx` and `help-detail.tsx` already carry
+              ("align the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
       title={wave.name}
@@ -373,7 +402,27 @@ export function WaveDetailScreen({
       // — the client's own ruling on that screen says the duplication
       // doesn't matter when the fact belongs in this exact position.
       subtitle={waveDates(wave, t, lang, sprints.filter((s) => s.active))}
-      actions={canEdit ? <RecordActionsMenu actions={overflow} /> : undefined}
+      // THE WIDE ROW. Aurora, 21 Sep 2026, verbatim: "missing the settings
+      // button in waves to adjust that!!!" The gear opens the phase-days sheet
+      // (below), unconditionally, beside the "…" overflow trigger that already
+      // held Edit and Switch off/Bring back — two standalone controls now, so
+      // the row wears `HEAD_ACTIONS_ROW_CLASS` and folds through
+      // `HeadActionsFoldMenu` above, the same pair `task-detail.tsx` and
+      // `help-detail.tsx` already wire.
+      actions={
+        <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
+          <Button
+            variant="secondary"
+            size="icon"
+            disabled={busy}
+            aria-label={t("Settings")}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Gear className="size-4" />
+          </Button>
+          <RecordActionsMenu actions={overflow} />
+        </div>
+      }
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column.
       audit={{
@@ -479,7 +528,17 @@ export function WaveDetailScreen({
                             id="wave-add-sprint"
                             value=""
                             onChange={(sprintId) => void moveSprint(sprintId, waveId)}
-                            options={sortedOptions(addable, lang, (s) => s.name).map((s) => ({ value: s.id, label: s.name, picture: null }))}
+                            // THE PHASE'S OWN TYPE ICON AS THE FACE (R90) — the
+                            // same glyph its own row draws further down this
+                            // screen (`SprintTypeGlyph`), so it still shows once
+                            // picked (or once this control is closed again).
+                            options={sortedOptions(addable, lang, (s) => s.name).map((s) => ({
+                              value: s.id,
+                              label: s.name,
+                              icon: sprintTypeHasGlyph(s.sprintType) ? (
+                                <SprintTypeGlyph type={s.sprintType} className="size-3.5 text-ink-secondary" />
+                              ) : undefined,
+                            }))}
                             placeholder={t("Put a phase in this wave")}
                             searchPlaceholder={t("Search phases…")}
                             emptyText={t("No phase matched.")}
@@ -562,20 +621,18 @@ export function WaveDetailScreen({
                 )}
               </div>
             )
+          // SETTINGS LIVES IN ONE PLACE NOW. It used to be a section here
+          // (Aurora, 20 Sep 2026: "on waves i am missing the settings"), and
+          // she could not find it: "missing the settings button in waves to
+          // adjust that!!!" (21 Sep 2026). It opens from the gear in the head's
+          // own actions row instead, as `WavePhaseDaysSheet` below, the way
+          // every other settings surface in this app is reached (R61's own
+          // "one derivation" for a MODULE's settings, mirrored here for a
+          // single RECORD's). The head's "Expected length" row above still
+          // reads this wave's own phase-days rows; only the editor moved.
           return (
             <div className="flex flex-col gap-6">
               <OverviewList items={overviewItems} />
-              {/* SETTINGS: HOW MANY DAYS EACH PHASE TYPE GETS (Aurora, 20 Sep
-                  2026: "on waves i am missing the settings"). Alongside the
-                  wave's other Overview panels, same tab, same Card pattern
-                  sprint-detail.tsx's own "Work inside it" band takes. */}
-              <WavePhaseDaysPanel
-                teamId={teamId}
-                phaseDays={phaseDays}
-                canEdit={canEdit}
-                busy={busy}
-                onSave={savePhaseDays}
-              />
             </div>
           )
         }}
@@ -642,6 +699,19 @@ export function WaveDetailScreen({
           refresh()
           toast.success(t("Wave updated."))
         }}
+      />
+
+      {/* THE SETTINGS SHEET (Aurora, 21 Sep 2026: "missing the settings button
+          in waves to adjust that!!!"). Opened from the gear in the head's
+          actions row above, or its folded twin in the chip row's "…" menu. */}
+      <WavePhaseDaysSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        teamId={teamId}
+        phaseDays={phaseDays}
+        canEdit={canEdit}
+        busy={busy}
+        onSave={savePhaseDays}
       />
     </RecordScreen>
   )

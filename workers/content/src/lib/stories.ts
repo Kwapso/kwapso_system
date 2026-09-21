@@ -119,9 +119,6 @@ type StoryRow = {
    * Required before Done: see `refuseUndocumented`, below. */
   build_notes: string | null
   moscow: string | null
-  /** AURORA'S "CONTRIBUTES TO THE GOAL" RULING, 20 SEP 2026 — paired with
-   * `sprints.goal_summary`. 0/1, team migration 0107. */
-  contributes_to_goal: number
   app_name?: string | null
   /** THE APP'S OWN ANSWER for "who is on it", when this story names no
    * assignee of its own — the app's LEAD (`app_staff.is_lead`), the exact
@@ -160,7 +157,7 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
   -- caller of \`STORY_COLS\`/\`STORY_LIST_COLS\` need no change at all -- the
   -- correction lives in exactly one place.
   (CASE WHEN s.ticket_id IS NOT NULL THEN 'Client-requested' ELSE 'Enabler' END) AS category,
-  s.story_type, s.acceptance_criteria, s.build_notes, s.moscow, s.contributes_to_goal, s.review_note, s.review_file_url, s.review_file_name,
+  s.story_type, s.acceptance_criteria, s.build_notes, s.moscow, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
   -- A story list that made a query per story to learn its processes would be
@@ -284,7 +281,6 @@ function toStory(r: StoryRow): Story {
     // direction `status` above takes: an unrecognised or blank word reads as
     // "not set" rather than a lie against the closed `MoscowValue` union.
     moscow: (MOSCOW_VALUES as readonly string[]).includes(r.moscow ?? "") ? (r.moscow as MoscowValue) : null,
-    contributesToGoal: r.contributes_to_goal === 1,
     reviewNote: r.review_note,
     reviewFileUrl: r.review_file_url,
     reviewFileName: r.review_file_name,
@@ -718,11 +714,6 @@ export type StoryInput = {
    * only ever checked against the closed `MOSCOW_VALUES` list when one is
    * sent. */
   moscow?: unknown
-  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
-   * 2026.) A plain boolean, never validated against a vocabulary — the same
-   * shape `changesNoStep` already takes on this same door. Optional; a value
-   * left unsaid reads as false, exactly like a create that never turns it on. */
-  contributesToGoal?: unknown
 }
 
 /** ONE OF MUST/SHOULD/COULD/WON'T, OR NOTHING SAID (Aurora's ruling, 20 Sep
@@ -1036,7 +1027,6 @@ export async function createStory(
   // either way, the same courtesy every other field on this door offers.
   const buildNotes = optionalText(input.buildNotes, "Build notes", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
-  const contributesToGoal = input.contributesToGoal === true
 
   // ONE WAVE, NOT SIX TRIPS (shared/workers/parallel.ts). Every one of these
   // reads only the INPUT — not each other — so the six `await`s were sequential
@@ -1083,9 +1073,9 @@ export async function createStory(
     cfg,
     guard.databaseId,
     `INSERT INTO stories (id, ref, account_id, ticket_id, app_id, process_id, step_key, changes_no_step,
-       sprint_id, title, detail, story_type, category, acceptance_criteria, build_notes, moscow, contributes_to_goal, assignee_id, assignee_name, reviewer_id, reviewer_name,
+       sprint_id, title, detail, story_type, category, acceptance_criteria, build_notes, moscow, assignee_id, assignee_name, reviewer_id, reviewer_name,
        starts_on, due_on, status, rank, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(buildNotes)}, ${sqlString(moscow)}, ${contributesToGoal ? 1 : 0}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(buildNotes)}, ${sqlString(moscow)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await setProcesses(cfg, guard, actor, id, processIds)
 
@@ -1137,7 +1127,6 @@ export async function updateStory(
   // record's own shape, so an edit made elsewhere never clears it by omission.
   const buildNotes = optionalText(input.buildNotes, "Build notes", TEXT_LIMITS.long) ?? null
   const moscow = optionalMoscow(input.moscow)
-  const contributesToGoal = input.contributesToGoal === true
 
   // The account is re-derived rather than carried: re-pointing a story at another
   // ticket moves the work to that client's books, and the margin has to follow it.
@@ -1159,7 +1148,7 @@ export async function updateStory(
     cfg,
     guard.databaseId,
     `UPDATE stories SET title = ?, detail = ?, ticket_id = ?, app_id = ?, process_id = ?, step_key = ?,
-       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, build_notes = ?, moscow = ?, contributes_to_goal = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
+       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, build_notes = ?, moscow = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
        reviewer_name = ?, starts_on = ?, due_on = ?, account_id = ?, updated_at = ?,
        editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
@@ -1179,7 +1168,6 @@ export async function updateStory(
       acceptanceCriteria,
       buildNotes,
       moscow,
-      contributesToGoal ? 1 : 0,
       assignee?.id ?? null,
       assignee?.name ?? null,
       reviewer?.id ?? null,
@@ -1201,11 +1189,6 @@ export async function updateStory(
     { label: "Type", from: before.story_type, to: storyType },
     { label: "Category", from: before.category, to: category },
     { label: "Priority", from: before.moscow, to: moscow },
-    {
-      label: "Contributes to the goal",
-      from: before.contributes_to_goal === 1 ? "Yes" : "No",
-      to: contributesToGoal ? "Yes" : "No",
-    },
     { label: "Assignee", from: before.assignee_name, to: assignee?.name ?? null },
     { label: "Due", from: before.due_on, to: dueOn },
     { label: "Sprint", from: before.sprint_id, to: sprintId, hideValues: true },
@@ -1594,9 +1577,14 @@ export async function storyBurndown(
       const rows = await d1Query<{ story_id: string; to_status: string; created_at: string }>(
         cfg,
         guard.databaseId,
+        // Tiebreak on `rowid`, not `id`: two events for the same story can
+        // land in the same millisecond (a quick reopen), and `id` is a ULID
+        // whose random suffix does not track insertion order once its
+        // millisecond-resolution time component ties. `rowid` is SQLite's
+        // own monotonically-increasing insertion order and always does.
         `SELECT story_id, to_status, created_at FROM story_status_events
           WHERE story_id IN (${batch.map(() => "?").join(", ")})
-          ORDER BY story_id, created_at, id`,
+          ORDER BY story_id, created_at, rowid`,
         batch
       )
       for (const r of rows) {

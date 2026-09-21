@@ -144,7 +144,11 @@ export function ProcessFormDialog({
               id="process-app"
               value={values.appId}
               onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-              options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+              // THE APP'S OWN LOGO AS THE FACE, `face: true` (R90) so an app with
+              // none on file still draws its own initial rather than a blank
+              // row — the same flag every other App field in this app sets
+              // (`account-app-picker.tsx`'s own `appOption`).
+              options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl, face: true }))}
               placeholder={t("Pick the app")}
               searchPlaceholder={t("Search apps…")}
               emptyText={t("No app matched.")}

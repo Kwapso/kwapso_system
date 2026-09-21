@@ -55,8 +55,8 @@ import { ReviewDialog, type ReviewFormValues } from "@/components/work/review-di
 import { storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
 import { storyStatusDotTone } from "@shared/status-tones"
 import { storyStatusWord } from "@shared/story-status-word"
-import { TimeFormDialog, type TimeFormValues } from "@/components/work/time-form-dialog"
 import { StoryBuildNotesSheet } from "@/components/work/story-build-notes-sheet"
+import { EffortCard } from "@/components/work/effort-card"
 import { AssignedToCard } from "@/components/tickets/help-stakeholders"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
@@ -69,7 +69,7 @@ import {
 } from "@/components/records/record-chrome"
 import { RecordDetailBody } from "@/components/records/record-detail-body"
 import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
-import { AddButton, EmptyGatedPanel } from "@/components/deep-link/screen-bits"
+import { EmptyGatedPanel } from "@/components/deep-link/screen-bits"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
@@ -88,26 +88,6 @@ import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { useSessionUserId } from "@/lib/use-active-team"
-
-/** ONE FRIENDLY STRING FOR A SECONDS COUNT — "3.5h", "0h". `WorkLogsPanel`'s
- * own Numbers stat draws the identical rounding (`round(seconds/3600*10)/10`),
- * kept local rather than shared: two call sites is not yet a seam. */
-function hoursLabel(seconds: number): string {
-  const hours = Math.round((seconds / 3600) * 10) / 10
-  return `${hours}h`
-}
-
-/** CYCLE TIME, AS A SENTENCE A PERSON READS AT A GLANCE — "2d 3h", "6h",
- * never a bare decimal. Days first because the design mockup itself reads
- * that way ("2d 3h, first work log to Done"), and a story's own cycle is
- * ordinarily measured in days, not fractions of an hour. */
-function cycleTimeLabel(seconds: number): string {
-  const totalHours = Math.round(seconds / 3600)
-  const days = Math.floor(totalHours / 24)
-  const hours = totalHours % 24
-  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`
-  return `${hours}h`
-}
 
 export function StoryDetailScreen({
   teamId,
@@ -163,14 +143,6 @@ export function StoryDetailScreen({
   const [reviewOpen, setReviewOpen] = React.useState(false)
   const [buildNotesOpen, setBuildNotesOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
-  // THE EFFORT CARD'S OWN "LOG TIME" DIALOG (Aurora's ruling, 21 Sep 2026,
-  // B44: "Include the metrics inside the effort card ... put the number
-  // next to the effort title"). No `WorkLogsPanel` here any more — that
-  // component's own list of rows is exactly the "value entries" the ruling
-  // removes — so this page mounts `TimeFormDialog` directly, the same door
-  // `WorkLogsPanel`'s own `log()` calls (`contentApi.logTime`), fixed to
-  // this story.
-  const [addTimeOpen, setAddTimeOpen] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   // NEST, DON'T REPLACE — the identical note ticket-detail-body.tsx and this
   // file's own earlier version both carry: a related record lands INSIDE
@@ -265,7 +237,6 @@ export function StoryDetailScreen({
       changesNoStep: values.changesNoStep,
       acceptanceCriteria: values.acceptanceCriteria || undefined,
       moscow: values.moscow || undefined,
-      contributesToGoal: values.contributesToGoal,
       // THE FORM NEVER TOUCHES buildNotes — its own sheet does — so it is
       // spread from the CURRENT record here, the same "replace every field,
       // spread the one you did not just change" shape the build notes sheet
@@ -274,42 +245,6 @@ export function StoryDetailScreen({
     })
     refresh()
     toast.success(t("Story updated."))
-  }
-
-  /** THE ASSIGNED TO CARD'S OWN DOOR — spreads the story's current shape
-   * (the update door replaces every field it reads) and overrides only the
-   * assignee. `null` clears it back to inherited: `updateStory`'s own
-   * `optionalText` already treats a missing and a null `assigneeId`
-   * identically (unlike the ticket door, which needs a separate raw-wire
-   * check for exactly this — see `help-stakeholders.tsx`'s own note), so no
-   * second seam is needed here. */
-  async function changeAssignee(newAssigneeId: string | null): Promise<void> {
-    if (!story) return
-    try {
-      await contentApi.updateStory({
-        ...story,
-        detail: story.detail || undefined,
-        ticketId: story.ticketId || undefined,
-        sprintId: story.sprintId || undefined,
-        appId: story.appId || undefined,
-        processId: story.processId || undefined,
-        stepKey: story.stepKey || undefined,
-        reviewerId: story.reviewerId || undefined,
-        startsOn: story.startsOn || undefined,
-        dueOn: story.dueOn || undefined,
-        accountId: story.accountId || undefined,
-        storyType: story.storyType || "",
-        acceptanceCriteria: story.acceptanceCriteria || undefined,
-        buildNotes: story.buildNotes || undefined,
-        moscow: story.moscow || undefined,
-        contributesToGoal: story.contributesToGoal,
-        assigneeId: newAssigneeId ?? undefined,
-      })
-      refresh()
-      toast.success(t("Story updated."))
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that story."))
-    }
   }
 
   /** READY FOR REVIEW (CHECKLIST 6.9) — refused until every timer on this
@@ -322,25 +257,6 @@ export function StoryDetailScreen({
     })
     refresh()
     toast.success(t("Sent for review."))
-  }
-
-  /** WRITE TIME DOWN AGAINST THIS STORY — the identical door and shape
-   * `WorkLogsPanel`'s own `log()` takes (work-logs-panel.tsx), called here
-   * directly now that the Effort card mounts no per-log list. `refresh()`
-   * already re-reads `story:metrics:${storyId}`, so the card's own count and
-   * three lines catch up the same as every other write on this page. */
-  async function logTime(values: TimeFormValues) {
-    await contentApi.logTime({
-      targetTable: "stories",
-      targetId: storyId,
-      startedAt: values.startedAt,
-      endedAt: values.endedAt,
-      note: values.note,
-      kind: values.kind,
-      billable: values.billable,
-    })
-    refresh()
-    toast.success(t("Time logged."))
   }
 
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4).
@@ -493,6 +409,12 @@ export function StoryDetailScreen({
 
   // THE RIGHT COLUMN — Assigned to, Related tickets, Related stories, Phase
   // and wave, Effort, Metrics, in that order.
+  //
+  // READ-ONLY, Aurora's ruling, 21 Sep 2026, verbatim, over `AssignedToCard`'s
+  // own pen: "ok, but rmeove the edit button (this can be editedfrom dtory
+  // edit screen)." `canEditAssignee`/`onChangeAssignee` are dropped from
+  // this call; a story's own assignee is changed from its own edit screen
+  // instead (`story-form-dialog.tsx`'s "Who's doing it").
   const assignedToPanel = (
     <AssignedToCard
       assigneeId={story.assigneeId}
@@ -501,8 +423,6 @@ export function StoryDetailScreen({
       appName={story.appName}
       appAssigneeId={story.appAssigneeId}
       members={assignableMembers(membersQ.data)}
-      canEditAssignee={canEdit}
-      onChangeAssignee={changeAssignee}
     />
   )
 
@@ -580,64 +500,24 @@ export function StoryDetailScreen({
     </TicketSidePanel>
   )
 
-  // EFFORT, WITH THE METRICS INSIDE IT NOW (Aurora's ruling, 21 Sep 2026,
-  // B44, verbatim: "Include the metrics inside the effort card. On the
-  // effort card, remove the value entries and put the number next to the
-  // effort title, just as you do, for example, for stakeholders."). The
-  // separate "Metrics" panel is GONE — its three lines are this card's own
-  // body now — and so is `WorkLogsPanel`'s own list of rows (the "value
-  // entries" the ruling names): the total hours ride the TITLE, the same
-  // title-with-count register `help-stakeholders.tsx`'s own
-  // `<TicketSidePanel title={t("Stakeholders")} count={stakeholderBadge}>`
-  // renders through (`TicketSidePanel`, `ticket-detail-body.tsx`).
-  //
-  // NOT `EmptyGatedPanel` ANY MORE — that shell's whole point is a header
-  // that disappears while a COLLECTION holds zero rows, in favour of one
-  // "Add the first" empty state; this card is never that shape now, it
-  // always has three facts to show ("Not started" / "0h" / "No time log"
-  // are answers, not an empty state), so the plain `TicketSidePanel` every
-  // other fact panel on this page already uses is the honest register.
-  // R88/R50 read that as a title-row `<AddButton>` outside both a
-  // `<ToolbarRow>` and an `<EmptyGatedPanel>` — `EMPTY_STATE_SINGLE_DOOR_
-  // EXEMPT`/`EMPTY_TOOLBAR_EXEMPT` (shared/rules/registry.ts) carry this
-  // file's own reason: there is no collection here to be empty, so
-  // `empty={false}` is not an escape hatch, it is the honest, permanent
-  // answer, the same shape `roles-matrix.tsx`'s own fixed-catalogue entry
-  // already argues.
+  // EFFORT — title with the total hours as its count, the three metric
+  // lines, and the individual time log rows, drawn by the one shared
+  // `EffortCard` (web/components/work/effort-card.tsx) the ticket page now
+  // draws too (Aurora's ruling, 21 Sep 2026, B44 amended, verbatim: "ok, but
+  // i still want to see the individual records of time og! also show avatar
+  // of perosn. bring back the old cards with the metrics inside effort" and
+  // "in effort card inside stories or tickets, rmeove the + button (we have
+  // the start on top!)"). No "Log time" door on this card any more — the
+  // head's own Start/Stop timer button is the one way a new row is written.
   const metrics = metricsQ.data
   const effortPanel = (
-    <TicketSidePanel
-      title={t("Effort")}
-      count={hoursLabel(metrics?.effortSeconds ?? 0)}
-      action={
-        canLogTime ? (
-          <AddButton label={t("Log time")} onClick={() => setAddTimeOpen(true)} empty={false} />
-        ) : undefined
-      }
-    >
-      <div className="grid grid-cols-3 gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs uppercase">{t("Cycle time")}</span>
-          <span className="font-mono text-sm font-semibold">
-            {metrics && metrics.cycleTimeSeconds !== null
-              ? cycleTimeLabel(metrics.cycleTimeSeconds)
-              : t("Not started")}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs uppercase">{t("Effort")}</span>
-          <span className="font-mono text-sm font-semibold">{hoursLabel(metrics?.effortSeconds ?? 0)}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs uppercase">{t("Flow efficiency")}</span>
-          <span className="font-mono text-sm font-semibold">
-            {metrics && metrics.flowEfficiency !== null
-              ? `${Math.round(metrics.flowEfficiency)}%`
-              : t("No time log")}
-          </span>
-        </div>
-      </div>
-    </TicketSidePanel>
+    <EffortCard
+      targetTable="stories"
+      targetId={storyId}
+      canEdit={canEdit}
+      members={membersQ.data}
+      metrics={metrics}
+    />
   )
 
   const sideColumn = (
@@ -798,7 +678,6 @@ export function StoryDetailScreen({
           changesNoStep: story.changesNoStep,
           acceptanceCriteria: story.acceptanceCriteria ?? "",
           moscow: story.moscow ?? "",
-          contributesToGoal: story.contributesToGoal,
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}
@@ -823,16 +702,6 @@ export function StoryDetailScreen({
           refresh()
           invalidate(storyAttachmentsKey(storyId))
         }}
-      />
-      {/* THE EFFORT CARD'S OWN "LOG TIME" DOOR — see `logTime`'s own doc
-          above. The identical `TimeFormDialog` shape `WorkLogsPanel` mounts
-          for the same act, fixed to this story. */}
-      <TimeFormDialog
-        open={addTimeOpen}
-        onOpenChange={setAddTimeOpen}
-        draftKey={`work-log:add:stories:${storyId}`}
-        fixedTarget={{ table: "stories", id: storyId, label: story.ref ? `${story.ref} · ${story.title}` : story.title }}
-        onSubmit={logTime}
       />
     </>
   )

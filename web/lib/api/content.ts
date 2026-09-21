@@ -36,6 +36,7 @@ import type {
   StoryMetrics,
   Task,
   TaskViewName,
+  TicketMetrics,
   TeamPulse,
   Todo,
   TodoViewName,
@@ -209,9 +210,6 @@ export type StoryWrite = {
   buildNotes?: string
   /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional. */
   moscow?: string
-  /** DOES THIS STORY CONTRIBUTE TO ITS PHASE'S GOAL? (Aurora's ruling, 20 Sep
-   * 2026, paired with `sprints.goalSummary`.) Optional; unsaid reads as false. */
-  contributesToGoal?: boolean
 }
 
 /** The facets the work-log list door parses. */
@@ -580,13 +578,16 @@ export const content = {
     raisedByContactId?: string
     /** WHO IS ON IT (Aurora, 21 Sep 2026), staff only. `undefined` (left out)
      * keeps whoever the ticket already carries; `null` is an EXPLICIT CLEAR,
-     * the ticket's own Assigned to card's "Use the app's lead" text button
-     * (`help-stakeholders.tsx`), never a picker entry (Aurora's 16 Sep 2026
-     * ruling: a staff picker never offers Nobody). The door tells the two
-     * apart on the raw wire value (`workers/content/src/lib/help.ts`'s own
-     * `assigneeCleared`). See `shared/types.ts`'s `assigneeId` for the
-     * redaction and `shared/effective-assignee.ts` for how the page reads
-     * the fallback once it is null. */
+     * a value the door still accepts even though the ticket's own edit form
+     * (`help-form-dialog.tsx`'s "Assigned to" field, the one caller of this
+     * door for this field as of 21 Sep 2026, its own pen having been
+     * retired off `AssignedToCard`) never sends it, never a picker entry
+     * either way (Aurora's 16 Sep 2026 ruling: a staff picker never offers
+     * Nobody). The door tells the two apart on the raw wire value
+     * (`workers/content/src/lib/help.ts`'s own `assigneeCleared`). See
+     * `shared/types.ts`'s `assigneeId` for the redaction and
+     * `shared/effective-assignee.ts` for how the page reads the fallback
+     * once it is null. */
     assigneeId?: string | null
   }) =>
     api<{
@@ -625,6 +626,11 @@ export const content = {
       ...post({ id, resolution }),
       keepalive: leaving === true,
     }),
+  /** THE TICKET'S OWN CYCLE TIME / EFFORT / FLOW EFFICIENCY (`TicketMetrics`,
+   * shared/types.ts, an alias of `StoryMetrics` — the shared `EffortCard`,
+   * web/components/work/effort-card.tsx, draws both through one prop). A
+   * GET-style POST, the same shape `storyMetrics` below takes. */
+  helpMetrics: (id: string) => api<TicketMetrics>("/api/content/help/metrics", post({ id })),
   /** Several files and several links on one ticket (5.10). The same three doors
    * the client portal calls — this is one record with one list, not two. */
   helpAttachments: (id: string) =>

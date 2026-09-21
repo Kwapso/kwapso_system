@@ -26,10 +26,10 @@
 // rides `POST /api/content/stories/update` like every other field that door
 // reads, and that door REPLACES EVERY FIELD IT READS (`updateStory`'s own
 // doc, workers/content/src/lib/stories.ts), so this sheet spreads the
-// story's own CURRENT shape and overrides only `buildNotes` — the identical
-// pattern `work-panels.tsx`'s `toggleContributesToGoal` already takes for
-// the same reason (a field-by-field call is a field the next door addition
-// gets silently dropped from).
+// story's own CURRENT shape and overrides only `buildNotes`, the identical
+// pattern every other story-write call site takes for the same reason (a
+// field-by-field call is a field the next door addition gets silently
+// dropped from).
 //
 // IMAGES, THROUGH THE KIT'S OWN DROP ZONE — Aurora's ruling, 21 Sep 2026,
 // verbatim: "On build nodes, use the already existing component to upload
@@ -162,10 +162,10 @@ export function StoryBuildNotesSheet({
   async function save() {
     setBusy(true)
     try {
-      // THE STORY'S OWN SHAPE, SPREAD — `work-panels.tsx`'s own
-      // `toggleContributesToGoal` takes the identical shape for the identical
-      // reason: `updateStory` replaces every field it reads, so a field named
-      // by hand here is a field the door's next addition silently drops.
+      // THE STORY'S OWN SHAPE, SPREAD. Every other story-write call site
+      // takes the identical shape for the identical reason: `updateStory`
+      // replaces every field it reads, so a field named by hand here is a
+      // field the door's next addition silently drops.
       await contentApi.updateStory({
         ...story,
         detail: story.detail || undefined,
@@ -182,7 +182,6 @@ export function StoryBuildNotesSheet({
         storyType: story.storyType || "",
         acceptanceCriteria: story.acceptanceCriteria || undefined,
         moscow: story.moscow || undefined,
-        contributesToGoal: story.contributesToGoal,
         buildNotes: html || undefined,
       })
       onSaved(html || null)

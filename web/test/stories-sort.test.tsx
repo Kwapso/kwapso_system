@@ -97,7 +97,6 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
     acceptanceCriteria: null,
     buildNotes: null,
     moscow: null,
-    contributesToGoal: false,
     reviewNote: null,
     reviewFileUrl: null,
     reviewFileName: null,

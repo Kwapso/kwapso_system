@@ -8116,6 +8116,39 @@ ALTER TABLE tasks ADD COLUMN deactivator_email TEXT;
 ALTER TABLE tasks ADD COLUMN deactivator_name TEXT;
 `,
   },
+  {
+    // THE STORY GOAL FLAG IS KILLED, NOT PARKED. Aurora's ruling, 21 Sep
+    // 2026, verbatim, over her own earlier 20 Sep 2026 "let users flag which
+    // stories contribute to it" ruling that minted this column (0107, above):
+    // "not parked, kill it." The column, its type (`Story.contributesToGoal`,
+    // shared/types.ts) and the `create_story`/`update_story` fields are all
+    // removed the same round; this migration is the data half.
+    //
+    // D1 supports `ALTER TABLE ... DROP COLUMN`, the same mechanism 0080 used
+    // to retire `knowledge_sources.identity_key` (this file, above), and the
+    // same discipline: no index rides `stories.contributes_to_goal` (0107
+    // added it plain, `INTEGER NOT NULL DEFAULT 0`, no matching `CREATE
+    // INDEX`), so there is nothing to drop first. The column carries a real
+    // value on rows where somebody used the UI before it was pulled (unlike
+    // 0080's `identity_key`, which was NULL on every row that ever existed),
+    // and that is exactly what "kill it" asks for: the flag itself is what
+    // Aurora rejects, not merely its display, so the value goes with the
+    // column rather than being preserved anywhere.
+    //
+    // `sprints.goal_summary` ("Phase goal") is A DIFFERENT FACT and is NOT
+    // touched here. The phase's own one-sentence goal stays exactly as
+    // 0107 left it; only the per-story flag that claimed to serve it is cut.
+    //
+    // NUMBERED 0114, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0113 is the highest version on both the
+    // local tree and `origin/main` as of 21 Sep 2026, so 0114 is the next
+    // free number.
+    version: "0114_the_story_goal_flag_is_killed",
+    sql: `
+ALTER TABLE stories DROP COLUMN contributes_to_goal;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

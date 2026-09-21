@@ -355,23 +355,17 @@ export function AppFormDialog({
         disabled: !ready,
       }}
     >
-      <Field
-        config={nameField}
-        htmlFor="app-name"
-        className={fieldSpacing}
-        count={values.name.length}
-        countMax={TITLE_MAX_CHARS}
-      >
-        <Input
-          id="app-name"
-          value={values.name}
-          onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder={t("e.g. Dispatch")}
-          maxLength={TITLE_MAX_CHARS}
-          disabled={busy}
-          autoFocus
-        />
-      </Field>
+      {/* THE ACCOUNT COMES FIRST, ABOVE THE NAME — Aurora's ruling, 21 Sep
+          2026, verbatim: "when creating app, first thing should be to
+          select account." It is the first field on the form and the one
+          the create dialog opens focused on (`autoFocus`, below), not a
+          courtesy reorder: whose system it is is the one fact this form can
+          never revisit (see this file's own header), so it is asked before
+          anything else rather than typed past on the way to a name. Absent
+          entirely on an EDIT — see `accountField`'s own comment on why the
+          picker disappears there rather than being shown disabled — so the
+          NAME field carries the dialog's own opening focus on that branch
+          instead; only one field may claim it. */}
       {!editing && (
       <Field config={accountField} htmlFor="app-account" className={fieldSpacing}>
         {/* The COMPANIES, asked of the door (accounts PAGE, R14). `accounts` is
@@ -388,9 +382,29 @@ export function AppFormDialog({
           searchPlaceholder={t("Search companies…")}
           emptyText={t("No company matched.")}
           disabled={busy}
+          autoFocus
         />
       </Field>
       )}
+      <Field
+        config={nameField}
+        htmlFor="app-name"
+        className={fieldSpacing}
+        count={values.name.length}
+        countMax={TITLE_MAX_CHARS}
+      >
+        <Input
+          id="app-name"
+          value={values.name}
+          onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
+          placeholder={t("e.g. Dispatch")}
+          maxLength={TITLE_MAX_CHARS}
+          disabled={busy}
+          // Only the dialog's OWN opening focus, and only when the account
+          // field above is not there to claim it (an EDIT never shows it).
+          autoFocus={editing}
+        />
+      </Field>
       {/* STAGE IS A CHOICE, not a typed word. It was free text until 17 Aug 2026,
           which is how one inventory came to carry "live", "Live" and "in dev" for
           the same three systems.
@@ -640,9 +654,11 @@ export function AppFormDialog({
             // Stakeholders tab — no photo comes through `listAccountLinks`
             // today, so this falls back to their initial the way every
             // unphotographed person does, never to a client/company square.
+            // `face: true` (R90) is what actually asks for that fallback —
+            // `shape` alone names the BOX, not whether one is drawn at all.
             options={sortedOptions(contacts, lang, (c) => c.name)
               .filter((c) => values.stakeholderContactIds.includes(c.id))
-              .map((c) => ({ value: c.id, label: c.name, shape: "round" as const }))}
+              .map((c) => ({ value: c.id, label: c.name, shape: "round" as const, face: true }))}
             emptyOption={{ value: NOBODY, label: t("Not said") }}
             placeholder={t("Not said")}
             searchPlaceholder={t("Search contacts…")}

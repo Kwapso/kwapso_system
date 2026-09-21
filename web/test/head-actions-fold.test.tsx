@@ -182,61 +182,64 @@ describe("the ticket head passes its actions through the shared component", () =
 })
 
 // ============================================================================
-// DELETE, AT EVERY WIDTH -- a live proof of commit dc8e76b2. Tasks' own Delete
+// THE TASK SHEET'S "…" MENU -- ONE MENU, NOT A FOLD. Tasks' own Delete
 // (Aurora, 21 Sep 2026, "i need delete actino for tasks on the ... button")
-// lived ONLY inside `foldedActions`, and this file's own `HeadActionsFoldMenu`
-// wrapper is `@min-[44rem]:hidden` BY DESIGN -- the fold is the narrow answer,
-// never a second home for an act with no standalone button. The ticket head's
-// own Archive already carries a persistent `RecordActionsMenu` in the WIDE
-// row for exactly that reason (`help-detail.tsx`); `task-detail.tsx` had none.
+// used to live only inside a narrow-width fold, the same live proof this
+// block once made against `task-detail.tsx` (commit dc8e76b2). That screen
+// is retired 21 Sep 2026, same round, replaced by the task slide-in
+// (`task-sheet.tsx`) -- a FIXED-WIDTH sheet (`clamp(26.25rem,34vw,40rem)`),
+// which is never wide enough to need `HeadActionsFoldMenu`'s own
+// `@min-[44rem]:hidden` split at all. So there is exactly one "…" menu now,
+// always rendered, carrying both Edit and Delete -- see task-sheet.tsx's own
+// header, "ONE '…' MENU, NOT A RESPONSIVE FOLD".
 // ============================================================================
-describe("the task head -- Delete is reachable at every width, not only the fold", () => {
-  const src = read("web/components/work/task-detail.tsx")
+describe("the task sheet -- one persistent \"…\" menu carries both Edit and Delete", () => {
+  const src = read("web/components/work/task-sheet.tsx")
 
-  it("imports RecordActionsMenu and renders it inside the wide HEAD_ACTIONS_ROW_CLASS row, not only the fold", () => {
+  it("imports RecordActionsMenu and renders it once, unconditionally, in the title row -- no HeadActionsFoldMenu at all", () => {
     expect(src).toMatch(/RecordActionsMenu/)
-    const wideRowStart = src.indexOf('<div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>')
-    expect(wideRowStart, "the wide actions row is where this test expects it").toBeGreaterThan(-1)
-    const wideRowEnd = src.indexOf("</div>", wideRowStart)
-    const wideRow = src.slice(wideRowStart, wideRowEnd)
-    // The persistent menu lives in the WIDE row itself -- the row that is
-    // `@min-[44rem]:flex`, never `hidden` at that width -- not only inside
-    // `HeadActionsFoldMenu`'s own `@min-[44rem]:hidden` wrapper.
-    expect(wideRow).toMatch(/<RecordActionsMenu actions=\{overflow\}/)
+    // A SHEET NEVER FOLDS -- there is no second, narrow-only menu definition
+    // to keep in sync with this one, because there is no wide row this
+    // fixed-width panel could ever grow into. Checked as an IMPORT, not a
+    // bare word search: this file's own comments say "HeadActionsFoldMenu"
+    // (explaining why it is absent), which a plain substring match would
+    // trip over.
+    expect(src).not.toMatch(/from "@shared\/web\/head-actions"/)
+    expect(src).not.toMatch(/<HeadActionsFoldMenu\b/)
+    expect(src).toMatch(/<RecordActionsMenu actions=\{actions\}/)
   })
 
-  it("the wide row's own RecordActionsMenu carries the same `overflow` the fold also spreads -- one Delete, not two definitions", () => {
-    expect(src).toMatch(/const overflow: RecordAction\[\] = canEdit/)
-    expect(src).toMatch(/\.\.\.overflow,?\s*\n\s*\]/)
-    // Delete is built once, inside `overflow`, never a second literal object
-    // repeated for the wide row.
+  it("the one menu's own `actions` carries Edit and Delete once each, never two definitions", () => {
+    expect(src).toMatch(/const actions: RecordAction\[\] = \[/)
+    expect(src).toMatch(/key:\s*"edit"/)
+    expect(src).toMatch(/key:\s*"delete"/)
     const deleteMentions = src.match(/key:\s*"delete"/g) ?? []
     expect(deleteMentions.length).toBe(1)
+    const editMentions = src.match(/key:\s*"edit"/g) ?? []
+    expect(editMentions.length).toBe(1)
   })
 
-  it("behaviourally: the same shape task-detail.tsx builds renders a More button whose opened menu lists Delete", async () => {
-    // NOT the whole screen (task-detail.tsx pulls in the timer bar, activity,
+  it("behaviourally: the same shape task-sheet.tsx builds renders a More button whose opened menu lists Edit and Delete", async () => {
+    // NOT the whole sheet (task-sheet.tsx pulls in the timer bar, activity,
     // form options and the running-timers cache -- real hooks this suite has
-    // no reason to fake). This exercises the REAL `RecordActionsMenu`, the
-    // real component the wide row now mounts, fed the exact item shape
-    // `task-detail.tsx`'s own `overflow` builds (source-proven above) -- the
-    // same technique this file already uses for `HeadActionsFoldMenu` itself
-    // (JSDOM never evaluates `@container`, so there is nothing to "make"
-    // wide; what is provable is that the persistent trigger this width is
-    // supposed to keep actually opens a menu that lists Delete).
-    const overflow = [
+    // no reason to fake). This exercises the REAL `RecordActionsMenu`, fed
+    // the exact item shape `task-sheet.tsx`'s own `actions` builds
+    // (source-proven above).
+    const actions = [
+      { key: "edit", label: "Edit", icon: <span />, onSelect: () => {} },
       { key: "delete", label: "Delete", icon: <Trash className="size-3.5" />, destructive: true, onSelect: () => {} },
     ]
-    render(<RecordActionsMenu actions={overflow} />)
+    render(<RecordActionsMenu actions={actions} />)
     const trigger = screen.getByRole("button", { name: "More actions" })
     fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
     fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
     fireEvent.click(trigger)
-    const item = await waitFor(() => screen.getByRole("menuitem", { name: "Delete" }))
-    expect(item.className).toMatch(/text-destructive/)
+    expect(await waitFor(() => screen.getByRole("menuitem", { name: "Edit" }))).toBeTruthy()
+    const deleteItem = await waitFor(() => screen.getByRole("menuitem", { name: "Delete" }))
+    expect(deleteItem.className).toMatch(/text-destructive/)
   })
 
-  it("renders nothing when there is nothing to delete -- the same empty rule every RecordActionsMenu follows", () => {
+  it("renders nothing when there is nothing to act on -- the same empty rule every RecordActionsMenu follows", () => {
     const { container } = render(<RecordActionsMenu actions={[]} />)
     expect(container.innerHTML).toBe("")
   })

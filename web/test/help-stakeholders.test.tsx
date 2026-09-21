@@ -55,11 +55,23 @@
 // Assigned to, first" describe block this comment used to sit above is
 // replaced below with two things: a suite over `AssignedToCard` standing
 // alone, and a suite proving `HelpStakeholders` carries none of it any more.
+//
+// AND THEN `AssignedToCard` ITSELF WENT READ-ONLY, SAME DAY. Aurora, reading
+// the card back, verbatim: "ok, but rmeove the edit button (this can be
+// editedfrom dtory edit screen). rmeove the 'use the apps lead' text." The
+// pen, the Select it opened and the "Use the app's lead" clear button are
+// deleted from the component, not merely hidden, the same shape the 20 Sep
+// 2026 ruling above already took on Raised by's own pen. The `describe`
+// blocks below that used to drive the pen open, pick an option and press the
+// clear button are replaced by tests proving none of that renders any more,
+// ever, even with the old gating props still passed; the one remaining door
+// onto `assigneeId` is `help-form-dialog-assignee.test.tsx`'s own field on
+// the ticket's edit screen.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import type * as React from "react"
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpStakeholder } from "@shared/types"
@@ -437,156 +449,77 @@ describe("AssignedToCard", () => {
     expect(assignedTile.getAttribute("data-variant")).toBe(raisedByTile.getAttribute("data-variant"))
   })
 
-  it("draws no pen and no Select for a reader with no edit right", () => {
-    render(
-      <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
-    )
-    expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
-    expect(screen.queryByRole("combobox")).toBeNull()
-  })
-
-  it("the pen opens the kit Select (R90 faces), and picking someone calls the door", async () => {
-    const onChangeAssignee = vi.fn(async () => {})
-    render(
-      <AssignedToCard
-        appId="app-1"
-        appName="Bergman dispatch"
-        appAssigneeId="u-lead"
-        members={MEMBERS}
-        canEditAssignee
-        onChangeAssignee={onChangeAssignee}
-      />
-    )
-    expect(screen.queryByRole("combobox")).toBeNull()
-    fireEvent.click(screen.getByLabelText("Change who is assigned"))
-    const trigger = document.getElementById("help-assignee") as HTMLElement
-    expect(trigger).toBeTruthy()
-    fireEvent.click(trigger)
-    const option = await screen.findByRole("option", { name: /Alaap Kanchwala/ })
-    // R90: every SelectItem over a person carries its own face.
-    expect(option.querySelector("[aria-hidden]")).toBeTruthy()
-    fireEvent.click(option)
-    expect(onChangeAssignee).toHaveBeenCalledWith("u-staff")
-  })
-
-  // THE CLEAR ACTION IS A SEPARATE TEXT BUTTON, NEVER A "NOBODY" ROW. Aurora's
-  // 16 Sep 2026 ruling, verbatim: "Kill the 'nobody' option for staff. If we
-  // leave it empty, it's not an option. Remove it from tasks and everywhere
-  // else. This 'nobody', just kill it." A 21 Sep 2026 pass had put a
-  // "Nobody, inherit from the app" row back into this card's own `Select`;
-  // reverted 20 Sep 2026. This is the door back now.
-  describe("the clear action returns the ticket's own assignee to inherited", () => {
-    it("the Select offers no Nobody option when the app has a lead, people only", async () => {
-      const onChangeAssignee = vi.fn(async () => {})
-      render(
-        <AssignedToCard
-          assigneeId="u-staff"
-          assigneeName="Alaap Kanchwala"
-          appId="app-1"
-          appName="Bergman dispatch"
-          appAssigneeId="u-lead"
-          members={MEMBERS}
-          canEditAssignee
-          onChangeAssignee={onChangeAssignee}
-        />
-      )
-      fireEvent.click(screen.getByLabelText("Change who is assigned"))
-      fireEvent.click(document.getElementById("help-assignee") as HTMLElement)
-      const options = await screen.findAllByRole("option")
-      expect(options.length).toBe(MEMBERS.length)
-      for (const option of options) {
-        expect(option.textContent?.toLowerCase()).not.toMatch(/nobody/)
-        // R90 still applies: every remaining row carries its own face.
-        expect(option.querySelector("[aria-hidden]")).toBeTruthy()
-      }
-    })
-
-    it("the Select offers no Nobody option when the app has no lead either", async () => {
-      render(
-        <AssignedToCard
-          assigneeId="u-staff"
-          assigneeName="Alaap Kanchwala"
-          members={MEMBERS}
-          canEditAssignee
-          onChangeAssignee={vi.fn()}
-        />
-      )
-      fireEvent.click(screen.getByLabelText("Change who is assigned"))
-      fireEvent.click(document.getElementById("help-assignee") as HTMLElement)
-      const options = await screen.findAllByRole("option")
-      expect(options.length).toBe(MEMBERS.length)
-      for (const option of options) {
-        expect(option.textContent?.toLowerCase()).not.toMatch(/nobody/)
-      }
-    })
-
-    it("renders no clear action when the ticket has no assignee of its own (nothing to clear)", () => {
-      render(
-        <AssignedToCard
-          appId="app-1"
-          appName="Bergman dispatch"
-          appAssigneeId="u-lead"
-          members={MEMBERS}
-          canEditAssignee
-          onChangeAssignee={vi.fn()}
-        />
-      )
+  // READ-ONLY. Aurora's ruling, 21 Sep 2026, verbatim, reading the card
+  // back: "ok, but rmeove the edit button (this can be editedfrom dtory edit
+  // screen). rmeove the 'use the apps lead' text." No pencil, no Select, no
+  // clear action, in EITHER state, ever, even with the old gating props
+  // still passed at the runtime boundary, the same proof
+  // `HelpStakeholders`'s own "draws no edit pen and no Select even when the
+  // old gating props are passed" test above holds Raised by to.
+  describe("read-only, no pencil, no Select, no clear action, in either state", () => {
+    it("draws no pen, no combobox and no clear text, with the ticket's own assignee", () => {
+      const staleProps = {
+        assigneeId: "u-staff",
+        assigneeName: "Alaap Kanchwala",
+        appId: "app-1",
+        appName: "Bergman dispatch",
+        appAssigneeId: "u-lead",
+        members: MEMBERS,
+        canEditAssignee: true,
+        onChangeAssignee: vi.fn(async () => {}),
+      } as unknown as React.ComponentProps<typeof AssignedToCard>
+      render(<AssignedToCard {...staleProps} />)
+      expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
+      expect(screen.queryByRole("combobox")).toBeNull()
       expect(screen.queryByText("Use the app's lead")).toBeNull()
     })
 
-    it("renders no clear action when the app has no lead to fall back to, even with an own assignee", () => {
-      render(
-        <AssignedToCard
-          assigneeId="u-staff"
-          assigneeName="Alaap Kanchwala"
-          members={MEMBERS}
-          canEditAssignee
-          onChangeAssignee={vi.fn()}
-        />
-      )
+    it("draws no pen, no combobox and no clear text, inheriting from the app", () => {
+      const staleProps = {
+        appId: "app-1",
+        appName: "Bergman dispatch",
+        appAssigneeId: "u-lead",
+        members: MEMBERS,
+        canEditAssignee: true,
+        onChangeAssignee: vi.fn(async () => {}),
+      } as unknown as React.ComponentProps<typeof AssignedToCard>
+      render(<AssignedToCard {...staleProps} />)
+      expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
+      expect(screen.queryByRole("combobox")).toBeNull()
       expect(screen.queryByText("Use the app's lead")).toBeNull()
     })
 
-    it("renders no clear action for a reader with no edit right, even with an own assignee and an app lead", () => {
-      render(
-        <AssignedToCard
-          assigneeId="u-staff"
-          assigneeName="Alaap Kanchwala"
-          appId="app-1"
-          appName="Bergman dispatch"
-          appAssigneeId="u-lead"
-          members={MEMBERS}
-        />
-      )
+    it("draws no pen, no combobox and no clear text, in the empty state", () => {
+      const staleProps = {
+        canEditAssignee: true,
+        onChangeAssignee: vi.fn(async () => {}),
+      } as unknown as React.ComponentProps<typeof AssignedToCard>
+      render(<AssignedToCard {...staleProps} />)
+      expect(screen.getByText("Nobody yet.")).toBeTruthy()
+      expect(screen.queryByLabelText("Change who is assigned")).toBeNull()
+      expect(screen.queryByRole("combobox")).toBeNull()
       expect(screen.queryByText("Use the app's lead")).toBeNull()
     })
 
-    it("renders the clear action when the ticket has its own assignee and the app has a lead, and pressing it calls the door with assigneeId null", () => {
-      const onChangeAssignee = vi.fn(async () => {})
-      render(
-        <AssignedToCard
-          assigneeId="u-staff"
-          assigneeName="Alaap Kanchwala"
-          appId="app-1"
-          appName="Bergman dispatch"
-          appAssigneeId="u-lead"
-          members={MEMBERS}
-          canEditAssignee
-          onChangeAssignee={onChangeAssignee}
-        />
+    // THE TYPE NO LONGER OFFERS THEM AT ALL, the same discipline this file's
+    // own `HelpStakeholders` census above holds the loop props to.
+    it("takes no editing props at all, a signature census, not a render one", () => {
+      const src = readFileSync(
+        join(import.meta.dirname, "..", "components", "tickets", "help-stakeholders.tsx"),
+        "utf8"
       )
-      const action = screen.getByText("Use the app's lead")
-      expect(action).toBeTruthy()
-      fireEvent.click(action)
-      expect(onChangeAssignee).toHaveBeenCalledWith(null)
+      const at = src.indexOf("export function AssignedToCard")
+      const signature = src.slice(at, src.indexOf("{\n  const", at))
+      for (const field of ["canEditAssignee", "onChangeAssignee", "pickingAssignee"])
+        expect(signature, `AssignedToCard must not declare or use ${field} any more`).not.toContain(field)
     })
 
-    it("the row returns to the inherited state once the ticket's own assignee is cleared", () => {
-      // A round trip in miniature: the parent calls the door (proven above),
-      // then re-renders with the ticket's own assigneeId now null, exactly
-      // what a real refetch hands back. The card must read the app's own
-      // lead again, the same "inherited" line `effectiveAssignee` already
-      // draws when the ticket never had one of its own.
+    it("the tile still reflects a re-render, own assignee to inherited to empty, with no door of its own", () => {
+      // A round trip in miniature, over ordinary prop changes a parent
+      // (`help-detail.tsx`) makes after ITS OWN write elsewhere (now
+      // `help-form-dialog.tsx`'s "Assigned to" field) resolves. The card's
+      // job is only to read `effectiveAssignee` off whatever it is handed;
+      // it never calls a door itself any more.
       const { rerender } = render(
         <AssignedToCard
           assigneeId="u-staff"
@@ -613,14 +546,9 @@ describe("AssignedToCard", () => {
       card = assignedCard()
       expect(within(card).getByText("Petya Bletsova")).toBeTruthy()
       expect(within(card).getByText(/Inherited from/)).toBeTruthy()
-    })
 
-    it("the row returns to empty when neither the ticket nor the app has one", () => {
-      const { rerender } = render(
-        <AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />
-      )
       rerender(<AssignedToCard assigneeId={null} assigneeName={null} members={MEMBERS} />)
-      const card = assignedCard()
+      card = assignedCard()
       expect(within(card).getByText("Nobody yet.")).toBeTruthy()
     })
   })

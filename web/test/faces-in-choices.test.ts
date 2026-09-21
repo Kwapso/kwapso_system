@@ -1,5 +1,5 @@
-// R90 — FACES IN CHOICES: ANY CHOICE OVER PEOPLE, CONTACTS, ACCOUNTS OR APPS
-// SHOWS THE SAME FACE THE LISTS SHOW.
+// R90 — FACES IN CHOICES: ANY CHOICE OVER PEOPLE, CONTACTS, ACCOUNTS, APPS,
+// TICKETS, PHASES OR WAVES SHOWS THE SAME FACE THE LISTS SHOW.
 //
 // Aurora, verbatim, about the new Raised-by `Select` on the ticket form and
 // page: "every time there is an avatar, I want to also see it in the choice
@@ -7,6 +7,18 @@
 // house rather than a one-off fix: any choice over people, contacts, accounts
 // or apps carries the record's own face — a photograph where it has one,
 // initials on the record's own tone where it does not — in its OPTIONS.
+//
+// WIDENED, 21 Sep 2026, to the two other kinds of record a choice in this app
+// ever offers: a TICKET (its type's own icon — her same-day ruling, "on every
+// choice component where I can choose a ticket, show me the type as the icon
+// everywhere") and a PHASE/WAVE (a phase's own type icon, `shared/
+// sprint-types.ts`). The census's field-name vocabulary below grows to match:
+// `appId` was itself missing before this pass — R90's own prose already named
+// apps, but nothing in the detector's word list could ever have matched an
+// app options array, only a person/contact/account one. `ticketId`/
+// `helpType` (a ticket, by id or by the type word the door reads it off) and
+// `sprintId`/`sprintType`/`phaseId`/`phaseType`/`waveId` (a phase or a wave,
+// both drawn from the one `sprints`/`sprint-types` vocabulary) join it.
 //
 // WHY THIS IS `Select`'S OWN LAW, AND NOT R35 WIDENED. R35
 // (`records-carry-their-face`) already holds `RecordPicker`/`PickerOption` to
@@ -64,11 +76,17 @@ import { FACES_IN_CHOICES_EXEMPT } from "@shared/rules/registry"
 
 const ROOT = join(import.meta.dirname, "..", "..")
 
-/** The seven field names the brief names, case-insensitively so a prefixed
+/** The field names the brief names, case-insensitively so a prefixed
  * camelCase field (`personAccountId`, `raisedByContactId`, `personLogoUrl`'s
  * sibling `personName`) still matches without hand-listing every prefix this
- * codebase happens to use today. */
-const IDENTITY_FIELD = /personname|contactid|memberid|accountid|avatar|photo|initials/i
+ * codebase happens to use today.
+ *
+ * `appid`, `ticketid`/`helptype` and `sprintid`/`sprinttype`/`phaseid`/
+ * `phasetype`/`waveid` joined the original seven on 21 Sep 2026, widening
+ * the census past people/contacts/accounts to the app, ticket, phase and
+ * wave choices R90's own prose already named. */
+const IDENTITY_FIELD =
+  /personname|contactid|memberid|accountid|appid|ticketid|helptype|sprintid|sprinttype|phaseid|phasetype|waveid|avatar|photo|initials/i
 
 /** The identifier (last dotted segment) an option list is built from —
  * either `IDENT.map(` directly, or `sortedOptions(IDENT, …)` (R75's own
@@ -156,14 +174,15 @@ function findings(): Finding[] {
 }
 
 describe("R90 — faces in choices", () => {
-  it("every Select over people/contacts/accounts/apps gives its options a face", () => {
+  it("every Select over people/contacts/accounts/apps/tickets/phases/waves gives its options a face", () => {
     const found = findings()
     const unexempt = found.filter((f) => !(`${f.rel}#${f.expr}` in FACES_IN_CHOICES_EXEMPT))
     expect(
       unexempt,
       `these Selects choose over a record with a face (personName/contactId/memberId/accountId/` +
-        `avatar/photo/initials on their own options array) but at least one <SelectItem> carries no ` +
-        `face= — give it one (kit v1.2.127's face slot), or name it in FACES_IN_CHOICES_EXEMPT with a ` +
+        `appId/ticketId/helpType/sprintId/sprintType/phaseId/phaseType/waveId/avatar/photo/initials ` +
+        `on their own options array) but at least one <SelectItem> carries no face= — give it one ` +
+        `(kit v1.2.144's face slot), or name it in FACES_IN_CHOICES_EXEMPT with a ` +
         `reason: ${unexempt.map((f) => `${f.rel}#${f.expr}`).join(", ")}`
     ).toEqual([])
   })

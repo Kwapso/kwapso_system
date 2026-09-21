@@ -563,6 +563,9 @@ export function TriageQueue({
       label: m.name,
       picture: m.photo,
       shape: "round" as const,
+      // `face: true` (R90) so a staff member with no photo on file still
+      // draws their own initial rather than a blank row.
+      face: true,
     }))
   const peopleOptions: PickerOption[] = peopleFor(current?.appId)
 

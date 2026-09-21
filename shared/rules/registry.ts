@@ -930,6 +930,8 @@ export const NO_NESTED_SCROLL_EXEMPT: Record<string, string> = {
     "a dialog body — `DialogPrimitive.Content` itself, the recipe engine's own centred/side dialog presentation. A true overlay, the law's own named exception.",
   "web/components/records/record-picker.tsx#max-h-none flex-1 overflow-y-auto overscroll-contain":
     "a command menu / select listbox body — `RecordPicker`'s own `CommandList`, rendered inside a sheet (phone) or a popover (desktop), never in normal page flow. A true overlay, the law's own named exception.",
+  "web/components/work/task-sheet.tsx#min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6":
+    "a sheet body — the task slide-in's own scrolling content region (chip row through the dark footer band, one region, nothing else in the sheet pinned), the kit's `Sheet`/`SheetContent`. A true overlay, the law's own named exception.",
 
   // ── SANCTIONED: the five pending scrollers, decided (Round 30) ──────────
   // Shown to Aurora on a decisions page, one recommendation each (keep or
@@ -989,8 +991,6 @@ export const EMPTY_STATE_SINGLE_DOOR_EXEMPT: Record<string, string> = {
     "TWO different first-adds on one collection — `<ReadACall>` beside `<AddButton>` — the same shape `EMPTY_TOOLBAR_EXEMPT` already carries this file for R50: `CollectionEmptyState` carries a single labelled `onCreate` and cannot offer both, so both stay reachable on an empty step list exactly as they are on a populated one. R88's single door does not apply where there were always two doors by design, not one duplicated.",
   "web/components/tickets/tickets-collection.tsx":
     "the `raiseTicket` `<AddButton>` is a NODE built once (`const raiseTicket = canCreateTicket ? <AddButton…/> : null`) and handed to a `<PagedFind>`/`<ToolbarRow>` `actions` slot one line further up — the identical indirection `EMPTY_TOOLBAR_EXEMPT` already carries this file for R50. The button IS inside a toolbar's own gated slot at every real call site; the census reads position rather than data flow and cannot see through the assignment.",
-  "web/components/work/story-detail.tsx":
-    "the Effort card's own `<AddButton>` (\"Log time\") — Aurora's ruling, 21 Sep 2026, B44: \"Include the metrics inside the effort card ... put the number next to the effort title, just as you do, for example, for stakeholders.\" The card used to be `EmptyGatedPanel` wrapping `WorkLogsPanel`'s own list of rows, the genuine empty-collection shape R88 exists for; it no longer is. `WorkLogsPanel` is gone from this page (its rows are the \"value entries\" the ruling removes), replaced by the three metric lines every render, with textual fallbacks (\"Not started\"/\"0h\"/\"No time log\") standing in for zero rather than a `CollectionEmptyState`. There is no collection left to be empty — the same reasoning `roles-matrix.tsx`'s own entry already argues for a fixed catalogue — so the plain `TicketSidePanel` every other fact panel on this page uses is the honest shell, and its `<AddButton empty={false}>` records that on purpose rather than hiding it.",
 }
 
 /** R66 — A PICTOGRAPH THAT IS THE CONTENT AND IS NOT A FLAG. Keyed by
@@ -2492,6 +2492,11 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
   // `<WaveFinder>` (its own real toolbar) already only ever rendered once
   // `all.length > 0`, so the bare fallback had nothing left to justify once
   // R50 made "Add the first" `<CollectionEmptyState>`'s job instead.
+
+  // ── R48 CENSUS (v), THE PAGED-READER WALK — a file rendering `<LoadMore>`
+  // with no toolbar of any shape.
+  "web/components/work/effort-card.tsx":
+    "bounded by ONE record's own time log rows (a story's or a ticket's), the same room `web-portal/components/ticket-attachments.tsx` above is exempted for — a record's individual time entries, not a team-wide collection anybody browses. The `<LoadMore>` door exists for the record that has genuinely worked a lot (R14: nothing here may be capped instead of paged), but a search box over one record's own handful-to-moderate log rows is exactly the control R48's own ground names as unable to do anything: they already read newest-first, which is the one order a reader looking for 'what did we log lately' wants. Aurora's ruling this round (21 Sep 2026, B44 amended) asks for the rows and the faces back on this card; a search/filter box was not one of the things asked for, unlike `WorkLogsPanel`'s own 'Logged by' picker (a SEPARATE, richer panel this card does not reuse).",
 }
 
 /** R49 — reviewed exceptions: a `<ToolbarRow>` call site (or wrapper) that
@@ -3036,8 +3041,6 @@ export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
     "TWO different first-adds on one collection, which is Contacts' exemption above in a different module: \"Add step\" types what somebody heard, and `<ReadACall>` beside it has the app propose the steps off a meeting and walk the person through them. `CollectionEmptyState` carries a single labelled `onCreate` and cannot offer both, so both stay reachable on an empty step list exactly as they are on a populated one.",
   "web/components/team/roles-matrix.tsx":
     "the grid's own <ToolbarRow> carries `empty={false}` — the rows it narrows are the team's own MODULE CATALOGUE (`TEAM_MODULES`, read off the first role sheet), which is fixed furniture for a live team rather than data it empties out. R50's question is whether the RAW row list, before search, ever holds zero rows, and for a fixed catalogue the honest answer is always no; the toolbar's search can narrow the visible rows to zero, which is a different, filtered zero the matrix's own `emptyTitle`/`emptyDescription` pair already tells apart from a true empty state.",
-  "web/components/work/story-detail.tsx":
-    "the Effort card's own <AddButton> (\"Log time\") carries `empty={false}` — Aurora's ruling, 21 Sep 2026, B44, merged the Metrics panel's three lines into this card and dropped `WorkLogsPanel`'s own list of rows, so the card no longer narrows a COLLECTION that could hold zero rows; it always shows Cycle time/Effort/Flow efficiency, with a textual fallback for none of it logged yet rather than an empty-collection state. Same reasoning as `roles-matrix.tsx` above, over metrics instead of a fixed catalogue: the honest answer to \"could this be empty\" is always no.",
 }
 
 /** R62, clause (iii) — THE FILES THAT MAY STILL DRAW A SECOND FILTERED-ZERO
@@ -4262,8 +4265,12 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // server total like every other record in the app.
   "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
   "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
-  "task-detail.overview":
-    "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its two sibling tabs, work logs and activity, each carry the exact server total like every other record in the app.",
+  // "task-detail.overview" STOOD HERE and went 21 Sep 2026 with the screen it
+  // named: `task-detail.tsx`'s own tabbed `TabsView` (Overview / Work logs) is
+  // deleted, replaced by the task slide-in (`task-sheet.tsx`), one scrolling
+  // sheet with no tabs at all — so there is no tab strip left for this
+  // component-tab census to find, and no exception left to grant it. See
+  // task-sheet.tsx's own header.
   "meeting-detail.overview":
     "one meeting's client, purpose, when and where, and its audit block — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
   "meeting-detail.notes":
@@ -4562,8 +4569,8 @@ export const STORED_FILES: {
   {
     writtenIn: "workers/content/src/routes/todos.ts",
     field: "Task.fileUrl",
-    shownIn: "web/components/work/task-detail.tsx",
-    why: "the photo of the letter on a piece of our own admin. Write-only from the day the door shipped — the third breach. Same file as the to-do above because one route module owns both doors",
+    shownIn: "web/components/work/task-sheet.tsx",
+    why: "the photo of the letter on a piece of our own admin. Write-only from the day the door shipped — the third breach. Same file as the to-do above because one route module owns both doors. RE-POINTED 21 Sep 2026: the task slide-in (task-sheet.tsx) replaced task-detail.tsx, which is deleted; the File fact row moved with it.",
   },
   {
     writtenIn: "workers/content/src/routes/knowledge.ts",
@@ -4736,6 +4743,8 @@ export const GONE_ON_PURPOSE: Record<string, string> = {
     "the \"what this account leaves us\" figure on a client's Rates tab, the margin's only consumer, which could not survive the loss of its input. Named in a lane report that measured its empty-state copy — the same snapshot argument as the card above",
   "web/components/team/role-detail.tsx":
     "the per-role screen the client deleted on 2026-09-09 (\"I want to see the roles much differently… all the roles together\"). Every role's sheet is one grid on Settings › Team now (roles-matrix.tsx), and half a dozen comments — module-content.tsx's `roles` branch, the roles matrix's own header, web/lib/pages.ts, R36's screen clause in rules.test.ts — name this path precisely BECAUSE it is gone, which is what makes each of those sentences readable",
+  "web/components/work/task-detail.tsx":
+    "the task's own tabbed full-page detail screen (Overview / Work logs), deleted 21 Sep 2026 with Aurora's ruling on the task slide-in (\"implement the slide-in design for tasks\"): task-sheet.tsx replaced it outright, one scrolling sheet with no tabs. UI-RULEBOOK.md's B49 entry names this path precisely BECAUSE it is gone — it is the retirement record itself.",
   "web/lib/use-live-refetch.ts":
     "R15's retired half. RULES.md, CACHING.md and the registry all say this hook was deleted when paging moved to cursors over the shared store — naming it is the whole point of the sentence",
   "web/lib/live-bus.ts":
@@ -4998,27 +5007,10 @@ export const REF_AS_STRING_OK: RefAsString[] = [
   },
   {
     file: "web/components/tickets/help-detail.tsx",
-    contains: "recordLabel={[ticket.ref",
-    why:
-      "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
-      "entry is being logged against, inside sentences and a dialog title, not on " +
-      "a row of its own.",
-  },
-  {
-    file: "web/components/tickets/help-detail.tsx",
     contains: "label: [ticket.ref",
     why:
       "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
       "string slot as picker-sources.ts, for the ticket the form is pinned to.",
-  },
-  {
-    file: "web/components/work/story-detail.tsx",
-    contains: "label: story.ref ?",
-    why:
-      "`TimeFormDialog.fixedTarget.label` is typed `string` (time-form-dialog.tsx) — the " +
-      "same slot `WorkLogsPanel.recordLabel` used to fill before B44 (21 Sep 2026) dropped " +
-      "that panel from the story page's own Effort card and mounted `TimeFormDialog` " +
-      "directly for its \"Log time\" door; the string shape is unchanged, only the prop.",
   },
   {
     file: "web/components/work/sprints-screen.tsx",
@@ -5243,6 +5235,8 @@ export const NOT_A_WORK_PICKER: Record<string, string> = {
     "reads the members list once, in AppTicketsPanel, only to resolve a ticket's editor/resolver AVATAR (`memberAvatar`, a `.find()` by userId) — a lookup by id, never turned into an option list. This file offers nobody a member to PICK. (The to-do form's own new 'Assigned to' field, migration 0103, is a different picker entirely — the account's own CONTACT, off `contactOptions`, never the team members list this census watches.)",
   "tickets/tickets-collection.tsx":
     "the top-level ticket list's own `membersQ` (R35, client ruling 18 Sep 2026: 'on column raised by i am missing the avatar') — read only so `TicketRowsTable`'s `memberFace(members, w.raiserId)` can resolve a staff raiser's picture, a `.find()` by userId exactly like `work-panels.tsx`'s AVATAR lookup above. Never turned into an option list; nothing on this screen lets a person pick a member from it.",
+  "work/task-sheet.tsx":
+    "reads the members list once (`membersQ`, same `members:<teamId>` key `story-detail.tsx`/`help-detail.tsx` read for the identical reason) only to hand it to EffortCard's `members` prop, which resolves each work-log row's own AVATAR (`memberFace(members, l.userId)`, a `.find()` by userId, R35/R90) — a lookup by id, never turned into an option list. Nothing on this sheet lets a person pick a member from it; the task's own assignee picker is `options.members`, `useTaskFormOptions`'s own seam, unrelated to this read.",
 }
 
 // ── orphan-components ───────────────────────────────────────────────────────
@@ -5305,28 +5299,6 @@ export const PARKED: Record<string, string> = {
     "door-side sort/filter plumbing this pair fed was removed from `stories-screen.tsx`'s own toolbar wiring " +
     "alongside them (never a server-side door, both were always answered in the browser, over the loaded " +
     "page), and re-adding either is exactly re-importing this file's two exports into that toolbar again.",
-  "work/goal-field":
-    "the story FORM's own \"contributes to the phase's goal\" checkbox (`GoalField`), shown once a phase was " +
-    "chosen. Aurora's ruling, 21 Sep 2026, verbatim: \"Remove the goal from the stories. I don't even know " +
-    "what that is, but remove it.\" Parked, not dead: `Story.contributesToGoal`/the `contributes_to_goal` " +
-    "column and the create/update doors keep accepting the field untouched (`create_story`/`update_story` " +
-    "still take `contributesToGoal`, documented as parked in documents/MCP.md), and `story-form-dialog.tsx` " +
-    "still carries `values.contributesToGoal` through an edit unchanged — only the control that let somebody " +
-    "SET it is unmounted. Delete this line and wire `<GoalField>` back into `story-form-dialog.tsx` the day " +
-    "she asks for the goal back.",
-  "work/goal-row-toggle":
-    "the story ROW's own goal checkbox (`useGoalToggle`/`GoalRowToggle`), the phase board's own way to flip " +
-    "the flag straight from `StoriesPanel` (work-panels.tsx) without opening the form. Same 21 Sep 2026 " +
-    "ruling as `work/goal-field` above. Parked, not dead: the write this pair made (`contentApi.updateStory` " +
-    "with `contributesToGoal`) is exactly the door call above, unmounted from the row rather than the door " +
-    "changed. Delete this line and wire the hook and the control back into `StoriesPanel`'s own row (between " +
-    "the story's name and its Done badge, `ownerKind === \"sprint\"` only) the day she asks for the goal back.",
-  "work/goal-badge":
-    "the story LIST's own goal mark (`GoalBadge`), the small icon `stories-screen.tsx`'s own `boardCard` drew " +
-    "beside the app-name badge when a story carried the flag. Same 21 Sep 2026 ruling as the two entries " +
-    "above. Parked, not dead: the display alone moved out into a file of its own and stopped being mounted. " +
-    "Delete this line and wire `<GoalBadge>` back into `boardCard`'s own badge row (guarded on " +
-    "`s.contributesToGoal`) the day she asks for the goal back.",
   "work/story-attachments":
     "`StoryAttachmentsPanel`, the story's own hand-built file list and upload widget over " +
     "`records/record-attachments.tsx`. Aurora's ruling, 21 Sep 2026, verbatim: \"On build nodes, use the " +
@@ -5659,6 +5631,8 @@ export const TOOLBAR_LEAD_GAP_EXEMPT: Record<string, string> = {}
 export const MANGO_OUTSIDE_TITLE_OK: Record<string, string> = {
   "web/components/shell/new-tab-screen.tsx#NewTabScreen":
     "Client ruling, 18 Sep 2026, verbatim: \"on new page where to, make the button mango.\" The page has no CollectionHeading/RecordScreen/RecordDetail/RecordChrome to host it — the search bar's own Go button is the page's one and only act.",
+  "web/components/work/task-sheet.tsx#TaskSheet":
+    "Aurora's ruling, 21 Sep 2026, verbatim: \"in task the main button is mark as done, tick it off. find shorter alternative for the word, and make the button mango\" and \"keep done yellow.\" The sheet's action row (start, left; done, right) sits below the title row rather than inside it, so the census cannot see the title-level exception her ruling grants. The offending element is the disabled \"Done\" button shown while the record's own timer is running (R99, `timerRunningOnThis`) — the same mango button, only disabled with a tooltip (\"Stop the timer first.\") until the clock stops; its enabled sibling right beside it computes `variant={done ? \"secondary\" : \"default\"}`, a ternary the census already leaves out of reach by construction.",
 }
 
 // ── R85 (rail-labels-one-word) ──────────────────────────────────────────────
@@ -5701,9 +5675,14 @@ export const RAIL_LABEL_WORDS_OK: Record<string, string> = {
  * ruled it, the one categorical field besides status this app colours by
  * design. Every ticket-type colour the same sweep found — the list row, the
  * board card, `TicketChips`, both type pickers and the portal's own row —
- * was converted to `ticketTypeIconName` rather than excused. */
+ * was converted to `ticketTypeIconName` rather than excused.
+ *
+ * `PriorityChip` MOVED FILES 21 Sep 2026 (`web/components/work/task-sheet.tsx`,
+ * the task slide-in's own title-row chip; `tasks-screen.tsx` now imports the
+ * one definition back) — the key below moved with it, same reason, same
+ * chip, one definition. */
 export const COLOURED_CHIP_OK: Record<string, string> = {
-  "web/components/work/tasks-screen.tsx#PriorityChip":
+  "web/components/work/task-sheet.tsx#PriorityChip":
     "the task priority dot, `PRIORITY_DOT_TONE[level]` — priority, not status, and already ruled a colour on tasks " +
     "(K19a, \"Priority has its own four colours, never App Stage's\"), the one categorical field besides status " +
     "this app colours on purpose.",
@@ -5794,8 +5773,41 @@ export const FOOTER_IS_LAST_EXEMPT: Record<string, string> = {}
  * inventory found choosing over a record — `help-form-dialog.tsx`'s and
  * `help-stakeholders.tsx`'s "Raised by" contact pickers, `work-logs-panel.
  * tsx`'s "Logged by" staff filter — was given a real `face=` rather than
- * excused. */
-export const FACES_IN_CHOICES_EXEMPT: Record<string, string> = {}
+ * excused.
+ *
+ * THREE ENTRIES ADDED 21 SEP 2026, when the census's own field vocabulary
+ * widened past people/contacts/accounts to `appId`/`ticketId`/`helpType`/
+ * `sprintId`/`sprintType`/`phaseId`/`phaseType`/`waveId` (apps, tickets,
+ * phases, waves — the categories R90 itself always named but the detector's
+ * word list had never actually matched). The detector reads a generous
+ * 2000-character WINDOW after a source array's own `const` binding rather
+ * than parsing scope, so a common field name appearing anywhere in that
+ * window — not necessarily inside the array literal it is judging — can
+ * false-match. All three below are exactly that: none of them is a choice
+ * over an account, an app, a person, a ticket, a phase or a wave. */
+export const FACES_IN_CHOICES_EXEMPT: Record<string, string> = {
+  // The module `<Select>` groups its rows BY the app they belong to
+  // (`byApp`, a `Map<string, { appName, modules }>`), so `m.appId` sits a
+  // few lines inside that grouping code — the window's match — while the
+  // options it renders are MODULES, each already carrying its own icon
+  // through the pre-existing `icon=` slot (`raise-ticket-dialog.tsx`'s own
+  // `<SelectItem icon={<Icon name={m.icon ?? DEFAULT_MODULE_ICON} />}>`),
+  // never an app.
+  "web-portal/components/raise-ticket-dialog.tsx#byApp+group.modules":
+    "grouped by app internally (m.appId), but the options are modules, not apps — each already carries its own icon= face",
+  // `statuses` is the TICKET STATUS filter's own option list (`all`/`open`/
+  // `resolved`, plain strings) — `tk.helpType` sits a few lines below its
+  // definition, in an unrelated search predicate over the same page-one
+  // ticket rows, which is the window's match. No record is chosen here.
+  "web/components/accounts/contact-panels.tsx#statuses":
+    "a ticket STATUS filter (plain words), not a choice over any record — tk.helpType nearby is an unrelated search predicate",
+  // `processOptions` feeds the "Add a process" `<Select>`, a PROCESS
+  // picker — outside R90's six categories. This file is otherwise full of
+  // ticket code (its own ticket-face `RecordPicker`, above), which is what
+  // lands `helpType`/`ticketId` inside the window.
+  "web/components/work/story-form-dialog.tsx#processOptions":
+    "a process picker, not one of R90's six categories — helpType/ticketId nearby belong to this file's separate ticket RecordPicker",
+}
 
 // ── R92 (main-excludes-secondary) ───────────────────────────────────────────
 
@@ -5903,8 +5915,8 @@ export const COUNT_REGISTER_EXEMPT: CountRegisterExempt[] = [
     why: "pending her word — the work-logs summary strip (hours logged, entries, members on it), a per-record stat strip rather than a whole-app dashboard, closer in shape to her own named examples than pulse.tsx/agent-blocks.tsx are, so named separately rather than assumed to share their answer.",
   },
   {
-    file: "web/components/work/story-detail.tsx",
-    why: "known offender, owned by another lane. The story lane is moving this Metrics panel (cycle time / effort / flow efficiency) into the Effort card the same session this law shipped (brief note, 21 Sep 2026); this lane's own brief forbids editing story-detail.tsx, so the finding is reported and tolerated here rather than fixed. Remove this entry once that lane reports the panel folded in.",
+    file: "web/components/work/effort-card.tsx",
+    why: "pending her word — the shared Effort card's own three metric lines (Cycle time / Effort / Flow efficiency, folded in from story-detail.tsx's own former Metrics panel, 21 Sep 2026, B44 amended), drawn once now for both the story and the ticket page. These are not a COUNT of things (how many tickets, stories, stakeholders) — R97's own named examples — they are duration/percentage figures, closer to work-logs-panel.tsx's own summary strip above than to a collection's tally; named separately, same as that entry, rather than assumed to share pulse.tsx/agent-blocks.tsx's answer.",
   },
 ]
 

@@ -276,7 +276,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **277 doors, 209 with a tool, 68 with a written reason**, the
+  red build. Today: **278 doors, 210 with a tool, 68 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -480,7 +480,7 @@ Today it covers:
   - tickets, `create_help_ticket`, `update_help_ticket`, `set_help_status`,
     `triage_help_ticket`, `resolve_help_ticket`,
     `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
-    `update_help_reply`, `delete_help_reply`,
+    `update_help_reply`, `delete_help_reply`, `ticket_metrics`,
     `add_help_stakeholder`, plus the three that carry the files and links on a
     ticket: `list_help_attachments`, `add_help_link` and
     `remove_help_attachment`. (The module is Tickets; the tool NAMES carry the old
@@ -576,12 +576,12 @@ Today it covers:
     "an Enabler story must also name `ticketId`, `ticket_required` otherwise"
     refusal is gone with it — there is nothing left to refuse once the
     category is read off the ticket rather than chosen against it.
-    `contributesToGoal` (true/false, default false) is still a real, accepted
-    field on both doors — PARKED in the app's own UI only (Aurora's ruling,
-    same day, verbatim: "Remove the goal from the stories. I don't even know
-    what that is, but remove it."): no screen offers a way to set or see it
-    any more, but a caller here can still write and read it, and the column
-    survives untouched. `update_story` also carries `buildNotes`
+    THE STORY GOAL FLAG IS GONE, not paused. Aurora's ruling, 21 Sep 2026,
+    verbatim, over her own earlier "pause it" call: "not parked, kill it."
+    Neither `create_story` nor `update_story` accepts a `contributesToGoal`
+    field any more; `Story.contributesToGoal` and the `stories.
+    contributes_to_goal` column are both deleted (team migration 0114 drops
+    the column outright). `update_story` also carries `buildNotes`
     (team migration 0112, Aurora's 21 Sep 2026 ruling: "call it build notes")
     — what was built and how, the same long-text shape as `detail`, written
     through the story detail page's own slide-in sheet once the story
@@ -596,6 +596,16 @@ Today it covers:
     Metrics panel draws (Aurora's ruling, 21 Sep 2026). `cycleTimeSeconds` is
     null until a work log exists; `flowEfficiency` is null while either side
     of the division is zero. Computed fresh on every call, never stored.
+  - `ticket_metrics` (`work:read`), the identical shape one door along: a
+    ticket's own Cycle time / Effort / Flow efficiency, by `id`, the ticket
+    detail page's own Metrics panel (Aurora's ruling, 21 Sep 2026, B44
+    amended). Same GET-style POST as `story_metrics` and the same right
+    (reading the team's logged time is a `work` right, not a `help` one), and
+    the same two fields read the same way: `cycleTimeSeconds` from the
+    ticket's first work log to its `resolved_at` moment (or to now while
+    unresolved), null until a work log exists; `flowEfficiency` null while
+    either side of the division is zero. Computed fresh on every call, never
+    stored.
   - `story_burndown` (`work:read`), a phase's burndown series (round-28 ruling,
     team migration 0110): one row per calendar day of the phase, the count still
     remaining and the ideal straight-line count for that day, plus the phase's

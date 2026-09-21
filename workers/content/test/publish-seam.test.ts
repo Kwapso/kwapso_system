@@ -45,6 +45,12 @@ const HOUSEKEEPING = [
   // as the burndown door immediately above it: nothing here changes a row,
   // it is computed fresh off `work_logs`/`story_status_events` every time.
   "POST /api/content/stories/metrics",
+  // A ticket's own Cycle time / Effort / Flow efficiency (`getTicketMetrics`).
+  // A read, work:read, no `publishChange`, the same "GET-style POST" shape
+  // as the burndown door and the story metrics door above it: nothing here
+  // changes a row, it is computed fresh off `work_logs`/`help_status_events`
+  // every time.
+  "POST /api/content/help/metrics",
   // "THE BYTES ARE UP" — the third step of the same upload. It LOOKS (`head`)
   // and answers the reference; it writes no row, no object and no counter.
   // The module's own door writes the row and publishes there, exactly as it

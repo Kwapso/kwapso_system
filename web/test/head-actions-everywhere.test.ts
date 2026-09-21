@@ -138,8 +138,13 @@ function controlCount(actionsValue: string): number {
  * never wraps at any width, so folding it buys nothing; it still has to say
  * so here, by name, with the reason — never silently skipped. */
 const HEAD_ACTIONS_FOLD_EXEMPT: Record<string, string> = {
-  "work/wave-detail.tsx":
-    "The head's whole `actions=` is the one RecordActionsMenu trigger (`canEdit ? <RecordActionsMenu actions={overflow} /> : undefined`) — nothing else stands beside it, so there is no second control the fold could ever save from wrapping.",
+  // wave-detail.tsx LEFT THIS REGISTRY 21 Sep 2026: Aurora's ruling ("missing
+  // the settings button in waves to adjust that!!!") gave the head a second
+  // standalone control, the phase-days gear, beside the RecordActionsMenu
+  // trigger that used to stand alone here, a real wide row now, wired with
+  // HEAD_ACTIONS_ROW_CLASS + HeadActionsFoldMenu the same shape
+  // help-detail.tsx already wired, so it no longer belongs on this
+  // single-control list.
   "knowledge/knowledge-detail.tsx":
     "The head's whole `actions=` is the one standalone EditPenButton (`canEdit && <EditPenButton … />`) — knowledge-detail.tsx carries no overflow menu at all, so a single 40px icon button is the entire row and never wraps.",
 }
@@ -166,7 +171,12 @@ describe("every record head that passes actions= to RecordScreen folds it", () =
         }))
     )
 
-  it("finds at least the eleven record heads this lane wired (plus the ticket head from the lane before it)", () => {
+  // "work/task-detail.tsx" LEFT THIS LIST 21 Sep 2026 with the screen it
+  // named: the task slide-in (`task-sheet.tsx`) replaced it outright, and a
+  // sheet is a fixed-width overlay, never a `<RecordScreen>` head that could
+  // ever need this responsive fold — see task-sheet.tsx's own header, "ONE
+  // '…' MENU, NOT A RESPONSIVE FOLD".
+  it("finds at least the ten record heads this lane wired (plus the ticket head from the lane before it)", () => {
     const rels = new Set(candidates.map((c) => c.rel))
     for (const expected of [
       "accounts/account-detail.tsx",
@@ -178,7 +188,6 @@ describe("every record head that passes actions= to RecordScreen folds it", () =
       "team/member-screen.tsx",
       "work/sprint-detail.tsx",
       "work/story-detail.tsx",
-      "work/task-detail.tsx",
       "work/wave-detail.tsx",
     ]) {
       expect(rels.has(expected), `${expected} should be a candidate (it passes actions= to RecordScreen)`).toBe(true)

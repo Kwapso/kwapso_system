@@ -34,7 +34,16 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { HelpMessage, HelpStakeholder, HelpTicket, HelpStatus, Story, TicketStageHistory } from "@shared/types"
+import type {
+  HelpMessage,
+  HelpStakeholder,
+  HelpTicket,
+  HelpStatus,
+  Story,
+  TeamMember,
+  TicketMetrics,
+  TicketStageHistory,
+} from "@shared/types"
 
 const BASE_TICKET = {
   id: "help-1",
@@ -74,6 +83,29 @@ const STAKEHOLDER: HelpStakeholder = {
   imageUrl: null,
   origin: "admin",
 } as unknown as HelpStakeholder
+
+// THE EFFORT CARD'S OWN TWO FIXTURES — Aurora's ruling, 21 Sep 2026, B44
+// amended: the ticket page gets the same three metric lines a story's
+// already had, computed off `getTicketMetrics`. 90000s = 25h = 1d 1h;
+// 5400s = 1.5h; 6%.
+const TICKET_METRICS: TicketMetrics = { cycleTimeSeconds: 90000, effortSeconds: 5400, flowEfficiency: 6 }
+const NO_TICKET_METRICS: TicketMetrics = { cycleTimeSeconds: null, effortSeconds: 0, flowEfficiency: null }
+
+// THE WORK LOG ROW'S OWN FACE — matched to the fixture row's `userId`
+// ("user-1") through `memberFace` (tickets-collection.tsx), the same lookup
+// `<RecordMark>` reads.
+const MEMBER_WITH_FACE: TeamMember = {
+  userId: "user-1",
+  email: "aurora@kwapso.com",
+  firstName: "Aurora",
+  lastName: null,
+  imageUrl: "https://kwapso.example/aurora.png",
+  roleId: "role-1",
+  roleTitle: "Staff",
+  isYou: false,
+  isAdmin: false,
+  isClient: false,
+} as unknown as TeamMember
 
 // THE RAISER — origin: "raiser", so the Raised-by tile itself renders
 // (`(raiser || raisedByContactId)` in help-stakeholders.tsx) and the round-26
@@ -165,7 +197,31 @@ const api = vi.hoisted(() => ({
   // list is gone" test below relies on "Raised by" not rendering at all.
   // Only the round-26 horizontal-card describe block overrides this.
   stakeholders: null as unknown as unknown[],
+  metrics: null as unknown,
+  updateWorkLog: vi.fn(),
+  members: [] as unknown[],
+  workLogs: null as unknown as unknown[],
 }))
+
+// THE DEFAULT WORK LOG ROW — ONE, NOT ZERO (R88, see the mock's own comment
+// below).
+const WORK_LOG_ROW = {
+  id: "log-1",
+  targetTable: "help",
+  targetId: "help-1",
+  targetLabel: "BERG-T0412",
+  targetRef: "BERG-T0412",
+  userId: "user-1",
+  userName: "Aurora",
+  kind: null,
+  note: null,
+  startedAt: "2026-08-18T09:00:00.000Z",
+  endedAt: "2026-08-18T09:30:00.000Z",
+  seconds: 1800,
+  billable: true,
+  discarded: false,
+  accountId: "acct-bergman",
+}
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
@@ -188,26 +244,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       // fixture here would be testing that law by accident, on a title this
       // file needs present to find the panel by.
       workLogs: async () => ({
-        logs: [
-          {
-            id: "log-1",
-            targetTable: "help",
-            targetId: "help-1",
-            targetLabel: "BERG-T0412",
-            targetRef: "BERG-T0412",
-            userId: "user-1",
-            userName: "Aurora",
-            kind: null,
-            note: null,
-            startedAt: "2026-08-18T09:00:00.000Z",
-            endedAt: "2026-08-18T09:30:00.000Z",
-            seconds: 1800,
-            billable: true,
-            discarded: false,
-            accountId: "acct-bergman",
-          },
-        ],
-        total: 1,
+        logs: api.workLogs,
+        total: api.workLogs.length,
         totalSeconds: 1800,
         nextCursor: null,
         hasMore: false,
@@ -223,10 +261,12 @@ vi.mock("@/lib/api", async (importOriginal) => {
       }),
       helpAttachments: async () => ({ attachments: [], total: 0 }),
       runningTimers: async () => ({ timers: [] }),
+      helpMetrics: async () => api.metrics,
+      updateWorkLog: api.updateWorkLog,
     },
     tenancy: {
       ...actual.tenancy,
-      members: async () => ({ members: [] }),
+      members: async () => ({ members: api.members }),
       selectable: async () => ({ values: [] }),
       apps: async () => ({ apps: [], total: 0 }),
       processes: async () => ({ processes: [], total: 0, nextCursor: null, hasMore: false }),
@@ -279,6 +319,10 @@ beforeEach(() => {
   window.history.pushState({}, "", "/tickets/help-1")
   api.replies = []
   api.stakeholders = [STAKEHOLDER]
+  api.metrics = TICKET_METRICS
+  api.updateWorkLog.mockReset().mockResolvedValue({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false })
+  api.members = [MEMBER_WITH_FACE]
+  api.workLogs = [WORK_LOG_ROW]
 })
 
 const openTicket = (status: HelpStatus = "triaged") => {
@@ -308,8 +352,9 @@ describe("the two-column body renders all four panels", () => {
     // RELATED STORIES — the panel's own title.
     expect(screen.getByText("Related stories")).toBeTruthy()
 
-    // EFFORT, the panel's own title.
-    expect(screen.getByText("Effort")).toBeTruthy()
+    // EFFORT, the panel's own title — a heading, disambiguated from the
+    // metrics grid's own "Effort" line inside the same card.
+    expect(screen.getByRole("heading", { name: /^Effort/ })).toBeTruthy()
 
     // STAKEHOLDERS — the panel's own title, and the people pill inside it.
     expect(screen.getByText("Stakeholders")).toBeTruthy()
@@ -322,7 +367,7 @@ describe("the two-column body renders all four panels", () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
-    const time = screen.getByText("Effort").closest('[data-slot="card"]')
+    const time = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]')
     const stakeholders = screen.getByText("Stakeholders").closest('[data-slot="card"]')
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
@@ -349,6 +394,89 @@ describe("the two-column body renders all four panels", () => {
     // `panelVisible={false}` means `RecordDetail` never draws that Card at
     // all, so the attribute must not appear anywhere on the page.
     expect(document.querySelector('[data-record-region="panel"]')).toBeNull()
+  })
+})
+
+// AURORA, 21 SEP 2026, B44 AMENDED, verbatim: "ok, but i still want to see
+// the individual records of time og! also show avatar of perosn. bring back
+// the old cards with the metrics inside effort" and "in effort card inside
+// stories or tickets, rmeove the + button (we have the start on top!)." The
+// ticket page draws the same shared `<EffortCard>`
+// (web/components/work/effort-card.tsx) the story page draws — metrics
+// (computed off `getTicketMetrics`, `POST /api/content/help/metrics`), the
+// individual time log rows with a face, and no add door anywhere.
+describe("Effort — the ticket gets the same card, metrics and rows and no add door", () => {
+  it("carries the total hours as a count beside the Effort title", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const heading = await screen.findByRole("heading", { name: /^Effort/ })
+    // 5400s = 1.5h.
+    expect(heading.textContent).toBe("Effort1.5h")
+  })
+
+  it("renders the door's own cycle time, effort and flow efficiency", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    // 90000s = 25h = 1d 1h; 5400s = 1.5h; 6%.
+    expect(await screen.findByText("1d 1h")).toBeTruthy()
+    expect(await screen.findByText("6%")).toBeTruthy()
+    expect(screen.getAllByText("1.5h").length).toBe(2)
+  })
+
+  it("reads 'Not started' and 'No time log' before any work is logged, with '0h' beside the title", async () => {
+    api.metrics = NO_TICKET_METRICS
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    expect(await screen.findByText("Not started")).toBeTruthy()
+    expect(await screen.findByText("No time log")).toBeTruthy()
+    const heading = await screen.findByRole("heading", { name: /^Effort/ })
+    expect(heading.textContent).toBe("Effort0h")
+  })
+
+  it("draws the individual time log rows with a face, name, date and duration", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const panel = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]') as HTMLElement
+    const list = panel.querySelector('ul[class*="divide-y"]')
+    expect(list, "the row list is drawn").toBeTruthy()
+    const row = list!.querySelector("li") as HTMLElement
+    expect(row).toBeTruthy()
+    expect(row.textContent).toContain("Aurora")
+    expect(row.textContent).toContain("2026-08-18")
+    expect(row.textContent).toContain("30m")
+    const face = row.querySelector("img")
+    expect(face).toBeTruthy()
+    expect(face!.getAttribute("src")).toBe(MEMBER_WITH_FACE.imageUrl)
+  })
+
+  // R88 — the card's own single door: at zero rows the header drops
+  // entirely and the body reads one sentence, no door.
+  it("drops the header and reads 'No time logged yet.' — no door — once the ticket has no time at all", async () => {
+    api.metrics = NO_TICKET_METRICS
+    api.workLogs = []
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    expect(await screen.findByText("No time logged yet.")).toBeTruthy()
+    expect(screen.queryByRole("heading", { name: /^Effort/ })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
+  })
+
+  it("draws no add / Log time button anywhere on the card", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    expect(screen.queryByRole("button", { name: "Log time" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
+  })
+
+  it("a row's own pencil corrects it through the same door WorkLogsPanel used", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const panel = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]') as HTMLElement
+    const edit = panel.querySelector('ul[class*="divide-y"] li button') as HTMLElement
+    expect(edit, "the row's own edit pencil").toBeTruthy()
+    fireEvent.click(edit)
+    const dialog = await screen.findByRole("dialog")
+    expect(dialog).toBeTruthy()
   })
 })
 

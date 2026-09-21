@@ -15,14 +15,28 @@
 // B44 (Aurora's ruling, 21 Sep 2026): "Include the metrics inside the
 // effort card. On the effort card, remove the value entries and put the
 // number next to the effort title, just as you do, for example, for
-// stakeholders." There is no separate "Metrics" panel and no `WorkLogsPanel`
-// row list here any more — the Effort card's own title carries the total
-// hours as its count, and its body holds the three metric lines.
+// stakeholders." AMENDED THE SAME DAY, verbatim: "ok, but i still want to
+// see the individual records of time og! also show avatar of perosn. bring
+// back the old cards with the metrics inside effort" and "in effort card
+// inside stories or tickets, rmeove the + button (we have the start on
+// top!)". The three metric lines stay; the individual time log rows are
+// back, each with a face, drawn by the shared `EffortCard`
+// (web/components/work/effort-card.tsx) — and there is no add door left on
+// the card at all, on either page.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { HelpTicket, RunningTimer, Sprint, Story, StoryAttachment, StoryMetrics } from "@shared/types"
+import type {
+  HelpTicket,
+  RunningTimer,
+  Sprint,
+  Story,
+  StoryAttachment,
+  StoryMetrics,
+  TeamMember,
+  WorkLog,
+} from "@shared/types"
 
 function story(overrides: Partial<Story>): Story {
   return {
@@ -61,7 +75,6 @@ function story(overrides: Partial<Story>): Story {
     acceptanceCriteria: "<p>A saved filter remembers app, phase and type.</p>",
     buildNotes: null,
     moscow: null,
-    contributesToGoal: false,
     accountId: null,
     createdAt: "2026-09-18T10:00:00.000Z",
     updatedAt: null,
@@ -116,13 +129,54 @@ const SIBLING_STORY: Story = story({
 const NO_METRICS: StoryMetrics = { cycleTimeSeconds: null, effortSeconds: 0, flowEfficiency: null }
 const FIXTURE_METRICS: StoryMetrics = { cycleTimeSeconds: 183600, effortSeconds: 23400, flowEfficiency: 41 }
 
+// ONE ROW, NOT ZERO (R88) — the default fixture, so a test that does not
+// care about the Effort card's own rows never trips the empty state by
+// accident (the same reason `ticket-detail-no-tabs.test.tsx`'s own
+// `workLogs` mock gives). 1800s = 30m, well inside `durationLabel`'s minute
+// branch.
+const WORK_LOG: WorkLog = {
+  id: "log-1",
+  targetTable: "stories",
+  targetId: "story-1",
+  targetLabel: "Add saved filters to the backlog board",
+  targetRef: "BERG-S0188",
+  userId: "user-priya",
+  userName: "Priya Nandal",
+  kind: null,
+  note: null,
+  startedAt: "2026-09-18T09:00:00.000Z",
+  endedAt: "2026-09-18T09:30:00.000Z",
+  seconds: 1800,
+  billable: true,
+  discarded: false,
+  accountId: null,
+}
+
+// PRIYA'S OWN FACE — matched to `WORK_LOG.userId` through `memberFace`
+// (tickets-collection.tsx), the same lookup the row's `<RecordMark>` reads.
+const MEMBER_WITH_FACE: TeamMember = {
+  userId: "user-priya",
+  email: "priya@kwapso.com",
+  firstName: "Priya",
+  lastName: "Nandal",
+  imageUrl: "https://kwapso.example/priya.png",
+  roleId: "role-1",
+  roleTitle: "Staff",
+  isYou: false,
+  isAdmin: false,
+  isClient: false,
+} as unknown as TeamMember
+
 const api = vi.hoisted(() => ({
   story: null as unknown as Story,
   setStoryStatus: vi.fn(),
   updateStory: vi.fn(),
   logTime: vi.fn(),
+  updateWorkLog: vi.fn(),
   metrics: null as unknown as StoryMetrics,
   timers: [] as RunningTimer[],
+  workLogs: [] as unknown[],
+  members: [] as unknown[],
 }))
 const perms = vi.hoisted(() => ({ can: vi.fn(() => true) }))
 
@@ -149,10 +203,18 @@ vi.mock("@/lib/api", async (importOriginal) => {
       help: async () => ({ tickets: [], total: 0, nextCursor: null, hasMore: false }),
       logTime: api.logTime,
       runningTimers: async () => ({ timers: api.timers }),
+      workLogs: async () => ({
+        logs: api.workLogs,
+        total: api.workLogs.length,
+        totalSeconds: 0,
+        nextCursor: null,
+        hasMore: false,
+      }),
+      updateWorkLog: api.updateWorkLog,
     },
     tenancy: {
       ...actual.tenancy,
-      members: async () => ({ members: [] }),
+      members: async () => ({ members: api.members }),
       selectable: async () => ({ values: [] }),
       apps: async () => ({ apps: [], total: 0 }),
       processes: async () => ({ processes: [], total: 0, nextCursor: null, hasMore: false }),
@@ -191,8 +253,11 @@ beforeEach(() => {
   api.setStoryStatus.mockReset().mockResolvedValue({ stories: [] })
   api.updateStory.mockReset().mockResolvedValue({ stories: [] })
   api.logTime.mockReset().mockResolvedValue({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false })
+  api.updateWorkLog.mockReset().mockResolvedValue({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false })
   api.metrics = NO_METRICS
   api.timers = []
+  api.workLogs = [WORK_LOG]
+  api.members = []
 })
 
 const RUNNING_ON_STORY: RunningTimer = {
@@ -316,6 +381,29 @@ describe("Build notes — R88 single door", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Edit the build notes" }))
     const dialog = await screen.findByRole("dialog")
     expect(within(dialog).getByRole("heading", { name: "Build notes" })).toBeTruthy()
+  })
+
+  // Aurora, over a screenshot of the kit's own dashed drop zone, 21 Sep 2026:
+  // "that's not what i neant. imeant a compmntet liek inscreenshot", the B43
+  // paragraph names `<FileUpload>` as the mount, but until this case the only
+  // proof was static (`story-b43-parked.test.tsx` greps the source for
+  // `<FileUpload`); nothing had rendered the sheet and read its own empty
+  // state back. This closes that gap: the dashed zone's two words ("Drop
+  // files here", "Choose a file") are on the page under the editor, and
+  // neither of `record-attachments.tsx`'s own two words ("Add a file",
+  // "Add a link", the hand-built widget the ruling replaced) is.
+  it("draws the kit's own dashed drop zone under the editor, never an 'Add a file' control", async () => {
+    api.story = story({ buildNotes: null })
+    openStory()
+    fireEvent.click(await screen.findByRole("button", { name: "Write the build notes" }))
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText("Drop files here")).toBeTruthy()
+    expect(within(dialog).getByRole("button", { name: "Choose a file" })).toBeTruthy()
+    expect(within(dialog).queryByText("Add a file")).toBeNull()
+    expect(within(dialog).queryByText("Add a link")).toBeNull()
+    // No "nothing attached" line either, Aurora's own second sentence in the
+    // same ruling ("don't show that there's nothing attached").
+    expect(within(dialog).queryByText(/nothing attached/i)).toBeNull()
   })
 
   it("Save writes buildNotes through the story update door, spreading the rest of the record", async () => {
@@ -447,7 +535,7 @@ describe("Category — derived, shown as a read-only fact (B43)", () => {
   })
 })
 
-describe("Effort — the metrics are inside the card now (B44)", () => {
+describe("Effort — the metrics AND the rows, no add door (B44 amended)", () => {
   it("carries the total hours as a count beside the Effort title, the same register as Stakeholders", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
@@ -471,26 +559,95 @@ describe("Effort — the metrics are inside the card now (B44)", () => {
     expect(heading.textContent).toBe("Effort0h")
   })
 
-  it("renders the door's own cycle time, effort and flow efficiency, no per-log rows", async () => {
+  it("renders the door's own cycle time, effort and flow efficiency, count said twice", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
-    const { container } = openStory()
+    openStory()
     // 183600s = 51h = 2d 3h; 23400s = 6.5h; 41%.
     expect(await screen.findByText("2d 3h")).toBeTruthy()
     expect(await screen.findByText("41%")).toBeTruthy()
     // "6.5h" appears twice on purpose — the title's own count and the
     // body's own "Effort" line, the same figure said two ways (B44).
     expect(screen.getAllByText("6.5h").length).toBe(2)
-    // NO WORK-LOG ROW LIST any more — `WorkLogsPanel`'s own row shape
-    // (a name/date line followed by a duration) is gone from this page.
-    expect(container.querySelector('ul[class*="divide-y"]')).toBeNull()
   })
 
-  it("the Log time door still opens and writes through the same door WorkLogsPanel used", async () => {
+  // AURORA, 21 SEP 2026, THE SAME ROUND: "ok, but i still want to see the
+  // individual records of time og! also show avatar of perosn. bring back
+  // the old cards with the metrics inside effort." The row list is back,
+  // with a face on every row (R35/R90) — this case proves both at once.
+  it("draws the individual time log rows, newest first, each with a face, name, date and duration", async () => {
+    api.story = story({})
+    api.metrics = FIXTURE_METRICS
+    api.members = [MEMBER_WITH_FACE]
+    const { container } = openStory()
+    await screen.findByText("Cycle time")
+
+    const list = container.querySelector('ul[class*="divide-y"]')
+    expect(list, "the row list is drawn").toBeTruthy()
+    const row = list!.querySelector("li")
+    expect(row).toBeTruthy()
+    // The name (first name only, R54/staff naming), the date, and the
+    // duration (1800s = 30m).
+    expect(row!.textContent).toContain("Priya")
+    expect(row!.textContent).toContain("2026-09-18")
+    expect(row!.textContent).toContain("30m")
+    // THE FACE — `RecordMark` draws the member's own photo once `memberFace`
+    // resolves it off `userId`, an <img>, never a broken or empty box.
+    const face = row!.querySelector("img")
+    expect(face).toBeTruthy()
+    expect(face!.getAttribute("src")).toBe(MEMBER_WITH_FACE.imageUrl)
+  })
+
+  it("falls back to initials when the row's own person carries no photo", async () => {
+    api.story = story({})
+    api.metrics = FIXTURE_METRICS
+    api.members = []
+    const { container } = openStory()
+    await screen.findByText("Cycle time")
+    const row = container.querySelector('ul[class*="divide-y"] li')
+    expect(row).toBeTruthy()
+    expect(row!.querySelector("img")).toBeNull()
+    // The fallback is the name's own first letter (`RecordMarkGlyph`).
+    expect(row!.textContent).toContain("P")
+  })
+
+  // R88 — the card's own single door, now genuinely a collection again: at
+  // zero rows the header (title + count) drops entirely and the body reads
+  // one sentence, no door — never "Add the first" (there is nothing here to
+  // add FROM any more).
+  it("drops the header and reads 'No time logged yet.' — no door — once the record has no time at all", async () => {
     api.story = story({})
     api.metrics = NO_METRICS
+    api.workLogs = []
     openStory()
-    fireEvent.click(await screen.findByRole("button", { name: "Log time" }))
+    await screen.findByText("Add saved filters to the backlog board")
+    expect(await screen.findByText("No time logged yet.")).toBeTruthy()
+    // No "Effort" heading at all while empty (R88's whole header drops).
+    expect(screen.queryByRole("heading", { name: /^Effort/ })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
+  })
+
+  // AURORA, THE SAME ROUND: "in effort card inside stories or tickets,
+  // rmeove the + button (we have the start on top!)." No add door anywhere
+  // on this card, empty or not — the head's own Start/Stop timer button is
+  // the one way a new row is written now.
+  it("draws no add / Log time button anywhere on the card", async () => {
+    api.story = story({})
+    api.metrics = FIXTURE_METRICS
+    openStory()
+    await screen.findByText("Cycle time")
+    expect(screen.queryByRole("button", { name: "Log time" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
+  })
+
+  it("a row's own pencil corrects it through the same door WorkLogsPanel used", async () => {
+    api.story = story({})
+    api.metrics = FIXTURE_METRICS
+    const { container } = openStory()
+    await screen.findByText("Cycle time")
+    const edit = container.querySelector('ul[class*="divide-y"] li button')
+    expect(edit, "the row's own edit pencil").toBeTruthy()
+    fireEvent.click(edit!)
     const dialog = await screen.findByRole("dialog")
     expect(dialog).toBeTruthy()
   })

@@ -20,6 +20,7 @@ import {
   bulkSetStatus,
   createTicket,
   getTicket,
+  getTicketMetrics,
   HELP_STATUSES,
   listReplies,
   listTickets,
@@ -742,6 +743,24 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
   // is what "best-effort and last" was always trying to say (parallel.ts).
   afterResponse(request, notifyTicketResolved(env, cfg, guard, id, resolution))
   return json({ sent: true, alreadyResolved: false })
+}
+
+/** POST /api/content/help/metrics — the ticket detail page's own three
+ * figures (Cycle time, Effort, Flow efficiency; `TicketMetrics`, shared/
+ * types.ts, an alias of `StoryMetrics` — the shared `EffortCard`,
+ * web/components/work/effort-card.tsx, draws both through the one prop).
+ * `work:read`, the SAME right `postStoryMetrics` (routes/stories.ts) gates
+ * on and the identical GET-style POST shape, for the identical reason: the
+ * ticket id travels as a body field rather than a query string, and reading
+ * the team's logged time is a `work` right, not a `help` one (this file's
+ * own `canSeeTime` note on the front end says why). Computed fresh on every
+ * read (`getTicketMetrics`), never cached. */
+export async function postHelpMetrics(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const metrics = await getTicketMetrics(cfg, guard, id)
+  return json(metrics)
 }
 
 /** POST /api/content/help/rank — put a ticket between two others (SCOPE ch.07:

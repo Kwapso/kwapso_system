@@ -132,31 +132,28 @@
 // offered at all, once assigned, a ticket or story keeps a person.
 import * as React from "react"
 
-import { Button } from "@shared/ui/components/button/button"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import type { HelpStakeholder } from "@shared/types"
 import { nameInitials } from "@/lib/identity"
 import { PersonCard } from "@shared/web/person-card"
 import { useLanguage } from "@shared/web/language"
 import { staffNameFromSnapshot } from "@shared/staff-name"
-import { EditPenButton } from "@shared/web/edit-pen-button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  type SelectFace,
-} from "@shared/ui/components/select/select"
-import { sortedOptions } from "@shared/web/sorted-options"
 import { effectiveAssignee } from "@shared/effective-assignee"
 import { formatCount } from "@shared/web/format-count"
 import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 
 /** One team member this ticket may be assigned to, the same shape
  * `assignableMembers` (`web/lib/members.ts`) already hands every other
- * assignee picker in the app: agency staff only, never a client login. */
-type AssignableMember = { id: string; name: string; photo?: string | null }
+ * assignee picker in the app: agency staff only, never a client login.
+ * EXPORTED since 21 Sep 2026 so `help-form-dialog.tsx`'s own "Assigned to"
+ * field (the one remaining door onto `assigneeId`, see this file's header
+ * below) can type its own `members` prop off the identical shape, rather
+ * than declaring a second one, and on purpose NOT `PickablePerson`
+ * (`web/lib/members.ts`): that is the type `web/test/staff-pill-row.test.ts`
+ * (R79) holds to the pill row, and Aurora asked for this field to wear the
+ * same kit `Select` this card's own assignee picker always wore, not a new
+ * pill row. */
+export type AssignableMember = { id: string; name: string; photo?: string | null }
 
 /** ONE HORIZONTAL FACE+NAME TILE, the shape Raised by defined (this file's
  * header above, "RAISED BY IS HORIZONTAL TOO NOW") and Assigned to now
@@ -339,21 +336,30 @@ export function HelpStakeholders({
  * never nested inside `<HelpStakeholders>` or the Stakeholders panel's own
  * `TicketSidePanel`.
  *
- * THE PEN, THE SELECT AND "USE THE APP'S LEAD" KEEP THEIR OWN POSITIONS,
- * only nested one level differently now the tile is `StakeholderTile`
- * rather than this card's own hand-rolled row: the pen is `StakeholderTile`'s
- * own `action` slot, sitting beside the face+name column exactly where
- * Raised by's own pen used to sit on ITS tile, before it was retired
- * (`HelpStakeholders`'s own header, "THE EDIT PEN IS GONE FROM THIS CARD"),
- * pressing it opens the same kit `Select` (R90 faces) it always has. "Use
- * the app's lead" stays a small text-button action under the tile, offered
- * only when there is somewhere to fall back TO (Aurora's 16 Sep 2026 ruling,
- * "kill the 'nobody' option for staff", this file's own header on
- * `HelpStakeholders` above). The empty state, when the ticket has no
- * assignee of its own and the app has no lead to inherit either, is plain
- * words inside the card, "Nobody yet." The title row above it already
- * says "Assigned to", so the tile's own eyebrow is not repeated a second
- * time when there is no tile to carry it. */
+ * THE PEN, THE SELECT AND "USE THE APP'S LEAD" ARE GONE. Aurora's ruling,
+ * 21 Sep 2026, verbatim, reading this very card back: "ok, but rmeove the
+ * edit button (this can be editedfrom dtory edit screen). rmeove the 'use
+ * the apps lead' text." RETIRES the paragraph this one replaces (which had
+ * the pen sitting in `StakeholderTile`'s own `action` slot, opening a kit
+ * `Select` in place, and a "Use the app's lead" text button clearing the
+ * ticket's own assignee back to inherited): this card is a plain fact now,
+ * the same turn `HelpStakeholders`'s own Raised-by tile took one file up
+ * ("THE EDIT PEN IS GONE FROM THIS CARD", this file's header, 20 Sep 2026),
+ * with no `onClick`, no local `pickingAssignee` state, no `Select`, no
+ * clear button. Editing `assigneeId` moved to the one door Aurora named,
+ * the ticket's own edit screen: `help-form-dialog.tsx`'s own "Assigned to"
+ * field, the kit `Select` this card's Select used to be, reached by opening
+ * the ticket for edit rather than by a pen on this tile. A story's own
+ * assignee is still changed from its own edit screen
+ * (`story-form-dialog.tsx`'s "Who's doing it"), which this ruling did not
+ * touch. `canEditAssignee`/`onChangeAssignee` are dropped from this
+ * component's own signature along with the mechanism they drove; both
+ * callers (`help-detail.tsx`, `story-detail.tsx`) stopped passing them the
+ * same turn. The empty state, when the ticket has no assignee of its own
+ * and the app has no lead to inherit either, is still plain words inside
+ * the card, "Nobody yet." The title row above it already says "Assigned
+ * to", so the tile's own eyebrow is not repeated a second time when there
+ * is no tile to carry it. */
 export function AssignedToCard({
   /** THE TICKET'S OWN ASSIGNEE, and the app's answer to fall back to when it
    * has none. Resolved through the one shared seam both the ticket page and
@@ -364,13 +370,13 @@ export function AssignedToCard({
   appId,
   appName,
   appAssigneeId,
-  /** Agency staff only (`web/lib/members.ts`'s `assignableMembers`), for the
-   * Select's own options AND for resolving the app-inherited candidate's
-   * current name/face, a live relationship, never a stored snapshot (see
-   * `shared/types.ts`'s `appAssigneeId`). */
+  /** Agency staff only (`web/lib/members.ts`'s `assignableMembers`), for
+   * resolving the app-inherited candidate's current name/face, a live
+   * relationship, never a stored snapshot (see `shared/types.ts`'s
+   * `appAssigneeId`), and the ticket's own assignee's photo. No longer feeds
+   * a picker of its own here, see this component's own header, "THE PEN,
+   * THE SELECT AND 'USE THE APP'S LEAD' ARE GONE". */
   members,
-  canEditAssignee,
-  onChangeAssignee,
 }: {
   assigneeId?: string | null
   assigneeName?: string | null
@@ -378,18 +384,8 @@ export function AssignedToCard({
   appName?: string | null
   appAssigneeId?: string | null
   members?: AssignableMember[]
-  canEditAssignee?: boolean
-  /** `null` CLEARS the ticket's own assignee back to inherited, called
-   * from the card's own "Use the app's lead" text button, never from a
-   * picker entry (Aurora's 16 Sep 2026 ruling: a staff picker never offers
-   * Nobody). The door's own `assigneeCleared`
-   * (`workers/content/src/lib/help.ts`) reads the wire value the same way,
-   * so this never collapses "clear it" into "leave it alone" the way an
-   * `undefined`-only signature would. */
-  onChangeAssignee?: (assigneeId: string | null) => Promise<void>
 }) {
-  const { t, lang } = useLanguage()
-  const [pickingAssignee, setPickingAssignee] = React.useState(false)
+  const { t } = useLanguage()
 
   // THE APP'S OWN ANSWER, resolved to a NAME/FACE off the team's own members
   // list, a lead is a live relationship (`shared/types.ts`'s own note on
@@ -408,111 +404,29 @@ export function AssignedToCard({
       : null
   )
   const assigneeMember = (members ?? []).find((m) => m.id === assignee.id)
-  // THE TRIGGER'S OWN FACE (R90, kit v1.2.127), off the ticket's OWN
-  // assignee, never the inherited candidate: the Select only ever changes
-  // the ticket's own field, so its chosen value is exactly that field, blank
-  // (the placeholder) until somebody actually picks somebody, even while the
-  // card above is showing an inherited name.
-  const ownAssigneeMember = assigneeId ? (members ?? []).find((m) => m.id === assigneeId) : undefined
-  const assigneeFace: SelectFace | undefined = assigneeId
-    ? { src: ownAssigneeMember?.photo ?? undefined, name: assigneeName ?? "" }
-    : undefined
-
-  // THE WAY BACK TO THE APP'S LEAD IS A SEPARATE ACTION, NOT A PICKER ENTRY.
-  // Aurora's 16 Sep 2026 ruling, verbatim: "Kill the 'nobody' option for
-  // staff. If we leave it empty, it's not an option. Remove it from tasks
-  // and everywhere else. This 'nobody', just kill it." A picker's list is
-  // people only (`StaffPillPicker`'s own law, R79) and this `Select` is no
-  // exception, so a 21 Sep 2026 attempt to reopen the clearing door as a
-  // "Nobody, inherit from the app" row was reverted 20 Sep 2026: clearing
-  // the ticket's own assignee back to inherited is now a plain text button,
-  // offered only when there is somewhere to go back TO (the record carries
-  // its own assignee AND the app has a lead to fall back on). When the app
-  // has no lead, no clear action is offered at all: once a ticket or story
-  // is assigned, it keeps a person, exactly as her ruling requires.
-  const clearToInherited =
-    assigneeId && appAssigneeId && canEditAssignee && onChangeAssignee ? onChangeAssignee : undefined
 
   return (
     <TicketSidePanel title={t("Assigned to")} count={formatCount(assignee.id ? 1 : 0)}>
       {assignee.id ? (
-        <>
-          <StakeholderTile
-            dataSlot="assignee-tile"
-            picture={assigneeMember?.photo}
-            mark={nameInitials(assignee.name ?? "")}
-            markName={assignee.name ?? undefined}
-            chip={
-              <span className="text-micro text-muted-foreground uppercase">
-                {assignee.inherited ? t("From the app") : t("Assigned to")}
+        <StakeholderTile
+          dataSlot="assignee-tile"
+          picture={assigneeMember?.photo}
+          mark={nameInitials(assignee.name ?? "")}
+          markName={assignee.name ?? undefined}
+          chip={
+            <span className="text-micro text-muted-foreground uppercase">
+              {assignee.inherited ? t("From the app") : t("Assigned to")}
+            </span>
+          }
+          title={<CardTitle className="text-sm">{assignee.name}</CardTitle>}
+          secondary={
+            assignee.inherited ? (
+              <span className="text-muted-foreground text-xs">
+                {t("Inherited from")} {assignee.appName}
               </span>
-            }
-            title={<CardTitle className="text-sm">{assignee.name}</CardTitle>}
-            secondary={
-              assignee.inherited ? (
-                <span className="text-muted-foreground text-xs">
-                  {t("Inherited from")} {assignee.appName}
-                </span>
-              ) : undefined
-            }
-            /* THE PEN, WHERE RAISED BY'S OWN USED TO SIT, before it was
-               retired (`HelpStakeholders`'s own header, "THE EDIT PEN IS
-               GONE FROM THIS CARD"), that pen opened an inline `Select`
-               right on that card. This tile gets a picker of its own kind,
-               so it gets the identical door: press the pen, the kit
-               `Select` (R90 faces) opens in its place. */
-            action={
-              canEditAssignee && onChangeAssignee && members && members.length > 0 ? (
-                <EditPenButton
-                  onClick={() => setPickingAssignee((v) => !v)}
-                  label={t("Change who is assigned")}
-                />
-              ) : undefined
-            }
-          />
-          {/* THE CLEAR ACTION, A SMALL TEXT BUTTON UNDER THE TILE, NEVER A
-              PICKER ENTRY (see the header note by `clearToInherited` above).
-              Writes `assigneeId: null` through the same door the Select
-              already calls; the doors already treat `null` as an explicit
-              clear, so the card falls straight back to `effectiveAssignee`'s
-              own inherited answer once the parent re-renders with the
-              ticket's own assignee gone. */}
-          {clearToInherited ? (
-            <Button
-              variant="link"
-              className="self-start text-sm"
-              onClick={() => void clearToInherited(null)}
-            >
-              {t("Use the app's lead")}
-            </Button>
-          ) : null}
-          {pickingAssignee && canEditAssignee && onChangeAssignee ? (
-            <Select
-              value={assigneeId ?? ""}
-              onValueChange={(v) => {
-                setPickingAssignee(false)
-                void onChangeAssignee(v)
-              }}
-            >
-              <SelectTrigger id="help-assignee" aria-label={t("Assigned to")} face={assigneeFace}>
-                <SelectValue placeholder={t("Choose someone")} />
-              </SelectTrigger>
-              <SelectContent>
-                {/* PEOPLE ONLY (16 Sep 2026 ruling), A to Z (R75), the same
-                    `sortedOptions` seam every other picker on this app reads
-                    its options through, and every row carries its own face
-                    (R90). No "Nobody" row: this Select only ever ADDS a
-                    name; the way back to the app's lead is the text button
-                    above. */}
-                {sortedOptions(members ?? [], lang, (m) => m.name).map((m) => (
-                  <SelectItem key={m.id} value={m.id} face={{ src: m.photo ?? undefined, name: m.name }}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-        </>
+            ) : undefined
+          }
+        />
       ) : (
         // EMPTY STATE, IN WORDS, INSIDE THE CARD. The title row above
         // already says "Assigned to" (and carries no count), so the tile's

@@ -1114,14 +1114,22 @@ export type ChoiceGroupHome = {
  * disagree with it: ONE word, `Protected` outranking `Active`/`Inactive`
  * (never "Active Protected" — protected values are never shown inactive,
  * which is the invariant the door now keeps rather than a display choice this
- * file is making). `statusText` is the same word — there is no second badge
- * left to fold in. `statusState` is the facet's own plain field, the SAME
- * three-way derivation the column draws, read by the toolbar's ONE Status
- * facet (settings-choices-panel.tsx) — the separate Protected yes/no facet
- * that stood beside it is GONE: it asked a question Status now already
- * answers, and keeping both would let a reader filter "Active" and
- * "Protected" as if a row could be excluded from one by matching the other,
- * which the invariant above makes impossible.
+ * file is making). `statusText` is the same word. `statusState` is the
+ * facet's own plain field, the SAME three-way derivation the badge draws,
+ * read by the toolbar's ONE Status facet (settings-choices-panel.tsx). The
+ * separate Protected yes/no facet that stood beside it is GONE: it asked a
+ * question Status now already answers, and keeping both would let a reader
+ * filter "Active" and "Protected" as if a row could be excluded from one by
+ * matching the other, which the invariant above makes impossible.
+ *
+ * STATUS STOPPED BEING ITS OWN COLUMN ON 21 SEP 2026. K59, Aurora: "ok split
+ * the who and date added in 2 columns." Splitting Added into Added by/Added
+ * on put this table one past R82's six-column ceiling, and the status chip
+ * built here now folds into the Value cell instead (`valueCell`'s own
+ * comment below has the fold itself; settings-choices-panel.tsx's header has
+ * the full accounting for why THIS fold over another). `statusText` and
+ * `statusState` are unchanged, still plain fields off the same derivation;
+ * only the chip's OWN seat moved.
  *
  * ── THE DETAILS COLUMN — 16 SEP 2026 EVENING ────────────────────────────────
  *
@@ -1246,38 +1254,57 @@ export function shapeChoicesTable(
       // that is actually wired today, so it wins the slot on the chance a
       // caller ever set both.
       const icon = colour ? undefined : home?.icon?.(v.value)
-      const valueCell =
-        colour ? (
-          <span className={REF_LEADS_NAME}>
-            <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
-            <span className="min-w-0 truncate">{v.value}</span>
-          </span>
-        ) : icon ? (
-          <span className={REF_LEADS_NAME}>
-            <Icon name={icon} className="text-muted-foreground size-4 shrink-0" />
-            <span className="min-w-0 truncate">{v.value}</span>
-          </span>
-        ) : (
-          v.value
-        )
       // PROTECTED OUTRANKS ACTIVE/INACTIVE — see this function's own header.
       // The invariant the door and 0088's migration now keep is what makes
       // this a safe simplification rather than a display choice papering over
       // a database that could still disagree: a protected row is never
       // inactive, so there is no case this ordering hides.
       const statusWord = v.isDefault ? t("Protected") : v.active ? t("Active") : t("Inactive")
-      // ── ADDED ON / ADDED BY — K59, the same ruling ─────────────────────────
-      // "in choices also show columns added on and added by". Two facts, one
-      // cell (settings-choices-panel.tsx's own header has the R82 accounting
-      // for why this is folded rather than two separate columns), the name
-      // leading and the date trailing beneath it in the muted tone every
-      // secondary line in this app already reads in — the same stack shape
-      // `record-chrome.tsx`'s own audit rows draw, one column instead of the
-      // footer's two. R54: a dropdown value is written only by staff (every
-      // write door on `selectable_data` refuses a portal caller, R21), so
+      // THE STATUS CHIP, FOLDED INTO THE VALUE CELL. K59, Aurora, 21 Sep
+      // 2026: "ok split the who and date added in 2 columns." Splitting the
+      // old one-cell "Added" into "Added by"/"Added on" (below) put this
+      // table at seven, one past R82's ceiling, so STATUS (its own column
+      // until now) folds into the Value cell instead. Settings-choices-
+      // panel.tsx's own header has the full R82 accounting for why this fold
+      // was chosen over another. Same word, same D17 dot this cell always
+      // drew on its own column, see the AMENDED 17 Sep 2026 note this
+      // replaces one screen up in this file's history, just sitting beside
+      // the value's own name now rather than in a seventh slot.
+      const statusChip = (
+        <Badge variant="status" dot={AUTOMATION_STATUS_DOT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
+          {statusWord}
+        </Badge>
+      )
+      const valueCell = (
+        <span className={REF_LEADS_NAME}>
+          {colour ? (
+            <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
+          ) : icon ? (
+            <Icon name={icon} className="text-muted-foreground size-4 shrink-0" />
+          ) : null}
+          <span className="min-w-0 truncate">{v.value}</span>
+          {statusChip}
+        </span>
+      )
+      // ADDED BY / ADDED ON. K59, Aurora, 21 Sep 2026: "ok split the who
+      // and date added in 2 columns." Two columns now, not the one folded
+      // cell the 21 Sep 2026 morning ruling shipped a few hours earlier (this
+      // function's own history one block up has that fold's own reasoning,
+      // superseded by this one). `addedBy` carries the creator's face and
+      // first name; `addedOn` carries the formatted date, with the raw
+      // instant riding beside it as `createdAtRaw` for the sort
+      // (`sorted-columns-declare-their-type.test.ts`'s own law). R54: a
+      // dropdown value is written only by staff (every write door on
+      // `selectable_data` refuses a portal caller, R21), so
       // `staffNameFromSnapshot` is unconditional here the way it is for every
       // OTHER staff-only record's created-by name.
       const addedByName = staffNameFromSnapshot(v.createdByName) || v.createdByName || ""
+      // THE RAW VALUE FIRST, THE SHAPED STRING OFF IT, never a formatter call
+      // inline in the row object (`sorted-columns-declare-their-type.test.ts`'s
+      // own census reads a literal `key: formatDate(...)` line as a column that
+      // needs its own `sortType` declared where it lives, and this column's
+      // real declaration lives in settings-choices-panel.tsx's `TableColumn`,
+      // not here).
       const addedOn = v.createdAt ? formatDate(v.createdAt, lang) : ""
       return {
         id: v.id,
@@ -1303,13 +1330,25 @@ export function shapeChoicesTable(
         // "Status", …), so a reader can narrow to every group that fills the
         // same kind of field across every module at once.
         whereField: fieldWord ?? "",
-        added: (
-          <span className="flex min-w-0 flex-col">
-            {addedByName && <span className="min-w-0 truncate">{addedByName}</span>}
-            {addedOn && <span className="text-muted-foreground text-xs">{addedOn}</span>}
+        // THE ADDED BY CELL: the record's own face (R90's own "no photo
+        // field yet" shape: `SelectableValue` carries no picture, so
+        // `RecordMark` draws the initials tile alone off the name, the same
+        // gap the work-logs panel's own Logged-by filter already carries)
+        // over the first name. `null`, never an empty wrapper, for a value
+        // with no audit block, the same "carries nothing" answer the
+        // Details column already gives R81.
+        addedBy: addedByName ? (
+          <span className="flex min-w-0 items-center gap-2">
+            <RecordMark name={addedByName} shape="round" size="choice" />
+            <span className="min-w-0 truncate">{addedByName}</span>
           </span>
-        ),
-        addedText: addedByName,
+        ) : null,
+        addedByText: addedByName,
+        // THE ADDED ON CELL: the date alone now, its own column. Plain text:
+        // no face, no icon, nothing this cell orders or searches by besides
+        // itself, so the shaped string IS what the column reads (no separate
+        // search field the way `addedByText` needs one for its node cell).
+        addedOn,
         // THE SORT'S OWN RAW VALUE — the RAW ISO instant, never the formatted
         // `addedOn` string above (`web/test/sorted-columns-declare-their-
         // type.test.ts`'s own law: a sortable date column compares the fact,
@@ -1319,30 +1358,9 @@ export function shapeChoicesTable(
         // COLUMN". `null` for every type with nothing beyond its word, which
         // `record-table.tsx` renders as a genuinely empty cell, not a dash.
         details: choiceDetailsCell(v, t),
-        // ── SAME WORD, SAME DOT AS AUTOMATIONS — 15 Sep 2026, AMENDED 17 Sep 2026 ──
-        // The coordinator's own ruling, 15 Sep 2026: Choices' three-way status
-        // (Protected/Active/Inactive) and Automations' own three-way
-        // (Protected/On/Off, automation-edit-sheet.tsx) are the SAME concept
-        // read from two modules, and a reader who learns one palette on one
-        // settings tab should not have to learn a second for the other. That
-        // used to mean a shared FILL (`AUTOMATION_STATUS_VARIANT`); the
-        // client's ruling on this table specifically, 17 Sep 2026, verbatim —
-        // *"Dots like everywhere else."* — replaces the filled pill with
-        // `<Badge variant="status" dot={…}>`, the same D17 tone table
-        // Automations' own list and detail head already draw: Active →
-        // `shipped` (green), Protected → `building` (charcoal), Retired/
-        // Inactive → `archived` (grey). ONE derivation, imported rather than
-        // copied — this file maps its own `isDefault`/`active` pair onto the
-        // automations module's own key domain (`"protected" | "on" | "off"`)
-        // rather than carrying a second copy of the map itself.
-        status: (
-          <Badge variant="status" dot={AUTOMATION_STATUS_DOT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
-            {statusWord}
-          </Badge>
-        ),
         statusText: statusWord,
-        // THE FACET'S OWN PLAIN FIELD, SAME THREE-WAY DERIVATION AS THE BADGE
-        // ABOVE — one flag pair read once, not a second source of truth. See
+        // THE FACET'S OWN PLAIN FIELD, SAME THREE-WAY DERIVATION AS THE CHIP
+        // ABOVE. One flag pair read once, not a second source of truth. See
         // this function's own header for why Protected is no longer a
         // separate facet beside this one.
         statusState: v.isDefault ? "protected" : v.active ? "active" : "inactive",

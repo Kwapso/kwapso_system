@@ -81,7 +81,6 @@ function story(overrides: Partial<Story>): Story {
     acceptanceCriteria: null,
     buildNotes: null,
     moscow: null,
-    contributesToGoal: false,
     ...overrides,
   } as unknown as Story
 }

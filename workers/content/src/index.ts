@@ -25,6 +25,7 @@
 //   POST /api/content/help/reply/update   -> change a reply already sent (author, or the ticket edit right)
 //   POST /api/content/help/reply/delete   -> take a reply back out of the thread (soft delete, same fence)
 //   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
+//   POST /api/content/help/metrics        -> a ticket's Cycle time / Effort / Flow efficiency (GET-style POST, {id})
 //   GET  /api/content/help/dashboard      -> the Dashboard tab's grouped reads, ?accountId/?helpType/?appId/?q (agency only)
 //   GET  /api/content/help/stages         -> one ticket's stage history + time in each (?id=<ticketId>, agency only)
 //   GET  /api/content/help/rating         -> how we did on one ticket (?id=<ticketId>)
@@ -121,6 +122,7 @@ import {
   postUpdateHelp,
   postBulkHelpStatusByFilter,
   postResolveHelp,
+  postHelpMetrics,
   getHelpAttachments,
   getHelpDashboard,
   postHelpAttachment,
@@ -403,6 +405,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/reply/delete": { handler: postHelpReplyDelete, kind: "mutation" },
   // COME BACK TO THE CLIENT — the second and last thing that emails one.
   "POST /api/content/help/resolve": { handler: postResolveHelp, kind: "mutation" },
+  "POST /api/content/help/metrics": { handler: postHelpMetrics, kind: "housekeeping" },
   // THE TWO ACTS ON THE LADDER A MACHINE CANNOT INFER (CHECKLIST 5.11, 5.13).
   // Everything else about a ticket's status now happens by itself — a timer
   // starts, a sprint is picked, the last story closes — so these two are doors

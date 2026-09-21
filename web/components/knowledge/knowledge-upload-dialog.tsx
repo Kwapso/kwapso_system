@@ -302,7 +302,11 @@ export function KnowledgeUploadDialog({
             id="knowledge-file-app"
             value={values.visibleToAppId}
             onChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
-            options={sortedOptions(appOptions, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+            // THE APP'S OWN LOGO AS THE FACE, `face: true` (R90) so an app with
+            // none on file still draws its own initial rather than a blank
+            // row — the same flag every other App field in this app sets
+            // (`account-app-picker.tsx`'s own `appOption`).
+            options={sortedOptions(appOptions, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl, face: true }))}
             placeholder={t("Pick the app")}
             searchPlaceholder={t("Search apps…")}
             emptyText={t("No app matched.")}

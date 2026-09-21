@@ -237,7 +237,6 @@ export async function createStoryFrom(
       changesNoStep: values.changesNoStep,
       acceptanceCriteria: values.acceptanceCriteria || undefined,
       moscow: values.moscow || undefined,
-      contributesToGoal: values.contributesToGoal,
     })
     invalidate(storiesKey(teamId))
     invalidate(sprintsKey(teamId))
@@ -567,7 +566,7 @@ const STORY_TABS: { value: StoryView; label: string; icon: string }[] = [
   // seeing everyone's ACTIVE backlog is; the door itself narrows to the
   // caller's own name for a reader who lacks that right, the identical
   // `all`/All fallback (`STORY_VIEWS`, shared/types.ts).
-  { value: "reviews", label: "Reviews", icon: "check-circle" },
+  { value: "reviews", label: "Review", icon: "check-circle" },
   { value: "completed", label: "Completed", icon: "check" },
   // "Backlog", NOT "All" — the client's own correction over the design
   // proposal's recommendation, 15 Sep 2026 (documents/UI-RULEBOOK.md K entry).
@@ -1028,11 +1027,6 @@ export function StoriesScreen({
           {s.appName ?? t("No app")}
         </Badge>
         {/* THE MOSCOW TAG STOOD HERE. PARKED, 21 Sep 2026 (`moscow-chip.tsx`). */}
-        {/* THE GOAL BADGE STOOD HERE. PARKED, 21 Sep 2026 (Aurora's ruling,
-            verbatim: "Remove the goal from the stories. I don't even know
-            what that is, but remove it."). Moved whole to `goal-badge.tsx`
-            (`PARKED["work/goal-badge"]`, shared/rules/registry.ts), see that
-            file's own header for how to bring it back. */}
       </>
     ),
     // SPRINT, THEN WHO'S DOING IT WITH AN AVATAR — the ruling's own order,

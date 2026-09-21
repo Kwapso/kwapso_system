@@ -133,7 +133,6 @@ const ONE_STORY = {
   acceptanceCriteria: null,
   buildNotes: null,
   moscow: null,
-  contributesToGoal: false,
   reviewNote: null,
   reviewFileUrl: null,
   reviewFileName: null,

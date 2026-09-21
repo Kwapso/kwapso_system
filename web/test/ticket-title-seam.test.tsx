@@ -228,14 +228,25 @@ describe("help-detail.tsx reads ticket.description in exactly two places", () =>
     // The edit dialog's initial value — never rendered as a title or a
     // label, only carried into the form that lets somebody rewrite it.
     "description: ticket.description,",
-    // TWO SHORT CAPTIONS, NOT THE RECORD'S NAME — WorkLogsPanel's
-    // `recordLabel` and StoryFormDialog's `fixedTicket.label`. Both are
-    // `[ticket.ref, richTextPlain(ticket.description)]` joined by " · ", a
-    // caption drawn BESIDE the ticket's own reference chip, never alone and
-    // never as this screen's title — B0302/T3661 was about the h1, and
-    // these two are not it. Out of this fix's scope on purpose (the
-    // planner's brief named only the RecordScreen title); flagged here so a
-    // reviewer knows they were seen, not missed.
+    // ONE SHORT CAPTION LEFT, NOT THE RECORD'S NAME — StoryFormDialog's
+    // `fixedTicket.label`, `[ticket.ref, richTextPlain(ticket.description)]`
+    // joined by " · ", a caption drawn BESIDE the ticket's own reference
+    // chip on the "New work on this request" dialog, never alone and never
+    // as this screen's title — B0302/T3661 was about the h1, and this is
+    // not it. Out of this fix's scope on purpose (the planner's brief named
+    // only the RecordScreen title); flagged here so a reviewer knows it was
+    // seen, not missed.
+    //
+    // WorkLogsPanel's OWN `recordLabel` caption sat here too until the
+    // Effort card round (B43/B44, round thirty-three): help-detail.tsx no
+    // longer mounts `<WorkLogsPanel>` at all, replaced by the shared
+    // `<EffortCard>` (web/components/work/effort-card.tsx), which carries no
+    // `recordLabel` prop and no "Log time" dialog of its own — the head's
+    // own Start/Stop timer button is the one way a new row is written now
+    // (that file's own header says so). The caption's only job was
+    // prefilling that dialog's "what you worked on" field (`fixedTarget:
+    // {…, label: recordLabel}`), so it did not lose its source, its whole
+    // reason for reading the description left with the door it labelled.
     "richTextPlain(ticket.description)].filter(Boolean)",
   ]
 
@@ -254,12 +265,17 @@ describe("help-detail.tsx reads ticket.description in exactly two places", () =>
     expect(source).toContain("title={ticketTitle(ticket, translation.of)}")
   })
 
-  it("keeps working titles (recordLabel / story label) out of scope, on record — both still flatten the body directly rather than through ticketTitle, which is correct: they are not the record's name, they are a short caption beside the ticket's own ref", () => {
-    // Documents the two remaining `richTextPlain(ticket.description)` call
-    // sites (WorkLogsPanel's recordLabel, StoryFormDialog's fixedTicket
-    // label) so a future reader does not mistake the census above for
-    // silence about them.
+  it("keeps the working title (story label) out of scope, on record — it still flattens the body directly rather than through ticketTitle, which is correct: it is not the record's name, it is a short caption beside the ticket's own ref", () => {
+    // Documents the one remaining `richTextPlain(ticket.description)` call
+    // site (StoryFormDialog's fixedTicket label) so a future reader does not
+    // mistake the census above for silence about it. WorkLogsPanel's own
+    // `recordLabel` read was here too until the Effort card round (B43/B44,
+    // round thirty-three) retired `<WorkLogsPanel>` from this screen
+    // entirely — `<EffortCard>` carries no "Log time" dialog and no
+    // `recordLabel` prop to feed, so there is nothing left on this page for
+    // that read to label. One caption's whole reason for reading the
+    // description left with the door it prefilled; the other is untouched.
     const flattenedLabelSites = [...source.matchAll(/richTextPlain\(ticket\.description\)/g)]
-    expect(flattenedLabelSites.length).toBe(2)
+    expect(flattenedLabelSites.length).toBe(1)
   })
 })

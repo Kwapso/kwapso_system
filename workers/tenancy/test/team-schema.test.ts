@@ -716,15 +716,16 @@ describe("0107 — Sprint type becomes Phase type, and the Wave lifecycle reorde
     expect(stale).toEqual({ n: 0 })
   })
 
-  it("sprints.goal_summary and stories.contributes_to_goal exist", () => {
+  // `stories.contributes_to_goal`, this migration's OTHER new column, is no
+  // longer asserted here: migration 0114 (below) drops it, and this describe
+  // block replays the WHOLE ledger, so a story column check here would be
+  // testing 0107's moment rather than today's schema. See
+  // migration-0114-goal-column-dropped.test.ts for its own proof.
+  it("sprints.goal_summary exists", () => {
     const sprintCols = (db.prepare("SELECT name FROM pragma_table_info('sprints')").all() as { name: string }[]).map(
       (c) => c.name
     )
     expect(sprintCols).toContain("goal_summary")
-    const storyCols = (db.prepare("SELECT name FROM pragma_table_info('stories')").all() as { name: string }[]).map(
-      (c) => c.name
-    )
-    expect(storyCols).toContain("contributes_to_goal")
   })
 })
 

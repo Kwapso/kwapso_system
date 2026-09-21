@@ -46,9 +46,14 @@ import { COLOURED_CHIP_OK } from "@shared/rules/registry"
 const ROOT = join(import.meta.dirname, "..", "..")
 
 /** The narrow population this law reads — shape.tsx, every ticket collection/
- * detail component the icon swap touched, and tasks-screen.tsx, the one file
- * that holds the ruling's own named exception. Relative to ROOT, the same
- * spelling every `_EXEMPT`/`_OK` key in this repo uses. */
+ * detail component the icon swap touched, and task-sheet.tsx, the file
+ * that holds the ruling's own named exception (the priority chip moved
+ * there off tasks-screen.tsx, 21 Sep 2026, with the task slide-in — see
+ * that file's own header; tasks-screen.tsx is kept in this list too, since
+ * it still imports and calls the chip, even though the literal `<Badge
+ * variant="status" dot={…}>` this census reads now lives one file over).
+ * Relative to ROOT, the same spelling every `_EXEMPT`/`_OK` key in this
+ * repo uses. */
 const FILES = [
   "web/components/deep-link/shape.tsx",
   "web/components/tickets/tickets-collection.tsx",
@@ -58,6 +63,7 @@ const FILES = [
   "web/components/tickets/help-form-dialog.tsx",
   "web/components/work/work-panels.tsx",
   "web/components/work/tasks-screen.tsx",
+  "web/components/work/task-sheet.tsx",
   "web/components/work/stories-screen.tsx",
   "web-portal/components/ticket-row.tsx",
   "shared/web/ticket-chips.tsx",

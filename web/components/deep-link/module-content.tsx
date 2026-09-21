@@ -32,7 +32,6 @@ import { ProcessDetailScreen } from "@/components/process/process-detail"
 import { AppDetailScreen } from "@/components/apps/app-detail"
 import { SprintDetailScreen } from "@/components/work/sprint-detail"
 import { StoryDetailScreen } from "@/components/work/story-detail"
-import { TaskDetailScreen } from "@/components/work/task-detail"
 import { MeetingDetailScreen } from "@/components/meetings/meeting-detail"
 import { ImportScreen } from "@/components/screens/import-screen"
 import { MemberScreen } from "@/components/team/member-screen"
@@ -508,28 +507,19 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         />
       )
     }
-    // ONE TASK. A component since 18 Aug 2026, when it grew a Work logs tab —
-    // see task-detail.tsx for why the engine handed it over. The tick still runs
-    // through the SAME `onAction` seam the recipe used, and the host still reads
-    // the CURRENT status off the record to decide which way it goes, so there is
-    // one place that owns the direction and it did not move.
-    if (module === "tasks") {
-      const task = ctx.tasksAllQ.data?.find((r) => r.id === recordId) ?? null
-      return (
-        <TaskDetailScreen
-          teamId={teamId as string}
-          taskId={recordId}
-          task={task}
-          loading={ctx.tasksAllQ.data === undefined}
-          onToggleDone={() =>
-            ctx.onAction("tasks.done", {
-              id: recordId,
-              record: { id: recordId, status: task?.status === "done" ? "Done" : "Open" },
-            })
-          }
-        />
-      )
-    }
+    // A TASK NO LONGER OPENS A FULL PAGE — Aurora's 21 Sep 2026 ruling, the
+    // task slide-in: "/t/<teamId>/tasks/<id>" now renders the SAME list this
+    // module falls through to below (`renderCollection`), with the record's
+    // own sheet open over it (`TasksScreen`'s `openTaskId`, read off
+    // `ctx.recordId` there). The old tabbed detail component
+    // (`task-detail.tsx`, "a component since 18 Aug 2026, when it grew a
+    // Work logs tab") is deleted rather than kept as a dead branch — see
+    // `task-sheet.tsx`'s own header for the registry/test fallout that
+    // retirement carried. The `!recordId` guard above already sends the
+    // bare collection address here; this is the identical call with a
+    // record id in the URL too, so the address is one shape whether or not
+    // a task is open.
+    if (module === "tasks") return renderCollection(ctx)
 
     // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
     // The only RECORD details in the app that are pure recipes: each one is the
