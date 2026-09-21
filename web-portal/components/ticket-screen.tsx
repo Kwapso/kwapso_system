@@ -454,20 +454,53 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         </span>
         {/* THE SUBJECT, AT THE PORTAL'S OWN SCREEN-TITLE REGISTER — the same
             `Headline` primitive `collection-heading.tsx`'s `level="screen"`
-            draws for a portal main screen's own title, sized `h2` (32,
-            `--tracking-h2`) rather than that level's own `display-m`: the
-            client's later, standing typography ruling caps every SCREEN and
-            RECORD title at 32px now (`shared/web/record-heading.tsx`'s own
-            header has the full account — the same `h2` step
-            `SHAPE_HEADING_SIZE.comfortable` already holds a record's name
-            to on the agency side). `as="h1"` because this IS the page's own
-            name — the one heading nothing else on this screen may also
-            claim — where `CollectionHeading`'s own "screen" level stays
-            `h2` because a portal MAIN screen (Home, Tickets) sits under a
-            heading this file does not own. `clampRecordHeading` is the same
-            one-line-with-ellipsis truncation (R87) every other record name
-            in the app renders through. */}
-        <Headline as="h1" size="h2">
+            draws for a portal main screen's own title, `size="h2"` rather
+            than that level's own `display-m`: the client's later, standing
+            typography ruling caps every SCREEN and RECORD title at 32px now
+            (`shared/web/record-heading.tsx`'s own header has the full
+            account — the same `h2` step `SHAPE_HEADING_SIZE.comfortable`
+            already holds a record's name to on the agency side). `as="h1"`
+            because this IS the page's own name — the one heading nothing
+            else on this screen may also claim — where `CollectionHeading`'s
+            own "screen" level stays `h2` because a portal MAIN screen (Home,
+            Tickets) sits under a heading this file does not own.
+
+            `size="h2"` ALONE DOES NOT LAND ON 32px HERE — finding, 21 Sep
+            2026, live measurement on staging: 36px at 1440, 34px at 760, on
+            a screen that never once names a font-size in its own copy. The
+            fault is this file's OWN root (`web-portal/app/globals.css`,
+            "Reading size"): the portal deliberately runs `:root`'s
+            `font-size` at 17px below 768px and 18px at/above it, "the base
+            step goes up one notch … cascades through every library
+            component at once" — a deliberate, portal-wide bump for a
+            surface people read at arm's length for ninety seconds. Every kit
+            type step is a `rem` value (`--text-3xl: 2rem`, tokens.css), and
+            `rem` is always relative to the DOCUMENT root's own font-size, so
+            that bump multiplies every step uniformly: 2rem × 18px = 36,
+            2rem × 17px = 34. No rung on the kit's own ladder (h4 20 / h3 24
+            / h2 32 / h1 44 …) lands on 32 once multiplied by 17 or 18
+            either — the portal's screen titles are DELIBERATELY 36 at this
+            width (that is the "more air" the bump exists for), so this is
+            not a rung to pick, it is the one title on this screen that must
+            opt OUT of the portal's own scale and hold the standing 32px
+            ruling instead, the same literal 32 that register already means
+            everywhere else in the app. Pinned by `text-[32px]` — a real
+            pixel value, immune to `:root`'s font-size the way `rem` is
+            not — with the h2 step's own line-height and letter-spacing
+            restated from the SAME tokens (`--text-3xl--line-height: 1.18`,
+            `--text-3xl--letter-spacing: -0.02em`) rather than a second,
+            hand-guessed pair, because `text-3xl` sets all three together and
+            dropping it for `text-[32px]` alone would silently drop the other
+            two (`typography.tsx`'s own comment on exactly this trap).
+            `web-portal/test/ticket-screen-h1.test.tsx` pins the class.
+            `clampRecordHeading` is the same one-line-with-ellipsis
+            truncation (R87) every other record name in the app renders
+            through. */}
+        <Headline
+          as="h1"
+          size="h2"
+          className="text-[32px] leading-[var(--text-3xl--line-height)] tracking-[var(--text-3xl--letter-spacing)]"
+        >
           {clampRecordHeading(subject)}
         </Headline>
         <RichText html={ticket.description} className="break-words" />

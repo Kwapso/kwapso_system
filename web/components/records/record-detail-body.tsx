@@ -109,7 +109,30 @@ export function RecordDetailBody({
    * record-chrome`), this component's own `flex-none` LAST child, `mt-auto`
    * so it reaches the root's own bottom edge on a short page and sits right
    * after the region on a tall one (round 28, R89/R91 — see this file's own
-   * header). */
+   * header).
+   *
+   * "THE ROOT'S OWN BOTTOM EDGE" IS `app-shell.tsx`'S DOING, NOT THIS FILE'S
+   * — 22 Sep 2026 finding. Measured live on staging (a thin proof story,
+   * then a short knowledge source, both through this component): `mt-auto`
+   * correctly pushes the band to the bottom of this file's own root, but
+   * that root's OWN height — resolved through the ordinary `flex-1`/`h-full`
+   * chain above it — stops exactly `DENSITY_BODY`'s reserved
+   * `padding-bottom` (screen-shell.tsx) short of the pane's true bottom
+   * edge whenever the record's content is too short to overflow it on its
+   * own. A real ticket (T0001) never shows this, because its conversation
+   * thread + three side panels are tall enough to overflow that ceiling by
+   * themselves — the exact case round 28's own proof measured when it
+   * retired `app-shell.tsx`'s old ticket-only growth rule. That rule is
+   * back now, narrower: `app-shell.tsx`'s content div carries
+   * `has-[[data-slot=record-footer-band]]:h-[calc(100%+…)]`, keyed to THIS
+   * file's own `footerDataSlot` default (`"record-footer-band"`, below),
+   * so it reaches every caller of `RecordDetailBody` without touching the
+   * ticket page's own, separately-marked band (`ticket-footer-band`) at
+   * all. Passing a `footerDataSlot` other than the default opts a caller
+   * out of that growth rule — there is no reason to today, but a future
+   * caller drawing its footer somewhere that must NOT reach the pane's true
+   * bottom (a record shown inside a dialog, a sheet) should know the two
+   * are linked. */
   footer: React.ReactNode
   dataSlot?: string
   footerDataSlot?: string

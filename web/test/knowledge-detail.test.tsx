@@ -31,8 +31,30 @@ import { stripComments } from "@shared/rules/source-scan"
 const ROOT = join(__dirname, "..", "..")
 const DETAIL_PATH = join(ROOT, "web", "components", "knowledge", "knowledge-detail.tsx")
 const BODY_PATH = join(ROOT, "web", "components", "records", "record-detail-body.tsx")
+const STORY_PATH = join(ROOT, "web", "components", "work", "story-detail.tsx")
 const source = () => stripComments(readFileSync(DETAIL_PATH, "utf8"))
 const bodySource = () => stripComments(readFileSync(BODY_PATH, "utf8"))
+const storySource = () => stripComments(readFileSync(STORY_PATH, "utf8"))
+
+/** THE ONE EXTRACTOR BOTH COMPARISON TESTS BELOW SHARE — pulls the literal
+ * `<RecordDetailBody …/>` call out of a stripped source string, tracking
+ * curly-brace depth rather than a literal indentation string so it survives
+ * either file reformatting its props onto different columns. A prop value
+ * itself nests JSX (`footer={<RecordFooterBand … />}`), so the scan cannot
+ * stop at the FIRST `/>` it sees — it has to know that one sits one brace
+ * deep and keep going until depth returns to zero. */
+function extractJsxCall(src: string, tagStart: string): string {
+  const startIdx = src.indexOf(tagStart)
+  if (startIdx === -1) throw new Error(`${tagStart} not found in source`)
+  let depth = 0
+  for (let i = startIdx; i < src.length; i++) {
+    const ch = src[i]
+    if (ch === "{") depth++
+    else if (ch === "}") depth--
+    else if (ch === "/" && src[i + 1] === ">" && depth === 0) return src.slice(startIdx, i + 2)
+  }
+  throw new Error(`${tagStart} never closes in source`)
+}
 
 describe("knowledge-detail's footer band sits flush, through the SAME construction the ticket/story pages use (finding, 21 Sep 2026)", () => {
   it("imports RecordDetailBody — the shared, proved root, not a hand-rolled look-alike", () => {
@@ -113,5 +135,90 @@ describe("knowledge-detail's footer band sits flush, through the SAME constructi
     const successReturnIdx = src.indexOf("collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}")
     const tail = src.slice(successReturnIdx)
     expect(tail, "the function must close on a fragment").toMatch(/<\/>\s*\)\s*}\s*$/)
+  })
+})
+
+describe("knowledge-detail's construction is the SAME one story-detail.tsx uses, token for token (line-by-line census, 21 Sep 2026)", () => {
+  // WHY A SECOND FILE ENTERS THIS CENSUS. Everything above proves
+  // knowledge-detail.tsx in isolation: it calls RecordDetailBody, it does not
+  // hand-roll the wrapper, `side` is optional at the shared component. None of
+  // that proves the two SCREENS actually agree — a call site can satisfy every
+  // isolated assertion above and still drift from story-detail.tsx's own shape
+  // (a different footer host, a stray wrapper only one of the two carries).
+  // This block extracts the same tokens off BOTH files and compares them
+  // directly, so "the exact slot story-detail uses, with the same props" is a
+  // checked fact rather than a sentence in a commit message.
+
+  it("both files import RecordDetailBody from the identical module", () => {
+    const importRe = /import \{[^}]*\bRecordDetailBody\b[^}]*\}\s*from\s*"@\/components\/records\/record-detail-body"/
+    expect(source()).toMatch(importRe)
+    expect(storySource()).toMatch(importRe)
+  })
+
+  it("both success-path <RecordScreen> calls turn off the combined panel and footer the same way", () => {
+    const knowledgeCall = source().slice(
+      source().indexOf("collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}")
+    )
+    const knowledgeHead = knowledgeCall.slice(0, knowledgeCall.indexOf("<RecordDetailBody"))
+    // Anchored on `chips={`, unique to the success-path call — story-detail
+    // also has earlier error/loading `<RecordScreen>` calls (self-closing,
+    // no footer of their own) that a bare `indexOf("<RecordScreen")` would
+    // catch instead.
+    const storyCall = storySource().slice(storySource().indexOf("chips={"))
+    const storyHead = storyCall.slice(0, storyCall.indexOf("<RecordDetailBody"))
+    for (const head of [knowledgeHead, storyHead]) {
+      expect(head).toContain("panelVisible={false}")
+      expect(head).toContain("footerVisible={false}")
+    }
+  })
+
+  it("both <RecordDetailBody> calls carry the identical REQUIRED tokens — main and footer, footer wrapping RecordFooterBand", () => {
+    const knowledgeCall = extractJsxCall(source(), "<RecordDetailBody")
+    const storyCall = extractJsxCall(storySource(), "<RecordDetailBody")
+    for (const call of [knowledgeCall, storyCall]) {
+      expect(call, "main is the required left/only column").toMatch(/\bmain=\{/)
+      expect(call, "footer is required and must exist").toMatch(/\bfooter=\{/)
+      // Scoped to the footer prop's own value, not merely "somewhere in the
+      // call" — a `<RecordFooterBand>` elsewhere in `main` would false-pass
+      // a bare `.toContain`.
+      const footerValue = call.slice(call.indexOf("footer={"))
+      expect(footerValue).toMatch(/footer=\{\s*<RecordFooterBand/)
+    }
+  })
+
+  it("the ONLY token difference between the two calls is `side`/`dataSlot`, and it is the reasoned one (a knowledge source has no side column)", () => {
+    const knowledgeCall = extractJsxCall(source(), "<RecordDetailBody")
+    const storyCall = extractJsxCall(storySource(), "<RecordDetailBody")
+
+    // knowledge-detail: names its own dataSlot (there is no second record
+    // screen sharing the default "record-detail-body" name to collide with,
+    // but the call still says which record it is), and carries no `side` —
+    // one tabbed body, no side column (record-detail-body.tsx's own doc
+    // comment on the prop explains why `side` is optional for exactly this
+    // screen).
+    expect(knowledgeCall).toMatch(/\bdataSlot="knowledge-detail-body"/)
+    expect(knowledgeCall, "a knowledge source has no side column").not.toMatch(/\bside=\{/)
+
+    // story-detail: two real columns, so `side` is required here — and it
+    // takes RecordDetailBody's own default dataSlot ("record-detail-body"),
+    // so the prop is absent from the call rather than restated.
+    expect(storyCall, "a story has a real side column (Assigned to, Related tickets, …)").toMatch(/\bside=\{/)
+    expect(storyCall, "story-detail takes the shared default dataSlot rather than restating it").not.toMatch(
+      /\bdataSlot=/
+    )
+  })
+
+  it("neither screen hand-rolls RecordDetailBody's own wrapper classes — that shape lives exactly once, in record-detail-body.tsx", () => {
+    for (const src of [source(), storySource()]) {
+      expect(src).not.toContain('className="flex min-w-0 flex-1 flex-col gap-6"')
+      expect(src).not.toContain('className="flex-none mt-auto w-full"')
+    }
+  })
+
+  it("both returns close on a fragment — RecordDetailBody is RecordScreen's sibling on both screens, never its child", () => {
+    const knowledgeTail = source().slice(source().indexOf("collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}"))
+    expect(knowledgeTail).toMatch(/<\/>\s*\)\s*}\s*$/)
+    const storyTail = storySource().slice(storySource().indexOf("chips={"))
+    expect(storyTail).toMatch(/<\/>\s*\)\s*}\s*$/)
   })
 })

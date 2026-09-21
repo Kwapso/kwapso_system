@@ -163,17 +163,36 @@ describe("R89 — footer-on-the-edge", () => {
     ).toBe(false)
   })
 
-  it("app-shell.tsx's page container carries NO special growth for a ticket body any more (round 28 — the band is mt-auto, never sticky, so nothing needs to reach past the pane's own padding)", () => {
+  it("app-shell.tsx's page container carries NO ticket-specific growth any more (round 28 retired it — the ticket band reaches flush through its own real content, not this rule)", () => {
     const at = shell.indexOf("mx-auto flex w-full max-w-none")
     expect(at, "app-shell.tsx must still draw its one R29 page container as a flex box").toBeGreaterThan(-1)
     const tagEnd = shell.indexOf(">", at)
     const tag = shell.slice(Math.max(0, at - 400), tagEnd)
     expect(
       tag.includes("has-[[data-slot=ticket-detail-body]]"),
-      "the has-[[data-slot=ticket-detail-body]] growth rule must be GONE — round 28 retires it, the container keeps its ordinary padding like every other record screen"
+      "the ticket-specific has-[[data-slot=ticket-detail-body]] growth rule must stay GONE — round 28 retired it for T0001, which overflows this div's h-full ceiling on its own real content"
     ).toBe(false)
-    expect(tag.includes("calc(100%+var(--space-5))"), "the below-lg growth calc must be gone too").toBe(false)
-    expect(tag.includes("calc(100%+var(--space-6))"), "the lg growth calc must be gone too").toBe(false)
+  })
+
+  it("app-shell.tsx's page container grows PAST the pane's reserved bottom padding whenever a RecordDetailBody footer band is present (22 Sep 2026 — a short story/knowledge source does not overflow the h-full ceiling on its own, so mt-auto alone lands 24px short; the exact calc() round 28 retired for tickets, narrowed to a marker only RecordDetailBody's own footer wrapper carries)", () => {
+    const at = shell.indexOf("mx-auto flex w-full max-w-none")
+    const tagEnd = shell.indexOf(">", at)
+    const tag = shell.slice(Math.max(0, at - 800), tagEnd)
+    expect(
+      tag.includes("has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-5))]"),
+      "the below-lg growth rule must be keyed to record-footer-band (RecordDetailBody's own footerDataSlot default) — reaching story-detail.tsx and knowledge-detail.tsx, never the ticket page's own, separately-marked ticket-footer-band"
+    ).toBe(true)
+    expect(
+      tag.includes("lg:has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-6))]"),
+      "the lg growth rule must exist too, matching DENSITY_BODY's own comfortable-density reserved padding-bottom at that breakpoint"
+    ).toBe(true)
+    // NEVER RE-KEYED TO THE TICKET'S OWN MARKER — that would double up with
+    // T0001's already-proved natural-overflow flush (harmless on its own,
+    // but a sign this rule drifted back onto the exact case round 28 showed
+    // needs no help) and would miss the whole point: the ticket page is
+    // deliberately UNTOUCHED by this rule.
+    expect(tag.includes("has-[[data-slot=ticket-detail-body]]:h-[calc")).toBe(false)
+    expect(tag.includes("has-[[data-slot=ticket-footer-band]]:h-[calc")).toBe(false)
   })
 
   it("record-chrome.tsx stops the head competing with a sibling body for the column's growth (unchanged)", () => {
@@ -517,5 +536,65 @@ describe("R89 — footer-on-the-edge", () => {
       overflowMatches.length,
       "TicketDetailBody's own JSX (root + region) must carry NO overflow-y-auto at all — the thread's scroller lives in a separate function it merely calls"
     ).toBe(0)
+  })
+})
+
+// R89, GENERALISED TO RecordDetailBody — 22 Sep 2026 finding. Measured live
+// on staging: a thin proof story and a short knowledge source (both drawn
+// through story-detail.tsx / knowledge-detail.tsx calling the shared
+// `RecordDetailBody`) already reach the pane's edges left/right — the kit's
+// own `-mx-[var(--pane-inset-x,0px)]` escape on the footer Card (v1.2.149)
+// covers that, unconditionally, for any caller — but land 24px SHORT at the
+// bottom (876px against a 900px pane at 1440×900), because `mt-auto` only
+// reaches `RecordDetailBody`'s own root, and that root's height is capped by
+// the ordinary `h-full` chain at exactly `DENSITY_BODY`'s reserved
+// `padding-bottom` (screen-shell.tsx) short of the pane's true edge, UNLESS
+// the record's own content is tall enough to overflow that ceiling on its
+// own (T0001 always is; a thin story or a short knowledge source is not).
+// The fix is the app-shell.tsx growth rule censused above, keyed to
+// `record-footer-band` — `RecordDetailBody`'s own `footerDataSlot` default —
+// so it reaches every caller of the shared shape without touching the
+// ticket page's own, separately-marked band.
+describe("R89 — RecordDetailBody's own footer band matches TicketDetailBody's construction, and stays on the marker app-shell.tsx's growth rule keys off", () => {
+  const recordBody = read("web/components/records/record-detail-body.tsx")
+  const ticketBody = read("web/components/tickets/ticket-detail-body.tsx")
+  const knowledgeDetail = read("web/components/knowledge/knowledge-detail.tsx")
+  const storyDetail = read("web/components/work/story-detail.tsx")
+
+  it("RecordDetailBody's root and footer wrapper carry the IDENTICAL classes TicketDetailBody's own root and band do", () => {
+    expect(
+      recordBody.includes('className="flex min-w-0 flex-1 flex-col gap-6"'),
+      "the root must be the same flex column, flex-1, no min-h-0, gap-6 — TicketDetailBody's own round-28 shape"
+    ).toBe(true)
+    expect(
+      ticketBody.includes('data-slot="ticket-detail-body"\n      className="flex min-w-0 flex-1 flex-col gap-6"'),
+      "TicketDetailBody's own root must still carry the same string, so the two constructions can never silently drift apart"
+    ).toBe(true)
+    expect(
+      recordBody.includes('className="flex-none mt-auto w-full"'),
+      "the footer wrapper must be flex-none, mt-auto, w-full — the identical 'push to the root's own bottom edge' trick"
+    ).toBe(true)
+    expect(
+      ticketBody.includes('className="flex-none mt-auto w-full"'),
+      "TicketDetailBody's own band must still carry the identical class string"
+    ).toBe(true)
+  })
+
+  it("footerDataSlot defaults to record-footer-band — the exact marker app-shell.tsx's growth rule reads", () => {
+    expect(recordBody).toMatch(/footerDataSlot\s*=\s*"record-footer-band"/)
+  })
+
+  it("TicketDetailBody's own band keeps its OWN, separate marker — never record-footer-band — so app-shell.tsx's growth rule cannot double up on a page that already reaches flush through natural overflow", () => {
+    expect(ticketBody).toContain('data-slot="ticket-footer-band"')
+    expect(ticketBody).not.toContain('data-slot="record-footer-band"')
+  })
+
+  it("neither knowledge-detail.tsx nor story-detail.tsx overrides RecordDetailBody's own footerDataSlot away from the shared default", () => {
+    // Overriding it would silently opt a screen OUT of the app-shell.tsx
+    // growth rule (which reads the literal data-slot value), so the census
+    // is positional: no `footerDataSlot=` prop on either call at all, never
+    // an assertion about what value it would carry if one existed.
+    expect(knowledgeDetail).not.toMatch(/\bfooterDataSlot=/)
+    expect(storyDetail).not.toMatch(/\bfooterDataSlot=/)
   })
 })

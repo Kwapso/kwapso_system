@@ -2217,10 +2217,49 @@ export function AppShell({
          * carry. Kept here as a comment, not deleted outright, because a
          * future reader hunting for why a `:has()` rule about a ticket body
          * doesn't exist any more should find the reason in one place rather
-         * than only in a git diff. */}
+         * than only in a git diff.
+         *
+         * THE RULE COMES BACK, NARROWER, FOR `RecordDetailBody`'S OWN BAND —
+         * 22 Sep 2026. Round 28's proof was against T0001, a real ticket
+         * whose conversation thread + three side panels are tall enough to
+         * OVERFLOW this div's `h-full` ceiling on their own — the removal
+         * was only ever proved for content that already exceeds the
+         * pane's content-box height. `story-detail.tsx` and
+         * `knowledge-detail.tsx` now draw their own footer through the
+         * SAME shared shape (`record-detail-body.tsx`'s `RecordDetailBody`,
+         * `mt-auto` on a `flex-1` root, exactly `TicketDetailBody`'s own
+         * construction), but a short story or a short knowledge source
+         * does NOT overflow — measured live on staging (a thin proof
+         * story, then a short knowledge source): `[data-slot="record-detail-body"]`
+         * resolves to the h-full ceiling exactly, `mt-auto` correctly
+         * pushes the band to THAT edge, and that edge sits exactly
+         * `DENSITY_BODY`'s own reserved `padding-bottom` (`--space-5`
+         * below `lg`, `--space-6` at it) short of the pane's true
+         * bottom — 876px against a 900px pane at 1440×900, on both
+         * screens, band edge-to-edge (the kit's own `-mx-[var(--pane-inset-x)]`
+         * escape already lands flush left/right) but never flush at the
+         * foot. A record whose content happens to be tall enough still
+         * reaches flush the OLD way (natural overflow past this ceiling,
+         * scrolled to its own end) — this rule does not change that case,
+         * it only stops a SHORT record from depending on content height to
+         * find the pane's true bottom.
+         *
+         * `record-footer-band` IS THE MARKER, NOT `ticket-detail-body` —
+         * `RecordDetailBody`'s own `footerDataSlot` defaults to exactly
+         * this string (record-detail-body.tsx's own header: "a NEUTRAL
+         * pair of names — never the literal `ticket-detail-body`/
+         * `ticket-footer-band` strings"), so this selector reaches every
+         * caller of the shared shape without reaching the ticket page's
+         * own, separately-marked band at all — `TicketDetailBody` carries
+         * `data-slot="ticket-footer-band"` and is untouched by this rule,
+         * on purpose: T0001 was already proved flush without it, and R89's
+         * own construction for the ticket page stays exactly as round 28
+         * left it. */}
         <div
           className={cn(
             "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip pb-24 md:pb-0",
+            "has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-5))]",
+            "lg:has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-6))]",
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >
