@@ -1,23 +1,26 @@
-// THE KNOWLEDGE SOURCE'S FOOTER BAND SITS FLUSH — finding, 21 Sep 2026: the
-// dark band on a knowledge source stopped 24px above the pane's own bottom
-// edge at 1440 (6px at 760), while the ticket page's band is flush. Cause:
-// this screen used to hand `activity`/`onAddNote`/`notePlaceholder` straight
-// to `<RecordScreen>` and let ONE combined `<RecordDetail>` call draw the
-// footer, which carries none of the pane-edge escape `<RecordFooterBand>`
-// pulls for itself (`-mx-[var(--pane-inset-x,0px)]`, record-chrome.tsx) — so
-// the band sat inset inside the panel's ordinary padding instead of reaching
-// the edge. Fixed the same way help-detail.tsx and story-detail.tsx do it:
-// `<RecordScreen panelVisible={false} footerVisible={false}>` draws the head
-// alone, and a sibling wraps the body with `<RecordFooterBand>` as its own
-// `mt-auto` last child — the identical root shape `record-detail-body.tsx`'s
-// own comment proves against `ticket-detail-body.tsx`, minus the `lg` grid
-// this single-column screen does not need.
+// THE KNOWLEDGE SOURCE'S FOOTER BAND SITS FLUSH — finding, 21 Sep 2026,
+// PROVED STILL LIVE ON STAGING AT COMMIT e30fa49e: the dark band on a
+// knowledge source was still inset 24px from each pane edge (band x 188 to
+// 1399 on a pane 164 to 1423 at 1440) despite the FIRST fix (git history) —
+// which put `<RecordFooterBand>` in this file's OWN hand-rolled
+// `<div className="flex-1 flex-col gap-6">` sibling of `<RecordScreen>`,
+// "flex-none mt-auto w-full" wrapper and all. That construction reads, byte
+// for byte, like `record-detail-body.tsx`'s own `<RecordDetailBody>` — and
+// is not it: a second, parallel hand-copy of a proved shape, exactly the
+// mistake `RecordDetailBody`'s own header warns against ("without
+// hand-copying it a second time").
+//
+// THE FIX: this screen now CALLS `<RecordDetailBody>` — the same component
+// `story-detail.tsx` calls for the ticket/story two-column shape — with no
+// `side` (a knowledge source has no side column, one tabbed body only;
+// `side` is optional for exactly this reason, see `record-detail-body.tsx`'s
+// own doc comment on it). One construction, not a look-alike of it.
 //
 // A STATIC CENSUS: the claim is a source-position fact (which component
-// draws the band, and whether anything after it carries a trailing inset),
-// not a rendered pixel — the same discipline every other R89/R83-shaped law
-// in this repo checks off the file rather than through jsdom, which applies
-// no CSS box model at all.
+// draws the band, and whether this file still hand-rolls its own copy of
+// `RecordDetailBody`'s wrapper), not a rendered pixel — the same discipline
+// every other R89/R83-shaped law in this repo checks off the file rather
+// than through jsdom, which applies no CSS box model at all.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -27,10 +30,18 @@ import { stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(__dirname, "..", "..")
 const DETAIL_PATH = join(ROOT, "web", "components", "knowledge", "knowledge-detail.tsx")
+const BODY_PATH = join(ROOT, "web", "components", "records", "record-detail-body.tsx")
 const source = () => stripComments(readFileSync(DETAIL_PATH, "utf8"))
+const bodySource = () => stripComments(readFileSync(BODY_PATH, "utf8"))
 
-describe("knowledge-detail's footer band sits flush (finding, 21 Sep 2026)", () => {
-  it("imports RecordFooterBand and calls it as its own composition, not through RecordScreen's combined footer", () => {
+describe("knowledge-detail's footer band sits flush, through the SAME construction the ticket/story pages use (finding, 21 Sep 2026)", () => {
+  it("imports RecordDetailBody — the shared, proved root, not a hand-rolled look-alike", () => {
+    const src = source()
+    expect(src).toMatch(/import \{[^}]*\bRecordDetailBody\b[^}]*\}\s*from\s*"@\/components\/records\/record-detail-body"/)
+    expect(src, "RecordDetailBody must actually be called").toContain("<RecordDetailBody")
+  })
+
+  it("imports RecordFooterBand and hands it to RecordDetailBody's own footer prop, not RecordScreen's combined footer", () => {
     const src = source()
     expect(src).toMatch(/import \{[^}]*\bRecordFooterBand\b[^}]*\}\s*from\s*"@\/components\/records\/record-chrome"/)
     expect(src, "RecordFooterBand must actually be called").toContain("<RecordFooterBand")
@@ -51,30 +62,48 @@ describe("knowledge-detail's footer band sits flush (finding, 21 Sep 2026)", () 
     expect(callTail, "activity must no longer be handed to RecordScreen directly").not.toMatch(/^\s*activity=\{activity\}/m)
   })
 
-  it("<RecordFooterBand> sits inside a flex-none, mt-auto wrapper — the R89 flush mechanic", () => {
+  it("<RecordDetailBody> is called with dataSlot, main and footer — never a second data-slot wrapper of this file's own", () => {
     const src = source()
-    const bandIdx = src.indexOf("<RecordFooterBand")
-    expect(bandIdx, "RecordFooterBand must be called").toBeGreaterThan(-1)
-    // The wrapper div opens shortly BEFORE the call and must carry both
-    // `flex-none` (so it never stretches) and `mt-auto` (so it is pushed to
-    // the bottom of its own flex column) — the exact pair
-    // `record-detail-body.tsx`'s own footer wrapper carries.
-    const before = src.slice(Math.max(0, bandIdx - 400), bandIdx)
-    expect(before, "the band's own wrapper must carry mt-auto").toMatch(/className="flex-none mt-auto w-full"/)
+    const callIdx = src.indexOf("<RecordDetailBody")
+    expect(callIdx, "RecordDetailBody must be called").toBeGreaterThan(-1)
+    const closeIdx = src.indexOf("\n    />", callIdx)
+    expect(closeIdx, "the RecordDetailBody call must close").toBeGreaterThan(callIdx)
+    const call = src.slice(callIdx, closeIdx)
+    expect(call, "the call must name its own dataSlot").toMatch(/dataSlot="knowledge-detail-body"/)
+    expect(call, "the call must pass main").toContain("main={")
+    expect(call, "the call must pass footer").toContain("footer={")
+    // NO `side` — a knowledge source has no side column, one tabbed body
+    // only (record-detail-body.tsx's own doc comment on the prop).
+    expect(call, "the call must NOT pass side — one tabbed body, no side column").not.toMatch(/\bside=\{/)
+    // AND NO HAND-ROLLED "flex-none mt-auto w-full" WRAPPER ANY MORE — that
+    // shape now lives exactly once, inside record-detail-body.tsx, and this
+    // file calling it rather than re-typing it is the whole fix.
+    expect(
+      call,
+      "this file must not still hand-roll RecordDetailBody's own wrapper class string"
+    ).not.toContain("flex-none mt-auto w-full")
   })
 
-  it("nothing renders after <RecordFooterBand>'s own wrapper closes but sibling dialogs (no trailing padded wrapper)", () => {
+  it("the same wrapper string this file used to hand-roll now lives ONLY in record-detail-body.tsx, never duplicated here", () => {
     const src = source()
-    const bandWrapperOpenIdx = src.indexOf('className="flex-none mt-auto w-full"')
-    expect(bandWrapperOpenIdx, "the band's own wrapper must be findable").toBeGreaterThan(-1)
-    // The body column itself (`data-slot="knowledge-detail-body"`) must
-    // close right after the band wrapper, with the fragment closing the
-    // whole return after only the two form dialogs — never a further
-    // `<div>` carrying its own bottom padding around the band.
-    const afterBand = src.slice(bandWrapperOpenIdx, bandWrapperOpenIdx + 300)
-    expect(afterBand, "no padded wrapper (pb-*/p-*) trails the band inside its own column").not.toMatch(
-      /\bp[bxy]?-\[?[\w.]/
-    )
+    expect(
+      src,
+      "knowledge-detail.tsx must not carry its own copy of the root's flex/gap classes any more"
+    ).not.toMatch(/data-slot="knowledge-detail-body" className="flex min-w-0 flex-1 flex-col gap-6"/)
+    // record-detail-body.tsx is the one file that still says it, twice: the
+    // root and the footer wrapper.
+    const body = bodySource()
+    expect(body).toContain('className="flex min-w-0 flex-1 flex-col gap-6"')
+    expect(body).toContain('className="flex-none mt-auto w-full"')
+  })
+
+  it("RecordDetailBody's own `side` prop is genuinely optional, and absent it renders `main` alone (no lg grid, no empty second track)", () => {
+    const body = bodySource()
+    expect(body, "side must be typed optional").toMatch(/side\?:\s*React\.ReactNode/)
+    expect(
+      body,
+      "absent side must skip the lg/below-lg grid entirely and render main by itself"
+    ).toMatch(/side === undefined \? \(\s*main\s*\)/)
   })
 
   it("the return closes on a fragment, not a second </RecordScreen> — the body is a sibling, not RecordScreen's child", () => {

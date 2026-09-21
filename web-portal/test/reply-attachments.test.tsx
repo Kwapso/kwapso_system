@@ -21,6 +21,15 @@ const BASE_TICKET = {
   id: "help-1",
   ref: "BERG-T0412",
   status: "triaged",
+  // A REAL SUBJECT, DISTINCT FROM THE DESCRIPTION — since the finding fix
+  // (21 Sep 2026) `TicketScreen` now draws `ticketTitle(ticket)` as the
+  // page's own `<h1>`, and `ticketTitle` falls back to the description ONLY
+  // when both titles are empty (`shared/web/ticket-chips.tsx`). Leaving
+  // `titleEn` unset here used to make the h1 repeat the description text
+  // verbatim, and `findByText` below stopped resolving once that same
+  // sentence existed twice on the page.
+  titleEn: "Drivers can't see today's routes",
+  titleDe: null,
   description: "<p>None of my drivers can see today's routes.</p>",
   createdAt: "2026-08-18T09:00:00.000Z",
 } as unknown as HelpTicket

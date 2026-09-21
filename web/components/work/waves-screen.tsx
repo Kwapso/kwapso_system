@@ -1184,7 +1184,7 @@ export function WaveCollection({
             onPrevious={() => setWeekOffset((o) => o - TIMELINE_STEP_WEEKS)}
             onNext={() => setWeekOffset((o) => o + TIMELINE_STEP_WEEKS)}
             onToday={() => setWeekOffset(0)}
-            emptyBody={
+            emptyTitle={
               asking
                 ? t("No waves match that in this window.")
                 : t("No waves have both a start and an end in this window yet.")

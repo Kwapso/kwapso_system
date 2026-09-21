@@ -79,6 +79,7 @@ import { Card } from "@shared/ui/components/card/card"
 import { FileUpload, type FileUploadItem } from "@shared/ui/components/file-upload/file-upload"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
   PortalConversation,
@@ -103,6 +104,8 @@ import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage } from "@shared/web/language"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { RichText } from "@shared/web/rich-text-view"
+import { ticketTitle } from "@shared/web/ticket-chips"
+import { clampRecordHeading } from "@shared/web/record-heading"
 // EACH MESSAGE'S OWN FILES (team migration 0105) — the SAME two pieces
 // `web/components/tickets/help-detail.tsx`'s own `messageFilesFor` reads a
 // picture and a document glyph through: `AttachmentPreview`/`hasPreview` for
@@ -415,6 +418,16 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
   }
 
   const status = STATUS_WORDS[ticket.status]
+  // THE PAGE'S ONE H1 — finding, 21 Sep 2026: this screen had no `<h1>` at
+  // all, and the subject it never drew read at the SAME `text-sm` (15.75px
+  // at this app's root) as "Files and links" (`ticket-attachments.tsx`'s own
+  // `CollectionHeading level="section"`) — nothing on the page was title
+  // scale. `ticketTitle` (`shared/web/ticket-chips.tsx`) is the one function
+  // that answers "what is this ticket called" everywhere else in the app
+  // (`titleEn || titleDe || the first 80 characters of the description`),
+  // written there specifically so "the portal can name a ticket the same way
+  // the day it needs to" — today is that day.
+  const subject = ticketTitle(ticket)
 
   return (
     <div className="flex flex-col gap-6">
@@ -430,13 +443,33 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
             chip is `RecordRef`, the same component and the same lozenge the
             agency's own ticket screen draws, and `ticket-row.tsx`'s header
             carries the whole argument for why a reference crosses the fence
-            when an assignee does not. */}
+            when an assignee does not. R94's own chip order (id, then status)
+            sits ABOVE the subject below it, exactly as a record's own chip
+            row sits above its name everywhere else in the app. */}
         <span className={`${REF_LEADS_NAME} w-fit flex-wrap`}>
           <RecordRef value={ticket.ref} />
           <Badge variant={status.variant} className="w-fit">
             {t(status.label)}
           </Badge>
         </span>
+        {/* THE SUBJECT, AT THE PORTAL'S OWN SCREEN-TITLE REGISTER — the same
+            `Headline` primitive `collection-heading.tsx`'s `level="screen"`
+            draws for a portal main screen's own title, sized `h2` (32,
+            `--tracking-h2`) rather than that level's own `display-m`: the
+            client's later, standing typography ruling caps every SCREEN and
+            RECORD title at 32px now (`shared/web/record-heading.tsx`'s own
+            header has the full account — the same `h2` step
+            `SHAPE_HEADING_SIZE.comfortable` already holds a record's name
+            to on the agency side). `as="h1"` because this IS the page's own
+            name — the one heading nothing else on this screen may also
+            claim — where `CollectionHeading`'s own "screen" level stays
+            `h2` because a portal MAIN screen (Home, Tickets) sits under a
+            heading this file does not own. `clampRecordHeading` is the same
+            one-line-with-ellipsis truncation (R87) every other record name
+            in the app renders through. */}
+        <Headline as="h1" size="h2">
+          {clampRecordHeading(subject)}
+        </Headline>
         <RichText html={ticket.description} className="break-words" />
       </Card>
 

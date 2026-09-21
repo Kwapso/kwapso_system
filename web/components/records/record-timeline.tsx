@@ -47,6 +47,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { CaretLeft, CaretRight } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 import { useLanguage } from "@shared/web/language"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /** ONE SEGMENT of one row's bar. Columns are WEEKS, zero-based against the
  * caller's own `weeks` window — the same start/span-in-columns shape the
@@ -129,7 +130,7 @@ export function RecordTimeline({
   windowLabel,
   loading = false,
   empty = false,
-  emptyBody,
+  emptyTitle,
   label,
 }: {
   /** the week-column headers, already formatted by the caller. */
@@ -150,7 +151,15 @@ export function RecordTimeline({
   loading?: boolean
   /** force the empty register — no rows already reads as empty on its own. */
   empty?: boolean
-  emptyBody?: string
+  /** THE R62 FILTERED SENTENCE, papered through `CollectionEmptyState`. This
+   * branch is never the genuinely-empty collection — the caller's own
+   * `all.length === 0` check owns that zero above every view branch (R88) —
+   * it is always "the collection holds rows, none fall in what's on screen
+   * right now": a search that narrowed to nothing, or a window with no
+   * dated wave in it. Read as `CollectionEmptyState`'s own `filteredTitle`,
+   * so it papers itself the same as every other zero on this screen and
+   * carries no create door (`filtered` withdraws it). */
+  emptyTitle?: string
   /** the grid's accessible name. */
   label?: string
 }) {
@@ -199,9 +208,11 @@ export function RecordTimeline({
           {t("Loading…")}
         </div>
       ) : isEmpty ? (
-        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-          {emptyBody}
-        </p>
+        <CollectionEmptyState
+          filtered
+          title={emptyTitle ?? t("Nothing matched.")}
+          filteredTitle={emptyTitle}
+        />
       ) : (
         // THE SCROLL, ON EVERY WIDTH — `snap-x snap-mandatory` and each week
         // header carries `snap-start`, so a phone drags the grid itself

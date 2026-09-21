@@ -34,6 +34,7 @@ import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { RecordFooterBand, RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
+import { RecordDetailBody } from "@/components/records/record-detail-body"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
@@ -345,27 +346,29 @@ export function KnowledgeDetailScreen({
   }
 
   return (
-    /* THE BAND MOVED TO ITS OWN, FLUSH COMPOSITION — 21 Sep 2026. This screen
-       used to hand `activity`/`onAddNote`/`notePlaceholder` straight to
-       `<RecordScreen>` and let ONE combined `<RecordDetail>` call draw the
-       head, the tabs, the panel AND the footer together (`footerVisible`
-       left at its default, `true`). That combined call's own footer region
-       carries none of the escape `RecordFooterBand` (record-chrome.tsx) pulls
-       for itself — the `-mx-[var(--pane-inset-x,0px)]` that reaches the
-       pane's own edge — so the band sat inset inside the panel's ordinary
-       padding: 24px short of the pane's bottom at 1440, 6px at 760, against
-       the ticket and story pages' flush 0px. Both of THOSE pages draw the
-       band through `<RecordFooterBand>` itself, called a SECOND time as a
-       sibling of a `<RecordScreen panelVisible={false} footerVisible={false}
-       >` (see help-detail.tsx's `<TicketDetailBody>` and story-detail.tsx's
-       `<RecordDetailBody>` for the two-column shape this screen does not
-       need — a knowledge source has no side column, one tabbed body only).
-       Rebuilt the same way, without either shared file: `RecordScreen` draws
-       the head alone, and the body below is this file's own single-column
-       sibling — `flex-1 flex-col gap-6`, `RecordFooterBand` as its `mt-auto`
-       last child, the identical root shape `record-detail-body.tsx`'s own
-       comment proves against `ticket-detail-body.tsx`, minus the `lg` grid
-       neither column needs here. */
+    /* THE BAND SITS INSIDE THE PROVED CONSTRUCTION, NOT A HAND COPY OF IT —
+       21 Sep 2026, second pass. The first pass (this comment's own earlier
+       text, in git history) still handed `activity`/`onAddNote`/
+       `notePlaceholder` straight to `<RecordScreen>` and drew the footer
+       through ONE combined `<RecordDetail>` call — no escape, 24px short of
+       the pane's bottom at 1440. That was fixed by moving to
+       `<RecordFooterBand>` as a second, footer-only call — but HAND-ROLLED
+       as this file's OWN `<div className="flex-1 flex-col gap-6">` sibling
+       rather than by calling `record-detail-body.tsx`'s own
+       `<RecordDetailBody>`, which draws exactly that root for
+       `story-detail.tsx` already. Proved live still 24px short on staging
+       (commit e30fa49e) — a second, parallel copy of a proved shape is
+       exactly the mistake `RecordDetailBody`'s own header warns against
+       ("without hand-copying it a second time"), and it drifted the moment
+       it was hand-copied rather than called.
+       So this screen now calls the SAME component `story-detail.tsx` does,
+       not a look-alike of it: `<RecordScreen panelVisible={false}
+       footerVisible={false}>` draws the head alone, exactly as it did
+       before, and `<RecordDetailBody>` below draws the body — `main` the
+       tabbed content, no `side` (a knowledge source has no side column, one
+       tabbed body only — `side` is optional for exactly this screen, see
+       `record-detail-body.tsx`'s own doc comment), `footer` the identical
+       `<RecordFooterBand>` call this file already built. */
     <>
     <RecordScreen
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
@@ -403,7 +406,9 @@ export function KnowledgeDetailScreen({
       panelVisible={false}
       footerVisible={false}
     />
-    <div data-slot="knowledge-detail-body" className="flex min-w-0 flex-1 flex-col gap-6">
+    <RecordDetailBody
+      dataSlot="knowledge-detail-body"
+      main={
       <TabsView
         className={STICKY_TABS}
         config={tabsConfig}
@@ -575,19 +580,23 @@ export function KnowledgeDetailScreen({
           )
         }}
       />
-      {/* THE BAND — the SAME data the old single call handed `<RecordScreen>`
-          (see this function's own header note above), built here instead so
-          this `<div>`'s own `mt-auto` reaches the true bottom of the page. No
-          `audit`: a knowledge source has no creator/editor (unchanged; see
-          the comment this replaced for why). */}
-      <div data-slot="record-footer-band" className="flex-none mt-auto w-full">
+      }
+      // NO `side` — a knowledge source has no side column, one tabbed body
+      // only (`RecordDetailBody`'s own doc comment above `side`).
+      //
+      // THE BAND — the SAME data the old single combined call handed
+      // `<RecordScreen>` (see this function's own header note above), built
+      // here instead so `RecordDetailBody`'s own `mt-auto` reaches the true
+      // bottom of the page. No `audit`: a knowledge source has no
+      // creator/editor (unchanged; see the comment this replaced for why).
+      footer={
         <RecordFooterBand
           activity={activity}
           onAddNote={can("knowledge", "create") ? activity.addNote : undefined}
           notePlaceholder={t("Add a note")}
         />
-      </div>
-    </div>
+      }
+    />
 
       <KnowledgeFormDialog
         open={editingOpen}

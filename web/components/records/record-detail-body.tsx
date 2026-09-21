@@ -44,6 +44,13 @@
 // literal `"ticket-detail-body"`/`"ticket-footer-band"` strings, which stay
 // owned by `ticket-detail-body.tsx`'s own inlined JSX and nowhere else, so
 // two different DOM subtrees can never carry the same marker.
+//
+// `side` IS OPTIONAL, FOR A SINGLE-COLUMN RECORD — added for
+// knowledge-detail.tsx (the finding, 21 Sep 2026: a knowledge source has one
+// tabbed body and no side panels, so the "previous fix" HAND-COPIED this
+// shape rather than calling it, one file drifting from the proved one — the
+// exact mistake this component exists to rule out). Absent `side`, `main`
+// renders alone, at every width; no empty `1fr` track, no `lg` grid at all.
 
 import * as React from "react"
 
@@ -89,8 +96,15 @@ export function RecordDetailBody({
   main: React.ReactNode
   /** THE RIGHT COLUMN AT `lg`, STACKED FIRST BELOW IT — one or more panels,
    * already in their own final order; this file wraps them in the one
-   * `flex flex-col gap-6` column and nothing more. */
-  side: React.ReactNode
+   * `flex flex-col gap-6` column and nothing more.
+   *
+   * OPTIONAL, for a single-column record with nothing to put beside `main`
+   * (a knowledge source: one tabbed body, no side panels) — added for
+   * knowledge-detail.tsx (the finding, 21 Sep 2026: it used to hand-copy
+   * this whole shape rather than call it, one file drifting from the
+   * proved one). Absent, `main` renders alone at every width — no `lg`
+   * grid, no empty second track. */
+  side?: React.ReactNode
   /** THE BLACK BAND — `RecordFooterBand` (`@/components/records/
    * record-chrome`), this component's own `flex-none` LAST child, `mt-auto`
    * so it reaches the root's own bottom edge on a short page and sits right
@@ -104,7 +118,9 @@ export function RecordDetailBody({
   return (
     <div data-slot={dataSlot} className="flex min-w-0 flex-1 flex-col gap-6">
       <div className="min-w-0">
-        {isAtLeastLg ? (
+        {side === undefined ? (
+          main
+        ) : isAtLeastLg ? (
           <div className="grid min-w-0 grid-cols-[2fr_1fr] items-stretch gap-6">
             {main}
             <div className="flex min-w-0 flex-col gap-6">{side}</div>
