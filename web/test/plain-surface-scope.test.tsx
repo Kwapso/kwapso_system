@@ -52,6 +52,7 @@
 // by path was moved to the new extension in the same change (R58).
 
 import { join } from "node:path"
+import type * as React from "react"
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -59,6 +60,7 @@ import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { CollectionCard, CollectionEmptyBody } from "@/components/deep-link/screen-bits"
 import { Panel } from "@/components/tickets/tickets-dashboard"
+import { PagedFind, type FindQuery } from "@/components/records/paged-find"
 
 // THE TRIAGE FACET'S OWN EMPTY BRANCH (below, the last describe block) needs
 // its door mocked before `TriageQueue` is imported — the same shape
@@ -388,5 +390,120 @@ describe("TriageQueue's own empty branch, on the plain Triage frame (rulebook L4
     const plainFrame = document.querySelector('[data-slot="card"][data-surface="plain"][data-variant="plain"]')
     expect(plainFrame, "the outer CollectionCard stays the plain, transparent frame").toBeTruthy()
     expect(plainFrame!.contains(paper), "the paper card is nested inside the plain frame").toBe(true)
+  })
+})
+
+// THE TOOLBAR'S OWN PAINTED REGISTER, KEYED TO THE FRAME IT STANDS IN —
+// Aurora's ruling, 21 Sep 2026: "on tickets, reduce space above and under
+// toolbar to 10px." `FolderTabStrip.tight` (proved by
+// `web/test/tickets-strip-gap.test.tsx`) already closed the strip's own 20px;
+// what was left was six pixels of slack on EACH side of the pinned box's own
+// 10-lead/10-trailing rhythm — `paged-find.tsx`'s hand-rolled toolbar pill
+// (`data-slot="toolbar-row-column"` > `data-slot="toolbar-row-track"`) spent
+// `py-1.5`/`pe-1.5`/`ps-4` (plus `bg-surface-raised` and a `rounded-*`)
+// UNCONDITIONALLY, whether or not the frame around it paints anything to read
+// the pill against. `ToolbarPaintedColumn` (paged-find.tsx) now reads
+// `useCollectionCardSurface()` — the same context `CollectionEmptyBody`
+// already reads, published by `CollectionCard` itself — and spends that whole
+// register only when the frame is `"boxed"` (the context's own default, and
+// every module but tickets' plain-surface experiment). On a `surface="plain"`
+// frame the pill paints nothing at all: no fill, no radius, no `py-1.5`, no
+// `pe-1.5`, no `ps-4` — the row's own edge lines up with `CardContent`'s zero
+// padding, the SAME edge the table already sits flush against (this file's
+// own assertion, two describe blocks up, that the plain frame's `CardContent`
+// carries none of its usual inset classes "so the toolbar and the table line
+// up with the page edge"). A bare `<PagedFind>` (no `wrap` at all — Contacts,
+// Meetings' own tab bodies) and a `<PagedFind wrap={(i) => <CollectionCard>
+// {i}</CollectionCard>}>` (the boxed default, spelled explicitly) must both
+// still carry the full painted register — this experiment is tickets-only,
+// and neither of the boxed shapes may lose it as a side effect of the plain
+// one gaining an unpainted register.
+describe("PagedFind's toolbar pill (R83 ruling 7 / rulebook L43) — painted only on a frame that paints", () => {
+  type Row = { id: string; name: string }
+
+  const fetchPage = async (_query: FindQuery, _cursor: string | null) => ({
+    rows: [{ id: "a", name: "x" }] as Row[],
+    nextCursor: null,
+    total: 1,
+  })
+
+  function renderFind(wrap?: (inner: React.ReactNode) => React.ReactNode) {
+    return render(
+      <PagedFind<Row>
+        listKey={`test:${Math.random()}`}
+        placeholder="Search…"
+        matches={{ none: "No matches", one: "1 match", many: "{count} matches" }}
+        // R50 — the toolbar's own painted register only exists to inspect
+        // while the row is actually drawn.
+        restingEmpty={false}
+        fetchPage={fetchPage}
+        wrap={wrap}
+      >
+        {() => <div data-testid="rows" />}
+      </PagedFind>
+    )
+  }
+
+  it("no wrap at all (the context's own default, \"boxed\") keeps bg-surface-raised, rounded-pill and the whole py-1.5/pe-1.5/ps-4 register", () => {
+    renderFind()
+    const column = document.querySelector('[data-slot="toolbar-row-column"]') as HTMLElement
+    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
+    expect(column, "the toolbar's merged container must render").toBeTruthy()
+    expect(track, "the toolbar's own track must render").toBeTruthy()
+    expect(column.className, "unwrapped reads as the context default, boxed").toContain("bg-surface-raised")
+    expect(column.className).toMatch(/(^|\s)rounded-pill(\s|$)/)
+    expect(track.className, "boxed keeps the vertical pill padding").toMatch(/(^|\s)py-1\.5(\s|$)/)
+    expect(track.className, "boxed keeps the trailing pill padding").toMatch(/(^|\s)pe-1\.5(\s|$)/)
+    expect(track.className, "boxed keeps the leading pill inset").toMatch(/(^|\s)ps-4(\s|$)/)
+  })
+
+  it('a boxed CollectionCard (surface left at its default) also keeps the full painted register', () => {
+    renderFind((inner) => <CollectionCard>{inner}</CollectionCard>)
+    const column = document.querySelector('[data-slot="toolbar-row-column"]') as HTMLElement
+    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
+    expect(column.className).toContain("bg-surface-raised")
+    expect(column.className).toMatch(/(^|\s)rounded-pill(\s|$)/)
+    expect(track.className).toMatch(/(^|\s)py-1\.5(\s|$)/)
+    expect(track.className).toMatch(/(^|\s)pe-1\.5(\s|$)/)
+    expect(track.className).toMatch(/(^|\s)ps-4(\s|$)/)
+  })
+
+  it('a plain CollectionCard (surface="plain") drops bg-surface-raised, every rounded-* and the whole py-1.5/pe-1.5/ps-4 register', () => {
+    renderFind((inner) => <CollectionCard surface="plain">{inner}</CollectionCard>)
+    const column = document.querySelector('[data-slot="toolbar-row-column"]') as HTMLElement
+    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
+    expect(column, "the toolbar's merged container must still render, unpainted").toBeTruthy()
+    expect(track, "the toolbar's own track must still render, unpainted").toBeTruthy()
+    expect(column.className, "no fill on a frame with nothing to paint it against").not.toContain(
+      "bg-surface-raised"
+    )
+    expect(column.className, "no pill radius either").not.toMatch(/(^|\s)rounded-pill(\s|$)/)
+    expect(column.className, "and no box radius — the plain register has no shape of its own").not.toMatch(
+      /rounded-\[var\(--radius\)\]/
+    )
+    expect(track.className, "no vertical pill padding on the plain register").not.toMatch(/(^|\s)py-1\.5(\s|$)/)
+    expect(track.className, "no trailing pill padding either").not.toMatch(/(^|\s)pe-1\.5(\s|$)/)
+    expect(
+      track.className,
+      "no leading pill inset either — the plain frame's own CardContent carries zero padding, so this is the whole edge"
+    ).not.toMatch(/(^|\s)ps-4(\s|$)/)
+    // The layout gap between controls is not a painted-register concern —
+    // it must survive on both frames.
+    expect(track.className, "the gap between controls is layout, not paint — it stays on every frame").toMatch(
+      /(^|\s)gap-2(\s|$)/
+    )
+  })
+
+  it("the pinned mechanics are untouched on the plain frame — PINNED_TOOLBAR and the R63 trailing gap still ride the outer pin wrapper", () => {
+    renderFind((inner) => <CollectionCard surface="plain">{inner}</CollectionCard>)
+    const pin = document.querySelector('[data-slot="toolbar-row-pin"]') as HTMLElement
+    expect(pin, "the pinned wrapper must still render").toBeTruthy()
+    for (const cls of PINNED_TOOLBAR.split(" ")) {
+      expect(pin.className.includes(cls), `the pin wrapper must still carry ${cls}`).toBe(true)
+    }
+    expect(
+      pin.className,
+      "the pin wrapper must still pay the R63 trailing gap token, untouched by the painted-register change"
+    ).toMatch(/(^|\s)pb-\[var\(--toolbar-content-gap\)\](\s|$)/)
   })
 })

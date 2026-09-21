@@ -79,7 +79,11 @@ import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
-import { TOOLBAR_SEARCH_SLOT, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
+import {
+  TOOLBAR_SEARCH_SLOT,
+  useCollectionCardSurface,
+  type ToolbarViewSlot,
+} from "@/components/deep-link/screen-bits"
 import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { invalidatePrefix, primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -173,6 +177,105 @@ function findKeyFor(listKey: string, query: FindQuery): string {
  * beside it without knowing `find:` is PagedFind's own word to spell. */
 export function invalidateFindsOf(listKey: string): void {
   invalidatePrefix(`find:${listKey}:`)
+}
+
+/** THE TOOLBAR'S OWN PILL — PAINTED ONLY WHEN ITS FRAME DOES NOT ALREADY.
+ * Aurora's ruling, 21 Sep 2026, verbatim: "on tickets, reduce space above and
+ * under toolbar to 10px." The tab strip's own 20px was already cut
+ * (`FolderTabStrip.tight`, `tickets-collection.tsx`'s one `renderFolderTabs`
+ * call); what was left, measured live at 1440x900 on the All tab, was six
+ * pixels on each side of the pinned box's OWN 10-lead/10-trailing rhythm — the
+ * pill's `py-1.5` (6px top, 6px bottom) plus its `ps-4`/`pe-1.5` horizontal
+ * inset, spent unconditionally, whether or not this row is standing on
+ * anything for a pill to read as a pill AGAINST. On a boxed `CollectionCard`
+ * it is: the row is a lighter tone sitting on the card's own soft paper, and
+ * the pill reads as a control cluster. On a PLAIN `CollectionCard`
+ * (`surface="plain"`, the tickets-main experiment, rulebook L43) the frame
+ * paints nothing at all — `web/test/plain-surface-scope.test.tsx`'s own
+ * assertion is that its `CardContent` carries none of its usual inset
+ * padding classes, "so the toolbar and the table line up with the page
+ * edge" — so the same padding
+ * that reads as a pill on the boxed frame reads as pure, unexplained slack on
+ * the plain one, and the same `ps-4` that keeps a painted pill's search glyph
+ * off ITS OWN rounded seam (see the kit's `ToolbarRow`, screen-bits.tsx) is a
+ * second, needless indent on a frame with no seam to clear — the table
+ * beside it has none either.
+ *
+ * KEYED OFF THE SAME CONTEXT THE EMPTY BODY ALREADY READS
+ * (`useCollectionCardSurface`, screen-bits.tsx) rather than a prop threaded
+ * down from `tickets-collection.tsx`: `painted` is a fact about the FRAME
+ * this row is standing in, and the frame already publishes it for exactly
+ * this reason — a call site cannot forget to pass what it never has to name.
+ * THIS MUST BE ITS OWN COMPONENT, NOT INLINE MARKUP INSIDE `PagedFind`'s
+ * render: `wrap` (below) receives an already-built element tree and wraps it
+ * in `<CollectionCard>`, so the elements inside only become DESCENDANTS of
+ * that card's context Provider once React reconciles the returned tree —
+ * `useCollectionCardSurface()` called directly in `PagedFind`'s own function
+ * body would read the context at `PagedFind`'s OWN position (an ANCESTOR of
+ * whatever `wrap` builds), always the default `"boxed"`, never the frame the
+ * row ends up nested in. A separate function component invoked as a JSX
+ * element is what makes the hook call happen at the ROW's true position in
+ * the rendered tree instead — the identical reason `CollectionEmptyBody` is
+ * its own component rather than a branch inlined where `PagedFind` computes
+ * its empty state. */
+function ToolbarPaintedColumn({
+  filterPanelOpen,
+  filterPanel,
+  children,
+}: {
+  filterPanelOpen: boolean
+  filterPanel: React.ReactNode
+  children: React.ReactNode
+}) {
+  const painted = useCollectionCardSurface() !== "plain"
+  return (
+    <div
+      data-slot="toolbar-row-column"
+      className={cn(
+        "flex min-w-0 flex-col",
+        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND (painted
+        // only) — the identical fix `ToolbarRow` (screen-bits.tsx) carries,
+        // for the identical reason: `bg-background` and
+        // `bg-[var(--surface-raised)]` coincide in LIGHT mode (both
+        // `--kw-off-beige`) and diverge in DARK mode (`--kw-unlit-page` vs
+        // `--kw-unlit-raised`), so a row copied from that file inherited the
+        // same latent mismatch.
+        // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
+        // reason the toolbar's buttons had no background. The kit rebinds
+        // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
+        // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so
+        // a secondary button is always the other tone from whatever it
+        // stands on and no component needs a prop. `bg-[var(--surface-raised)]`
+        // paints the identical colour but is a DIFFERENT CLASS, so no
+        // selector in that list matched, the rebind never fired, and the
+        // token stayed at its base `var(--card)` — the same #FFFEF9 this
+        // container is painted with. Beige on beige: the client, twice, "the
+        // buttons in the toolbar are missing the background". `bg-surface-
+        // raised` is a real generated utility (tokens.css bridges
+        // `--color-surface-raised` precisely so it exists), paints the same
+        // colour, and IS in the list — so every secondary control inside now
+        // resolves to `--surface-panel` #F7F2EB.
+        //
+        // THE RULE, not the patch: an element that paints a GROUND uses the
+        // named utility. The `bg-[var(--token)]` escape hatch silently
+        // freezes every ground-aware token beneath it.
+        painted && "bg-surface-raised",
+        painted && (filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill")
+      )}
+    >
+      <div
+        data-slot="toolbar-row-track"
+        className={cn("flex flex-wrap items-center gap-2", painted && "py-1.5 pe-1.5 ps-4")}
+      >
+        {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
+            control sits in one visibly distinct row. No fill and no radius of
+            its own any more — both now belong to the merged container above,
+            painted only when it does. */}
+        {children}
+      </div>
+      {filterPanel}
+    </div>
+  )
 }
 
 export function PagedFind<T>({
@@ -668,44 +771,7 @@ export function PagedFind<T>({
     // (this component draws one itself, right at the bottom of this file), a
     // record's strip, or nothing. See shared/web/pinned-chrome.ts.
     <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-[var(--toolbar-content-gap)]")}>
-      <div
-        data-slot="toolbar-row-column"
-        className={cn(
-          // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND — the
-          // identical fix `ToolbarRow` (screen-bits.tsx) carries, for the
-          // identical reason: `bg-background` and `bg-[var(--surface-raised)]`
-          // coincide in LIGHT mode (both `--kw-off-beige`) and diverge in DARK
-          // mode (`--kw-unlit-page` vs `--kw-unlit-raised`), so a row copied
-          // from that file inherited the same latent mismatch.
-          // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
-          // reason the toolbar's buttons had no background. The kit rebinds
-          // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
-          // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
-          // secondary button is always the other tone from whatever it stands on
-          // and no component needs a prop. `bg-[var(--surface-raised)]` paints
-          // the identical colour but is a DIFFERENT CLASS, so no selector in that
-          // list matched, the rebind never fired, and the token stayed at its
-          // base `var(--card)` — the same #FFFEF9 this container is painted with.
-          // Beige on beige: the client, twice, "the buttons in the toolbar are
-          // missing the background". `bg-surface-raised` is a real generated
-          // utility (tokens.css bridges `--color-surface-raised` precisely so it
-          // exists), paints the same colour, and IS in the list — so every
-          // secondary control inside now resolves to `--surface-panel` #F7F2EB.
-          //
-          // THE RULE, not the patch: an element that paints a GROUND uses the
-          // named utility. The `bg-[var(--token)]` escape hatch silently freezes
-          // every ground-aware token beneath it.
-          "flex min-w-0 flex-col bg-surface-raised",
-          filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
-        )}
-      >
-        <div
-          data-slot="toolbar-row-track"
-          className="flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
-        >
-            {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
-                control sits in one visibly distinct row. No fill and no radius of
-                its own any more — both now belong to the merged container above. */}
+      <ToolbarPaintedColumn filterPanelOpen={filterPanelOpen} filterPanel={showFilters ? filterPanel : null}>
             {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
                 the filter row's "Clear all" — one control quietly owning two
                 questions — and the kit's bar says "Clear filters" and now means
@@ -822,9 +888,7 @@ export function PagedFind<T>({
             {actions && (
               <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
             )}
-          </div>
-          {showFilters && filterPanel}
-      </div>
+      </ToolbarPaintedColumn>
     </div>
   )
 

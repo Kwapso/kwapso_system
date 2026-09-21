@@ -89,7 +89,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R80 | enforced | `rows-are-a-list` | `web/test/rows-are-a-list.test.ts` |
 | R81 | enforced | `form-carries-no-hints` | `web/test/help-form-dialog-loop-field.test.tsx`<br>`web/test/settings-appearance.test.tsx` |
 | R82 | enforced | `table-column-budget` | `web/test/table-column-budget.test.ts` |
-| R83 | enforced | `toolbar-lead-gap` | `web/test/toolbar-lead-gap-card.test.tsx`<br>`web/test/toolbar-lead-gap.test.ts` |
+| R83 | enforced | `toolbar-lead-gap` | `web/test/plain-surface-scope.test.tsx`<br>`web/test/toolbar-lead-gap-card.test.tsx`<br>`web/test/toolbar-lead-gap.test.ts` |
 | R84 | enforced | `mango-in-title-only` | `web/test/mango-title-only.test.ts` |
 | R85 | enforced | `rail-labels-one-word` | `web/test/rail-labels-one-word.test.ts` |
 | R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/contacts-are-a-table.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |

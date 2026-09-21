@@ -274,6 +274,25 @@ export function LoadError({ what }: { what: string }) {
 // draw nothing extra."
 const CollectionCardSurfaceContext = React.createContext<"boxed" | "plain">("boxed")
 
+/** WHICH SURFACE THE NEAREST `CollectionCard` PUBLISHED — the same context
+ * `CollectionEmptyBody` above reads, exported so a toolbar built OUTSIDE this
+ * file (`paged-find.tsx`'s own hand-rolled pill) can key its painted register
+ * off the frame it is actually standing in instead of spending it
+ * unconditionally (R83, 21 Sep 2026 — "on tickets, reduce space above and
+ * under toolbar to 10px": the pill's own `py-1.5`/`ps-4` painted register was
+ * the 6px of slack on a frame that paints nothing to paint it against).
+ *
+ * A component calling this must itself be a descendant of `CollectionCard`'s
+ * Provider in the RENDERED tree, not merely textually nested inside a value
+ * that eventually becomes one — the same requirement `CollectionEmptyBody`
+ * already carries. Called from a value built earlier in a parent's own
+ * function body (before that parent returns its `<CollectionCard>` element)
+ * reads the context's default, `"boxed"`, exactly as a render nested nowhere
+ * near a `CollectionCard` would. */
+export function useCollectionCardSurface(): "boxed" | "plain" {
+  return React.useContext(CollectionCardSurfaceContext)
+}
+
 export function CollectionCard({ children, surface = "boxed" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
   if (surface === "plain") {
     return (
