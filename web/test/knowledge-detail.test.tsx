@@ -112,11 +112,15 @@ describe("knowledge-detail's footer band sits flush, through the SAME constructi
       src,
       "knowledge-detail.tsx must not carry its own copy of the root's flex/gap classes any more"
     ).not.toMatch(/data-slot="knowledge-detail-body" className="flex min-w-0 flex-1 flex-col gap-6"/)
-    // record-detail-body.tsx is the one file that still says it, twice: the
-    // root and the footer wrapper.
+    // record-detail-body.tsx is the one file that still says it. The root's
+    // className is a plain string; the footer wrapper's is a ternary since
+    // round 29 (22 Sep 2026 — the negative-margin growth applies only at
+    // the default footerDataSlot marker), so both its branches are checked
+    // instead of one literal className= attribute.
     const body = bodySource()
     expect(body).toContain('className="flex min-w-0 flex-1 flex-col gap-6"')
-    expect(body).toContain('className="flex-none mt-auto w-full"')
+    expect(body).toContain('"flex-none mt-auto w-full mb-[calc(var(--space-5)*-1)] lg:mb-[calc(var(--space-6)*-1)]"')
+    expect(body).toContain('"flex-none mt-auto w-full"')
   })
 
   it("RecordDetailBody's own `side` prop is genuinely optional, and absent it renders `main` alone (no lg grid, no empty second track)", () => {

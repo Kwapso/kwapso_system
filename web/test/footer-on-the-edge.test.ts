@@ -120,6 +120,36 @@
 // carries the full account and the live proof numbers
 // (`${SCRATCH}/onescroll-proof2.json`, after a failed `min-h-full`
 // candidate in `${SCRATCH}/onescroll-proof.json`).
+//
+// ROUND 29, THE NEGATIVE-MARGIN CORRECTION, 22 Sep 2026 — the round-22
+// `has-[[data-slot=record-footer-band]]:h-[calc(100%+…)]` growth rule
+// (censused two paragraphs above this one, in git history) reached the
+// pane's true bottom edge ONLY at `scrollTop=0`. Live DOM proof against the
+// knowledge source this was reported against: scrolling the pane to its
+// own `scrollHeight` (how a person actually reaches the bottom) measured
+// `el.scrollHeight === el.clientHeight + padding-bottom` — `DENSITY_BODY`'s
+// reserved bottom padding, counted a SECOND time — because growing a
+// descendant's own `height` past its scrolling ancestor's content-box edge
+// is, by definition, scrollable overflow, and a scrolling ancestor with
+// `padding-bottom` reserves that padding again after any overflow it
+// detects (Chromium's own documented behaviour). The calc's own +20/24px
+// growth bought exactly that much new, illusory scroll room instead of
+// closing the gap, so scrolling to the end dragged the already-flush band
+// back UP by the same amount — reproducing the live bug exactly.
+//
+// THE GROWTH RULE MOVED, RETIRED HERE, ADDED IN `record-detail-body.tsx`
+// INSTEAD: a fixed, NEGATIVE `margin-bottom` on the div carrying
+// `data-slot="record-footer-band"` (`mb-[calc(var(--space-5)*-1)]
+// lg:mb-[calc(var(--space-6)*-1)]`) reaches the identical pixel without
+// enlarging any box's own measured `height`, so the scrolling ancestor's
+// overflow/padding accounting never sees it — proved live,
+// `el.scrollHeight === el.clientHeight` afterwards (zero phantom scroll
+// room), flush at `scrollTop=0` AND unchanged after scrolling to the
+// pane's own end, and proved harmless on genuinely tall content (a real
+// story, B0002, already overflowing the ceiling on its own): identical
+// flush result with and without the margin. `app-shell.tsx`'s page
+// container goes back to a bare `h-full`, censused below alongside the
+// (unchanged) absence of the retired ticket-only rule.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -174,23 +204,23 @@ describe("R89 — footer-on-the-edge", () => {
     ).toBe(false)
   })
 
-  it("app-shell.tsx's page container grows PAST the pane's reserved bottom padding whenever a RecordDetailBody footer band is present (22 Sep 2026 — a short story/knowledge source does not overflow the h-full ceiling on its own, so mt-auto alone lands 24px short; the exact calc() round 28 retired for tickets, narrowed to a marker only RecordDetailBody's own footer wrapper carries)", () => {
+  it("app-shell.tsx's page container carries NO record-footer-band growth rule either any more (round 29 retired it — reaching past the pane's own padding via an explicit height() registers as real scrollable overflow, and the pane's overflow:auto reserves that padding a SECOND time once it detects any, undoing the growth the instant the pane is scrolled to its own end; the fix moved to record-detail-body.tsx's own footer wrapper, a negative margin that never enlarges a measured height)", () => {
     const at = shell.indexOf("mx-auto flex w-full max-w-none")
+    expect(at, "app-shell.tsx must still draw its one R29 page container as a flex box").toBeGreaterThan(-1)
     const tagEnd = shell.indexOf(">", at)
     const tag = shell.slice(Math.max(0, at - 800), tagEnd)
     expect(
-      tag.includes("has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-5))]"),
-      "the below-lg growth rule must be keyed to record-footer-band (RecordDetailBody's own footerDataSlot default) — reaching story-detail.tsx and knowledge-detail.tsx, never the ticket page's own, separately-marked ticket-footer-band"
-    ).toBe(true)
+      tag.includes("has-[[data-slot=record-footer-band]]:h-[calc"),
+      "the below-lg growth rule must stay GONE — round 29 moved the fix to record-detail-body.tsx's own negative margin, which never registers as overflow of screen-shell-body's own padding"
+    ).toBe(false)
     expect(
-      tag.includes("lg:has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-6))]"),
-      "the lg growth rule must exist too, matching DENSITY_BODY's own comfortable-density reserved padding-bottom at that breakpoint"
-    ).toBe(true)
-    // NEVER RE-KEYED TO THE TICKET'S OWN MARKER — that would double up with
-    // T0001's already-proved natural-overflow flush (harmless on its own,
-    // but a sign this rule drifted back onto the exact case round 28 showed
-    // needs no help) and would miss the whole point: the ticket page is
-    // deliberately UNTOUCHED by this rule.
+      tag.includes("lg:has-[[data-slot=record-footer-band]]:h-[calc"),
+      "the lg growth rule must stay gone too, for the same reason"
+    ).toBe(false)
+    // NEITHER TICKET MARKER EVER BELONGED HERE, ROUND 22 THROUGH 29 ALIKE —
+    // the ticket page reaches flush through its own real, natural content
+    // overflow (round 28) and was never meant to double up with any growth
+    // rule keyed to a RecordDetailBody marker.
     expect(tag.includes("has-[[data-slot=ticket-detail-body]]:h-[calc")).toBe(false)
     expect(tag.includes("has-[[data-slot=ticket-footer-band]]:h-[calc")).toBe(false)
   })
@@ -539,9 +569,10 @@ describe("R89 — footer-on-the-edge", () => {
   })
 })
 
-// R89, GENERALISED TO RecordDetailBody — 22 Sep 2026 finding. Measured live
-// on staging: a thin proof story and a short knowledge source (both drawn
-// through story-detail.tsx / knowledge-detail.tsx calling the shared
+// R89, GENERALISED TO RecordDetailBody — 22 Sep 2026 finding, round 29
+// correction same day. Measured live on staging: a thin proof story and a
+// short knowledge source (both drawn through story-detail.tsx /
+// knowledge-detail.tsx calling the shared
 // `RecordDetailBody`) already reach the pane's edges left/right — the kit's
 // own `-mx-[var(--pane-inset-x,0px)]` escape on the footer Card (v1.2.149)
 // covers that, unconditionally, for any caller — but land 24px SHORT at the
@@ -551,17 +582,30 @@ describe("R89 — footer-on-the-edge", () => {
 // `padding-bottom` (screen-shell.tsx) short of the pane's true edge, UNLESS
 // the record's own content is tall enough to overflow that ceiling on its
 // own (T0001 always is; a thin story or a short knowledge source is not).
-// The fix is the app-shell.tsx growth rule censused above, keyed to
-// `record-footer-band` — `RecordDetailBody`'s own `footerDataSlot` default —
-// so it reaches every caller of the shared shape without touching the
-// ticket page's own, separately-marked band.
-describe("R89 — RecordDetailBody's own footer band matches TicketDetailBody's construction, and stays on the marker app-shell.tsx's growth rule keys off", () => {
+//
+// ROUND 29 MOVED THE FIX HERE, off app-shell.tsx entirely. The first
+// attempt grew app-shell.tsx's own page container past screen-shell-body's
+// content-box edge — flush at `scrollTop=0`, but 24px short again the
+// instant the pane was scrolled to its own end (live proof:
+// `el.scrollHeight` counted `DENSITY_BODY`'s padding-bottom a SECOND time,
+// because a descendant's own `height` reaching past its scrolling
+// ancestor's content edge is real, detected overflow, and Chromium
+// reserves the trailing padding again once it sees any). This file's own
+// footer wrapper (`data-slot="record-footer-band"`) instead carries a
+// fixed, NEGATIVE `margin-bottom` — it reaches the identical pixel without
+// enlarging any box's measured `height`, so the ancestor's overflow
+// accounting never registers it (proved live: `scrollHeight ===
+// clientHeight` afterwards, zero phantom scroll room). Still keyed to
+// `record-footer-band` — `RecordDetailBody`'s own `footerDataSlot`
+// default — so it reaches every caller of the shared shape without
+// touching the ticket page's own, separately-marked band.
+describe("R89 — RecordDetailBody's own footer band matches TicketDetailBody's construction, and carries its own negative-margin growth (round 29)", () => {
   const recordBody = read("web/components/records/record-detail-body.tsx")
   const ticketBody = read("web/components/tickets/ticket-detail-body.tsx")
   const knowledgeDetail = read("web/components/knowledge/knowledge-detail.tsx")
   const storyDetail = read("web/components/work/story-detail.tsx")
 
-  it("RecordDetailBody's root and footer wrapper carry the IDENTICAL classes TicketDetailBody's own root and band do", () => {
+  it("RecordDetailBody's root carries the IDENTICAL classes TicketDetailBody's own root does", () => {
     expect(
       recordBody.includes('className="flex min-w-0 flex-1 flex-col gap-6"'),
       "the root must be the same flex column, flex-1, no min-h-0, gap-6 — TicketDetailBody's own round-28 shape"
@@ -570,29 +614,59 @@ describe("R89 — RecordDetailBody's own footer band matches TicketDetailBody's 
       ticketBody.includes('data-slot="ticket-detail-body"\n      className="flex min-w-0 flex-1 flex-col gap-6"'),
       "TicketDetailBody's own root must still carry the same string, so the two constructions can never silently drift apart"
     ).toBe(true)
-    expect(
-      recordBody.includes('className="flex-none mt-auto w-full"'),
-      "the footer wrapper must be flex-none, mt-auto, w-full — the identical 'push to the root's own bottom edge' trick"
-    ).toBe(true)
+  })
+
+  it("TicketDetailBody's own band keeps the plain, unconditional flex-none/mt-auto/w-full string — it never reaches for the negative-margin growth, because its own content already overflows on its own (round 28)", () => {
     expect(
       ticketBody.includes('className="flex-none mt-auto w-full"'),
-      "TicketDetailBody's own band must still carry the identical class string"
+      "TicketDetailBody's own band must still carry the plain, ungrown class string"
     ).toBe(true)
   })
 
-  it("footerDataSlot defaults to record-footer-band — the exact marker app-shell.tsx's growth rule reads", () => {
+  it("RecordDetailBody's own footer wrapper carries a fixed, NEGATIVE margin-bottom at the default marker — round 29's fix, replacing app-shell.tsx's retired height-growth rule", () => {
+    // The growth is CONDITIONAL in source (a ternary keyed to whether
+    // footerDataSlot is still the default), so the census reads for the
+    // GROWN branch's own class string rather than a single literal
+    // className= attribute — that shape stopped existing the moment the
+    // growth became conditional.
+    expect(
+      recordBody.includes("mb-[calc(var(--space-5)*-1)]"),
+      "the below-lg negative margin must exist, matching DENSITY_BODY's own reserved padding-bottom at that breakpoint"
+    ).toBe(true)
+    expect(
+      recordBody.includes("lg:mb-[calc(var(--space-6)*-1)]"),
+      "the lg negative margin must exist too, matching DENSITY_BODY's own comfortable-density reserved padding-bottom"
+    ).toBe(true)
+    // The UNGROWN branch (a caller naming its own footerDataSlot opts out)
+    // must still exist, carrying no margin at all — the same contract the
+    // retired app-shell.tsx rule offered.
+    expect(
+      recordBody.includes('"flex-none mt-auto w-full"'),
+      "the opted-out branch must still exist, with no negative margin, for a caller naming its own footerDataSlot"
+    ).toBe(true)
+    // NEVER GROWN UNCONDITIONALLY — the negative margin must be gated on
+    // reaching the default marker, never a bare, always-on class string
+    // (which would also reach a future caller's own, deliberately
+    // different footerDataSlot).
+    expect(
+      recordBody.includes('reachesPaneFloor'),
+      "the growth must be gated by a named condition, never applied unconditionally to every caller"
+    ).toBe(true)
+  })
+
+  it("footerDataSlot defaults to record-footer-band — the exact marker record-detail-body.tsx's own growth reads", () => {
     expect(recordBody).toMatch(/footerDataSlot\s*=\s*"record-footer-band"/)
   })
 
-  it("TicketDetailBody's own band keeps its OWN, separate marker — never record-footer-band — so app-shell.tsx's growth rule cannot double up on a page that already reaches flush through natural overflow", () => {
+  it("TicketDetailBody's own band keeps its OWN, separate marker — never record-footer-band — so the negative-margin growth cannot double up on a page that already reaches flush through natural overflow", () => {
     expect(ticketBody).toContain('data-slot="ticket-footer-band"')
     expect(ticketBody).not.toContain('data-slot="record-footer-band"')
   })
 
   it("neither knowledge-detail.tsx nor story-detail.tsx overrides RecordDetailBody's own footerDataSlot away from the shared default", () => {
-    // Overriding it would silently opt a screen OUT of the app-shell.tsx
-    // growth rule (which reads the literal data-slot value), so the census
-    // is positional: no `footerDataSlot=` prop on either call at all, never
+    // Overriding it would silently opt a screen OUT of the negative-margin
+    // growth (which reads the literal data-slot value), so the census is
+    // positional: no `footerDataSlot=` prop on either call at all, never
     // an assertion about what value it would carry if one existed.
     expect(knowledgeDetail).not.toMatch(/\bfooterDataSlot=/)
     expect(storyDetail).not.toMatch(/\bfooterDataSlot=/)

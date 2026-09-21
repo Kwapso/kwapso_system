@@ -112,32 +112,57 @@ export function RecordDetailBody({
    * header).
    *
    * "THE ROOT'S OWN BOTTOM EDGE" IS `app-shell.tsx`'S DOING, NOT THIS FILE'S
-   * — 22 Sep 2026 finding. Measured live on staging (a thin proof story,
-   * then a short knowledge source, both through this component): `mt-auto`
-   * correctly pushes the band to the bottom of this file's own root, but
-   * that root's OWN height — resolved through the ordinary `flex-1`/`h-full`
-   * chain above it — stops exactly `DENSITY_BODY`'s reserved
-   * `padding-bottom` (screen-shell.tsx) short of the pane's true bottom
-   * edge whenever the record's content is too short to overflow it on its
-   * own. A real ticket (T0001) never shows this, because its conversation
-   * thread + three side panels are tall enough to overflow that ceiling by
-   * themselves — the exact case round 28's own proof measured when it
-   * retired `app-shell.tsx`'s old ticket-only growth rule. That rule is
-   * back now, narrower: `app-shell.tsx`'s content div carries
-   * `has-[[data-slot=record-footer-band]]:h-[calc(100%+…)]`, keyed to THIS
-   * file's own `footerDataSlot` default (`"record-footer-band"`, below),
-   * so it reaches every caller of `RecordDetailBody` without touching the
-   * ticket page's own, separately-marked band (`ticket-footer-band`) at
-   * all. Passing a `footerDataSlot` other than the default opts a caller
-   * out of that growth rule — there is no reason to today, but a future
-   * caller drawing its footer somewhere that must NOT reach the pane's true
-   * bottom (a record shown inside a dialog, a sheet) should know the two
-   * are linked. */
+   * — 22 Sep 2026 finding. `mt-auto` correctly pushes the band to the
+   * bottom of this file's own root, but that root's OWN height — resolved
+   * through the ordinary `flex-1`/`h-full` chain above it — stops exactly
+   * `DENSITY_BODY`'s reserved `padding-bottom` (screen-shell.tsx) short of
+   * the pane's true bottom edge whenever the record's content is too short
+   * to overflow it on its own. A real ticket (T0001) never shows this,
+   * because its conversation thread + three side panels are tall enough to
+   * overflow that ceiling by themselves.
+   *
+   * THE FIRST FIX (22 Sep 2026, same day, since retired) GREW
+   * `app-shell.tsx`'s content div INSTEAD — `has-[[data-slot=record-footer-
+   * band]]:h-[calc(100%+…)]`, reaching the container PAST
+   * `screen-shell-body`'s own reserved padding. Measured flush live at
+   * `scrollTop=0` (876 → 900) — and STILL 876 after scrolling the pane to
+   * its own `scrollHeight`, which is how a person actually reaches the
+   * bottom. Live DOM proof: growing the container's own `height` past its
+   * parent's content-box edge makes it register as genuine scrollable
+   * overflow, and a scrolling ancestor with `padding-bottom` reserves that
+   * same padding a SECOND time after any overflow — Chromium's own
+   * documented behaviour, not a bug in this construction's arithmetic
+   * (`el.scrollHeight` measured `clientHeight + padding-bottom`, on TOP of
+   * a box that had already grown into that padding once). Scrolling to the
+   * pane's own end therefore dragged the already-flush band back UP by
+   * exactly the grown amount — the live bug Aurora reported, reproduced
+   * exactly by `el.scrollTop = el.scrollHeight`.
+   *
+   * THE REAL FIX DOES NOT GROW ANY BOX'S OWN `height`. A fixed, negative
+   * `margin-bottom` on THIS div (below, `mb-[calc(var(--space-5)*-1)]
+   * lg:mb-[calc(var(--space-6)*-1)]`) reaches the identical pixel — proved
+   * live, `el.scrollHeight === el.clientHeight` afterwards (ZERO phantom
+   * scroll room, so there is nothing left for a person to overscroll into)
+   * — because a negative margin does not enlarge this div's own measured
+   * box past its ancestor's content edge the way an explicit `height` does;
+   * it only shifts where the box PAINTS, which the scrolling ancestor's own
+   * overflow/padding accounting never sees. Proved harmless on genuinely
+   * tall content too (a real story, B0002, which overflows the ceiling on
+   * its own): identical `scrollHeight`/flush position with and without the
+   * margin, since `mt-auto` already resolves to 0 there and the fixed
+   * offset rides along for free. Scoped to THIS file's own `footerDataSlot`
+   * default exactly as the retired rule was — a caller naming a different
+   * `footerDataSlot` opts out, unchanged. */
   footer: React.ReactNode
   dataSlot?: string
   footerDataSlot?: string
 }) {
   const isAtLeastLg = useIsAtLeastLg()
+  // THE NEGATIVE-MARGIN GROWTH APPLIES ONLY AT THE DEFAULT MARKER — a
+  // caller naming its own `footerDataSlot` (opting out of the shared shape)
+  // gets no reach-past-the-pane's-padding behaviour either, same contract
+  // the retired `app-shell.tsx` `:has()` rule carried.
+  const reachesPaneFloor = footerDataSlot === "record-footer-band"
   return (
     <div data-slot={dataSlot} className="flex min-w-0 flex-1 flex-col gap-6">
       <div className="min-w-0">
@@ -155,7 +180,14 @@ export function RecordDetailBody({
           </div>
         )}
       </div>
-      <div data-slot={footerDataSlot} className="flex-none mt-auto w-full">
+      <div
+        data-slot={footerDataSlot}
+        className={
+          reachesPaneFloor
+            ? "flex-none mt-auto w-full mb-[calc(var(--space-5)*-1)] lg:mb-[calc(var(--space-6)*-1)]"
+            : "flex-none mt-auto w-full"
+        }
+      >
         {footer}
       </div>
     </div>

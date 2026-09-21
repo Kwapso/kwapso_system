@@ -2244,22 +2244,42 @@ export function AppShell({
          * it only stops a SHORT record from depending on content height to
          * find the pane's true bottom.
          *
-         * `record-footer-band` IS THE MARKER, NOT `ticket-detail-body` —
-         * `RecordDetailBody`'s own `footerDataSlot` defaults to exactly
-         * this string (record-detail-body.tsx's own header: "a NEUTRAL
-         * pair of names — never the literal `ticket-detail-body`/
-         * `ticket-footer-band` strings"), so this selector reaches every
-         * caller of the shared shape without reaching the ticket page's
-         * own, separately-marked band at all — `TicketDetailBody` carries
-         * `data-slot="ticket-footer-band"` and is untouched by this rule,
-         * on purpose: T0001 was already proved flush without it, and R89's
-         * own construction for the ticket page stays exactly as round 28
-         * left it. */}
+         * THE `has-[[data-slot=record-footer-band]]:h-[calc(100%+…)]`
+         * GROWTH RULE IS RETIRED — 22 Sep 2026, SAME DAY, LIVE DOM PROOF.
+         * It reached the pane's true bottom edge at `scrollTop=0` (876 →
+         * 900 on the knowledge source this was measured against) and then
+         * LOST it again the instant the pane was scrolled to its own
+         * `scrollHeight` — which is how a person actually reaches the
+         * bottom, and exactly reproduces Aurora's reported bug. Cause,
+         * proved by live injection (`el.scrollHeight` measured
+         * `el.clientHeight + padding-bottom`, i.e. `DENSITY_BODY`'s own
+         * reserved bottom padding counted a SECOND time): growing a
+         * descendant's own `height` PAST its scrolling ancestor's
+         * content-box edge, by design, IS scrollable overflow, and
+         * Chromium reserves that ancestor's `padding-bottom` again after
+         * any overflow it detects — so the calc's own +20/24px growth
+         * bought exactly 20/24px of new, illusory scroll room rather than
+         * closing the gap, and scrolling into that room dragged the
+         * already-flush band back up by the same amount.
+         *
+         * THE FIX MOVED TO `record-detail-body.tsx`'S OWN FOOTER WRAPPER —
+         * a fixed, NEGATIVE `margin-bottom` on the div carrying
+         * `data-slot="record-footer-band"` reaches the identical pixel
+         * without enlarging any box's measured `height`, so the scrolling
+         * ancestor's overflow accounting never sees it: proved live,
+         * `el.scrollHeight === el.clientHeight` afterwards (no phantom
+         * scroll room at all), band flush at `scrollTop=0` AND unchanged
+         * after scrolling to the pane's own end. Proved harmless on
+         * genuinely tall content too (story B0002, which already overflows
+         * this div's `h-full` ceiling on its own): identical flush result
+         * with and without the margin. This div goes back to a bare
+         * `h-full` for exactly the reason `has-[[data-slot=ticket-detail-
+         * body]]` did in round 28 — nothing here needs to reach past this
+         * pane's own padding any more; `record-detail-body.tsx`'s own
+         * header carries the rest of this argument. */}
         <div
           className={cn(
             "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip pb-24 md:pb-0",
-            "has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-5))]",
-            "lg:has-[[data-slot=record-footer-band]]:h-[calc(100%+var(--space-6))]",
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >
