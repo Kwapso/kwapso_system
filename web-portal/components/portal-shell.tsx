@@ -148,6 +148,29 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     // with neither ref in it.
   }, [session.state])
 
+  /* `--live-status-tab-clear`, read by `shared/web/live-status.tsx` (K62): the
+   * pill has to clear this bottom nav, and a flat guess does not track it —
+   * the bar's real height moves with the label text (see the comment above
+   * the `<nav>` below: German and Catalan wrap to a second line, ~16px
+   * taller). MEASURED, the same "leave a gutter, not a guess" shape
+   * `--pinned-chrome-h` above already uses for the header: a `ResizeObserver`
+   * on the bar itself, published onto the shell root as the bar's own real
+   * height plus one 16px gutter. */
+  const tabBarRef = React.useRef<HTMLElement>(null)
+  React.useEffect(() => {
+    const shell = shellRef.current
+    const bar = tabBarRef.current
+    if (!shell || !bar) return
+    const publish = () => {
+      const height = Math.round(bar.getBoundingClientRect().height)
+      shell.style.setProperty("--live-status-tab-clear", height > 0 ? `${height + 16}px` : "0px")
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [session.state])
+
   // THE APP IS STARTING. Not one screen's own wait — nothing is drawn yet and
   // nothing is known yet, including whether there is anything here for this
   // person — so it wears the mark the front door opens on rather than a spinner
@@ -216,10 +239,11 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     {/* `--live-status-tab-clear` is read by `shared/web/live-status.tsx`
         (K62): its fixed, bottom centred pill has to clear the bottom nav
         below, which (unlike the agency's phone only bar) shows at every
-        width here, so the property carries no `md` override. See
+        width here — MEASURED, not a class on this div any more; see the
+        `ResizeObserver` above this component's other early returns. See
         `web/components/shell/app-shell.tsx`'s own `[--shell-top…]` div for
         the sibling copy of this note. */}
-    <div ref={shellRef} className="flex min-h-[100svh] flex-col [--live-status-tab-clear:6rem]">
+    <div ref={shellRef} className="flex min-h-[100svh] flex-col">
       {/* THE STICKY HEADER'S EDGE IS AN INSET SHADOW (kit §2.7). It is
           load-bearing rather than decorative: this bar is `sticky` over
           scrolling content, and without an edge the page slides under it with
@@ -326,7 +350,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
       {/* The header's own argument, upside down: the bottom bar is sticky over
           the same scrolling content, on the same ground, so it takes the same
           strong edge on its top side (kit §2.7). */}
-      <nav className="bg-background sticky bottom-0 shadow-[var(--hairline-over-strong)]">
+      <nav ref={tabBarRef} className="bg-background sticky bottom-0 shadow-[var(--hairline-over-strong)]">
         <div className="mx-auto flex w-full max-w-3xl px-1">
           {DESTINATIONS.map((dest) => {
             const { label, icon: Icon } = dest

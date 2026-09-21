@@ -405,42 +405,6 @@ export function TicketDetailBody({
 }) {
   const isAtLeastLg = useIsAtLeastLg()
 
-  // K62's own clearance for THIS screen: `shared/web/live-status.tsx`'s pill
-  // clears the band below by reading `--live-status-band-clear` off the
-  // shell root, and until this measured it that property was a flat
-  // `8rem` (128px) guess set by `app-shell.tsx`'s `has-[[data-slot=
-  // ticket-footer-band]]` selector, a fixed number for a band whose real
-  // height depends on what `RecordFooterBand` actually draws. Measured on
-  // staging that guess put the pill 160px above the bottom at `lg` and
-  // 240px on a phone, both exactly the old flat 128px plus the ordinary
-  // base offset (`--space-7`/`--space-4`) and the phone tab bar term,
-  // more clearance than the band it was clearing, on every width. This
-  // `ResizeObserver` publishes the band's own real height plus ONE 16px
-  // gutter instead, the same "leave a gutter, not a guess" shape
-  // `web-portal/components/portal-shell.tsx`'s own `--pinned-chrome-h`
-  // already uses for its measured header. Published on `documentElement`,
-  // not a ref this component owns: the pill lives in a wholly different
-  // subtree (a sibling of `<ScreenShell>` in `app-shell.tsx`, never a
-  // descendant of this band), and a custom property only inherits DOWN,
-  // so the one ancestor both subtrees share is `<html>`. Removed on
-  // unmount so a screen with no band never inherits a stale one.
-  const footerBandRef = React.useRef<HTMLDivElement>(null)
-  React.useEffect(() => {
-    const el = footerBandRef.current
-    if (!el) return
-    const publish = () => {
-      const height = Math.round(el.getBoundingClientRect().height)
-      document.documentElement.style.setProperty("--live-status-band-clear", `${height + 16}px`)
-    }
-    publish()
-    const observer = new ResizeObserver(publish)
-    observer.observe(el)
-    return () => {
-      observer.disconnect()
-      document.documentElement.style.removeProperty("--live-status-band-clear")
-    }
-  }, [])
-
   // TWO DIFFERENT CELLS, NOT ONE CLASS REUSED — at `lg` this is a GRID cell,
   // ROUND 27 (see this file's own header): `relative min-h-0`, NEVER
   // `h-full`. The cell itself carries no height class at all — it is the
@@ -599,7 +563,6 @@ export function TicketDetailBody({
           pane's own ordinary bottom padding, exactly like every other
           record screen). */}
       <div
-        ref={footerBandRef}
         data-slot="ticket-footer-band"
         className="flex-none mt-auto w-full"
       >
@@ -631,7 +594,7 @@ export function TicketSidePanel({
    * drops the box: `Card variant="plain"`, no `p-4` on the content so the
    * kit's own zero inset applies and the section's text lines up with the
    * column edge. Only tickets' own call sites (help-detail.tsx) pass
-   * `"plain"` — see `web/test/plain-surface-scope.test.ts`. */
+   * `"plain"` — see `web/test/plain-surface-scope.test.tsx`. */
   surface?: "boxed" | "plain"
   children: React.ReactNode
 }) {

@@ -1424,6 +1424,31 @@ export function AppShell({
     </div>
   )
 
+  // `--live-status-tab-clear`, read by `shared/web/live-status.tsx` (K62): the
+  // pill has to clear the phone bottom tab bar below. MEASURED, not a flat
+  // guess any more: a `ResizeObserver` on the bar itself, published onto the
+  // shell root wrapper as the bar's own real height plus one 16px gutter, the
+  // same "leave a gutter, not a guess" shape `web-portal/components/
+  // portal-shell.tsx`'s own `--pinned-chrome-h` already uses for its measured
+  // header. At `md` the bar carries `md:hidden` (`display:none`), so it
+  // measures zero height and the published clearance collapses to `0px` on
+  // its own — no separate `md:` literal needed any more.
+  const shellRootRef = React.useRef<HTMLDivElement>(null)
+  const tabBarRef = React.useRef<HTMLElement>(null)
+  React.useEffect(() => {
+    const shell = shellRootRef.current
+    const bar = tabBarRef.current
+    if (!shell || !bar) return
+    const publish = () => {
+      const height = Math.round(bar.getBoundingClientRect().height)
+      shell.style.setProperty("--live-status-tab-clear", height > 0 ? `${height + 16}px` : "0px")
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     // THE LANGUAGE WRAPS THE WHOLE SHELL, so the nav, the breadcrumbs, every
     // routed screen and every dialog opened from one all read the same `t`.
@@ -1450,29 +1475,21 @@ export function AppShell({
         height is a variable rather than a literal. Zero at `md`, where the bar
         is not drawn.
 
-        `--live-status-tab-clear` AND `--live-status-band-clear` are the same
-        shape, read by `shared/web/live-status.tsx` (K62) rather than by
-        anything in this file: its fixed, bottom centred pill needs to clear
-        the phone bottom tab bar below, and a ticket screen's own dark
-        footer band when its content draws one, and it has no way to know
-        either fact on its own. `--live-status-tab-clear` matches the tab
-        bar's own reservation one screen down (`pb-24`, this file), zero at
-        `md` where the bar is hidden.
-
-        `--live-status-band-clear` is NOT set here any more. It used to be a
-        flat `has-[[data-slot=ticket-footer-band]]:[…]8rem` guess, a fixed
-        128px for a band whose real height varies with what it draws,
-        which staging measured putting the pill 160px/240px above the
-        bottom, more than the band it was clearing, on every width.
-        `web/components/tickets/ticket-detail-body.tsx` now measures its own
-        footer band with a `ResizeObserver` and publishes the real height
-        plus one 16px gutter onto `document.documentElement` directly,
-        because the pill and the band sit in two different subtrees of this
-        div (the pill is `LiveStatus` below, a sibling of `ScreenShell`;
-        the band is deep inside `ScreenShell`'s own body) and a custom
-        property only inherits DOWN, so `<html>` is the one ancestor they
-        share. See that file's own comment for the whole account. */}
-    <div className="[--shell-top:3.75rem] md:[--shell-top:0px] [--live-status-tab-clear:6rem] md:[--live-status-tab-clear:0px]">
+        `--live-status-tab-clear` is read by `shared/web/live-status.tsx`
+        (K62): its fixed, bottom centred pill takes exactly the version
+        toast's own offsets, plus this one clearance for the phone bottom tab
+        bar below it — MEASURED now, not a class on this div: see the
+        `ResizeObserver` above this component's own return statement, and the
+        `ref={tabBarRef}` on the `<nav>` a few screens down. `--live-status-
+        band-clear` — a second clearance this pill used to read for a ticket
+        screen's own dark footer band — is GONE. It was a flat guess here
+        (`has-[[data-slot=ticket-footer-band]]:[…]8rem`) that staging measured
+        putting the pill 160px/240px above the bottom, more than the band it
+        was clearing, on every width, and removing the band's own clearance
+        term altogether (rather than fixing the guess) is what the pill now
+        does: it clears the tab bar and nothing else, the same as the toast it
+        borrows its register from. */}
+    <div ref={shellRootRef} className="[--shell-top:3.75rem] md:[--shell-top:0px]">
       {/* Mobile top bar, an explicit height, because `--shell-top` above is a
           promise about it. ScreenShell has no mobile-chrome concept of its
           own (the rail simply disappears below `md`, by the kit's own
@@ -2215,7 +2232,7 @@ export function AppShell({
        * this is dropped entirely below `md` by the shell's own breakpoint
        * law, so this bar is the ONLY way through the app on a phone or a
        * tablet: anything it cannot reach cannot be reached. */}
-      <nav className="bg-card fixed inset-x-0 bottom-0 z-20 flex items-center justify-around shadow-[var(--hairline-over)] px-2 py-1.5 md:hidden">
+      <nav ref={tabBarRef} className="bg-card fixed inset-x-0 bottom-0 z-20 flex items-center justify-around shadow-[var(--hairline-over)] px-2 py-1.5 md:hidden">
         {bottomNav.map((item) => {
           const Icon = item.Icon
           const activeNav = isNavActive(item.path, here)

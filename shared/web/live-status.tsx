@@ -11,23 +11,34 @@
 // why this renders NOTHING while `useTeamLive` says the link is up, and
 // exactly the exception when it says otherwise.
 //
-// THE OFFSET IS THE TOAST'S OWN (shared/ui/components/sonner/sonner.tsx):
-// `var(--space-7)` up from the bottom on a wide screen, `var(--space-4)` on
-// a phone, the same two tokens `<Toaster>` already passes as `offset` and
-// `mobileOffset`. Two more clearances stack on top of that base, both read
-// off custom properties rather than computed here (the same seam
-// app-shell.tsx already uses for `--shell-top`): `--live-status-tab-clear`,
-// for the phone's own fixed bottom tab bar (agency only, zero at `md`; the
-// portal's own bottom nav shows at every width, so its wrapper sets the
-// same property with no `md` override), set once on each shell's own root
-// wrapper; and `--live-status-band-clear`, the ticket screen's own dark
-// Latest activity / Record band (R89), MEASURED rather than guessed.
-// `web/components/tickets/ticket-detail-body.tsx` publishes the band's
-// real height plus one 16px gutter onto `document.documentElement` with a
-// `ResizeObserver` (see that file's own comment), because this component
-// has no way to know what a screen it did not write is drawing below it,
-// and a flat guess (the old `8rem`) measured 160px/240px of clearance on
-// staging against a band that never needed that much.
+// THE OFFSET IS EXACTLY THE TOAST'S OWN (shared/ui/components/sonner/
+// sonner.tsx) AND NOTHING ELSE: `var(--space-7)` up from the bottom on a
+// wide screen, `var(--space-4)` on a phone, the same two tokens `<Toaster>`
+// already passes as `offset` and `mobileOffset`. ONE clearance stacks on top
+// of that base, read off a custom property rather than computed here (the
+// same seam app-shell.tsx already uses for `--shell-top`): `--live-status-
+// tab-clear`, for the phone's own fixed bottom tab bar (agency only, zero at
+// `md`, where the bar is `md:hidden` and so measures zero height on its own;
+// the portal's own bottom nav shows at every width, so its wrapper sets the
+// same property with no `md` override). Both shells MEASURE the bar rather
+// than guess: a `ResizeObserver` on the bar itself, published onto each
+// shell's own root wrapper as the bar's own real height plus one 16px
+// gutter (`web/components/shell/app-shell.tsx` and `web-portal/components/
+// portal-shell.tsx`).
+//
+// There used to be a second clearance property here, one this file will not
+// name again because the whole point is that it is gone: it read a ticket
+// screen's own dark Latest activity / Record band (R89). GONE, not fixed:
+// staging measured it putting the pill 160px/240px above the bottom, more
+// than the band it was clearing, on every width, because the band is a
+// STICKY element inside the page's own scroller and is mostly NOT at the
+// viewport's true bottom edge — a fact no flat number or measurement of the
+// band itself could ever correct for, since the pill needed the band's
+// DISTANCE from the viewport bottom, not its height. The fix is that this
+// pill takes exactly the version toast's own offsets and nothing else, the
+// same register K62 borrowed in the first place — it can sit in front of
+// the band on a ticket screen exactly as the toast already does everywhere
+// else.
 //
 // It carries the ONLY thing a person can do about it, the same remedy the
 // strip always offered: the socket is already reconnecting on its own
@@ -92,8 +103,8 @@ export function LiveStatus() {
         // 720 with the identical two root rules in play), so the flex
         // child inside centres on the real viewport again.
         "pointer-events-none fixed left-0 w-screen z-[70] flex justify-center px-4",
-        "bottom-[calc(var(--space-4)+var(--live-status-tab-clear,0px)+var(--live-status-band-clear,0px))]",
-        "md:bottom-[calc(var(--space-7)+var(--live-status-tab-clear,0px)+var(--live-status-band-clear,0px))]"
+        "bottom-[calc(var(--space-4)+var(--live-status-tab-clear,0px))]",
+        "md:bottom-[calc(var(--space-7)+var(--live-status-tab-clear,0px))]"
       )}
     >
       <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-pill bg-warning text-warning-foreground py-3 ps-[var(--space-6)] pe-[var(--space-3h)] text-caption shadow-xl">

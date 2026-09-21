@@ -131,41 +131,49 @@ describe("no shell mounts LiveStatus inline in its own content column", () => {
   })
 })
 
-describe("--live-status-band-clear is measured, not guessed", () => {
+describe("--live-status-band-clear is gone; --live-status-tab-clear is measured, not guessed", () => {
   const REPO_ROOT = join(__dirname, "..", "..")
 
-  // Staging measured the pill's bottom edge 160px above the viewport at
-  // 1440px and 240px at 760px on a ticket screen, both exactly the old
-  // flat `8rem` (128px) `has-[[data-slot=ticket-footer-band]]` guess plus
-  // the ordinary base offset and, on the phone width, the tab-clear term.
-  // That guess never tracked the band's own real height. Fixed by measuring
-  // it and publishing the real height plus one 16px gutter, so these
-  // assertions are a source census (jsdom does not lay out real pixel
-  // heights, so the measured NUMBER is not assertable here) that the flat
-  // guess is gone from app-shell.tsx and the measuring code is in place on
-  // the one component that owns the band.
-  it("app-shell.tsx no longer sets --live-status-band-clear off a has-[] guess", () => {
-    const src = readFileSync(join(REPO_ROOT, "web", "components", "shell", "app-shell.tsx"), "utf8")
-    expect(src).not.toMatch(/has-\[\[data-slot=ticket-footer-band\]\]:\[--live-status-band-clear:/)
+  // The band clearance used to sit the pill 160px/240px above the viewport
+  // on a ticket screen at 1440/760px, more than the band it was meant to
+  // clear, because the band is a STICKY element inside the page's own
+  // scroller and is mostly NOT at the viewport's true bottom edge — a fact
+  // no measurement of the band itself could correct, since the pill needed
+  // the band's DISTANCE from the bottom, not its height. Removed rather than
+  // re-fixed: the pill now takes exactly the version toast's own offsets,
+  // plus the tab bar clearance below, and nothing else.
+  it("the band variable is gone from all three files that used to carry it", () => {
+    for (const rel of [
+      ["shared", "web", "live-status.tsx"],
+      ["web", "components", "shell", "app-shell.tsx"],
+      ["web", "components", "tickets", "ticket-detail-body.tsx"],
+    ]) {
+      const src = readFileSync(join(REPO_ROOT, ...rel), "utf8")
+      expect(src, rel.join("/")).not.toMatch(/live-status-band-clear/)
+    }
   })
 
-  it("ticket-detail-body.tsx measures its own footer band with a ResizeObserver and publishes height + 16px", () => {
-    const src = readFileSync(join(REPO_ROOT, "web", "components", "tickets", "ticket-detail-body.tsx"), "utf8")
+  // The old flat `6rem` (96px) guess on app-shell.tsx's own root wrapper
+  // never tracked the phone tab bar's real height (staging measured 60px,
+  // not 96), and the portal's own bottom nav grows a whole extra line in
+  // German and Catalan (see portal-shell.tsx's own comment above its
+  // `<nav>`), which no flat number could track either. Fixed the same way
+  // `--pinned-chrome-h` already was: a `ResizeObserver` on the bar itself.
+  it("app-shell.tsx derives --live-status-tab-clear from the tab bar's own measured height", () => {
+    const src = readFileSync(join(REPO_ROOT, "web", "components", "shell", "app-shell.tsx"), "utf8")
+    expect(src).not.toMatch(/\[--live-status-tab-clear:6rem\]/)
     expect(src).toMatch(/new ResizeObserver/)
-    expect(src).toMatch(/--live-status-band-clear/)
-    // The gutter is one 16px, added once, in code (not a second, bigger
-    // guess dressed up as a measurement): `height + 16`, not `height * `
-    // anything or a second constant stacked on top.
-    expect(src).toMatch(/height\s*\+\s*16/)
-    // Published on the one ancestor the pill (a sibling of ScreenShell in
-    // app-shell.tsx) and the band (deep inside ScreenShell's own body)
-    // actually share, a custom property only inherits down.
-    expect(src).toMatch(/documentElement\.style\.setProperty\(\s*"--live-status-band-clear"/)
-    // Cleared on unmount so a screen with no ticket band never inherits a
-    // stale clearance from the last ticket that was open.
-    expect(src).toMatch(/documentElement\.style\.removeProperty\("--live-status-band-clear"\)/)
-    // The measuring ref actually rides the band's own DOM node, the same
-    // one `data-slot="ticket-footer-band"` marks (R89's own marker).
-    expect(src).toMatch(/ref={footerBandRef}\s*\n\s*data-slot="ticket-footer-band"/)
+    expect(src).toMatch(/setProperty\(\s*"--live-status-tab-clear"/)
+    // The observed node is the bottom tab bar itself, not a second, bigger
+    // guess dressed up as a measurement.
+    expect(src).toMatch(/<nav ref={tabBarRef}/)
+  })
+
+  it("portal-shell.tsx derives --live-status-tab-clear from the tab bar's own measured height", () => {
+    const src = readFileSync(join(REPO_ROOT, "web-portal", "components", "portal-shell.tsx"), "utf8")
+    expect(src).not.toMatch(/\[--live-status-tab-clear:6rem\]/)
+    expect(src).toMatch(/new ResizeObserver/)
+    expect(src).toMatch(/setProperty\(\s*"--live-status-tab-clear"/)
+    expect(src).toMatch(/<nav ref={tabBarRef}/)
   })
 })

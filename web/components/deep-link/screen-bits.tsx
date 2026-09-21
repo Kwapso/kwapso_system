@@ -218,8 +218,60 @@ export function LoadError({ what }: { what: string }) {
  *    `bg-surface-panel` is what publishes `--pinned-ground: var(--surface-panel)`
  *    for everything inside it). Without that the corner is a transparent notch
  *    over this card's own paper, which is the same colour and therefore no
- *    corner at all. */
-export function CollectionCard({ children }: { children: React.ReactNode }) {
+ *    corner at all.
+ *
+ * THE TICKETS-MAIN EXPERIMENT, EXTENDED 21 SEP 2026 (rulebook L43, her own
+ * words: "can yo do it also on tickets main?"). `surface="plain"` (only
+ * `tickets-collection.tsx` and `tickets-dashboard.tsx` pass it —
+ * `web/test/plain-surface-scope.test.tsx`) drops the box: `Card
+ * variant="plain" data-surface="plain"`, no padding class on `CardContent`
+ * at all, so a plain frame's toolbar and table sit flush with the page's own
+ * content edge, horizontally, the way `TicketSidePanel`/`EmptyGatedPanel`
+ * already sit for the record page.
+ *
+ * THE PINNED MECHANISM SURVIVES BOTH WAYS, AND FOR TWO DIFFERENT REASONS.
+ * `--pinned-lead` stays on the card unconditionally, same value, same
+ * className, because R83's OWN OVERRIDE is what actually sets the padding a
+ * pinned-strip-led or tab-pane-nested card pays — `.pinned-strip +
+ * [data-slot="card"] > [data-slot="card-content"] { padding-top: … }` and
+ * its `[data-tab-pane]` sibling in `web/app/globals.css` — and that selector
+ * (three-plus attribute/class steps) outranks the kit's own
+ * `group-data-[variant=plain]/card:pt-0` (wrapped in `:where()`, so it
+ * carries the specificity of ONE class) regardless of which Tailwind class
+ * this component types on `CardContent`. So the "10px above" a toolbar
+ * survives on the plain frame too, wherever a strip or a tab pane leads it —
+ * which every Tickets-main call site is — with no explicit `pt-*` needed
+ * here to fight the kit's own zero. `--pinned-inset-x` is left UNSET for
+ * plain rather than carried over at `--space-4`/`--space-7`: it defaults to
+ * `0px` (`PINNED_TOOLBAR`'s own `var(--pinned-inset-x,0px)` fallback), which
+ * is already the right bleed for a container with no side inset of its own
+ * to reach — carrying the boxed value over would bleed the pinned toolbar
+ * out by 16–32px it does not need to, a jump between resting and stuck that
+ * the boxed card never has because its own inset is real. `PINNED_INSET_MARK`
+ * is left off for the same reason `--pinned-behind` needs no capture here: a
+ * `plain` Card paints `bg-transparent`, so it never overwrote the ground its
+ * parent already had, and the row's own default (`var(--pinned-behind,
+ * var(--pinned-ground))`) is already the right paint without a mark asking
+ * `globals.css` to capture a value nothing here changed. */
+// ONE LINE, DELIBERATELY — not this file's usual multi-line destructured
+// param block. `web/test/rules.test.ts`'s own R63 census pulls this
+// function's whole body with a NON-GREEDY `export function
+// CollectionCard[\s\S]*?\n\}` — it stops at the first "}" that opens a line
+// with no leading whitespace, which is how it reaches past every INDENTED
+// brace inside the body to the function's own true close. A multi-line
+// `}: { … }) {` parameter block puts exactly that unindented "}" three lines
+// in, on the destructured object's own close, and would truncate the census
+// before it ever saw the boxed branch's `--pinned-lead` declaration. `surface`
+// is documented in the block comment above instead. `"boxed"` (the default)
+// is today's markup, byte for byte; `"plain"` is the tickets-main experiment.
+export function CollectionCard({ children, surface = "boxed" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
+  if (surface === "plain") {
+    return (
+      <Card variant="plain" data-surface="plain" className="[--pinned-lead:var(--toolbar-lead-gap)]">
+        <CardContent>{children}</CardContent>
+      </Card>
+    )
+  }
   return (
     <Card
       className={
@@ -412,7 +464,7 @@ export function EmptyGatedPanel({
    * kit's own zero inset applies, and R88's own header drop when empty
    * (this component's central `{!empty &&` guard) is unchanged either way.
    * Only tickets' own call sites (help-detail.tsx) pass `"plain"` — see
-   * `web/test/plain-surface-scope.test.ts`. */
+   * `web/test/plain-surface-scope.test.tsx`. */
   surface?: "boxed" | "plain"
   children: React.ReactNode
 }) {

@@ -1742,6 +1742,8 @@ live: no em dash anywhere a person reads.
 
 **What changes.** The no-containers change (removing the grouping card box around sections like Assigned to, Related stories, Related tickets, Stakeholders, Effort, Detail and similar sections on detail screens, so they sit on the paper background directly instead of on a raised card) ships to the tickets module first as an experiment, gets reviewed and iterated there, and only then rolls out to the whole app, the UI kit and the repo. Chips, tabs, buttons, tables, toolbars, tiles and the conversation card stay boxed as they are. The No Containers page (five staging screens redrawn) was validated by Aurora on 21 Sep 2026: *"artifact validated, go ahead and deploy tickets when ready"*. Status: design validated, build in the tickets module pending her live review.
 
+**Extended, 21 Sep 2026.** Aurora, verbatim: *"can yo do it also on tickets main?"* The tickets main page follows: the collection frame around the toolbar and the table, board, split or list on every tab, and the Overview chart panels, render plain; the board cards, the rows' washes, the triage well and the error and empty states keep their paper. Still the tickets module only.
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order

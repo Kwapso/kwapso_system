@@ -84,7 +84,7 @@ const SHORT_LOG: WorkLog = {
 // `surface` prop, defaulting to `"boxed"` (today's markup, byte for byte)
 // with `"plain"` opting into the kit's `Card variant="plain"` and dropping
 // `CardContent`'s own `p-4`. R88's own header-drop-when-empty guard is
-// unchanged by either surface. See web/test/plain-surface-scope.test.ts for
+// unchanged by either surface. See web/test/plain-surface-scope.test.tsx for
 // the census that keeps the string scoped to the tickets module.
 describe("EmptyGatedPanel — surface", () => {
   it("boxed (the default) carries data-variant=\"default\" and p-4 on its content", () => {

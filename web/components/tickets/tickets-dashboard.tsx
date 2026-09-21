@@ -415,8 +415,24 @@ function TallyBar({
  * `flex-1`, so the height reaches the body and a panel whose body wants to fill
  * (the trend's plot, the per-system list) can actually claim it. `className` is
  * the one thing a call site may say about the box itself, and today it says
- * exactly one thing: which fraction of a row the panel spans. */
-function Panel({
+ * exactly one thing: which fraction of a row the panel spans.
+ *
+ * PLAIN, UNCONDITIONALLY, SINCE 21 SEP 2026 (rulebook L43, "can yo do it also
+ * on tickets main?"). Every one of the six chart panels is this function, so
+ * there is no per-caller toggle to get wrong: `variant="plain"
+ * data-surface="plain"`, no `p-4` on the content, the box gone the same way
+ * `CollectionCard`'s own `surface="plain"` drops it (screen-bits.tsx). The
+ * GRID's own gap (`TicketsDashboard`'s own `gap-4`, below) is what keeps
+ * the panels apart now that neither paints a border of its own — no
+ * `<Separator>` added inside the grid, which would be a second, competing
+ * answer to the same question. The dashboard's own error/empty-state
+ * `<Card>`s (see the bottom of this file) are NOT this component and stay
+ * boxed. */
+// EXPORTED FOR ITS OWN TEST ONLY (`web/test/plain-surface-scope.test.tsx`),
+// same reasoning `dead-exports.test.ts`'s own header gives for a registry
+// read only by the law that enforces it: a test IS a user. Every OTHER call
+// site is still this file's own six panels, below.
+export function Panel({
   title,
   chip,
   className,
@@ -428,8 +444,12 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <Card className={className ? `min-w-0 h-full ${className}` : "min-w-0 h-full"}>
-      <CardContent className="flex min-w-0 flex-col gap-4 p-4">
+    <Card
+      variant="plain"
+      data-surface="plain"
+      className={className ? `min-w-0 h-full ${className}` : "min-w-0 h-full"}
+    >
+      <CardContent className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="min-w-0 text-base font-[var(--font-weight-medium)]">{title}</h3>
           {chip}

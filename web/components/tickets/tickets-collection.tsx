@@ -1414,7 +1414,7 @@ export function TicketsCollection({
           {renderFolderTabs({ config: tabsConfig, value: facet, onValueChange: (v) => setFacet(v as HelpFacet) })}
 
           {facet === TRIAGE ? (
-            <CollectionCard>
+            <CollectionCard surface="plain">
               {/* THE TOOLBAR, WITH ITS OWN SEARCH — CLIENT RULING, 2026-09-03,
                   SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO CARRY. Triage
                   still has no `<PagedFind>` to share a search box with (it is
@@ -1485,7 +1485,7 @@ export function TicketsCollection({
               ticketTotal={totals.help}
             />
           ) : scopedQ.error ? (
-            <CollectionCard>
+            <CollectionCard surface="plain">
               <ShapeStateBody
                 shape="collectionScreen"
                 state="error"
@@ -1601,7 +1601,7 @@ export function TicketsCollection({
               // (`collection-content.tsx`'s own `wrap`): zero gap to the tab row
               // above, which is this component's own flex column rather than a
               // second `gap-*` here.
-              wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
+              wrap={(inner) => <CollectionCard surface="plain">{inner}</CollectionCard>}
             >
               {(found) => {
                 const rows = found.active ? found.rows : scopedQ.data
