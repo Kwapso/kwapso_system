@@ -8149,6 +8149,41 @@ ALTER TABLE tasks ADD COLUMN deactivator_name TEXT;
 ALTER TABLE stories DROP COLUMN contributes_to_goal;
 `,
   },
+  {
+    // THE BILLABLE FLAG ON WORK LOGS IS KILLED. Aurora's ruling, 22 Sep 2026,
+    // verbatim: "remove the billable from logs, not hide, remove." Not a
+    // display change: the column, its type (`WorkLog.billable`, shared/types.ts),
+    // the `log_time`/`update_work_log` fields on both the web door
+    // (workers/content/src/routes/work-logs.ts) and the MCP tool
+    // (shared/workers/tool-catalog.ts), the meeting-capture INSERT
+    // (workers/content/src/lib/meetings.ts), the Logs screen's "not billable"
+    // chip and the time form's switch are all removed the same round; this
+    // migration is the data half.
+    //
+    // D1 supports `ALTER TABLE ... DROP COLUMN`, the same mechanism 0080 used
+    // to retire `knowledge_sources.identity_key` and 0114 used to retire
+    // `stories.contributes_to_goal` (both above), and the same discipline: no
+    // index rides `work_logs.billable` (0015 added it plain, `INTEGER NOT
+    // NULL DEFAULT 1`, and none of `idx_work_logs_running`,
+    // `idx_work_logs_target`, `idx_work_logs_account` or `idx_work_logs_user`
+    // reference it), so there is nothing to drop first. The column carries a
+    // real value on every row that ever existed (`NOT NULL DEFAULT 1`), and
+    // that is exactly what "not hide, remove" asks for: the flag itself is
+    // what Aurora rejects, not merely its display, so the value goes with the
+    // column rather than being preserved anywhere. Any hours summary that
+    // used to split billable from non-billable time was already one total
+    // (`totalSeconds`, `WorkLogSummary`) and needed no change.
+    //
+    // NUMBERED 0115, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0114 is the highest version on both the
+    // local tree and `origin/main` as of 22 Sep 2026, so 0115 is the next
+    // free number.
+    version: "0115_the_billable_flag_is_killed",
+    sql: `
+ALTER TABLE work_logs DROP COLUMN billable;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

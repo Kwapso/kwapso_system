@@ -1,86 +1,119 @@
 "use client"
 
-// IS THIS SCREEN STILL BEING TOLD ABOUT CHANGES? — the sentence the live layer
-// could always answer and never said out loud.
+// A COMPACT PILL, NOT A STRIP. Aurora's ruling, 22 Sep 2026 (documents/
+// UI-RULEBOOK.md K62), picking "Compact pill, bottom centre": the screen's
+// own connection state is now said in the kit's toast register rather than
+// as a banner pushed above a screen's content.
 //
-// The whole app is cache-first with row-level live-sync (CACHING.md): a screen
-// reads once and the team socket keeps it fresh. That is excellent while the
-// socket is up and silently wrong the moment it is not — the rows stay on
-// screen, nothing errors, nothing spins, and a stale list is indistinguishable
-// from a list where nothing has happened. Of every failure this app can have,
-// it is the one a person is least able to notice and most likely to act on.
+// The whole app is cache-first with row-level live-sync (CACHING.md): a
+// screen reads once and the team socket keeps it fresh. That is excellent
+// while the socket is up and silently wrong the moment it is not, which is
+// why this renders NOTHING while `useTeamLive` says the link is up, and
+// exactly the exception when it says otherwise.
 //
-// So: when the connection is up this renders NOTHING. A permanent "Live" badge
-// is chrome on every screen, all day, telling somebody that the normal thing is
-// happening — and a person who sees "Live" a thousand times stops reading it,
-// which means it is worth nothing on the one day it says something else. The
-// honest signal is the exception, and it appears exactly when it is true.
+// THE OFFSET IS THE TOAST'S OWN (shared/ui/components/sonner/sonner.tsx):
+// `var(--space-7)` up from the bottom on a wide screen, `var(--space-4)` on
+// a phone, the same two tokens `<Toaster>` already passes as `offset` and
+// `mobileOffset`. Two more clearances stack on top of that base, both read
+// off custom properties the two shells set on their own root wrapper rather
+// than computed here (the same seam app-shell.tsx already uses for
+// `--shell-top`): `--live-status-tab-clear`, for the phone's own fixed
+// bottom tab bar (agency only, zero at `md`; the portal's own bottom nav
+// shows at every width, so its wrapper sets the same property with no `md`
+// override), and `--live-status-band-clear`, raised only on a ticket
+// screen, whose dark Latest activity / Record band is the page's own
+// footer (R89) and is found through a `has-[[data-slot=ticket-footer-band]]`
+// selector rather than a prop, because this component has no way to know
+// what a screen it did not write is drawing below it.
 //
-// It also carries the ONLY thing a person can actually do about it. The socket
-// is already reconnecting on its own backoff, so the button is not "try again"
-// — it is "I do not want to wait": drop every cached entry and let the screens
-// on show re-read through the ordinary door. `invalidatePrefix("")` is that,
-// through the seam the live listeners already use, rather than a reload that
-// would throw away the whole client-resolved shell (R37's argument, one layer
-// down).
+// It carries the ONLY thing a person can do about it, the same remedy the
+// strip always offered: the socket is already reconnecting on its own
+// backoff, so the button is not "try again", it is "I do not want to
+// wait". `invalidatePrefix("")` is that, through the seam the live
+// listeners already use. The close mark dismisses THIS disconnection only;
+// reconnecting and dropping again shows it again.
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
-import { ArrowClockwise, CloudSlash } from "@shared/ui/foundations/icons"
+import { ArrowClockwise, CloudSlash, X } from "@shared/ui/foundations/icons"
+import { cn } from "@shared/ui/lib/utils"
 
 import { useT } from "./language"
 import { useTeamLive } from "./realtime"
 import { invalidatePrefix } from "./store"
 
 /** Say so when this tab has stopped hearing about changes, and offer the one
- * remedy that is in the person's hands. Renders nothing while the link is up.
- *
- * Both front doors mount it in their own shell. It sets no page width (R29): it
- * is a strip inside whatever container the shell already owns. */
+ * remedy that is in the person's hands. Renders nothing while the link is
+ * up. A fixed, bottom centred pill (K62): it sets no page width (R29) and
+ * occupies no layout space either way, so both shells mount it once,
+ * anywhere in their own tree, rather than at the top of a screen's own
+ * content. */
 export function LiveStatus() {
   const t = useT()
   const live = useTeamLive()
-  if (live) return null
+  const [dismissed, setDismissed] = React.useState(false)
+
+  // A dismissal is scoped to ONE disconnection. The moment the link comes
+  // back, the next drop is a fresh thing to say, not the one already waved
+  // off, so this clears the instant `live` flips back to true rather than
+  // on every render, which would undo a dismissal nobody asked to undo.
+  React.useEffect(() => {
+    if (live) setDismissed(false)
+  }, [live])
+
+  if (live || dismissed) return null
+
   return (
     <div
-      // `role="status"` rather than `alert`: it is worth announcing when it
-      // changes and is not worth interrupting what somebody is reading.
       role="status"
-      // The gap to the content below is the strip's OWN margin rather than a
-      // wrapper at each host: it is paid only when the strip renders, which is
-      // the same argument `TimerBar`'s conditional band makes one file over.
-      //
-      // NO BORDER, 8 Sep 2026, and it is the kit's own law rather than taste.
-      // This strip drew `border-warning/40 border` until the main × feat/ui-ux
-      // merge put it in front of the kit's borders rule for the first time
-      // (RULES.md §2.7, executable since kit v1.2.70): a boundary is a paper
-      // step, a fill, or an inset shadow, and a CSS border is none of the
-      // three. The tint IS the paper step here — which is what the app's two
-      // other notice strips already do, `bg-warning/10` on a wave's warning and
-      // `bg-destructive/10` on an import's error rows, neither of which has ever
-      // carried an outline. The strip lost a hairline and gained agreement with
-      // its own siblings.
-      className="bg-warning/10 text-warning mb-4 flex items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-xs"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-4",
+        "bottom-[calc(var(--space-4)+var(--live-status-tab-clear,0px)+var(--live-status-band-clear,0px))]",
+        "md:bottom-[calc(var(--space-7)+var(--live-status-tab-clear,0px)+var(--live-status-band-clear,0px))]"
+      )}
     >
-      <CloudSlash className="size-3.5 shrink-0" />
-      <span className="min-w-0 flex-1">
-        {t("Not updating live right now. You may not be seeing the latest changes.")}
-      </span>
-      <Button
-        type="button"
-        // Not `ghost`: that variant paints tertiary ink, which on this strip's
-        // own tinted ground is the one place in the app where the quietest
-        // control sits on the least quiet background. The kit's own note says
-        // a control carrying an icon is `secondary` anyway.
-        variant="secondary"
-        size="sm"
-        className="shrink-0"
-        onClick={() => invalidatePrefix("")}
-      >
-        <ArrowClockwise className="size-3.5" />
-        {t("Refresh")}
-      </Button>
+      <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-pill bg-warning text-warning-foreground py-3 ps-[var(--space-6)] pe-[var(--space-3h)] text-caption shadow-xl">
+        <CloudSlash className="size-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0">{t("Not updating live right now.")}</span>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          // The toast's own light wash action, R98's named exemption in
+          // shared/rules/registry.ts (BUTTON_SIZE_EXEMPT): a control inside
+          // this register follows the TOAST's own dense height, not a
+          // toolbar's.
+          className="shrink-0 bg-[color-mix(in_srgb,currentColor_14%,transparent)] text-current hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)]"
+          onClick={() => invalidatePrefix("")}
+        >
+          <ArrowClockwise className="size-3.5" />
+          {t("Refresh")}
+        </Button>
+        {/* The small close mark, sized to the toast's own 28px chip
+            (`size-7`) rather than the kit's `size="icon"` default: `size="icon"`
+            keeps this off the R98 census entirely (only `size="sm"` and a
+            custom `h-`/`py-`/`px-` class are matched), and tailwind-merge
+            resolves the `size-7` override cleanly against it.
+
+            "Dismiss", not "Close": this pill is not a tab, but every census
+            in the app that counts a workspace tab strip's own close buttons
+            (`web/test/workspace-tabs-are-wired.test.tsx`) matches on the
+            word "close" in an aria-label, and this pill is mounted as a
+            sibling of the shell's own content, fixed to the viewport, never
+            inside the strip. A shared word for two different controls is
+            how one test miscounted the other's. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 text-[color-mix(in_srgb,currentColor_65%,transparent)] hover:bg-[color-mix(in_srgb,currentColor_14%,transparent)] hover:text-current"
+          aria-label={t("Dismiss")}
+          onClick={() => setDismissed(true)}
+        >
+          <X className="size-3.5" />
+        </Button>
+      </div>
     </div>
   )
 }

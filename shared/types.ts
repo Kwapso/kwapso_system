@@ -2434,7 +2434,6 @@ export type WorkLog = {
   /** null = still running */
   endedAt: string | null
   seconds: number
-  billable: boolean
   /** a runaway timer somebody binned. The row survives; every sum subtracts it. */
   discarded: boolean
   accountId: string | null

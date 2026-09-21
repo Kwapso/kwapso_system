@@ -131,8 +131,8 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 63 of the 186 tools answer on a GET (counted from the live
-  catalogue, 21 Sep 2026), and 185 of the doors in the
+- **Read** — 64 of the 189 tools answer on a GET (counted from the live
+  catalogue, 21 Sep 2026), and 188 of the doors in the
   census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
@@ -276,7 +276,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **278 doors, 210 with a tool, 68 with a written reason**, the
+  red build. Today: **280 doors, 212 with a tool, 68 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -434,8 +434,10 @@ Today it covers:
     `set_audit_date`, `connect_processes`, `disconnect_processes` (all need
     `processes:*`).
   - waves, `list_waves`, `get_wave`, `create_wave`, `update_wave`,
-    `set_wave_active`, `set_sprint_wave`, `update_wave_phase_days` (all need
-    `work:*`). A WAVE is what a
+    `set_wave_active`, `set_sprint_wave`, `update_wave_phase_days`,
+    `get_wave_phase_day_defaults`, `update_wave_phase_day_defaults` (all need
+    `work:*`, except `get_wave_phase_day_defaults` which only needs `work:read`).
+    A WAVE is what a
     client bought: several phases sold together. It carries NO price — what a
     wave costs is deliberately out of this module's first version — and its dates
     are DERIVED from the phases inside it, so `set_sprint_wave` re-dates both the
@@ -444,7 +446,11 @@ Today it covers:
     be enforcing a rule nobody agreed to. `update_wave_phase_days` sets how many
     days one or more phase types get on a wave (Aurora's 20 Sep 2026 ruling), a
     whole number of days from 1 to 365 per phase type; a wave with no rows of its
-    own reads the placeholder defaults. `set_audit_date` moves the day a map's savings are measured
+    own reads the TEAM's own default (`get_wave_phase_day_defaults`), which is
+    itself the code's placeholder wherever the team has never set one.
+    `update_wave_phase_day_defaults` sets that team-wide default (Aurora's 21 Sep
+    2026 ruling, "Make sure we can adjust this on the settings in Waves"), same
+    shape one level up. `set_audit_date` moves the day a map's savings are measured
     FROM, which changes every figure on it and on the client's own portal while
     changing not one minute of their work — so it confirms before it writes.
     `connect_processes` is LOOSE by ruling: the last step of one map is very

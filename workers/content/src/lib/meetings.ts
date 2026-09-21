@@ -1124,8 +1124,8 @@ export async function captureTranscript(
       cfg,
       guard.databaseId,
       `INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, user_name, kind, note,
-         started_at, ended_at, seconds, billable, created_at, creator_id, creator_email, creator_name)
-SELECT ${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlString(id)}, ${sqlString(person.userId)}, ${sqlString(person.name)}, ${sqlString(MEETING_LOG_KIND)}, ${sqlString(`In "${meeting.title}"`)}, ${sqlString(meeting.startsAt)}, ${sqlString(endsAt)}, ${seconds}, 1, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)}
+         started_at, ended_at, seconds, created_at, creator_id, creator_email, creator_name)
+SELECT ${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlString(id)}, ${sqlString(person.userId)}, ${sqlString(person.name)}, ${sqlString(MEETING_LOG_KIND)}, ${sqlString(`In "${meeting.title}"`)}, ${sqlString(meeting.startsAt)}, ${sqlString(endsAt)}, ${seconds}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)}
  WHERE NOT EXISTS (
    SELECT 1 FROM work_logs
     WHERE target_table = 'meetings' AND target_id = ${sqlString(id)}

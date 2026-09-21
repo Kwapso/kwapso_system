@@ -23,7 +23,6 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { Swatch } from "@/components/records/record-picker"
 import type { PickablePerson } from "@/lib/members"
-import { NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
 import { CONCEPT_ICON } from "@/lib/pages"
 // THE ONE STATUS→DOT DERIVATION, IMPORTED RATHER THAN COPIED — see
 // `shapeChoicesTable`'s own status-cell comment below. `automation-edit-sheet.tsx`
@@ -1074,13 +1073,18 @@ export type ChoiceGroupHome = {
  * ruling is flat too ("kill ALL the emojis").
  *
  * WHAT MAY STILL DRAW BESIDE THE WORD is a COLOUR swatch, if the value's
- * group carries one (`ChoiceGroupHome.colour` — unwired today, see that
- * type's own header), or an ICON, if it carries one
- * (`ChoiceGroupHome.icon` — likewise unwired; Ticket type's own icon draws in
- * the DETAILS column instead, not here — see `choiceDetailsCell`'s header).
- * NEVER BOTH: `icon` is only ever consulted when `colour` came back nothing.
- * A group with neither draws the bare word, which is every group today,
- * Ticket type included.
+ * group carries one (`ChoiceGroupHome.colour`, unwired today, see that
+ * type's own header), an ICON, if it carries one (`ChoiceGroupHome.icon`,
+ * likewise unwired), OR ONE OF THE FOUR TYPE-OWNED MARKS `choiceValueMark`
+ * (below) resolves for Sprint type, Story type, Ticket type and App stage,
+ * moved here from the Details column on Aurora's 22 Sep 2026 (later) ruling,
+ * verbatim: *"no: the icon/color next to the value in first column! …
+ * however icon color its not a detail!"* See `choiceValueMark`'s own header
+ * for the full account, and why Details keeps only text now.
+ * NEVER MORE THAN ONE: colour wins over a home icon, which wins over a
+ * type-owned mark. A group with none of the four draws the bare word, which
+ * is every group with no code-owned mark (Industry, Country, the three
+ * "labels" groups, and more).
  *
  * A PLAIN STRING WHEN THERE IS NOTHING TO DRAW BESIDE THE WORD, and that is
  * a search/sort decision as much as a visual one: `record-table.tsx`'s
@@ -1175,27 +1179,54 @@ export type ChoiceGroupHome = {
  *     nothing beyond its word — an honest empty cell, no dash, no hint
  *     (R81's own rule, read here for a table cell rather than a form).
  *
- * DETAILS STOPPED BEING ITS OWN COLUMN ON 22 SEP 2026, the same reading that
- * restored Status above (this file's own header, "STATUS IS BACK TO BEING
- * ITS OWN COLUMN"). The cell this function builds is unchanged; only where
- * it renders moved, onto the Value cell's own second line — `valueCell`'s
- * own comment below has the fold, the same technique `tickets-collection.tsx`
- * stacks a resolver's name over their date in the Closed column. */
-function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>): React.ReactNode {
+ * DETAILS STOPPED BEING ITS OWN COLUMN ON 22 SEP 2026 (MORNING), the same
+ * reading that restored Status above (this file's own header, "STATUS IS
+ * BACK TO BEING ITS OWN COLUMN"): the cell this function built was
+ * unchanged that round, only where it rendered moved, onto the Value cell's
+ * own second line.
+ *
+ * THAT FOLD DID NOT SURVIVE THE DAY EITHER. Aurora, later the same day,
+ * verbatim: *"no: the icon/color next to the value in first column! details
+ * is the next column (however icon color its not a detail!) make status the
+ * second column, the rest ok."* Two corrections in one sentence: what the
+ * second line under Value had been showing for three of the four cases above
+ * (Sprint type's glyph, Story type's glyph, Ticket type's glyph, App stage's
+ * dot) was never a DETAIL, it was a MARK, the same kind of thing
+ * `ChoiceGroupHome.colour`/`.icon` already draw beside a value's own name,
+ * so it moves there now (`choiceValueMark`, just below this function), and
+ * Details returns as its own column, third (after Status), holding only what
+ * is left once the mark is gone: Sprint type's own day-count `Badge` and
+ * nothing else, since Story type, Ticket type and App stage had no text
+ * beyond the mark that just moved out. */
+/** THE VALUE'S OWN MARK: an icon or a colour drawn BESIDE the value, never a
+ * second line beneath it (Aurora, 22 Sep 2026 (later); this file's own
+ * header above has her verbatim ruling, and `choiceDetailsCell`'s own header
+ * a few lines down has the accounting for what stayed behind). `ChoiceGroupHome
+ * .colour`/`.icon` (unwired today) win first, unchanged from before this
+ * change; failing those, the same four type-owned marks `choiceDetailsCell`
+ * used to draw as a "detail" read here instead: Sprint type and Story type
+ * and Ticket type's own icon (`sprintTypeIcon`/`storyTypeIconName`/
+ * `ticketTypeIconName`), and App stage's own dot tone.
+ *
+ * NEVER A `Badge`: a coloured tone beside a value is a `Swatch`, the same
+ * mark `ChoiceGroupHome.colour` already draws, so R86 ("the one coloured
+ * chip is the record's status") never sees a second coloured CHIP on this
+ * row. App stage's tone used to be a `Badge variant="status" dot={…}>
+ * {v.value}</Badge>`, repeating the value's own word as its label to satisfy
+ * the kit's "a dot never renders without one" rule (ruling 04); that label is
+ * unnecessary here because the mark now sits beside that SAME text already,
+ * so a plain `Swatch` reading the tone's own CSS custom property
+ * (`var(--dot-<tone>)`, the identical token `badge.tsx`'s own `DOT_FILL`
+ * resolves) is both simpler and the honest "mark, not chip" answer. */
+function choiceValueMark(v: SelectableValue, home: ChoiceGroupHome | undefined): React.ReactNode {
+  const colour = home?.colour?.(v.value)
+  if (colour) return <Swatch colour={colour} />
+  const homeIcon = home?.icon?.(v.value)
+  if (homeIcon) return <Icon name={homeIcon} className="text-muted-foreground size-4 shrink-0" />
   if (v.type === PHASE_TYPE_GROUP) {
-    const hasIcon = phaseTypeIcon(v.value) !== ""
-    const days = v.standardDays
-    if (!hasIcon && days === null) return null
-    return (
-      <span className="inline-flex min-w-0 items-center gap-2">
-        {hasIcon && <SprintTypeGlyph type={v.value} size={14} className="text-muted-foreground shrink-0" />}
-        {days !== null && (
-          <Badge variant="secondary" className="shrink-0">
-            {t("{days} days", { days })}
-          </Badge>
-        )}
-      </span>
-    )
+    return phaseTypeIcon(v.value) !== "" ? (
+      <SprintTypeGlyph type={v.value} size={14} className="text-muted-foreground shrink-0" />
+    ) : null
   }
   if (v.type === "Story type") {
     const iconName = storyTypeIconName(v.value)
@@ -1206,15 +1237,39 @@ function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>)
     return iconName ? <Icon name={iconName} className="text-muted-foreground size-4 shrink-0" /> : null
   }
   if (v.type === SELECTABLE_GROUPS.appStage) {
-    const tone = appStageDotTone(v.value)
-    // A DOT NEVER RENDERS WITHOUT A LABEL (the kit's own ruling 04) — the
-    // stage's own word is the only label there is, so it repeats here
-    // beside its colour, the same pairing `apps-screen.tsx` already draws.
-    return tone ? (
-      <Badge variant="status" dot={tone}>
-        {v.value}
+    // NAMED `stageTone`, NOT THE GENERIC `tone`. R86's own census
+    // (`web/test/status-owns-the-chip.test.ts`) reads a `<Swatch colour={…}>`
+    // expression's resolved TEXT for "status"/"stage"/"waiting" before it
+    // will pass a coloured mark with no exemption; a template literal
+    // resolves to nobody's identifier (`rootIdentifierName` gives up on a
+    // `TemplateExpression`), so what the census actually reads here is this
+    // literal's own source text, `${stageTone}` embedded in it, the same
+    // "resolved through a local const" shape that census's own doc already
+    // approves for `appStageDotTone(v.value)` READ AS TEXT, one step wider.
+    const stageTone = appStageDotTone(v.value)
+    return stageTone ? <Swatch colour={`var(--dot-${stageTone})`} /> : null
+  }
+  return null
+}
+
+/** THE REMAINING DETAIL: text only, never an icon or a colour (see
+ * `choiceValueMark`'s own header, just above: the mark moved there on
+ * Aurora's 22 Sep 2026 (later) ruling). The only group left with something
+ * to say here is Sprint type's own duration, a plain `Badge
+ * variant="secondary"`, a quiet count chip rather than a status colour, so
+ * R86 does not reach it either. Every other group `choiceValueMark` draws a
+ * mark for (Story type, Ticket type, App stage) had NOTHING beyond that
+ * mark, so their Details cell is now an honest empty one, the same
+ * "carries nothing" answer R81 gives elsewhere. */
+function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>): React.ReactNode {
+  if (v.type === PHASE_TYPE_GROUP) {
+    const days = v.standardDays
+    if (days === null) return null
+    return (
+      <Badge variant="secondary" className="shrink-0">
+        {t("{days} days", { days })}
       </Badge>
-    ) : null
+    )
   }
   return null
 }
@@ -1248,68 +1303,47 @@ export function shapeChoicesTable(
       // "everywhere where i edit choices we need to add a c[o]lumn as for
       // where is th[a]t choice[]! for exmaple in settibsg s[t]icket: typ[e]
       // (bug, etc) but i[n]eed to see that 'type'." The record half is the
-      // settings page's own title (`moduleTitle`, above — the one this cell
+      // settings page's own title (`moduleTitle`, above, the one this cell
       // used to draw ALONE, in the retired "Module" column); the field half
       // is `shared/selectable-where.ts`'s own answer, derived from `shared/
       // selectable-homes.ts` rather than typed here. FOLDS the old Module
-      // column into this one (R82's six-column ceiling — see settings-
+      // column into this one (R82's six-column ceiling, see settings-
       // choices-panel.tsx's own header for the accounting) rather than
       // adding a seventh: the Module FACET stays, reading `moduleSegment`
       // below unchanged, but the Module CELL does not survive as its own
       // column now that this one says strictly more.
       const fieldWord = choiceFieldWord(v.type)
       const whereText = fieldWord ? `${moduleTitle}: ${t(fieldWord)}` : moduleTitle
-      const colour = home?.colour?.(v.value)
-      // NEVER BOTH — see `ChoiceGroupHome`'s own header. Colour is the one
-      // that is actually wired today, so it wins the slot on the chance a
-      // caller ever set both.
-      const icon = colour ? undefined : home?.icon?.(v.value)
-      // PROTECTED OUTRANKS ACTIVE/INACTIVE — see this function's own header.
+      // PROTECTED OUTRANKS ACTIVE/INACTIVE, see this function's own header.
       // The invariant the door and 0088's migration now keep is what makes
       // this a safe simplification rather than a display choice papering over
       // a database that could still disagree: a protected row is never
       // inactive, so there is no case this ordering hides.
       const statusWord = v.isDefault ? t("Protected") : v.active ? t("Active") : t("Inactive")
-      // THE DETAILS CELL, FOLDED UNDER THE VALUE. K59, Aurora, 22 Sep 2026,
-      // the same reading that put Status back above: restoring Status put
-      // this table at seven again once Added by/Added on stayed split, so
-      // Details (its own column since 16 Sep 2026 evening) is what folds
-      // this time — `choiceDetailsCell`'s own header has the full R82
-      // accounting for why Details over another column. Computed once here
-      // so the SAME node both rides the Value cell's second line, below, and
-      // still answers `rows[i].details` for a reader that wants the fact on
-      // its own (web/test/shape.test.ts's own census reads it that way).
+      // THE DETAILS CELL, text only, its own column again (third, after
+      // Status). See `choiceDetailsCell`'s own header for what is left in it
+      // now that the icon/dot marks moved to the Value cell.
       const detailsNode = choiceDetailsCell(v, t)
-      // THE VALUE CELL — the record's own mark and name on the first line,
-      // Details (above) as a MUTED SECOND LINE beneath it when there is one,
-      // the same stacking `tickets-collection.tsx`'s Closed column already
-      // uses for a resolver's name over their date (`flex flex-col gap-0.5`,
-      // the second line at `text-xs` — the surrounding `text-muted-
-      // foreground` on the column cell does the colour, same as that column).
-      // `null` draws nothing beneath, never an empty line — the same "carries
-      // nothing" answer Details has always given a type with nothing to say.
+      // THE VALUE CELL, the mark (`choiceValueMark`, above `choiceDetailsCell`)
+      // and the name, ONE LINE, `REF_LEADS_NAME` (the shrink-0-mark-in-front-
+      // of-a-truncating-name class every other leading mark in this app
+      // already uses). NO SECOND LINE any more, Aurora, 22 Sep 2026 (later),
+      // verbatim, this file's own header: "no: the icon/color next to the
+      // value in first column!"
       const valueCell = (
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className={REF_LEADS_NAME}>
-            {colour ? (
-              <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
-            ) : icon ? (
-              <Icon name={icon} className="text-muted-foreground size-4 shrink-0" />
-            ) : null}
-            <span className="min-w-0 truncate">{v.value}</span>
-          </span>
-          {detailsNode && <span className="text-muted-foreground text-xs">{detailsNode}</span>}
+        <span className={REF_LEADS_NAME}>
+          {choiceValueMark(v, home)}
+          <span className="min-w-0 truncate">{v.value}</span>
         </span>
       )
-      // ADDED BY / ADDED ON. K59, Aurora, 21 Sep 2026: "ok split the who
-      // and date added in 2 columns." Two columns now, not the one folded
-      // cell the 21 Sep 2026 morning ruling shipped a few hours earlier (this
-      // function's own history one block up has that fold's own reasoning,
-      // superseded by this one). `addedBy` carries the creator's face and
-      // first name; `addedOn` carries the formatted date, with the raw
-      // instant riding beside it as `createdAtRaw` for the sort
-      // (`sorted-columns-declare-their-type.test.ts`'s own law). R54: a
-      // dropdown value is written only by staff (every write door on
+      // ADDED, creator's face and first name, over the date. FOLDED BACK
+      // INTO ONE CELL, 22 Sep 2026 (later): Aurora's ruling put Details back
+      // at its own seat (this function's own header), which puts the table
+      // at seven named facts the moment Added by/Added on stay split, so
+      // they fold back into one Added cell, the same shape the very first
+      // 21 Sep 2026 reading of K59 shipped, before that same-day split
+      // (documents/UI-RULEBOOK.md's own K59 has the full back and forth).
+      // R54: a dropdown value is written only by staff (every write door on
       // `selectable_data` refuses a portal caller, R21), so
       // `staffNameFromSnapshot` is unconditional here the way it is for every
       // OTHER staff-only record's created-by name.
@@ -1317,9 +1351,10 @@ export function shapeChoicesTable(
       // THE RAW VALUE FIRST, THE SHAPED STRING OFF IT, never a formatter call
       // inline in the row object (`sorted-columns-declare-their-type.test.ts`'s
       // own census reads a literal `key: formatDate(...)` line as a column that
-      // needs its own `sortType` declared where it lives, and this column's
-      // real declaration lives in settings-choices-panel.tsx's `TableColumn`,
-      // not here).
+      // needs its own `sortType` declared where it lives, this table's own
+      // sort lives in the TOOLBAR now (settings-choices-panel.tsx's
+      // `sortOptions`), reading `createdAtRaw` below directly, never this
+      // formatted string).
       const addedOn = v.createdAt ? formatDate(v.createdAt, lang) : ""
       return {
         id: v.id,
@@ -1335,27 +1370,26 @@ export function shapeChoicesTable(
           </span>
         ),
         whereText,
-        // THE MODULE FACET'S OWN PLAIN FIELD, UNCHANGED — a filter reads
+        // THE MODULE FACET'S OWN PLAIN FIELD, UNCHANGED. A filter reads
         // `row[field]` for an exact match (`evaluateRules`, shared/web/
         // screen-engine/config.ts), so it cannot share a key with a node
         // column any more than search or sort can. The Module COLUMN folded
         // into `where` above; the Module FACET still reads this.
         moduleSegment: segment,
-        // THE WHERE FACET'S OWN PLAIN FIELD — the field word alone ("Type",
+        // THE WHERE FACET'S OWN PLAIN FIELD, the field word alone ("Type",
         // "Status", …), so a reader can narrow to every group that fills the
         // same kind of field across every module at once.
         whereField: fieldWord ?? "",
-        // THE STATUS CELL, ITS OWN COLUMN AGAIN. K59, Aurora, 22 Sep 2026,
-        // verbatim: "ok, but keep status as its own column!" Same word, same
-        // D17 dot this cell has drawn all along (see the AMENDED 17 Sep 2026
-        // note one screen up in this file's history) — only its seat moved,
-        // back to its own `status` column cell rather than a child of
-        // `value` (this function's own header, "STATUS IS BACK TO BEING ITS
-        // OWN COLUMN", has the accounting). Inline, never a variable read
-        // back in — `web/test/ticket-list-face-and-status.test.ts`'s own
-        // census reads THIS property's own text for `<Badge … dot=`, the
-        // same reason `shapeAccountsList`'s own `status` cell, one screen up
-        // in this file, writes its Badge inline rather than through a named
+        // THE STATUS CELL, ITS OWN COLUMN, SECOND SEAT NOW. K59, Aurora,
+        // 22 Sep 2026, verbatim: "ok, but keep status as its own column!"
+        // (morning) then "make status the second column, the rest ok."
+        // (later). Same word, same D17 dot this cell has drawn all along
+        // (see the AMENDED 17 Sep 2026 note one screen up in this file's
+        // history). Inline, never a variable read back in,
+        // `web/test/ticket-list-face-and-status.test.ts`'s own census reads
+        // THIS property's own text for `<Badge … dot=`, the same reason
+        // `shapeAccountsList`'s own `status` cell, one screen up in this
+        // file, writes its Badge inline rather than through a named
         // constant.
         status: (
           <Badge variant="status" dot={AUTOMATION_STATUS_DOT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
@@ -1368,37 +1402,35 @@ export function shapeChoicesTable(
         // this function's own header for why Protected is no longer a
         // separate facet beside this one.
         statusState: v.isDefault ? "protected" : v.active ? "active" : "inactive",
-        // THE ADDED BY CELL: the record's own face (R90's own "no photo
-        // field yet" shape: `SelectableValue` carries no picture, so
-        // `RecordMark` draws the initials tile alone off the name, the same
-        // gap the work-logs panel's own Logged-by filter already carries)
-        // over the first name. `null`, never an empty wrapper, for a value
-        // with no audit block, the same "carries nothing" answer the
-        // Details cell already gives R81.
-        addedBy: addedByName ? (
+        // THE DETAILS FACT, ITS OWN COLUMN AGAIN, see this function's own
+        // header and `choiceDetailsCell`'s own doc. `null` for every type
+        // Details has nothing left to say about, now that the icon/dot marks
+        // moved to Value.
+        details: detailsNode,
+        // THE ADDED CELL, who over when: the creator's face (R90's own
+        // "no photo field yet" shape, `SelectableValue` carries no picture,
+        // so `RecordMark` draws the initials tile alone off the name, the
+        // same gap the work-logs panel's own Logged-by filter already
+        // carries) and first name on the first line, the formatted date
+        // muted beneath it. `null`, never an empty wrapper, for a value with
+        // no audit block, the same "carries nothing" answer Details already
+        // gives R81.
+        added: addedByName ? (
           <span className="flex min-w-0 items-center gap-2">
             <RecordMark name={addedByName} shape="round" size="choice" />
-            <span className="min-w-0 truncate">{addedByName}</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="min-w-0 truncate">{addedByName}</span>
+              {addedOn && <span className="text-muted-foreground text-xs">{addedOn}</span>}
+            </span>
           </span>
         ) : null,
-        addedByText: addedByName,
-        // THE ADDED ON CELL: the date alone now, its own column. Plain text:
-        // no face, no icon, nothing this cell orders or searches by besides
-        // itself, so the shaped string IS what the column reads (no separate
-        // search field the way `addedByText` needs one for its node cell).
-        addedOn,
-        // THE SORT'S OWN RAW VALUE — the RAW ISO instant, never the formatted
-        // `addedOn` string above (`web/test/sorted-columns-declare-their-
-        // type.test.ts`'s own law: a sortable date column compares the fact,
-        // never the words shaped for a reader).
+        addedText: addedByName,
+        // THE SORT'S OWN RAW VALUE, the RAW ISO instant, read by the
+        // toolbar's own "Added on" `SortOption` (settings-choices-panel.tsx),
+        // never the shaped `addedOn` string above
+        // (`sorted-columns-declare-their-type.test.ts`'s own law: a sortable
+        // date compares the fact, never the words shaped for a reader).
         createdAtRaw: v.createdAt,
-        // THE DETAILS FACT, OFF ITS OWN COLUMN NOW — see this function's own
-        // header, "THE DETAILS COLUMN", and `choiceDetailsCell`'s own header
-        // for where it draws instead (the Value cell's second line, above).
-        // Same node, computed once as `detailsNode`, never a second call.
-        // `null` for every type with nothing beyond its word, which draws no
-        // second line at all, not an empty one.
-        details: detailsNode,
       }
     }),
   }

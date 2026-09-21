@@ -560,7 +560,6 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "startedAt", column: "started_at", type: "date" },
       { name: "endedAt", column: "ended_at", type: "date", note: "null while the timer is still running" },
       { name: "seconds", column: "seconds", type: "number" },
-      { name: "billable", column: "billable", type: "boolean" },
       { name: "discardedAt", column: "discarded_at", type: "date" },
       ACCOUNT,
       CREATED,

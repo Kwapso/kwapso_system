@@ -35,6 +35,17 @@
 //   · the Effort section (the shared `EffortCard`, another lane's own empty/
 //     avatar behaviour, unmodified here) is absent when the task carries no
 //     logged time.
+//
+// AMENDED AGAIN 22 Sep 2026 — Aurora, verbatim, reading the three-card
+// version back: "great work. however merge assigned to details and deadline
+// in the same container together (in this order)." So the three separate
+// `TicketSidePanel` cards above are now ONE card, holding, in this order,
+// the Assigned to eyebrow tile, Details (the description, renamed off
+// "Description"), then Deadline — the kit's own `Separator` between each
+// part, no nested cards. The `task-assignee-card`/`task-deadline-card`/
+// `task-description-card` slots are gone; the merged card is
+// `task-details-card`, with `task-assignee-part`/`task-details-part`/
+// `task-deadline-part` inside it, in that order.
 
 import * as React from "react"
 import { readFileSync } from "node:fs"
@@ -47,6 +58,7 @@ import { RememberedScreen } from "@shared/web/remembered"
 import { BASE_RECIPES } from "@/lib/screens"
 import { TasksScreen } from "@/components/work/tasks-screen"
 import { recordTimeKey, recordTimeSummaryKey } from "@/lib/live-resources"
+import { useScreenActions } from "@/lib/use-screen-actions"
 import type { Task, TeamMember, WorkLog } from "@shared/types"
 
 const ROOT = join(__dirname, "..", "..")
@@ -138,6 +150,67 @@ vi.mock("@/lib/api", async (importOriginal) => {
         dueTodayDone: 0,
       }),
       updateTask: async () => ({ tasks: [] }),
+      // THE DEFECT THIS FILE'S OWN "reacts to a start/stop/done mutation"
+      // describe blocks were written for: a live proof found Done staying
+      // enabled after Start, Reopen not appearing after Done, and the Effort
+      // card not appearing after a Stop, all until a full reload. Mutating
+      // `door.tasks`/`door.timers`/`door.workLogs` BY REASSIGNMENT (never in
+      // place) here, the same way a real fetch hands back a brand-new array —
+      // mutating in place would let a stale cached reference pass React's
+      // `Object.is` check and hide the very bug these tests exist to catch.
+      setTaskDone: async (id: string, done: boolean) => {
+        door.tasks = (door.tasks as { id: string; status: string }[]).map((x) =>
+          x.id === id ? { ...x, status: done ? "done" : "open" } : x
+        )
+        const openTotal = (door.tasks as { status: string }[]).filter((x) => x.status !== "done").length
+        return {
+          tasks: door.tasks,
+          openTotal,
+          allTotal: door.tasks.length,
+          overdueTotal: 0,
+          plannedTotal: 0,
+          upcomingTotal: 0,
+          completedTotal: 0,
+          calendarTotal: 0,
+          dueTodayTotal: 0,
+          dueTodayDone: 0,
+        }
+      },
+      startTimer: async (targetTable: string, targetId: string) => {
+        const startedAt = new Date().toISOString()
+        const timerId = `timer-${targetTable}-${targetId}`
+        door.timers = [
+          ...(door.timers as unknown[]),
+          { id: timerId, targetTable, targetId, targetLabel: null, targetRef: null, userId: "u1", startedAt, elapsedSeconds: 0, runaway: false },
+        ]
+        door.workLogs = [
+          ...(door.workLogs as unknown[]),
+          {
+            id: timerId,
+            targetTable,
+            targetId,
+            targetLabel: null,
+            targetRef: null,
+            userId: "u1",
+            userName: "Ana",
+            kind: null,
+            note: null,
+            startedAt,
+            endedAt: null,
+            seconds: 0,
+            discarded: false,
+            accountId: null,
+          },
+        ]
+        return { timers: door.timers }
+      },
+      stopTimer: async (id: string) => {
+        door.timers = (door.timers as { id: string }[]).filter((t) => t.id !== id)
+        door.workLogs = (door.workLogs as { id: string; startedAt: string }[]).map((l) =>
+          l.id === id ? { ...l, endedAt: new Date().toISOString(), seconds: 300 } : l
+        )
+        return { timers: door.timers }
+      },
     },
     tenancy: {
       ...actual.tenancy,
@@ -255,6 +328,64 @@ function Harness({
   )
 }
 
+/** THE SAME HARNESS, WIRED TO THE REAL `onAction` DISPATCH — `Harness` above
+ * stubs `onAction` to nothing, which is right for every test that never fires
+ * "tasks.done", and wrong for the ones below that need to prove the sheet
+ * updates once the real write lands. `deep-link-screen.tsx`'s own "tasks.done"
+ * arm, reproduced verbatim: `runAction("tasks.done", { id, done: String(done) })`
+ * off `ctx.record?.status !== "Done"`. */
+function LiveHarness({
+  teamId,
+  tasks,
+  initialOpenTaskId,
+}: {
+  teamId: string
+  tasks: Task[]
+  initialOpenTaskId?: string
+}) {
+  const [openTaskId, setOpenTaskId] = React.useState<string | null>(initialOpenTaskId ?? null)
+  const { runAction } = useScreenActions(teamId)
+  const memory: Record<string, unknown> = { "task-overdue-view": "table" }
+  return (
+    <RememberedScreen
+      memory={{ read: (slot) => memory[slot], write: (slot, value) => void (memory[slot] = value) }}
+    >
+      <TasksScreen
+        teamId={teamId}
+        recipe={BASE_RECIPES["tasks.list"]}
+        rights={{ work: { read: true } } as never}
+        total={tasks.length}
+        counts={{
+          all: undefined,
+          overdue: tasks.length,
+          planned: undefined,
+          upcoming: undefined,
+          completed: undefined,
+          calendar: undefined,
+          dueToday: undefined,
+          dueTodayDone: undefined,
+        }}
+        view="overdue"
+        onViewChange={() => {}}
+        myUserId="u1"
+        canCreate
+        onAction={(actionId, ctx) => {
+          if (actionId === "tasks.done") {
+            const done = ctx.record?.status !== "Done"
+            void runAction("tasks.done", { id: ctx.id ?? "", done: String(done) })
+          }
+        }}
+        onIntent={(intent) => {
+          if (intent.kind === "open") setOpenTaskId(intent.id)
+        }}
+        openTaskId={openTaskId}
+        basePath="/t/team-1/tasks"
+        go={() => setOpenTaskId(null)}
+      />
+    </RememberedScreen>
+  )
+}
+
 const TASK = task({
   id: "t1",
   title: "File the quarterly VAT return",
@@ -278,7 +409,6 @@ const WORK_LOG: WorkLog = {
   startedAt: "2026-09-20T09:00:00.000Z",
   endedAt: "2026-09-20T10:30:00.000Z",
   seconds: 5400,
-  billable: true,
   discarded: false,
   accountId: null,
 }
@@ -370,6 +500,116 @@ describe("Done refuses while the task's own timer runs (R99's mirror)", () => {
   })
 })
 
+// DEFECT (live proof): a Start/Stop/Done mutation resolved and the sheet kept
+// showing the state from before it — Done stayed enabled after Start, Reopen
+// never appeared after Done, and the Effort card never appeared after the
+// first Stop, until a full page reload. All three are the same shape: a
+// cache key the mutation's own invalidation missed, or a read this sheet (or
+// the shared `EffortCard`) was not actually subscribed to.
+describe("the sheet reacts to a start/stop/done mutation in the same page load, no reload", () => {
+  afterEach(() => {
+    door.timers = []
+  })
+
+  it("disables Done as soon as the Start mutation resolves", async () => {
+    // SAVED AND RESTORED — the mock's own `startTimer` (this file's `@/lib/api`
+    // mock) appends a running log to `door.workLogs`, and a later test in this
+    // file counts that same array (`carries the record count beside the
+    // Effort title`); left unrestored, this test would permanently grow the
+    // shared fixture by one row.
+    const savedLogs = door.workLogs
+    try {
+      const teamId = warmTeam([TASK])
+      render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+      await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+      const actionsRow = document.querySelector('[data-slot="task-sheet-actions"]') as HTMLElement
+
+      const startButton = within(actionsRow)
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("Start")) as HTMLButtonElement
+      expect(startButton, "the sheet must render a Start button before a timer runs").toBeTruthy()
+      fireEvent.click(startButton)
+
+      await waitFor(() => {
+        const doneButton = within(actionsRow)
+          .getAllByRole("button")
+          .find((b) => b.textContent?.includes("Done")) as HTMLButtonElement | undefined
+        expect(doneButton, "Done must still render, disabled, once Start resolves").toBeTruthy()
+        expect(doneButton!.disabled).toBe(true)
+      })
+    } finally {
+      door.workLogs = savedLogs
+    }
+  })
+
+  it("shows the Effort card once the first Stop resolves, no reload", async () => {
+    const savedLogs = door.workLogs
+    door.workLogs = []
+    // A FRESH RECORD-TIME SLICE — the same reason the "no time logged" test
+    // above invalidates it first: these keys carry no teamId (target table +
+    // id only, R56), so an earlier test's cached log for t1 would otherwise
+    // leak into this one.
+    invalidate(recordTimeKey("tasks", "t1"))
+    invalidate(recordTimeSummaryKey("tasks", "t1"))
+    try {
+      const teamId = warmTeam([TASK])
+      render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+      await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+      const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
+      const actionsRow = document.querySelector('[data-slot="task-sheet-actions"]') as HTMLElement
+
+      // NO LOGGED TIME YET — the card draws nothing at all (its own rule,
+      // effort-card.tsx).
+      await waitFor(() => expect(within(sheet).queryByText("Effort")).toBeNull())
+
+      const startButton = within(actionsRow)
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("Start")) as HTMLButtonElement
+      fireEvent.click(startButton)
+
+      // STOP — the same button, now reading "Stop timer".
+      const stopButton = await waitFor(() => {
+        const b = within(actionsRow)
+          .getAllByRole("button")
+          .find((btn) => btn.textContent?.includes("Stop"))
+        expect(b, "the Start button must flip to Stop once the timer is running").toBeTruthy()
+        return b as HTMLButtonElement
+      })
+      fireEvent.click(stopButton)
+
+      // THE EFFORT CARD APPEARS — one settled row, no remount, no reload.
+      await waitFor(() => expect(within(sheet).queryByText("Effort")).toBeTruthy())
+    } finally {
+      door.workLogs = savedLogs
+    }
+  })
+})
+
+describe("Done flips to Reopen once the mutation resolves, no reload", () => {
+  it("marks the task done and shows Reopen in its place", async () => {
+    const teamId = warmTeam([TASK])
+    render(<LiveHarness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    const actionsRow = document.querySelector('[data-slot="task-sheet-actions"]') as HTMLElement
+
+    const doneButton = within(actionsRow)
+      .getAllByRole("button")
+      .find((b) => b.textContent?.includes("Done")) as HTMLButtonElement
+    expect(doneButton.disabled).toBe(false)
+    fireEvent.click(doneButton)
+
+    await waitFor(() => {
+      const reopenButton = within(actionsRow)
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("Reopen"))
+      expect(reopenButton, "Reopen must render once the done mutation resolves, no reload").toBeTruthy()
+    })
+    // AND DONE IS GONE — a ticked task is a record of something that
+    // happened, not a button to press twice.
+    expect(within(actionsRow).queryByRole("button", { name: /^Done$/ })).toBeNull()
+  })
+})
+
 describe("Delete lives in the \"…\" menu, alone", () => {
   it("opens on the trigger and lists Delete, never Edit", async () => {
     const teamId = warmTeam([TASK])
@@ -413,7 +653,7 @@ describe("the title row holds the title, the pencil and the More button (Aurora,
 })
 
 describe("the order of sections, top to bottom", () => {
-  it("title row, Start/Done, Assigned to, Deadline, Description, Effort, then the footer band, last", async () => {
+  it("title row, Start/Done, the merged Assigned to/Details/Deadline card, Effort, then the footer band, last", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
@@ -421,19 +661,17 @@ describe("the order of sections, top to bottom", () => {
     const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
     const titleRow = document.querySelector('[data-slot="task-sheet-title-row"]') as HTMLElement
     const actionsRow = document.querySelector('[data-slot="task-sheet-actions"]') as HTMLElement
-    const assigneeCard = document.querySelector('[data-slot="task-assignee-card"]') as HTMLElement
-    const deadlineCard = document.querySelector('[data-slot="task-deadline-card"]') as HTMLElement
-    const descriptionCard = document.querySelector('[data-slot="task-description-card"]') as HTMLElement
+    const detailsCard = document.querySelector('[data-slot="task-details-card"]') as HTMLElement
     // The Effort card's own title (`EmptyGatedPanel`) only draws once the
     // card's own work-log read settles, so this one waits.
     const effortHeading = await within(sheet).findByText("Effort")
     const footerBand = document.querySelector('[data-record-region="footer"]') as HTMLElement
 
-    for (const el of [titleRow, actionsRow, assigneeCard, deadlineCard, descriptionCard, effortHeading, footerBand]) {
+    for (const el of [titleRow, actionsRow, detailsCard, effortHeading, footerBand]) {
       expect(el, "every section must be on the page").toBeTruthy()
     }
 
-    const order = [titleRow, actionsRow, assigneeCard, deadlineCard, descriptionCard, effortHeading, footerBand]
+    const order = [titleRow, actionsRow, detailsCard, effortHeading, footerBand]
     for (let i = 0; i < order.length - 1; i++) {
       const a = order[i] as HTMLElement
       const b = order[i + 1] as HTMLElement
@@ -455,21 +693,41 @@ describe("the order of sections, top to bottom", () => {
     expect(within(sheet).queryByText("Priority")).toBeNull()
   })
 
-  it("Assigned to, Deadline and Description each draw as their own matching card", async () => {
+  it("Assigned to, Details and Deadline merge into ONE card, in that order, no nested cards (Aurora, 22 Sep 2026)", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
-    for (const slot of ["task-assignee-card", "task-deadline-card", "task-description-card"]) {
-      const card = document.querySelector(`[data-slot="${slot}"]`) as HTMLElement
-      expect(card, `${slot} must render`).toBeTruthy()
-      // Every one of the three wraps the kit's own panel-background Card —
-      // `TicketSidePanel`'s own `data-slot="card"` — the same design.
-      expect(card.querySelector('[data-slot="card"]'), `${slot} must be a Card`).toBeTruthy()
+
+    const detailsCard = document.querySelector('[data-slot="task-details-card"]') as HTMLElement
+    expect(detailsCard, "the merged card must render").toBeTruthy()
+
+    // Exactly ONE kit Card inside the merged wrapper — the three parts sit
+    // inside it, never each in their own.
+    const cards = detailsCard.querySelectorAll('[data-slot="card"]')
+    expect(cards.length, "no nested cards — one Card only").toBe(1)
+
+    const assigneePartEl = document.querySelector('[data-slot="task-assignee-part"]') as HTMLElement
+    const detailsPartEl = document.querySelector('[data-slot="task-details-part"]') as HTMLElement
+    const deadlinePartEl = document.querySelector('[data-slot="task-deadline-part"]') as HTMLElement
+
+    for (const el of [assigneePartEl, detailsPartEl, deadlinePartEl]) {
+      expect(el, "every part must render inside the merged card").toBeTruthy()
+      expect(detailsCard.contains(el), "every part must sit inside the merged card").toBe(true)
     }
-    const deadlineCard = document.querySelector('[data-slot="task-deadline-card"]') as HTMLElement
-    expect(within(deadlineCard).getByText("Deadline")).toBeTruthy()
-    const descriptionCard = document.querySelector('[data-slot="task-description-card"]') as HTMLElement
-    expect(within(descriptionCard).getByText("Description")).toBeTruthy()
+
+    // In order: Assigned to, then Details, then Deadline.
+    expect(assigneePartEl.compareDocumentPosition(detailsPartEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(detailsPartEl.compareDocumentPosition(deadlinePartEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // Assigned to's own eyebrow tile already carries the "Assigned to" word
+    // (its own chip label) — no second, separate heading repeats it.
+    expect(within(assigneePartEl).getAllByText("Assigned to").length).toBeGreaterThan(0)
+    expect(within(detailsPartEl).getByText("Details")).toBeTruthy()
+    expect(within(deadlinePartEl).getByText("Deadline")).toBeTruthy()
+
+    // Separated by the kit's own Separator, not a second Card edge.
+    const separators = detailsCard.querySelectorAll('[data-slot="separator"]')
+    expect(separators.length, "one Separator between each of the three parts").toBe(2)
   })
 
   it("the footer band is the sheet's own last element", async () => {

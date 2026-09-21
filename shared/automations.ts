@@ -331,12 +331,12 @@ export const AUTOMATIONS: Automation[] = [
     switchable: true,
   },
   {
-    key: "meetings.billable-time",
+    key: "meetings.time-log",
     segment: "meetings",
     source: "workers/content/src/lib/meetings.ts::captureTranscript",
     trigger: "write",
-    title: "Billable time from a meeting",
-    description: "A captured meeting writes one billable work log for each member who attended.",
+    title: "Time logged from a meeting",
+    description: "A captured meeting writes one work log for each member who attended.",
     switchable: false,
     helpText:
       "It is the second half of the capture above and is written by the same statement. Switching it off alone would record the meeting and lose the hours it took, which is a half-finished record rather than a preference.",

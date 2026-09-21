@@ -147,7 +147,6 @@ const WORK_LOG: WorkLog = {
   startedAt: "2026-09-18T09:00:00.000Z",
   endedAt: "2026-09-18T09:30:00.000Z",
   seconds: 1800,
-  billable: true,
   discarded: false,
   accountId: null,
 }
@@ -177,6 +176,8 @@ const api = vi.hoisted(() => ({
   timers: [] as RunningTimer[],
   workLogs: [] as unknown[],
   members: [] as unknown[],
+  siblingStories: [] as Story[],
+  attachments: [] as StoryAttachment[],
 }))
 const perms = vi.hoisted(() => ({ can: vi.fn(() => true) }))
 
@@ -191,12 +192,12 @@ vi.mock("@/lib/api", async (importOriginal) => {
       storyOne: async () => api.story,
       setStoryStatus: api.setStoryStatus,
       updateStory: api.updateStory,
-      storyAttachments: async () => ({ attachments: [] as StoryAttachment[], total: 0 }),
+      storyAttachments: async () => ({ attachments: api.attachments, total: api.attachments.length }),
       addStoryAttachment: async () => ({ attachments: [] as StoryAttachment[], total: 0 }),
       removeStoryAttachment: async () => ({ attachments: [] as StoryAttachment[], total: 0 }),
       updateStoryAttachment: async () => ({ attachments: [] as StoryAttachment[], total: 0 }),
       helpOne: async () => RELATED_TICKET,
-      stories: async () => ({ stories: [SIBLING_STORY], total: 1, mineTotal: 0, nextCursor: null, hasMore: false }),
+      stories: async () => ({ stories: api.siblingStories, total: api.siblingStories.length, mineTotal: 0, nextCursor: null, hasMore: false }),
       sprintOne: async () => SPRINT,
       storyMetrics: async () => api.metrics,
       sprints: async () => ({ sprints: [], total: 0 }),
@@ -211,6 +212,56 @@ vi.mock("@/lib/api", async (importOriginal) => {
         hasMore: false,
       }),
       updateWorkLog: api.updateWorkLog,
+      // START/STOP — the seam the "Effort card's stat tiles update after a
+      // start/stop" describe block below drives through the real
+      // `RecordTimerButton`, the same way a person on staging does. BY
+      // REASSIGNMENT, never in place: `useCached` compares the fetcher's
+      // answer by reference, and mutating `api.workLogs`/`api.timers` in
+      // place would hand back the SAME array a stale cache entry already
+      // holds, hiding exactly the staleness this describe block exists to
+      // catch (the same note `task-sheet.test.tsx`'s own mock carries).
+      startTimer: async (targetTable: string, targetId: string) => {
+        const startedAt = new Date().toISOString()
+        const id = `timer-${targetTable}-${targetId}`
+        api.timers = [
+          ...api.timers,
+          { id, targetTable, targetId, targetLabel: null, targetRef: null, startedAt, elapsedSeconds: 0, runaway: false },
+        ]
+        api.workLogs = [
+          ...(api.workLogs as unknown[]),
+          {
+            id,
+            targetTable,
+            targetId,
+            targetLabel: null,
+            targetRef: null,
+            userId: "user-priya",
+            userName: "Priya Nandal",
+            kind: null,
+            note: null,
+            startedAt,
+            endedAt: null,
+            seconds: 0,
+            discarded: false,
+            accountId: null,
+          },
+        ]
+        return { timers: api.timers }
+      },
+      stopTimer: async (id: string) => {
+        api.timers = api.timers.filter((t) => t.id !== id)
+        const stoppedAt = new Date().toISOString()
+        api.workLogs = (api.workLogs as { id: string; startedAt: string }[]).map((l) =>
+          l.id === id ? { ...l, endedAt: stoppedAt, seconds: 3 } : l
+        )
+        // THE METRICS DOOR'S OWN REAL ANSWER, recomputed from the same rows —
+        // a 3-SECOND STOP, so effort is real and near-zero (the live proof's
+        // own scenario), and the story has genuinely started work now
+        // (`cycleTimeSeconds` moves off `null`).
+        const totalSeconds = (api.workLogs as { seconds: number }[]).reduce((sum, l) => sum + (l.seconds || 0), 0)
+        api.metrics = { cycleTimeSeconds: 3, effortSeconds: totalSeconds, flowEfficiency: 100 }
+        return { timers: api.timers }
+      },
     },
     tenancy: {
       ...actual.tenancy,
@@ -258,6 +309,8 @@ beforeEach(() => {
   api.timers = []
   api.workLogs = [WORK_LOG]
   api.members = []
+  api.siblingStories = [SIBLING_STORY]
+  api.attachments = []
 })
 
 const RUNNING_ON_STORY: RunningTimer = {
@@ -364,6 +417,75 @@ describe("Build notes — R88 single door", () => {
     // The empty state's own heading stands in for a header — no second
     // "Build notes" title text sits above it.
     expect(screen.queryByText("Build notes")).toBeNull()
+  })
+
+  // DEFECT (live proof, 21 Sep 2026): a story with attachments but no
+  // written prose still showed the empty "Write the build notes" door —
+  // `buildNotesMissing` asked only about the TEXT column, and this section
+  // has a second way to have something to show. Her ruling: prose WITH
+  // images inline; the empty door shows only when there is neither.
+  it("with attachments and no text: draws the images, no empty door", async () => {
+    api.story = story({ buildNotes: null })
+    api.attachments = [
+      {
+        id: "att-1",
+        storyId: "story-1",
+        kind: "file",
+        label: "Before and after.png",
+        url: "/media/story-attachments/before-and-after.png",
+        contentType: "image/png",
+        sizeBytes: 40_000,
+        createdAt: "2026-09-21T10:00:00.000Z",
+        addedByName: "Priya Nandal",
+      },
+    ]
+    const { container } = openStory()
+    await screen.findByText("Add saved filters to the backlog board")
+
+    // NO EMPTY DOOR — a story with images is not "nothing written".
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Write the build notes" })).toBeNull()
+    })
+    // The pencil still reopens the same sheet, exactly as it does once text
+    // exists.
+    expect(await screen.findByRole("button", { name: "Edit the build notes" })).toBeTruthy()
+    // THE IMAGE ITSELF — the kit's own `<Image>`, `data-slot="image-media"`.
+    const image = container.querySelector('[data-slot="image-media"]') as HTMLImageElement | null
+    expect(image, "the attachment must render as an inline image").toBeTruthy()
+    expect(image!.getAttribute("src")).toBe("/media/story-attachments/before-and-after.png")
+  })
+
+  it("with BOTH text and attachments: draws the prose above the images", async () => {
+    api.story = story({ buildNotes: "<p>Shipped the redesigned filter bar.</p>" })
+    api.attachments = [
+      {
+        id: "att-1",
+        storyId: "story-1",
+        kind: "file",
+        label: "Before and after.png",
+        url: "/media/story-attachments/before-and-after.png",
+        contentType: "image/png",
+        sizeBytes: 40_000,
+        createdAt: "2026-09-21T10:00:00.000Z",
+        addedByName: "Priya Nandal",
+      },
+    ]
+    const { container } = openStory()
+    const prose = await screen.findByText("Shipped the redesigned filter bar.")
+    const image = await waitFor(() => {
+      const el = container.querySelector('[data-slot="image-media"]')
+      expect(el).toBeTruthy()
+      return el as HTMLElement
+    })
+    // Prose ABOVE the gallery, in that order.
+    expect(prose.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("with neither text nor an attachment: still shows the empty door", async () => {
+    api.story = story({ buildNotes: null })
+    api.attachments = []
+    openStory()
+    expect(await screen.findByRole("button", { name: "Write the build notes" })).toBeTruthy()
   })
 
   it("opens the slide-in sheet from the empty door", async () => {
@@ -490,6 +612,50 @@ describe("Done is disabled while a timer on the story is still running (R99)", (
   })
 })
 
+// DEFECT (live proof, 21 Sep 2026): the Effort card's own stat tiles stayed
+// on their BEFORE-the-timer values (a story never worked on: "Not started",
+// "No time log", "0h") after a real Start-then-Stop of a very short (3
+// second) timer, until a full reload — `refreshTimers` (shell/timer-bar.tsx)
+// invalidated `recordTimeKey` (the ROWS) on every start/stop but never
+// `story:metrics:<id>` (the door behind these three TILES), so the rows
+// updated and the tiles beside them did not.
+describe("the Effort card's stat tiles update after a real start/stop, no reload", () => {
+  it("moves off 'Not started' / 'No time log' once a short timer is stopped", async () => {
+    api.story = story({ status: "open" })
+    // A REAL WORK LOG ALREADY EXISTS (the default `WORK_LOG` fixture,
+    // `beforeEach` primes it) — the card draws nothing at all otherwise
+    // (R88's own "zero records" rule, proved elsewhere in this file) — but
+    // the METRICS DOOR is deliberately stale/behind it (`NO_METRICS`),
+    // standing in for the exact staleness this describe block exists to
+    // catch: a `story:metrics:<id>` cache entry primed before this
+    // session's own timer activity.
+    api.metrics = NO_METRICS
+    api.timers = []
+    openStory()
+    await screen.findByText("Add saved filters to the backlog board")
+
+    // BEFORE: nothing has ever run on this story — the placeholder words.
+    await screen.findByText("Not started")
+    expect(screen.getByText("No time log")).toBeTruthy()
+
+    const startButton = await screen.findByRole("button", { name: /^Start/ })
+    fireEvent.click(startButton)
+
+    const stopButton = await screen.findByRole("button", { name: /Stop timer/ })
+    fireEvent.click(stopButton)
+
+    // AFTER: a real (if tiny) cycle time and effort figure, not the
+    // placeholder words a stale cache would keep showing.
+    await waitFor(() => {
+      expect(screen.queryByText("Not started")).toBeNull()
+      expect(screen.queryByText("No time log")).toBeNull()
+    })
+    // AND THE TILES STILL RENDER — never blank, never gone — with the
+    // rounded-to-zero figure the 3 second stop actually produced.
+    expect(screen.getByText("0h")).toBeTruthy()
+  })
+})
+
 describe("Assigned to", () => {
   it("is the first panel in the right column and shows the inherited line when the story has no assignee of its own", async () => {
     api.story = story({
@@ -530,8 +696,51 @@ describe("Category — derived, shown as a read-only fact (B43)", () => {
   it("shows Enabler when the story has no ticket", async () => {
     api.story = story({ category: "Enabler", ticketId: null })
     openStory()
-    await screen.findByText("Related tickets")
+    // The Related tickets panel is hidden when there's no ticket — wait for
+    // another panel to settle instead, then verify the category reads Enabler.
+    await screen.findByText("Phase and wave")
     expect(await screen.findByText("Enabler")).toBeTruthy()
+  })
+})
+
+describe("Related tickets and stories — render only when present (B42 amended 22 Sep 2026)", () => {
+  it("renders the Related tickets panel when the story has a ticket", async () => {
+    api.story = story({ ticketId: "ticket-1" })
+    openStory()
+    const panel = await screen.findByText("Related tickets")
+    expect(panel).toBeTruthy()
+  })
+
+  it("renders nothing at all when the story has no ticket — no panel, no title, no row", async () => {
+    api.story = story({ ticketId: null })
+    openStory()
+    await screen.findByText("Add saved filters to the backlog board")
+    // The rest of the page still settles (a neighbouring panel proves the
+    // page did not simply fail to render).
+    await screen.findByText("Phase and wave")
+    expect(screen.queryByText("Related tickets")).toBeNull()
+  })
+
+  it("renders the Related stories panel when there are sibling stories", async () => {
+    api.story = story({})
+    api.siblingStories = [
+      story({ id: "story-2", ref: "BERG-S0189", title: "Related story" }),
+    ]
+    openStory()
+    const panel = await screen.findByText("Related stories")
+    expect(panel).toBeTruthy()
+    expect(await screen.findByText("Related story")).toBeTruthy()
+  })
+
+  it("renders nothing at all when there are no related stories — no panel, no title, no empty state", async () => {
+    api.story = story({})
+    api.siblingStories = []
+    openStory()
+    await screen.findByText("Add saved filters to the backlog board")
+    // The rest of the page still settles (a neighbouring panel proves the
+    // page did not simply fail to render).
+    await screen.findByText("Phase and wave")
+    expect(screen.queryByText("Related stories")).toBeNull()
   })
 })
 
@@ -582,6 +791,20 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     // "6.5h" appears once now — the tile's own figure, the title carries the
     // record count instead of repeating it (B44 amended, 22 Sep 2026).
     expect(screen.getAllByText("6.5h").length).toBe(1)
+  })
+
+  // AMENDED AGAIN, 22 Sep 2026, same day: Aurora, verbatim, "good. add kind
+  // of card background behind cards, this is a metric, like in kit." Each
+  // tile's own figure now sits inside the kit's `<Card variant="raised">`,
+  // proven by walking up from the value to the nearest `[data-slot="card"]`.
+  it("draws each metric tile inside the kit's own raised card, not bare", async () => {
+    api.story = story({})
+    api.metrics = FIXTURE_METRICS
+    openStory()
+    const cycleValue = await screen.findByText("2d 3h")
+    const tileCard = cycleValue.closest('[data-slot="card"]')
+    expect(tileCard).toBeTruthy()
+    expect(tileCard?.getAttribute("data-variant")).toBe("raised")
   })
 
   // AURORA, 21 SEP 2026, THE SAME ROUND: "ok, but i still want to see the

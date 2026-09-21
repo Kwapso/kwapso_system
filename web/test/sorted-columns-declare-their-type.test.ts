@@ -191,6 +191,16 @@ const DOOR_ORDERED: Record<string, string> = {
   ),
 }
 
+/** SHAPED CELLS THAT ARE NOT SORTABLE COLUMNS — an exemption table for formatted
+ * `key: value` rows that are not meant to be sorted in a browser table. Keyed by
+ * the file path and column key, rot-checked: an entry that has outlived its cell
+ * or gained a sortType must be deleted. */
+const SHAPED_CELL_EXEMPT: Record<string, string> = {
+  "web/components/work/task-sheet.tsx|value": (
+    "a fact row in the task sheet's description list, not a sortable column, 22 Sep 2026"
+  ),
+}
+
 /** Every `key: value` line in a file where the value calls a formatter. */
 function shapedCells(source: string): Map<string, string> {
   const found = new Map<string, string>()
@@ -230,7 +240,12 @@ describe("a sortable column showing a formatted value declares what it is", () =
 
   it("every one of them has a sortType, or is a column the door orders", () => {
     const offenders = formattedColumns
-      .filter((k) => !declared.has(k) && !(k in DOOR_ORDERED))
+      .filter((k) => {
+        if (declared.has(k) || k in DOOR_ORDERED) return false
+        const cellInfo = cells.get(k)
+        const file = cellInfo?.split(" — ")[0]
+        return !(file && `${file}|${k}` in SHAPED_CELL_EXEMPT)
+      })
       .map((k) => `${k} — ${cells.get(k)}`)
     expect(
       offenders,
@@ -255,6 +270,23 @@ describe("a sortable column showing a formatted value declares what it is", () =
       stale,
       "DOOR_ORDERED entries that no longer describe anything — the column moved, stopped being " +
         "formatted, or gained a sortType of its own; delete the line:\n  " + stale.join("\n  ")
+    ).toEqual([])
+  })
+
+  it("no SHAPED_CELL_EXEMPT line has outlived its cell", () => {
+    // ROT, both ways round. An entry whose shaped cell no longer exists, or whose
+    // cell has gained a sortType or moved to a table file, is a stale exception
+    // nobody re-reads; delete the line.
+    const stale = Object.keys(SHAPED_CELL_EXEMPT).filter((exemption) => {
+      const [file, key] = exemption.split("|")
+      const cellInfo = cells.get(key)
+      const found = cellInfo && cellInfo.split(" — ")[0] === file
+      return !found || declared.has(key) || key in DOOR_ORDERED
+    })
+    expect(
+      stale,
+      "SHAPED_CELL_EXEMPT entries that no longer describe anything — the cell moved, " +
+        "gained a sortType, or is now door-ordered; delete the line:\n  " + stale.join("\n  ")
     ).toEqual([])
   })
 

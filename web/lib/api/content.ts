@@ -1045,7 +1045,6 @@ export const content = {
     endedAt: string
     note?: string
     kind?: string
-    billable?: boolean
   }) => api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>("/api/content/work-logs", post(input)),
   updateWorkLog: (input: {
     id: string
@@ -1053,7 +1052,6 @@ export const content = {
     endedAt?: string
     note?: string
     kind?: string
-    billable?: boolean
   }) =>
     api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
       "/api/content/work-logs/update",

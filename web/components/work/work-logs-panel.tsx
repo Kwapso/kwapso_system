@@ -52,8 +52,7 @@ import { LoadMore } from "@/components/records/load-more"
 import { BandCard, HoursByChart, NothingYet, RecordWeeksChart, hoursSpoken } from "@/components/screens/pulse"
 import { TimeFormDialog, type TimeFormValues } from "@/components/work/time-form-dialog"
 import { content as contentApi } from "@/lib/api"
-import { cursorKey, recordTimeKey, recordTimeSummaryKey, totalKey } from "@/lib/live-resources"
-import { recordTimeCountKey } from "@shared/record-counts"
+import { cursorKey, recordTimeKey, recordTimeSummaryKey, workLogsTotalKey } from "@/lib/live-resources"
 import type { WorkLog, WorkLogSummary } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
@@ -65,22 +64,13 @@ import { sortedOptions } from "@shared/web/sorted-options"
 /** WHERE THE EXACT ENTRY COUNT IS PARKED, for the tab badge above the panel to
  * read (R16 — the door's own COUNT(*), never the loaded page's length).
  *
- * Exported because the badge is drawn by the HOST, in its tabs config, and the
- * panel is what fetches the number. One function so the two cannot type the
- * string differently — which is the whole reason every key in this app is a
- * function rather than a template literal at each site.
- *
- * IT IS AN ORDINARY `totalKey` SIDECAR NOW, and that is the whole of the fix for
- * a badge that stayed blank until you opened the tab. The panel's own list fetch
- * used to be the only thing that ever primed it, and the panel does not mount
- * until the tab is active — so on a story, a ticket, a task and a meeting the
- * Time badge was missing exactly when a reader needed it to decide whether to
- * look. Composed through `recordTimeCountKey` it is a line in the record-counts
- * registry like any other, fetched when the record OPENS, and this fetch simply
- * refreshes the same key when the rows finally arrive. */
-export function workLogsTotalKey(targetTable: string, targetId: string): string {
-  return totalKey(recordTimeCountKey(targetTable), targetId)
-}
+ * MOVED to `@/lib/live-resources` (2026-09-22) — re-exported here, unchanged
+ * for every existing caller of THIS path, so `refreshTimers`
+ * (`web/components/shell/timer-bar.tsx`) can invalidate it on start/stop
+ * without pulling this panel's own heavy import chain (`ToolbarRow`, the
+ * pulse charts) into the header bundle every screen loads. That file's own
+ * header carries the rest of this seam's account. */
+export { workLogsTotalKey }
 
 /** Whole seconds → the hours and minutes a person would say out loud. */
 function spell(seconds: number): string {
@@ -380,7 +370,6 @@ export function WorkLogsPanel({
       endedAt: values.endedAt,
       note: values.note,
       kind: values.kind,
-      billable: values.billable,
     })
     refresh()
     toast.success(t("Time corrected."))
@@ -398,7 +387,6 @@ export function WorkLogsPanel({
       endedAt: values.endedAt,
       note: values.note,
       kind: values.kind,
-      billable: values.billable,
     })
     refresh()
     toast.success(t("Time logged."))

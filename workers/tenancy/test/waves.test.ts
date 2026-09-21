@@ -49,11 +49,13 @@ import { accountScope } from "@shared/workers/account-scope"
 import {
   countWaves,
   createWave,
+  getTeamPhaseDayDefaults,
   getWave,
   listWaves,
   recalcWaveDates,
   setSprintWave,
   setWaveActive,
+  updateTeamPhaseDayDefaults,
   updateWave,
   updateWavePhaseDays,
 } from "../src/lib/waves"
@@ -581,5 +583,70 @@ describe("a wave's phase days", () => {
     await expect(
       updateWavePhaseDays(cfg, guard, burglar, actor, { id, days: [{ phaseType: "Plan", days: 5 }] })
     ).rejects.toMatchObject({ status: 404 })
+  })
+})
+
+// THE TEAM'S OWN DEFAULT, ONE LEVEL UP — Aurora's very next ruling, 21 Sep 2026,
+// verbatim, closing the loop the block above already answers per wave: "Make
+// sure we can adjust this on the settings in Waves." Stored in the `automations`
+// table (workers/tenancy/src/lib/automations-config.ts), module "waves",
+// reserved key "phaseDayDefaults" — no table of its own, so this suite also
+// proves the reuse actually lands where it says it does.
+describe("the team's own default phase days", () => {
+  it("answers with all seven, in PHASE_TYPES order, at the code's own placeholder before anybody sets one", async () => {
+    const defaults = await getTeamPhaseDayDefaults(cfg, guard)
+    expect(defaults.map((p) => p.phaseType)).toEqual(PHASE_TYPES.map((p) => p.name))
+    expect(defaults.find((p) => p.phaseType === "Audit")?.days).toBe(5)
+    expect(defaults.find((p) => p.phaseType === "Build")?.days).toBe(15)
+    expect(defaults.find((p) => p.phaseType === "Hypercare")?.days).toBe(7)
+  })
+
+  it("sets a subset and leaves the rest at their placeholder", async () => {
+    const defaults = await updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Build", days: 25 }])
+    expect(defaults.find((p) => p.phaseType === "Build")?.days).toBe(25)
+    expect(defaults.find((p) => p.phaseType === "Audit")?.days).toBe(5) // untouched
+
+    // Reading it back agrees — no second copy of the truth.
+    expect((await getTeamPhaseDayDefaults(cfg, guard)).find((p) => p.phaseType === "Build")?.days).toBe(25)
+  })
+
+  it("upserts on the same module row rather than growing a second one (reuses the automations table)", async () => {
+    await updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Build", days: 25 }])
+    await updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Build", days: 40 }])
+    const rows = db().prepare(`SELECT settings FROM automations WHERE module = 'waves'`).all() as {
+      settings: string
+    }[]
+    expect(rows).toHaveLength(1)
+    expect(JSON.parse(rows[0].settings)).toMatchObject({ phaseDayDefaults: { Build: 40 } })
+  })
+
+  it("refuses a phase type this team's vocabulary does not carry, and a non-integer / out-of-range day count", async () => {
+    await expect(
+      updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Enhancement", days: 5 }])
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+    await expect(
+      updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Plan", days: 2.5 }])
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+    await expect(
+      updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Plan", days: 0 }])
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+  })
+
+  it("a NEW wave with no Settings row of its own reads the TEAM's default, not the code's placeholder", async () => {
+    await updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Build", days: 25 }])
+    const id = await aWave()
+    const { phaseDays } = await readWave(id)
+    expect(phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(25)
+    // Every OTHER phase type still falls all the way through to the code's
+    // own placeholder, since the team never touched them.
+    expect(phaseDays.find((p) => p.phaseType === "Audit")?.days).toBe(5)
+  })
+
+  it("a wave's OWN row still wins over the team default (the per-wave sheet is the closer override)", async () => {
+    await updateTeamPhaseDayDefaults(cfg, guard, actor, [{ phaseType: "Build", days: 25 }])
+    const id = await aWave()
+    await updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Build", days: 99 }] })
+    const { phaseDays } = await readWave(id)
+    expect(phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(99)
   })
 })

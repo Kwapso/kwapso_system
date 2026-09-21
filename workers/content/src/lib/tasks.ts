@@ -30,7 +30,7 @@ import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { PRIORITY_LABEL, departmentAsks, priorityScore } from "@shared/departments"
 import type { Task, TaskViewName } from "@shared/types"
-import { refuseWhileTimerRuns } from "./work-logs"
+import { refuseWhileTimerRuns, stopAllRunningTimersForTarget } from "./work-logs"
 
 type TaskRow = {
   id: string
@@ -649,13 +649,22 @@ export async function setTaskDone(
  * R17, THE SAME WAY `deleteReply` IS: the current-status predicate
  * (`deactivated_at IS NULL`) rides the WRITE itself, not only the read above,
  * so two concurrent deletes racing past the same lookup still move at most
- * one row and write history once. */
+ * one row and write history once.
+ *
+ * STOPS ITS OWN RUNNING TIMER FIRST. Unlike `setTaskDone`, deleting is not
+ * `refuseWhileTimerRuns` territory (that rule is about CLOSING a record, and
+ * her ruling was explicit that closing refuses while the clock runs) —
+ * deleting a task is different: the record is leaving every list either way,
+ * so leaving its `work_logs` row open would orphan a timer nothing but
+ * `GET /api/content/work-logs/running` could ever find again. Stopped through
+ * `stopAllRunningTimersForTarget` (work-logs.ts), whoever started it, in the
+ * same request as the soft delete. */
 export async function deleteTask(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
   id: string
-): Promise<{ accountId: string | null }> {
+): Promise<{ accountId: string | null; stoppedTimers: { id: string; accountId: string | null }[] }> {
   const rows = await d1Query<{ account_id: string | null; title: string; ref: string | null }>(
     cfg,
     guard.databaseId,
@@ -664,6 +673,7 @@ export async function deleteTask(
   )
   const row = rows[0]
   if (!row) throw new GuardError(404, "task_not_found", "That task doesn't exist.")
+  const stoppedTimers = await stopAllRunningTimersForTarget(cfg, guard, actor, { table: "tasks", id })
   const now = new Date().toISOString()
   const changed = await d1Query<{ id: string }>(
     cfg,
@@ -672,12 +682,12 @@ export async function deleteTask(
       WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
     [now, actor.id, actor.email, actor.name, id]
   )
-  if (!changed[0]) return { accountId: row.account_id }
+  if (!changed[0]) return { accountId: row.account_id, stoppedTimers }
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Task deleted",
     description: `${actor.name} deleted the task ${row.ref ?? row.title}`,
     relatedTable: "tasks",
     relatedRowId: id,
   })
-  return { accountId: row.account_id }
+  return { accountId: row.account_id, stoppedTimers }
 }

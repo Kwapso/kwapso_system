@@ -34,6 +34,15 @@ export function waveOneKey(id: string): string {
   return `wave:one:${id}`
 }
 
+/** THE TEAM'S OWN DEFAULT DAYS PER PHASE TYPE — Aurora's 21 Sep 2026 ruling,
+ * "Make sure we can adjust this on the settings in Waves." Team-wide, so one
+ * key per team rather than per wave; the waves module-settings page
+ * (`module-settings-screen.tsx`'s `"waves"` segment) and every fresh wave's
+ * own prefill both read through this one key. */
+export function phaseDayDefaultsKey(teamId: string): string {
+  return `wave-phase-day-defaults:${teamId}`
+}
+
 export const waves = {
   /** Every wave the caller may see, or one client's, one carrying a live
    * sprint of one type (`EXISTS`, the door's own — a wave has no such column),
@@ -94,5 +103,22 @@ export const waves = {
     api<{ ok: true; phaseDays: WavePhaseDay[] }>("/api/tenancy/waves/phase-days", {
       method: "POST",
       body: JSON.stringify(input),
+    }),
+
+  /** The team's own default days per phase type — always seven rows, the
+   * code's own `PHASE_DAY_DEFAULTS` (shared/waves.ts) filled in wherever this
+   * team has never set one. Open to any member who may read `work` (Aurora's
+   * 21 Sep 2026 ruling: "Make sure we can adjust this on the settings in
+   * Waves"). */
+  phaseDayDefaults: () =>
+    api<{ phaseDays: WavePhaseDay[] }>("/api/tenancy/waves/phase-day-defaults"),
+
+  /** Set the team's default days for one or more phase types. Same shape as
+   * `setPhaseDays` above, one level up: a new wave with no Settings row of
+   * its own starts from these. */
+  setPhaseDayDefaults: (days: { phaseType: string; days: number }[]) =>
+    api<{ ok: true; phaseDays: WavePhaseDay[] }>("/api/tenancy/waves/phase-day-defaults", {
+      method: "POST",
+      body: JSON.stringify({ days }),
     }),
 }

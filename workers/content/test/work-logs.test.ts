@@ -167,9 +167,6 @@ describe("a timer is a work log with no end yet", () => {
     const [row] = logRows()
     expect(row.ended_at).toBe(null)
     expect(row.seconds).toBe(0)
-    // Billable is ON by default — a plain switch, and the default is the
-    // ordinary case rather than the cautious one.
-    expect(row.billable).toBe(1)
     expect(row.account_id).toBe(IDS.victimAccount)
     // The started moment is the server's, not something a caller could send.
     expect(Date.parse(row.started_at as string)).toBeLessThanOrEqual(Date.now() + 1000)

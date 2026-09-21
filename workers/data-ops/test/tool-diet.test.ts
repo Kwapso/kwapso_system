@@ -599,7 +599,11 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // 127 → 128 on 21 Sep 2026: `ticket_metrics` (the ticket detail page's
     // own Metrics panel, mirroring `story_metrics`) shipped with a `detail`
     // from the start, same reason.
-    const DETAILED_TOOLS = 128
+    // 128 → 130 on 21 Sep 2026: `get_wave_phase_day_defaults` and
+    // `update_wave_phase_day_defaults` (the team's own wave-phase-day
+    // defaults, one level up from `update_wave_phase_days`) both shipped
+    // with a `detail` from the start, same shape as their sibling.
+    const DETAILED_TOOLS = 130
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

@@ -42,6 +42,24 @@
 // `writeSegmentSettings` are the read-modify-write the two writers share; each
 // still gates, refuses a key the registry does not know, and logs its own
 // activity row.
+//
+// A THIRD SEGMENT, 2026-09-21, NOT AN AUTOMATION AT ALL. Aurora's ruling on
+// the wave phase-days panel: "Make sure we can adjust this on the settings in
+// Waves." A wave's own Settings sheet already lets somebody set the days per
+// PHASE (team migration 0109); this is the team-WIDE starting point a new
+// wave reads before anybody touches its own sheet, and it is exactly the
+// shape this table already holds — one small object, per module, that no
+// worker but this one has an opinion about. `getWavePhaseDayDefaults`/
+// `updateWavePhaseDayDefaults` (`workers/tenancy/src/lib/waves.ts`) are the
+// third caller of `readSegmentSettings`/`writeSegmentSettings`, module
+// `"waves"`, reserved key `"phaseDayDefaults"` — its own key, exactly the way
+// `overrides` is `setAutomationOverride`'s, so the three questions this row
+// can answer about a module ("what's off", "what does this team call it",
+// "what does this team default it to") can never collide on one value. Waves
+// carries no entry in `AUTOMATIONS` (`shared/automations.ts`), so the closed
+// key-space refusal in `setAutomation`/`setAutomationOverride` below never
+// applies to it — the two functions below skip it on purpose, the same way
+// `readSegmentSettings`/`writeSegmentSettings` already do.
 
 import { AUTOMATION_OFF, AUTOMATIONS } from "@shared/automations"
 import { logActivity, type Actor } from "@shared/workers/activity"
@@ -88,7 +106,7 @@ export async function getAutomationSettings(
  * the DEFAULT rather than a guess: every automation on, no team words). Shared
  * by every write below, so the two writers can never disagree about what
  * "nothing stored yet" means. */
-async function readSegmentSettings(
+export async function readSegmentSettings(
   cfg: D1Rest,
   guard: MemberGuard,
   segment: string
@@ -119,7 +137,7 @@ async function readSegmentSettings(
  * upsert itself. Shared by both writers below; each still writes its OWN activity
  * row, because "who switched what off" and "who renamed what" are different
  * sentences in the trail. */
-async function writeSegmentSettings(
+export async function writeSegmentSettings(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,

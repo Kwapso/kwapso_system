@@ -5939,7 +5939,7 @@ export const BUTTON_SIZE_EXEMPT: ButtonSizeExempt[] = [
   {
     file: "shared/web/live-status.tsx",
     contains: "onClick={() => invalidatePrefix(\"\")}",
-    why: "An inline banner/prompt action (a runaway-timer or live-sync notice), not a toolbar, a page head, a card header or a form foot.",
+    why: "K62, 22 Sep 2026: the live-sync pill's own Refresh action, drawn in the kit toast's dense light-wash register (shared/ui/components/sonner/sonner.tsx's ACTION recipe) rather than a toolbar, a page head, a card header or a form foot, so it follows the toast's own control height, not R98's default.",
   },
   {
     file: "web-portal/components/error-panel.tsx",

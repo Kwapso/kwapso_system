@@ -84,10 +84,27 @@
 // `WorkLogsPanel` reads for a task or a meeting, already a `time-of:` R15
 // live listener, so a timer stopped from the header bar updates this card
 // with no reload exactly as it always has.
+//
+// A FIFTH CHANGE, SAME DAY: Aurora, verbatim, reviewing the deployed tiles,
+// "good. add kind of card background behind cards, this is a metric, like in
+// kit." The three tiles drew no visible card fill. `StatGrid`'s own `tone`
+// only maps to `Card` variant `default` ("quiet", `bg-surface-panel`, chosen
+// upstream precisely because a dashboard's strip sits BARE on the off-beige
+// body pane), `brand` or `inverse`, never `raised`, and this card's own
+// tiles sit inside `EmptyGatedPanel`'s `<Card variant="default">`, so a
+// `default` tile nested in a `default` panel painted the identical soft-paper
+// tone on top of itself (contrast 1.000, the exact K1/override-77 collision
+// `card.tsx`'s own header describes: "off-beige over soft paper … only reads
+// as raised when it sits inside a `--surface-panel` band"). `StatGrid` has no
+// prop for the raised tone, so each tile is wrapped in the kit's own
+// `<Card variant="raised">` by hand, with `<StatGrid surface="bare">`'s
+// register (label / value, no card of its own) drawn inside it: the kit's
+// stat markup, the kit's card, never a hand-rolled fill or border.
 
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -95,9 +112,8 @@ import { RecordMark } from "@shared/web/record-mark"
 import { EmptyGatedPanel } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/records/load-more"
 import { TimeFormDialog, type TimeFormValues } from "@/components/work/time-form-dialog"
-import { workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { content as contentApi } from "@/lib/api"
-import { cursorKey, recordTimeKey } from "@/lib/live-resources"
+import { cursorKey, recordTimeKey, workLogsTotalKey } from "@/lib/live-resources"
 import { memberFace } from "@/components/tickets/tickets-collection"
 import type { TeamMember, WorkLog } from "@shared/types"
 import { staffNameFromSnapshot } from "@shared/staff-name"
@@ -193,7 +209,6 @@ export function EffortCard({
       endedAt: values.endedAt,
       note: values.note,
       kind: values.kind,
-      billable: values.billable,
     })
     refresh()
     toast.success(t("Time corrected."))
@@ -220,41 +235,81 @@ export function EffortCard({
             {/* THE THREE STAT TILES — only for a caller that HAS a metrics
                 door (a story or a ticket). Omitted rather than drawn with
                 placeholder tiles when there is no such concept for the
-                record (a task) — see this file's own header. Drawn through
-                the kit's own `<StatGrid>` now, the same primitive
-                `work-logs-panel.tsx`'s own Numbers band and `pulse.tsx`'s
-                dashboard already call (Aurora, 22 Sep 2026: "make the
-                metrics cards inside the container, like in the metrics
-                artifact you did for me!"). */}
+                record (a task) — see this file's own header. Each tile is
+                the kit's own stat register (`<StatGrid surface="bare">`, the
+                same label/value markup `pulse.tsx`'s dashboard and
+                `work-logs-panel.tsx`'s Numbers band draw) inside the kit's
+                own `<Card variant="raised">`, a card background `StatGrid`
+                itself cannot give a tile nested this deep (see this file's
+                own header, the fifth change).
+
+                THREE FIXED TILES, WRITTEN OUT RATHER THAN `.map()`-ED. R65's
+                own census reads any kit `<Card>` carrying React's own `key=`
+                as a per-row RECORD card (one drawn per item of a collection)
+                and requires it to carry a `<CardTitle>` a chip could sit
+                above, the right rule for an actual list of records, and a
+                false match here, where the three tiles are fixed metrics,
+                not rows, and a second title inside the card would only
+                repeat the stat register's own label. Naming each tile by
+                hand keeps it off that census instead of fighting it with an
+                exemption the census has no slot for. */}
             {metrics && (
-              <StatGrid
-                items={[
-                  {
-                    id: "cycle",
-                    label: t("Cycle time"),
-                    value:
-                      metrics.cycleTimeSeconds !== null
-                        ? cycleTimeLabel(metrics.cycleTimeSeconds)
-                        : t("Not started"),
-                  },
-                  {
-                    // "Effort hours", not "Effort" — the title's own count is
-                    // the record count now, so the tile answers a different
-                    // question beside it rather than repeating the word.
-                    id: "effort",
-                    label: t("Effort hours"),
-                    value: hoursLabel(metrics.effortSeconds),
-                  },
-                  {
-                    id: "flow",
-                    label: t("Flow efficiency"),
-                    value:
-                      metrics.flowEfficiency !== null
-                        ? `${Math.round(metrics.flowEfficiency)}%`
-                        : t("No time log"),
-                  },
-                ]}
-              />
+              <div className="grid grid-cols-1 gap-[var(--space-3h)] sm:grid-cols-3">
+                <Card variant="raised">
+                  <CardContent>
+                    <StatGrid
+                      items={[
+                        {
+                          id: "cycle",
+                          label: t("Cycle time"),
+                          value:
+                            metrics.cycleTimeSeconds !== null
+                              ? cycleTimeLabel(metrics.cycleTimeSeconds)
+                              : t("Not started"),
+                        },
+                      ]}
+                      surface="bare"
+                      label={t("Cycle time")}
+                    />
+                  </CardContent>
+                </Card>
+                <Card variant="raised">
+                  <CardContent>
+                    {/* "Effort hours", not "Effort" — the title's own count is
+                        the record count now, so the tile answers a different
+                        question beside it rather than repeating the word. */}
+                    <StatGrid
+                      items={[
+                        {
+                          id: "effort",
+                          label: t("Effort hours"),
+                          value: hoursLabel(metrics.effortSeconds),
+                        },
+                      ]}
+                      surface="bare"
+                      label={t("Effort hours")}
+                    />
+                  </CardContent>
+                </Card>
+                <Card variant="raised">
+                  <CardContent>
+                    <StatGrid
+                      items={[
+                        {
+                          id: "flow",
+                          label: t("Flow efficiency"),
+                          value:
+                            metrics.flowEfficiency !== null
+                              ? `${Math.round(metrics.flowEfficiency)}%`
+                              : t("No time log"),
+                        },
+                      ]}
+                      surface="bare"
+                      label={t("Flow efficiency")}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
             )}
 
             {/* THE INDIVIDUAL RECORDS OF TIME, newest first (the door's own

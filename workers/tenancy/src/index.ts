@@ -96,6 +96,9 @@
 //                                             could make its own next mistake quiet)
 //   POST /api/tenancy/config/automations/override -> a team's own name/description for one
 //                                             automation (teams:update; same reason as the switch)
+//   GET  /api/tenancy/waves/phase-day-defaults -> the team's own default days per phase type,
+//                                             any member who may read `work`
+//   POST /api/tenancy/waves/phase-day-defaults -> set one or more of them (work:update)
 //   POST /api/tenancy/admin/migrate-teams  -> roll team-schema migrations (x-admin-key)
 //   POST /api/tenancy/admin/create-team    -> seed a team (x-admin-key; the user door is closed)
 //   GET  /api/tenancy/admin/db-sizes       -> size every DB (core included) + open alarms
@@ -135,10 +138,12 @@ import {
 } from "./routes/process-drafts"
 import {
   getWaveOne,
+  getWavePhaseDayDefaults,
   getWaves,
   postCreateWave,
   postUpdateWave,
   postWaveActive,
+  postWavePhaseDayDefaults,
   postWavePhaseDays,
   postWaveSprint,
 } from "./routes/waves"
@@ -367,6 +372,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/waves/active": { handler: postWaveActive, kind: "mutation" },
   "POST /api/tenancy/waves/sprint": { handler: postWaveSprint, kind: "mutation" },
   "POST /api/tenancy/waves/phase-days": { handler: postWavePhaseDays, kind: "mutation" },
+  // THE TEAM'S OWN DEFAULT, PER PHASE TYPE — Aurora, 21 Sep 2026: "Make sure we
+  // can adjust this on the settings in Waves." A new wave's own phase days start
+  // from these before the code's own PHASE_DAY_DEFAULTS does; the read is open to
+  // any member who may read `work`, the write is `work:update`.
+  "GET /api/tenancy/waves/phase-day-defaults": { handler: getWavePhaseDayDefaults, kind: "read" },
+  "POST /api/tenancy/waves/phase-day-defaults": { handler: postWavePhaseDayDefaults, kind: "mutation" },
   "POST /api/tenancy/processes/audit-date": { handler: postAuditDate, kind: "mutation" },
   "POST /api/tenancy/processes/link": { handler: postLinkProcesses, kind: "mutation" },
   "POST /api/tenancy/processes/unlink": { handler: postUnlinkProcesses, kind: "mutation" },

@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 762 strings · 3 languages · 1540 of the entries below are hand-written seed.
+// 761 strings · 3 languages · 1538 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -91,7 +91,6 @@ export const CATALOGUE: Catalogue = {
   "Being worked on": { de: "In Bearbeitung", es: "En proceso", ca: "En procés" },
   "Bergman S.A.": { de: "Bergman S.A.", es: "Bergman S.A.", ca: "Bergman S.A." },
   "Best at": { de: "Stark bei", es: "Mejor en", ca: "Millor en" },
-  "Billable": { de: "Abrechenbar", es: "Facturable", ca: "Facturable" },
   "Bin it": { de: "Löschen", es: "Desecharlo", ca: "Esborra-ho" },
   "Booked in": { de: "Gebucht", es: "Reservado", ca: "Reservat" },
   "Brand asset": { de: "Markenasset", es: "Activo de marca", ca: "Recurs de marca" },

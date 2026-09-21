@@ -806,7 +806,12 @@ export async function postDeleteTask(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Task", TEXT_LIMITS.short)
-  const { accountId } = await deleteTask(cfg, guard, actor, id)
+  const { accountId, stoppedTimers } = await deleteTask(cfg, guard, actor, id)
+  // R1: a timer this delete stopped is a work_logs row that just acquired a
+  // finish and a duration — the same reason `postStartTimer`'s auto-stop
+  // publishes one row per timer it closes, before the delete's own publish.
+  for (const timer of stoppedTimers)
+    await publishChange(env, guard.teamId, "work_logs", timer.id, "edit", timer.accountId ?? undefined)
   await publishChange(env, guard.teamId, "tasks", id, "remove", accountId ?? undefined)
   return taskMutationReply(cfg, guard, id, true)
 }

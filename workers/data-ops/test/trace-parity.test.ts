@@ -45,6 +45,8 @@ const TEAM_IMPLICIT_PATHS: Record<string, string> = {
     "the agency's own Details page — it titles itself with the ACTIVE team's name and carries the name/logo edit, which is what the deleted team overview used to do",
   "/settings":
     "the four dropdown-value writes, since 11 Sep 2026. They used to land on /t/<team>/dropdowns — the one screen that held the team's WHOLE vocabulary — and the client retired that screen with the Choices tab (\"end goal kill the big tab 'choice options'\"). A group is edited on its own module's settings page now, and this trace deliberately does NOT resolve which one: the group→module map lives in a React file agent-trace.ts may not import (it is kept DOM-free so this very suite can read it), and these tools take a FREE `type`, so a value can be written into a group no module owns and for which no page exists at all. Settings' Modules index is the one answer that is right for every one of those writes, and it is the client's own \"find the module once\". Like /kwapso it resolves against the ACTIVE team rather than naming one.",
+  "/settings/waves":
+    "`update_wave_phase_day_defaults` (Aurora's 21 Sep 2026 ruling, \"Make sure we can adjust this on the settings in Waves\"). The team's own default days per phase type are a team-wide fact, not a field on any one wave, so there is no wave record to land on — the Waves module's own settings page (module-settings-screen.tsx's `waves` segment, `TeamPhaseDayDefaultsPanel`) is where the change is visible. Like /settings itself, this resolves against the ACTIVE team rather than naming one.",
 }
 
 describe("screen-trace parity: the co-pilot can show every write on a real screen", () => {

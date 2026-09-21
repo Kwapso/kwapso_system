@@ -46,6 +46,7 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { RecordTimeline, type TimelineRow, type TimelineSegment } from "@/components/records/record-timeline"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
 import { RecordTable, type TableColumn } from "@/components/records/record-table"
@@ -1043,7 +1044,16 @@ export function WaveCollection({
   // the strip below, through the identical arbitration every other tabbed
   // collection screen uses (`CountedAbove`/`useCountStandsDown`,
   // records/counted-tabs.tsx).
-  const heading = accountId ? null : <CollectionHeading sectionKey="waves" total={total} />
+  // THE GEAR — R61's two doors: every module with something to set gets a
+  // gear on its own main screen (Aurora, 21 Sep 2026: "i still dont see the
+  // gear button on main page waves"). The team's phase-day defaults are the
+  // something (module-settings-screen.tsx's own "waves" segment); this is
+  // the OTHER door onto them, beside the per-wave gear `wave-detail.tsx`
+  // already carries in its own head. Last in the action slot — there is
+  // nothing else in it here to lead it.
+  const heading = accountId ? null : (
+    <CollectionHeading sectionKey="waves" total={total} action={<ModuleSettingsGear teamId={teamId} segment="waves" />} />
+  )
 
   const tabsConfig = {
     ...defaultTabsConfig,

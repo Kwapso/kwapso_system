@@ -25,7 +25,6 @@ import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dia
 import { Field } from "@shared/web/field"
 import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
-import { Switch } from "@shared/ui/components/switch/switch"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
@@ -51,7 +50,6 @@ export type TimeFormValues = {
    * internal rate card would show what our hours cost to anybody who may log
    * time — a different permission entirely. */
   kind: string
-  billable: boolean
 }
 
 const workField = { ...defaultFieldConfig, label: "What you worked on", required: true }
@@ -64,11 +62,6 @@ const startField = { ...defaultFieldConfig, label: "Started", required: true }
 const endField = { ...defaultFieldConfig, label: "Finished", required: true }
 const kindField = { ...defaultFieldConfig, label: "Kind of work", required: false }
 const noteField = { ...defaultFieldConfig, label: "Note", required: false }
-const billableField = {
-  ...defaultFieldConfig,
-  label: "Billable",
-  required: false,
-}
 
 export function TimeFormDialog({
   open,
@@ -109,7 +102,6 @@ export function TimeFormDialog({
       endedAt: toLocalInput(initial?.endedAt ?? null),
       note: initial?.note ?? "",
       kind: initial?.kind ?? "",
-      billable: initial ? initial.billable : true,
     },
     open
   )
@@ -133,7 +125,6 @@ export function TimeFormDialog({
         endedAt: toMoment(values.endedAt),
         note: values.note.trim(),
         kind: values.kind.trim(),
-        billable: values.billable,
       })
       clearDraft()
       onOpenChange(false)
@@ -240,14 +231,6 @@ export function TimeFormDialog({
           placeholder={t("What you actually did.")}
           disabled={busy}
           rows={2}
-        />
-      </Field>
-      <Field config={billableField} htmlFor="time-billable" className={fieldSpacing}>
-        <Switch
-          id="time-billable"
-          checked={values.billable}
-          onCheckedChange={(v: boolean) => setValues((s) => ({ ...s, billable: v }))}
-          disabled={busy}
         />
       </Field>
     </FormShellDialog>

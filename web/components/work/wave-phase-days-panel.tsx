@@ -49,14 +49,20 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Input } from "@shared/ui/components/input/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@shared/ui/components/sheet/sheet"
+import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { sprintTypeName, useSprintTypes } from "@/components/work/sprint-form-dialog"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
+import { ApiFailure } from "@/lib/api"
+import { phaseDayDefaultsKey, waves as wavesApi } from "@/lib/api/waves"
+import { usePermissions } from "@/lib/perms"
 import { PHASE_TYPES } from "@shared/sprint-types"
-import type { WavePhaseDay } from "@shared/waves"
+import { PHASE_DAY_DEFAULTS, type WavePhaseDay } from "@shared/waves"
 import { useLanguage } from "@shared/web/language"
+import { invalidate, useCached } from "@shared/web/store"
 
 /** The draft, keyed by phase type name, as the seven number inputs hold it,
  * strings, because a field mid-edit ("" or "1" typed toward "15") is not yet
@@ -202,5 +208,69 @@ export function WavePhaseDaysSheet({
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+/** THE TEAM'S OWN DEFAULTS, ON THE WAVES MODULE SETTINGS PAGE — Aurora's very
+ * next ruling, 21 Sep 2026, verbatim, closing the loop the panel above
+ * already answers per wave: "Make sure we can adjust this on the settings in
+ * Waves." Mounted by `module-settings-screen.tsx`'s `"waves"` segment, its own
+ * `"phaseDays"` section — the SAME seven-row panel above, so a person edits
+ * one control whether they are looking at a wave's own Settings sheet or the
+ * module's page, never a second editor for one fact. Own fetch, own save,
+ * and ITS OWN `usePermissions` call for `canEdit` — the identical split
+ * `ModuleAutomations` already takes for its own module-settings mounting
+ * (module-automations.tsx's own `mayChange`), and the reason it is not a
+ * prop from the host: R61 holds `module-settings-screen.tsx` to exactly ONE
+ * `can(` call, the one inside `visibleModuleSettings` that decides whether
+ * this section is offered at all — asking `work:update` a second time there
+ * would be the very duplication that rule exists to refuse. The host hands
+ * this component nothing but `teamId`. */
+export function TeamPhaseDayDefaultsPanel({ teamId }: { teamId: string }) {
+  const { t } = useLanguage()
+  const { can } = usePermissions(teamId)
+  // THE SAME RIGHT THE DOOR GATES THE WRITE ON — `work:update`, the identical
+  // right a wave's own Settings sheet already asks (wave-detail.tsx's
+  // `canEdit`). A reader without it sees the team's seven numbers and cannot
+  // change them, the honest shape of "visibility" R61's own header argues for.
+  const canEdit = can("work", "update")
+  const [busy, setBusy] = React.useState(false)
+  const defaultsQ = useCached<{ phaseDays: WavePhaseDay[] }>(phaseDayDefaultsKey(teamId), () =>
+    wavesApi.phaseDayDefaults()
+  )
+
+  const save = async (rows: { phaseType: string; days: number }[]): Promise<void> => {
+    setBusy(true)
+    try {
+      await wavesApi.setPhaseDayDefaults(rows)
+      invalidate(phaseDayDefaultsKey(teamId))
+      toast.success(t("Phase days changed."))
+    } catch (e) {
+      toast.error(
+        e instanceof ApiFailure ? e.message : t("That didn't save. Try again, and tell us if it keeps happening.")
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // WHILE LOADING, THE CODE'S OWN PLACEHOLDER — a wave with no rows of its own
+  // answers with `PHASE_DAY_DEFAULTS` too, so the seven fields never draw
+  // empty; the fresh read replaces them the moment it lands.
+  const phaseDays: WavePhaseDay[] =
+    defaultsQ.data?.phaseDays ?? PHASE_TYPES.map((p) => ({ phaseType: p.name, days: PHASE_DAY_DEFAULTS[p.name] ?? 1 }))
+
+  // R67 — A TITLED SECTION STANDS ON PAPER, NOTHING ON THE BARE PAGE GROUND.
+  // `WavePhaseDaysPanel` draws no `Card` of its own any more (it moved into
+  // the sheet's own scrolling body, this file's own header) — right for a
+  // sheet, which is already its own surface, and wrong here, where this
+  // panel is the whole content of the "Phase days" TAB on an ordinary main
+  // screen. The kit `Card` (`bg-surface-panel` by default) is the container.
+  return (
+    <Card>
+      <CardContent className="flex min-w-0 flex-col gap-4">
+        <WavePhaseDaysPanel teamId={teamId} phaseDays={phaseDays} canEdit={canEdit} busy={busy} onSave={save} />
+      </CardContent>
+    </Card>
   )
 }

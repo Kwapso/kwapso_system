@@ -824,6 +824,48 @@ describe("a task is deleted the same way a reply is — deactivated, never remov
         .deactivated_at
     ).toBe(null)
   })
+
+  // DEFECT (live proof): deleting a task left its running timer open for
+  // ever, and only GET /api/content/work-logs/running could still see it —
+  // nothing on the task itself said so once the row was gone from every list.
+  it("stops a running timer on the task instead of orphaning it", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Clock this and delete it" })
+    const id = (db().prepare(`SELECT id FROM tasks`).get() as { id: string }).id
+
+    const start = await call(IDS.staffUser, "POST /api/content/work-logs/start", {
+      targetTable: "tasks",
+      targetId: id,
+    })
+    expect(start.status).toBe(200)
+    const logId = (db().prepare(`SELECT id FROM work_logs WHERE target_id = ?`).get(id) as { id: string }).id
+    expect(
+      (db().prepare(`SELECT ended_at FROM work_logs WHERE id = ?`).get(logId) as { ended_at: string | null })
+        .ended_at
+    ).toBe(null)
+
+    const res = await call(IDS.staffUser, "POST /api/content/tasks/delete", { id })
+    expect(res.status).toBe(200)
+
+    // THE TIMER IS STOPPED, in the same request — `ended_at` is set and it no
+    // longer shows on the running-timers door.
+    const log = db().prepare(`SELECT ended_at, seconds FROM work_logs WHERE id = ?`).get(logId) as {
+      ended_at: string | null
+      seconds: number
+    }
+    expect(log.ended_at).not.toBe(null)
+    expect(log.seconds).toBeGreaterThanOrEqual(0)
+
+    const running = (await (
+      await call(IDS.staffUser, "GET /api/content/work-logs/running")
+    ).json()) as { timers: { id: string }[] }
+    expect(running.timers.map((t) => t.id)).not.toContain(logId)
+
+    // …and the task is deleted just the same as an untimed one.
+    const row = db().prepare(`SELECT deactivated_at FROM tasks WHERE id = ?`).get(id) as {
+      deactivated_at: string | null
+    }
+    expect(row.deactivated_at).not.toBe(null)
+  })
 })
 
 // ── A RUNNING CLOCK BLOCKS THE CLOSE (Aurora's 21 Sep 2026 ruling) ────────────

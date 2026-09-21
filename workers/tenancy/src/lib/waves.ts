@@ -53,6 +53,7 @@ import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
 import { PHASE_DAY_DEFAULTS, type Wave, type WaveOverlap, type WavePhaseDay, type WaveSprint } from "@shared/waves"
 import { PHASE_TYPES } from "@shared/sprint-types"
 import { GuardError, type MemberGuard } from "./permissions"
+import { readSegmentSettings, writeSegmentSettings } from "./automations-config"
 
 /* ------------------------------- the shapes -------------------------------
  *
@@ -326,18 +327,97 @@ export async function getWave(
  * `ownerOf` exactly as `updateWave` does), so a phase-days row is fenced by
  * the wave it names rather than fencing itself a second time. */
 
+/** THE TEAM'S OWN STARTING POINT, PER PHASE TYPE — Aurora's very next
+ * ruling, 21 Sep 2026, verbatim, closing the loop the paragraph above opened:
+ * "Make sure we can adjust this on the settings in Waves." A wave's own
+ * Settings sheet (above) already lets somebody set the days per PHASE; this
+ * is the team-WIDE default a wave with no row of its own falls back to
+ * BEFORE the code's own placeholder does — `PHASE_DAY_DEFAULTS`
+ * (shared/waves.ts) is now the fallback of a fallback, unchanged in every
+ * other way (still what a wave answers with on a team that has never opened
+ * this page). Stored in the `automations` table (`workers/tenancy/src/lib/
+ * automations-config.ts`), module `"waves"`, reserved key
+ * `"phaseDayDefaults"` — the same shape `setAutomationOverride`'s own
+ * `overrides` key already takes, never a table of its own, because it is one
+ * small object nothing but this door has an opinion about. */
+const WAVES_SETTINGS_MODULE = "waves"
+const PHASE_DAY_DEFAULTS_KEY = "phaseDayDefaults"
+
+/** ONE ROW PER PHASE TYPE, ALWAYS SEVEN, in `PHASE_TYPES` order — this
+ * team's own default, or the code's placeholder where the team has never set
+ * one. The one read `getWavePhaseDays` below merges in as its OWN fallback,
+ * and the same read the waves module-settings page draws its seven rows
+ * from. */
+export async function getTeamPhaseDayDefaults(cfg: D1Rest, guard: MemberGuard): Promise<WavePhaseDay[]> {
+  const { settings } = await readSegmentSettings(cfg, guard, WAVES_SETTINGS_MODULE)
+  const stored =
+    typeof settings[PHASE_DAY_DEFAULTS_KEY] === "object" && settings[PHASE_DAY_DEFAULTS_KEY] !== null
+      ? (settings[PHASE_DAY_DEFAULTS_KEY] as Record<string, unknown>)
+      : {}
+  return PHASE_TYPES.map((p) => {
+    const raw = stored[p.name]
+    const days = typeof raw === "number" && Number.isFinite(raw) ? raw : undefined
+    return { phaseType: p.name, days: days ?? PHASE_DAY_DEFAULTS[p.name] ?? 1 }
+  })
+}
+
+/** SET THE TEAM'S DEFAULT DAYS FOR ONE OR MORE PHASE TYPES. Same validation
+ * as a wave's own `updateWavePhaseDays` below (a phase type this team's own
+ * vocabulary carries, a whole number of days from 1 to 365) — `days` may
+ * name any subset of the seven; the rest keep whatever this team already
+ * defaults them to, or the code's own placeholder. */
+export async function updateTeamPhaseDayDefaults(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  days: { phaseType: unknown; days: unknown }[]
+): Promise<WavePhaseDay[]> {
+  if (!Array.isArray(days) || !days.length)
+    throw new GuardError(400, "invalid_input", "At least one phase's days are required.")
+  const known = new Set(PHASE_TYPES.map((p) => p.name))
+  const { existing, settings } = await readSegmentSettings(cfg, guard, WAVES_SETTINGS_MODULE)
+  const stored =
+    typeof settings[PHASE_DAY_DEFAULTS_KEY] === "object" && settings[PHASE_DAY_DEFAULTS_KEY] !== null
+      ? { ...(settings[PHASE_DAY_DEFAULTS_KEY] as Record<string, unknown>) }
+      : {}
+  for (const row of days) {
+    const phaseType = typeof row.phaseType === "string" ? row.phaseType : ""
+    if (!known.has(phaseType))
+      throw new GuardError(400, "invalid_input", "That's not a phase type this team uses.")
+    stored[phaseType] = phaseDaysValue(row.days, phaseType)
+  }
+  settings[PHASE_DAY_DEFAULTS_KEY] = stored
+  await writeSegmentSettings(cfg, guard, actor, WAVES_SETTINGS_MODULE, existing, settings)
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "updated",
+    description: "Wave phase day defaults changed",
+    relatedTable: "automations",
+    relatedRowId: WAVES_SETTINGS_MODULE,
+  })
+  return getTeamPhaseDayDefaults(cfg, guard)
+}
+
 /** ONE ROW PER PHASE TYPE, ALWAYS SEVEN, in `PHASE_TYPES` order. A wave
- * that has never had this settings panel touched answers with the
- * placeholder defaults (`PHASE_DAY_DEFAULTS`, shared/waves.ts) rather than
- * an empty list, so the screen always has seven rows to draw. */
+ * that has never had this settings panel touched answers with the TEAM's own
+ * defaults (`getTeamPhaseDayDefaults` above), which is itself the code's
+ * placeholder (`PHASE_DAY_DEFAULTS`, shared/waves.ts) on a team that has
+ * never set one — so the screen always has seven rows to draw, whichever of
+ * the three ever actually decided a number. */
 async function getWavePhaseDays(cfg: D1Rest, guard: MemberGuard, waveId: string): Promise<WavePhaseDay[]> {
-  const rows = await d1Query<{ phase_type: string; days: number }>(
-    cfg,
-    guard.databaseId,
-    `SELECT phase_type, days FROM wave_phase_days WHERE wave_id = ${sqlString(waveId)}`
-  )
+  const [rows, teamDefaults] = await Promise.all([
+    d1Query<{ phase_type: string; days: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT phase_type, days FROM wave_phase_days WHERE wave_id = ${sqlString(waveId)}`
+    ),
+    getTeamPhaseDayDefaults(cfg, guard),
+  ])
   const set = new Map(rows.map((r) => [r.phase_type, Number(r.days)]))
-  return PHASE_TYPES.map((p) => ({ phaseType: p.name, days: set.get(p.name) ?? PHASE_DAY_DEFAULTS[p.name] ?? 1 }))
+  const defaults = new Map(teamDefaults.map((d) => [d.phaseType, d.days]))
+  return PHASE_TYPES.map((p) => ({
+    phaseType: p.name,
+    days: set.get(p.name) ?? defaults.get(p.name) ?? PHASE_DAY_DEFAULTS[p.name] ?? 1,
+  }))
 }
 
 /** A phase type's days, 1 to 365 and always a whole number, the same

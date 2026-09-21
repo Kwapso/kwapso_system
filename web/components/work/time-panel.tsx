@@ -62,11 +62,10 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
  * duration · Edit` — eight things on one line, the worst row in the agency app
  * by the glance budget's own count (UI-RULEBOOK N1 caps a band at four). K1 is
  * the shape it takes instead: a title, ONE meta line, and the number the row is
- * for. So the two STATES (not billable, the kind of work) leave the sentence and
- * become a badge, which is what a state is; and the NOTE leaves the row
- * altogether, because a note is a paragraph somebody wrote and a list is not
- * where you read one — it is on the record, one click away, and the click is
- * cheaper than the crowd. */
+ * for. So the STATE (the kind of work) leaves the sentence and becomes a badge,
+ * which is what a state is; and the NOTE leaves the row altogether, because a
+ * note is a paragraph somebody wrote and a list is not where you read one — it
+ * is on the record, one click away, and the click is cheaper than the crowd. */
 function line(l: WorkLog): string {
   // R54: only staff log hours — there is no work-log door on the portal.
   return [staffNameFromSnapshot(l.userName), l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")
@@ -241,7 +240,6 @@ export function TimePanel({
       endedAt: values.endedAt,
       note: values.note || undefined,
       kind: values.kind || undefined,
-      billable: values.billable,
     })
     refreshTime(teamId)
     toast.success(t("Time logged."))
@@ -259,7 +257,6 @@ export function TimePanel({
       endedAt: values.endedAt,
       note: values.note,
       kind: values.kind,
-      billable: values.billable,
     })
     refreshTime(teamId)
     toast.success(t("Time corrected."))
@@ -401,18 +398,12 @@ export function TimePanel({
                         <p className="truncate text-sm font-medium">{l.targetLabel ?? ""}</p>
                         <p className="text-muted-foreground flex items-center gap-2 truncate text-xs">
                           {line(l)}
-                          {/* THE STATES, at the END of the meta line, never
+                          {/* THE STATE, at the END of the meta line, never
                               inside it — a badge is how the eye reads "this
                               row is unusual" without reading the row (N4).
-                              Only the exceptions are drawn: nearly all time is
-                              billable and most of it has no kind said, and a
-                              badge on every row is a badge that says
-                              nothing. */}
-                          {!l.billable && (
-                            <Badge variant="secondary" className="shrink-0">
-                              {t("not billable")}
-                            </Badge>
-                          )}
+                              Only the exception is drawn: most time has no
+                              kind said, and a badge on every row is a badge
+                              that says nothing. */}
                           {l.kind && (
                             <Badge variant="secondary" className="shrink-0">
                               {l.kind}

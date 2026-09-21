@@ -7,7 +7,7 @@
 // bug, so the check derives the publisher set by scanning publishChange calls
 // and fails the build on any resource no listener claims. Lives in lib (not the
 // shell component) so the check can import it as data.
-import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
+import { phaseDayDefaultsKey, waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 //
 // The list fetchers here ALSO prime the `total:` sidecar each door now returns
 // (R16): a badge shows the server COUNT(*), never rows.length, so whoever pulls
@@ -28,7 +28,7 @@ import {
   type StoryViewName,
   type TaskViewName,
 } from "@shared/types"
-import { RECORD_CHILDREN } from "@shared/record-counts"
+import { RECORD_CHILDREN, recordTimeCountKey } from "@shared/record-counts"
 import { cachedKeys, primeCache, readCache } from "@shared/web/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
@@ -755,6 +755,18 @@ export function recordTimeKey(targetTable: string, targetId: string): string {
  * reading the number from before. */
 export function recordTimeSummaryKey(targetTable: string, targetId: string): string {
   return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}:summary`
+}
+/** THE SIDECAR A RECORD'S TIME TAB BADGES, and the Effort card's own title
+ * count — MOVED HERE from `work-logs-panel.tsx` (2026-09-22) so
+ * `refreshTimers` (`web/components/shell/timer-bar.tsx`) can invalidate it on
+ * every start/stop without pulling that panel's own heavy import chain
+ * (`ToolbarRow`, the pulse charts) into the header bundle every screen loads
+ * (`TimerBar` mounts there). `work-logs-panel.tsx` re-exports this, unchanged
+ * for every existing caller. DELIBERATELY NOT under `TIME_SLICE_PREFIX`: it is
+ * a `total:` sidecar (R16), the same family every other collection badge
+ * lives in, not a `time-of:` row slice. */
+export function workLogsTotalKey(targetTable: string, targetId: string): string {
+  return totalKey(recordTimeCountKey(targetTable), targetId)
 }
 /** The agency-internal collections' cache keys. Named functions rather than
  * inline templates for the same reason the accounts and ticket keys are: the
@@ -2241,6 +2253,15 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // be more precise and would leave the resource with no listener here at all,
   // which is the shape R15 exists to prevent.
   google: (t) => [googleKey(t)],
+  // THE TEAM'S OWN DEFAULT DAYS PER PHASE TYPE (Aurora, 21 Sep 2026: "Make sure
+  // we can adjust this on the settings in Waves"). A coarse drop, the same
+  // reason `automations` takes one: the whole answer is seven small rows read
+  // whole by the waves module-settings page, so a row-level patch would save
+  // nothing a re-read does not. It never touches an OPEN wave's own cached
+  // phase days (`wave:one:<id>`) — those are read fresh from the door on every
+  // open anyway, and a wave with a row of its own does not move when the team's
+  // default does.
+  wave_phase_day_defaults: (t) => [phaseDayDefaultsKey(t)],
 }
 
 /** The one cache key the Google settings card lives in. */

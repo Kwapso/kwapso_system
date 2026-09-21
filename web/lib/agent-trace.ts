@@ -294,6 +294,15 @@ export function traceFor(
     // `set_wave_active` siblings above.
     case "update_wave_phase_days":
       return { path: `${seg(teamId, "waves")}/${str(input, "waveId")}`, highlight: "main" }
+    // THE TEAM'S OWN DEFAULT, ONE LEVEL UP — there is no wave to land on (it is
+    // a team-wide fact, not a field on any one wave), so it lands on the Waves
+    // module's own settings page instead, where `TeamPhaseDayDefaultsPanel`
+    // lives (module-settings-screen.tsx's `waves` segment, "phase-days"
+    // section, Aurora's 21 Sep 2026 ruling: "Make sure we can adjust this on
+    // the settings in Waves."). Like `/settings` itself (TEAM_IMPLICIT_PATHS
+    // above), this resolves against the ACTIVE team rather than naming one.
+    case "update_wave_phase_day_defaults":
+      return { path: "/settings/waves", highlight: "main" }
     case "set_sprint_wave":
       return { path: seg(teamId, "waves"), highlight: "main" }
     case "update_process":

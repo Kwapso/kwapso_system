@@ -611,36 +611,51 @@ const choicesGroupHome: Map<string, ChoiceGroupHome> = new Map([
 ])
 
 describe("shapeChoicesTable", () => {
-  // THE DETAILS COLUMN — client ruling, 16 Sep 2026 evening (this function's
-  // own header, "THE DETAILS COLUMN"). Sprint type is the one type that
-  // carries BOTH an icon (shared/sprint-types.ts, matched by the row's own
-  // word) and a duration (`standardDays`, a real column).
-  it("draws the icon for a sprint type row that has one, and the door's own duration", () => {
+  // THE MARK MOVED TO VALUE, 22 SEP 2026 (LATER). Aurora's ruling, this
+  // file's own header (deep-link/shape.tsx) has it verbatim: "no: the
+  // icon/color next to the value in first column! ... however icon color
+  // its not a detail!" So Sprint type, Story type, Ticket type and App
+  // stage's own icon/dot now draw beside the Value cell's name
+  // (`choiceValueMark`), and Details (below) keeps only the text left over.
+
+  // Sprint (Phase) type is the one seeded type left with text of its own,
+  // the door's own duration, `standardDays`, drawn as a plain count `Badge`.
+  it("draws the duration badge in Details, and the sprint icon beside the value in Value, for a sprint type row with both", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "s1", type: "Phase type", value: "Build", standardDays: 5 })],
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].details), "a sprint type with a known word draws a node").toBe(true)
+    expect(React.isValidElement(rows?.[0].details), "the duration badge is a node").toBe(true)
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.isValidElement(value)).toBe(true)
+    // The Value cell is one line (mark, then name), a mark and a text line,
+    // never a third, muted line underneath (that fold is retired).
+    expect(React.Children.toArray(value!.props.children).length, "mark + name, no second line").toBe(2)
   })
 
-  // A BARE TYPE — one `selectable_data` carries no code-owned enrichment for
-  // (Industry, here) — draws a genuinely empty cell: no dash, no placeholder,
-  // the same "carries nothing" answer R81 gives a form field.
-  it("draws nothing for a type the Details column has no case for", () => {
+  // A BARE TYPE, one `selectable_data` carries no code-owned enrichment for
+  // (Industry, here), draws a genuinely empty Details cell (no mark either,
+  // for the same reason): no dash, no placeholder, the same "carries
+  // nothing" answer R81 gives a form field.
+  it("draws nothing for a type Details has no case for, and no mark beside its Value either", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "i1", type: "Industry", value: "Hospitality" })],
       choicesGroupHome,
       "en"
     ).rows
     expect(rows?.[0].details).toBeNull()
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    // No mark to draw: React.Children.toArray drops the null child, leaving
+    // only the name span.
+    expect(React.Children.toArray(value!.props.children).length, "name only, no mark").toBe(1)
   })
 
   // A SPRINT TYPE ROW WHOSE WORD THE CODE HAS NEVER MET (a team's own
-  // rename) carries no icon and, absent a duration too, draws nothing —
-  // `sprintTypeIcon` returns "" rather than throwing, and the cell reads
-  // that the same way it reads any other type with nothing to show.
-  it("draws nothing for a sprint type row the icon vocabulary has never met, with no duration either", () => {
+  // rename) carries no icon and, absent a duration too, Details draws
+  // nothing. `sprintTypeIcon` returns "" rather than throwing, and the cell
+  // reads that the same way it reads any other type with nothing to show.
+  it("draws nothing in Details for a sprint type row with no duration, known icon or not", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "s2", type: "Phase type", value: "Retro" })],
       choicesGroupHome,
@@ -649,28 +664,35 @@ describe("shapeChoicesTable", () => {
     expect(rows?.[0].details).toBeNull()
   })
 
-  // A STORY TYPE ROW draws its own icon only — no duration column is ever
-  // read for it, so the fixture's `standardDays: null` (the default) is
-  // never in question here.
-  it("draws the icon for a story type row that has one", () => {
+  // A STORY TYPE ROW draws its own icon beside the Value cell's name, and
+  // Details, which used to hold that same icon, is empty now that the mark
+  // moved. No duration column is ever read for Story type either, so the
+  // fixture's `standardDays: null` (the default) is never in question here.
+  it("draws the icon beside the value for a story type row that has one, and nothing in Details", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "t1", type: "Story type", value: "Bug" })],
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].details)).toBe(true)
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.Children.toArray(value!.props.children).length, "mark + name").toBe(2)
+    expect(rows?.[0].details, "Details has nothing left to say once the icon moved").toBeNull()
   })
 
   // AN APP STAGE ROW draws the same dot tone `apps-screen.tsx`'s own stage
-  // pill already draws — a node, not a bare string, because a dot never
-  // renders without its label (the kit's own ruling 04).
-  it("draws the dot tone for an app stage row", () => {
+  // pill already draws, a `Swatch` beside the value's own name now (never a
+  // `Badge`, since the value text right beside it already answers the kit's
+  // "a dot never renders without a label" rule, ruling 04), and Details,
+  // which used to hold that dot as a `Badge`, is empty.
+  it("draws the dot tone beside the value for an app stage row, and nothing in Details", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "a1", type: "App stage", value: "Build" })],
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].details)).toBe(true)
+    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.Children.toArray(value!.props.children).length, "mark + name").toBe(2)
+    expect(rows?.[0].details, "Details has nothing left to say once the dot moved").toBeNull()
   })
 
   // THE STATUS CHIP, ITS OWN COLUMN AGAIN. Client ruling, 17 Sep 2026,
@@ -710,11 +732,10 @@ describe("shapeChoicesTable", () => {
     }
   })
 
-  // THE VALUE CELL NO LONGER CARRIES THE STATUS CHIP — the one thing worth a
-  // reader not re-adding without reading this test first: the chip moved to
+  // THE VALUE CELL NO LONGER CARRIES THE STATUS CHIP, the one thing worth a
+  // reader not re-adding without reading this test first: the chip lives in
   // its own `status` cell (the test above), so the Value cell's own children
-  // are the mark/icon and the name alone, plus Details (below) when the row
-  // has one.
+  // are the mark (when the group/type has one) and the name alone.
   it("does not carry the status chip inside the Value cell any more", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "s4", type: "Industry", value: "A row", active: true, isDefault: false })],
@@ -723,9 +744,9 @@ describe("shapeChoicesTable", () => {
     ).rows
     const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
     expect(React.isValidElement(value)).toBe(true)
-    // `value`'s own DOM has no descendant carrying `variant="status"` — walked
-    // recursively rather than just the immediate children, since the fold
-    // moved this cell from a flat `<span>` to a `flex-col` wrapper.
+    // `value`'s own DOM has no descendant carrying `variant="status"`, walked
+    // recursively rather than just the immediate children, since a mark node
+    // (a `Swatch`/`Icon`) could in principle nest one.
     function hasStatusChip(node: React.ReactNode): boolean {
       if (!React.isValidElement(node)) return false
       const props = node.props as { variant?: string; children?: React.ReactNode }
@@ -735,14 +756,13 @@ describe("shapeChoicesTable", () => {
     expect(hasStatusChip(value)).toBe(false)
   })
 
-  // DETAILS, FOLDED UNDER VALUE AS A MUTED SECOND LINE — K59, Aurora, 22 Sep
-  // 2026 (this function's own header, "DETAILS STOPPED BEING ITS OWN COLUMN
-  // ON 22 SEP 2026"): the value on the first line, Details beneath it, the
-  // same stacking `tickets-collection.tsx`'s Closed column uses for a
-  // resolver's name over their date. A Phase (sprint) type row carries both
-  // an icon and a duration badge in Details, so it is a real, non-null second
-  // line to prove the fold against.
-  it("folds the Details cell under the Value cell as a muted second line", () => {
+  // THE VALUE CELL NEVER CARRIES A SECOND LINE ANY MORE. K59, Aurora, 22 Sep
+  // 2026 (later), this function's own header, "THE MARK MOVES TO VALUE,
+  // DETAILS RETURNS AS TEXT ONLY, 22 SEP 2026 (LATER)": the fold that used to
+  // stack Details beneath the value's own name is retired. A row with a mark
+  // (Phase type "Build", a known icon) still has exactly two children, the
+  // mark and the name, side by side, never a third line underneath.
+  it("never folds a second line under the Value cell, even for a row with both a mark and a Details fact", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "p2", type: "Phase type", value: "Build", standardDays: 5 })],
       choicesGroupHome,
@@ -750,30 +770,12 @@ describe("shapeChoicesTable", () => {
     ).rows
     const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
     expect(React.isValidElement(value)).toBe(true)
-    const [nameLine, detailsLine] = React.Children.toArray(value!.props.children) as React.ReactElement<{
-      className?: string
-      children?: React.ReactNode
-    }>[]
-    expect(React.isValidElement(nameLine), "the value's own name is the first line").toBe(true)
-    expect(React.isValidElement(detailsLine), "Details rides the second line").toBe(true)
-    expect(detailsLine.props.className, "the second line is muted, sized down").toContain("text-muted-foreground")
-    // `rows[i].details` still answers on its own, unchanged in content — only
-    // where it renders moved (this function's own header).
-    expect(React.isValidElement(rows?.[0].details), "details still answers off the row too").toBe(true)
-  })
-
-  // A ROW WITH NOTHING FOR DETAILS TO SAY draws no second line at all, not an
-  // empty one — the Value cell's own single child is the name line.
-  it("draws no second line under Value for a type Details has nothing to say about", () => {
-    const rows = shapeChoicesTable(
-      [selectableValue({ id: "i2", type: "Industry", value: "Hospitality" })],
-      choicesGroupHome,
-      "en"
-    ).rows
-    const value = rows?.[0].value as React.ReactElement<{ children?: React.ReactNode }> | undefined
-    expect(React.isValidElement(value)).toBe(true)
-    const children = React.Children.toArray(value!.props.children)
-    expect(children.length, "no second line when Details is null").toBe(1)
+    // Mark, then name, never a third child, and the outer wrapper carries
+    // no `flex-col` (the retired stacking class, `gap-0.5`, that used to
+    // hold the fold).
+    expect(React.Children.toArray(value!.props.children).length, "mark + name, never a third child").toBe(2)
+    const outerClassName = (value!.props as { className?: string }).className ?? ""
+    expect(outerClassName, "no flex-col wrapper, the fold is retired").not.toContain("flex-col")
   })
 
   // K59 (documents/UI-RULEBOOK.md), Aurora, 21 Sep 2026: "in settibsg sticket:
@@ -806,13 +808,17 @@ describe("shapeChoicesTable", () => {
     expect(rows?.[0].whereField).toBe("")
   })
 
-  // "ok split the who and date added in 2 columns". K59, Aurora, 21 Sep
-  // 2026, splitting the same day's earlier "in choices also show columns
-  // added on and added by" out of its one folded cell into two real columns:
-  // `addedBy` (the creator's face and first name) and `addedOn` (the
-  // formatted date), with the RAW instant riding beside them for the date
-  // sort (`sorted-columns-declare-their-type.test.ts`'s own law).
-  it("the Added by cell carries the creator's face and first name, and the Added on cell carries the date plus the raw instant for sort", () => {
+  // ADDED, FOLDED BACK INTO ONE CELL. K59, Aurora, 22 Sep 2026 (later),
+  // this function's own header has the full accounting: restoring Details to
+  // its own column put the table at seven named facts again, so Added by and
+  // Added on (split apart by the 21 Sep 2026 evening reading) fold back
+  // together, the creator's face and first name on the first line, the
+  // formatted date muted beneath it, the same "who over when" shape the very
+  // first 21 Sep 2026 reading shipped. `createdAtRaw` keeps riding beside it,
+  // raw, for the toolbar's own "Added on" sort option
+  // (`sorted-columns-declare-their-type.test.ts`'s own law: never the
+  // formatted string).
+  it("the Added cell carries the creator's face and first name over the formatted date, plus the raw instant for sort", () => {
     const rows = shapeChoicesTable(
       [
         selectableValue({
@@ -826,29 +832,27 @@ describe("shapeChoicesTable", () => {
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].addedBy), "Added by draws a node (face + name)").toBe(true)
+    expect(React.isValidElement(rows?.[0].added), "Added draws a node (face + name + date)").toBe(true)
     // R54: staff are shown by first name only, everywhere.
-    expect(rows?.[0].addedByText).toBe("Ana")
-    expect(rows?.[0].addedOn, "Added on is the formatted date alone").toBe("May 1, 2026")
+    expect(rows?.[0].addedText).toBe("Ana")
     expect(rows?.[0].createdAtRaw, "the sort's own raw value, never the shaped date").toBe(
       "2026-05-01T09:00:00.000Z"
     )
   })
 
   // A value from before the audit columns existed (or a row the fixture just
-  // never set them on) draws both cells with nothing to say, not a crash and
-  // not a dash, the same "carries nothing" answer R81 gives elsewhere.
-  // Added by draws `null` (the same empty answer the Details column gives),
-  // never an empty wrapper node, because there is no face to anchor one.
-  it("the Added by and Added on cells are empty, not broken, for a value with no audit block", () => {
+  // never set them on) draws the Added cell with nothing to say, not a crash
+  // and not a dash, the same "carries nothing" answer R81 gives elsewhere.
+  // `null`, never an empty wrapper node, because there is no face to anchor
+  // one.
+  it("the Added cell is empty, not broken, for a value with no audit block", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "a2", type: "Industry", value: "Retail" })],
       choicesGroupHome,
       "en"
     ).rows
-    expect(rows?.[0].addedBy).toBeNull()
-    expect(rows?.[0].addedByText).toBe("")
-    expect(rows?.[0].addedOn).toBe("")
+    expect(rows?.[0].added).toBeNull()
+    expect(rows?.[0].addedText).toBe("")
     expect(rows?.[0].createdAtRaw).toBeNull()
   })
 })

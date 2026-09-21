@@ -201,6 +201,7 @@ const api = vi.hoisted(() => ({
   updateWorkLog: vi.fn(),
   members: [] as unknown[],
   workLogs: null as unknown as unknown[],
+  timers: [] as unknown[],
 }))
 
 // THE DEFAULT WORK LOG ROW — ONE, NOT ZERO (R88, see the mock's own comment
@@ -218,7 +219,6 @@ const WORK_LOG_ROW = {
   startedAt: "2026-08-18T09:00:00.000Z",
   endedAt: "2026-08-18T09:30:00.000Z",
   seconds: 1800,
-  billable: true,
   discarded: false,
   accountId: "acct-bergman",
 }
@@ -260,9 +260,53 @@ vi.mock("@/lib/api", async (importOriginal) => {
         weeks: [],
       }),
       helpAttachments: async () => ({ attachments: [], total: 0 }),
-      runningTimers: async () => ({ timers: [] }),
+      runningTimers: async () => ({ timers: api.timers }),
       helpMetrics: async () => api.metrics,
       updateWorkLog: api.updateWorkLog,
+      // START/STOP — wired for "the Effort card's stat tiles update after a
+      // real start/stop" below, the ticket page's own copy of the story
+      // page's identical test (both read the same shared `refreshTimers`
+      // seam, `web/components/shell/timer-bar.tsx`). BY REASSIGNMENT, never
+      // in place — `useCached` compares by reference (see the story test's
+      // own note).
+      startTimer: async (targetTable: string, targetId: string) => {
+        const startedAt = new Date().toISOString()
+        const id = `timer-${targetTable}-${targetId}`
+        api.timers = [
+          ...api.timers,
+          { id, targetTable, targetId, targetLabel: null, targetRef: null, startedAt, elapsedSeconds: 0, runaway: false },
+        ]
+        api.workLogs = [
+          ...(api.workLogs as unknown[]),
+          {
+            id,
+            targetTable,
+            targetId,
+            targetLabel: null,
+            targetRef: null,
+            userId: "user-1",
+            userName: "Aurora",
+            kind: null,
+            note: null,
+            startedAt,
+            endedAt: null,
+            seconds: 0,
+            discarded: false,
+            accountId: "acct-bergman",
+          },
+        ]
+        return { timers: api.timers }
+      },
+      stopTimer: async (id: string) => {
+        api.timers = (api.timers as { id: string }[]).filter((t) => t.id !== id)
+        const stoppedAt = new Date().toISOString()
+        api.workLogs = (api.workLogs as { id: string; startedAt: string }[]).map((l) =>
+          l.id === id ? { ...l, endedAt: stoppedAt, seconds: 3 } : l
+        )
+        const totalSeconds = (api.workLogs as { seconds: number }[]).reduce((sum, l) => sum + (l.seconds || 0), 0)
+        api.metrics = { cycleTimeSeconds: 3, effortSeconds: totalSeconds, flowEfficiency: 100 }
+        return { timers: api.timers }
+      },
     },
     tenancy: {
       ...actual.tenancy,
@@ -323,6 +367,7 @@ beforeEach(() => {
   api.updateWorkLog.mockReset().mockResolvedValue({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false })
   api.members = [MEMBER_WITH_FACE]
   api.workLogs = [WORK_LOG_ROW]
+  api.timers = []
 })
 
 const openTicket = (status: HelpStatus = "triaged") => {
@@ -433,6 +478,19 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     expect(screen.getAllByText("1.5h").length).toBe(1)
   })
 
+  // AMENDED AGAIN, 22 Sep 2026, same day: Aurora, verbatim, "good. add kind
+  // of card background behind cards, this is a metric, like in kit." Each
+  // tile's own figure now sits inside the kit's `<Card variant="raised">`,
+  // proven by walking up from the value to the nearest `[data-slot="card"]`.
+  it("draws each metric tile inside the kit's own raised card, not bare", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const cycleValue = await screen.findByText("1d 1h")
+    const tileCard = cycleValue.closest('[data-slot="card"]')
+    expect(tileCard).toBeTruthy()
+    expect(tileCard?.getAttribute("data-variant")).toBe("raised")
+  })
+
   it("reads 'Not started' and 'No time log' before any work is logged, with the record count beside the title", async () => {
     api.metrics = NO_TICKET_METRICS
     openTicket()
@@ -443,6 +501,36 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     // door has nothing to say yet.
     const heading = await screen.findByRole("heading", { name: /^Effort/ })
     expect(heading.textContent).toBe("Effort1")
+  })
+
+  // DEFECT (live proof, 21 Sep 2026): the Effort card's own stat tiles
+  // stayed on their BEFORE-the-timer values after a real Start-then-Stop of
+  // a very short (3 second) timer, until a full reload — the ticket page's
+  // own copy of the story page's identical bug (both read the same shared
+  // `refreshTimers` seam, `web/components/shell/timer-bar.tsx`, which
+  // invalidated `recordTimeKey` (the ROWS) on every start/stop but never
+  // `help:metrics:<id>` (the door behind these three TILES)).
+  it("moves off 'Not started' / 'No time log' once a short timer is stopped, no reload", async () => {
+    api.metrics = NO_TICKET_METRICS
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+
+    // BEFORE: the metrics door has nothing to say yet.
+    await screen.findByText("Not started")
+    expect(screen.getByText("No time log")).toBeTruthy()
+
+    const startButton = await screen.findByRole("button", { name: /^Start/ })
+    fireEvent.click(startButton)
+
+    const stopButton = await screen.findByRole("button", { name: /Stop timer/ })
+    fireEvent.click(stopButton)
+
+    // AFTER: real figures, not the stale placeholder words.
+    await waitFor(() => {
+      expect(screen.queryByText("Not started")).toBeNull()
+      expect(screen.queryByText("No time log")).toBeNull()
+    })
+    expect(screen.getByText("100%")).toBeTruthy()
   })
 
   it("draws the individual time log rows with a face, name, date and duration", async () => {

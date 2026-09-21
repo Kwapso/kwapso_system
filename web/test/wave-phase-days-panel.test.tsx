@@ -16,7 +16,8 @@
 // close mid-save.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { clearCache } from "@shared/web/store"
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
@@ -32,9 +33,39 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
-import { WavePhaseDaysPanel, WavePhaseDaysSheet } from "@/components/work/wave-phase-days-panel"
+const teamDefaultsApi = vi.hoisted(() => ({
+  phaseDayDefaults: vi.fn(),
+  setPhaseDayDefaults: vi.fn(),
+}))
+
+vi.mock("@/lib/api/waves", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/waves")>()
+  return {
+    ...actual,
+    waves: {
+      ...actual.waves,
+      phaseDayDefaults: teamDefaultsApi.phaseDayDefaults,
+      setPhaseDayDefaults: teamDefaultsApi.setPhaseDayDefaults,
+    },
+  }
+})
+
+// `TeamPhaseDayDefaultsPanel` asks `work:update` itself (its own
+// `usePermissions` call, the same split `ModuleAutomations` takes) rather
+// than taking `canEdit` as a prop — see that component's own header for why.
+const perms = vi.hoisted(() => ({ can: vi.fn(() => true) }))
+vi.mock("@/lib/perms", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/perms")>()
+  return { ...actual, usePermissions: () => ({ can: perms.can }) }
+})
+
+import {
+  TeamPhaseDayDefaultsPanel,
+  WavePhaseDaysPanel,
+  WavePhaseDaysSheet,
+} from "@/components/work/wave-phase-days-panel"
 import { PHASE_TYPES } from "@shared/sprint-types"
-import type { WavePhaseDay } from "@shared/waves"
+import { PHASE_DAY_DEFAULTS, type WavePhaseDay } from "@shared/waves"
 
 afterEach(cleanup)
 
@@ -191,5 +222,75 @@ describe("WavePhaseDaysSheet, the slide-in the wave head's gear opens", () => {
     const overlay = document.body.querySelector('[data-slot="sheet-overlay"]')
     fireEvent.pointerDown(overlay as Element)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+})
+
+// THE TEAM'S OWN DEFAULTS, ON THE WAVES MODULE SETTINGS PAGE — Aurora's very
+// next ruling, 21 Sep 2026, verbatim, closing the loop the two blocks above
+// already answer per wave: "Make sure we can adjust this on the settings in
+// Waves." Same seven-row panel, its own fetch and save.
+describe("TeamPhaseDayDefaultsPanel, the waves module-settings page's own mounting", () => {
+  beforeEach(() => {
+    clearCache()
+    perms.can.mockReturnValue(true)
+  })
+  afterEach(() => {
+    teamDefaultsApi.phaseDayDefaults.mockReset()
+    teamDefaultsApi.setPhaseDayDefaults.mockReset()
+  })
+
+  it("renders the code's own placeholder while the read is in flight, then the team's own answer once it lands", async () => {
+    let resolve!: (v: { phaseDays: WavePhaseDay[] }) => void
+    teamDefaultsApi.phaseDayDefaults.mockReturnValue(
+      new Promise((r) => {
+        resolve = r
+      })
+    )
+    render(<TeamPhaseDayDefaultsPanel teamId="team-1" />)
+    const build = (await screen.findByLabelText("Build")) as HTMLInputElement
+    expect(build.value).toBe(String(PHASE_DAY_DEFAULTS.Build))
+
+    resolve({ phaseDays: PHASE_TYPES.map((p) => ({ phaseType: p.name, days: 25 })) })
+    await waitFor(() => expect(build.value).toBe("25"))
+  })
+
+  it("Save calls setPhaseDayDefaults, not the per-wave door", async () => {
+    // A DELIBERATELY SETTLED READ FIRST — the placeholder and the team's real
+    // answer are the same seven numbers in this suite (nothing has been set
+    // yet), so nothing here would ever prove the fetch had actually landed
+    // before the edit. Awaiting the resolve explicitly, the same shape the
+    // block above already uses, is what removes that race.
+    let resolve!: (v: { phaseDays: WavePhaseDay[] }) => void
+    teamDefaultsApi.phaseDayDefaults.mockReturnValue(
+      new Promise((r) => {
+        resolve = r
+      })
+    )
+    teamDefaultsApi.setPhaseDayDefaults.mockResolvedValue({ ok: true, phaseDays: [] })
+    render(<TeamPhaseDayDefaultsPanel teamId="team-1" />)
+    const build = (await screen.findByLabelText("Build")) as HTMLInputElement
+    expect(build.value).toBe(String(PHASE_DAY_DEFAULTS.Build)) // the placeholder, while the read is in flight
+
+    // A DIFFERENT number than the placeholder, on purpose: `waitFor` below can
+    // only prove the fetch has genuinely landed (and its own effect settled)
+    // by waiting for a value the placeholder could never already show.
+    resolve({ phaseDays: PHASE_TYPES.map((p) => ({ phaseType: p.name, days: 20 })) })
+    await waitFor(() => expect(build.value).toBe("20"))
+
+    fireEvent.change(build, { target: { value: "40" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(teamDefaultsApi.setPhaseDayDefaults).toHaveBeenCalledTimes(1))
+    expect(teamDefaultsApi.setPhaseDayDefaults).toHaveBeenCalledWith([{ phaseType: "Build", days: 40 }])
+  })
+
+  it("is read-only for a caller without the wave update right", async () => {
+    perms.can.mockReturnValue(false)
+    teamDefaultsApi.phaseDayDefaults.mockResolvedValue({
+      phaseDays: PHASE_TYPES.map((p) => ({ phaseType: p.name, days: PHASE_DAY_DEFAULTS[p.name] })),
+    })
+    render(<TeamPhaseDayDefaultsPanel teamId="team-1" />)
+    const build = (await screen.findByLabelText("Build")) as HTMLInputElement
+    expect(build.disabled).toBe(true)
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull()
   })
 })

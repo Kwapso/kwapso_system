@@ -1844,7 +1844,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Rows of time — who worked on what, in whole seconds. `period`: '7d', '30d' or '90d'. `totalSeconds` is exact, never capped. For prose, ask_knowledge.",
     detail:
-      "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, `meetingTime` ('exclude' drops the time spent in meetings, 'only' keeps nothing else, leaving it off counts all of it), `q` (matches who logged it and what it was against — the same search the Time screen's toolbar asks), and `period` ('7d', '30d' or '90d', a rolling window on when it was logged; leave it off for all time). `sort` ('started', the default, newest first; 'duration', longest first; 'person', alphabetically by who logged it) and `dir` ('asc' or 'desc') choose the order; leave `sort` off to keep the door's own default. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, it is billable time, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+      "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, `meetingTime` ('exclude' drops the time spent in meetings, 'only' keeps nothing else, leaving it off counts all of it), `q` (matches who logged it and what it was against — the same search the Time screen's toolbar asks), and `period` ('7d', '30d' or '90d', a rolling window on when it was logged; leave it off for all time). `sort` ('started', the default, newest first; 'duration', longest first; 'person', alphabetically by who logged it) and `dir` ('asc' or 'desc') choose the order; leave `sort` off to keep the door's own default. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
     schema: obj({
       scope: S, targetTable: S, targetId: S, userId: S, meetingTime: S, q: S, period: S, sort: S, dir: S, cursor: S,
@@ -1920,12 +1920,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "log_time",
     summary:
-      "Write finished time down by hand. `startedAt` and `endedAt` are ISO moments; the duration comes from them, there is no hours field. `billable` defaults true.",
+      "Write finished time down by hand. `startedAt` and `endedAt` are ISO moments; the duration comes from them, there is no hours field.",
     detail:
-      "Write time down by hand, for work already finished. `startedAt` and `endedAt` are ISO moments and the duration is computed FROM them, there is no field for a number of hours, because two moments can be checked afterwards and a number cannot. `billable` defaults to true. Same targets as start_timer: a story or a ticket, never a to-do and never an account.",
+      "Write time down by hand, for work already finished. `startedAt` and `endedAt` are ISO moments and the duration is computed FROM them, there is no field for a number of hours, because two moments can be checked afterwards and a number cannot. Same targets as start_timer: a story or a ticket, never a to-do and never an account.",
     binding: "CONTENT", method: "POST", path: "/api/content/work-logs",
     schema: obj(
-      { targetTable: S, targetId: S, startedAt: S, endedAt: S, note: S, kind: S, billable: B },
+      { targetTable: S, targetId: S, startedAt: S, endedAt: S, note: S, kind: S },
       ["targetTable", "targetId", "startedAt", "endedAt"]
     ),
     buildBody: (i) => ({
@@ -1935,10 +1935,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       endedAt: str(i, "endedAt"),
       note: opt(i, "note"),
       kind: opt(i, "kind"),
-      // R22 — forwarded ALWAYS, never conditionally. An `undefined` here would
-      // mean the door never sees the field a caller deliberately set, and the
-      // door's own default (billable on) would quietly overrule them.
-      billable: i.billable !== false,
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Log time on ${str(i, "targetId")}` },
   },
@@ -2755,7 +2751,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Set how many days one or more phase types get on a wave (`waveId`, `days`: a list of {phaseType, days}). 1-365 days, whole numbers.",
     detail:
-      "Set how many days one or more phase types get on a wave, by the wave's `waveId`. `days` is a list of {phaseType, days}, phaseType one of Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare (the Wave-lifecycle vocabulary, in that order), days a whole number from 1 to 365. Name any subset; the rest keep whatever they already carry, a row of their own or the placeholder default (Audit 5, Plan 5, Build 20, Pilot 10, Revision 10, Deploy 3, Hypercare 10 days, hers to adjust) get_wave fills in for a wave with no rows yet. Answers with all seven, in Wave-lifecycle order.",
+      "Set how many days one or more phase types get on a wave, by the wave's `waveId`. `days` is a list of {phaseType, days}, phaseType one of Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare (the Wave-lifecycle vocabulary, in that order), days a whole number from 1 to 365. Name any subset; the rest keep whatever they already carry, a row of their own, the team's own default (get_wave_phase_day_defaults), or the code's own placeholder (Audit 5, Plan 5, Build 15, Pilot 5, Revision 10, Deploy 3, Hypercare 7 days) get_wave fills in for a wave with no rows yet. Answers with all seven, in Wave-lifecycle order.",
     binding: "TENANCY",
     method: "POST",
     path: "/api/tenancy/waves/phase-days",
@@ -2775,6 +2771,46 @@ export const SHARED_TOOLS: SharedTool[] = [
     ),
     buildBody: (i) => ({ waveId: str(i, "waveId"), days: Array.isArray(i.days) ? i.days : [] }),
     agent: { write: true, confirm: false, summarize: (i) => `Set phase days for wave ${str(i, "waveId")}` },
+  },
+  {
+    // THE TEAM'S OWN STARTING POINT, ONE LEVEL UP FROM `update_wave_phase_days`.
+    // Aurora's very next ruling, 21 Sep 2026, verbatim: "Make sure we can adjust
+    // this on the settings in Waves." A new wave with no Settings row of its own
+    // reads THESE before it reads the code's own placeholder.
+    name: "get_wave_phase_day_defaults",
+    summary:
+      "The team's own default days per phase type, all seven, before any wave's own Settings override them.",
+    detail:
+      "The team's own default days per phase type — always seven rows, Audit through Hypercare in Wave-lifecycle order, the code's own placeholder (Audit 5, Plan 5, Build 15, Pilot 5, Revision 10, Deploy 3, Hypercare 7 days) filled in wherever this team has never set one. A wave with no Settings row of its own (get_wave's own `phaseDays`) reads these first.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/waves/phase-day-defaults",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Check the team's default phase days" },
+  },
+  {
+    name: "update_wave_phase_day_defaults",
+    summary:
+      "Set the team's own default days for one or more phase types (`days`: a list of {phaseType, days}). 1-365 days, whole numbers.",
+    detail:
+      "Set the team's own default days for one or more phase types — `days` is a list of {phaseType, days}, phaseType one of Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare, days a whole number from 1 to 365. Name any subset; the rest keep whatever this team already defaults them to, or the code's own placeholder. A new wave with no Settings row of its own starts from these.",
+    binding: "TENANCY",
+    method: "POST",
+    path: "/api/tenancy/waves/phase-day-defaults",
+    schema: obj(
+      {
+        days: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { phaseType: S, days: N },
+            required: ["phaseType", "days"],
+          },
+        },
+      },
+      ["days"]
+    ),
+    buildBody: (i) => ({ days: Array.isArray(i.days) ? i.days : [] }),
+    agent: { write: true, confirm: false, summarize: () => "Set the team's default phase days" },
   },
   {
     name: "set_audit_date",

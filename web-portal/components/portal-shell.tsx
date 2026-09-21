@@ -213,7 +213,13 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     // screens, and every dialog opened from them. `session.user.language` is
     // already resolved by the time this paints, so there is no flash of English.
     <LanguageProvider value={session.user?.language}>
-    <div ref={shellRef} className="flex min-h-[100svh] flex-col">
+    {/* `--live-status-tab-clear` is read by `shared/web/live-status.tsx`
+        (K62): its fixed, bottom centred pill has to clear the bottom nav
+        below, which (unlike the agency's phone only bar) shows at every
+        width here, so the property carries no `md` override. See
+        `web/components/shell/app-shell.tsx`'s own `[--shell-top…]` div for
+        the sibling copy of this note. */}
+    <div ref={shellRef} className="flex min-h-[100svh] flex-col [--live-status-tab-clear:6rem]">
       {/* THE STICKY HEADER'S EDGE IS AN INSET SHADOW (kit §2.7). It is
           load-bearing rather than decorative: this bar is `sticky` over
           scrolling content, and without an edge the page slides under it with
@@ -267,13 +273,6 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
        * `children(session)` inside 600 characters of each other, which is its way
        * of saying the flag still gates the body. Keep prose out of that gap. */}
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">
-        {/* The client's door is cache-first over the same socket the agency's
-         * is, so it can go quietly stale in exactly the same way — and a client
-         * has less reason than anybody to suspect it. Above the switch, not
-         * inside it: a company switch is a wait the shell already draws, and
-         * this is about the connection rather than about which company's rows
-         * are coming. Renders nothing while the socket is up. */}
-        <LiveStatus />
         {/* Mid-switch the rows below still belong to the company being left, so
          * they are held back rather than shown under the new company's name.
          * Skeletons in the SHAPE of what's coming — a heading, then request rows
@@ -290,6 +289,15 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
           <div className="motion-page-in">{children(session)}</div>
         )}
       </main>
+
+      {/* IS THIS SCREEN STILL LIVE? A fixed, bottom centred pill (K62), a
+          sibling of `<main>` rather than nested inside it, so it never adds
+          a box, a height or a width to the page it floats over. The
+          client's door is cache-first over the same socket the agency's is,
+          so it can go quietly stale in exactly the same way, and a client
+          has less reason than anybody to suspect it. Renders nothing while
+          the socket is up. */}
+      <LiveStatus />
 
       {/* The nav sits at the BOTTOM on a phone, where a thumb is — and it is the
        * same three items on every screen, always in the same order, always

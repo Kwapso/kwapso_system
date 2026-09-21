@@ -253,6 +253,16 @@ export const TOOL_GATES: Record<string, string> = {
   // SAME RIGHT AS `update_wave`: how many days a phase type gets is a field on
   // the wave, not a record of its own (Aurora's 20 Sep 2026 ruling).
   update_wave_phase_days: "work:update",
+  // THE TEAM'S OWN DEFAULT, ONE LEVEL UP — same right again, because it is the
+  // same fact a wave with no Settings row of its own starts from (Aurora's
+  // 21 Sep 2026 ruling).
+  update_wave_phase_day_defaults: "work:update",
+  // Read carries an explicit hint too, same shape as `list_story_attachments`
+  // above: the team's own defaults are a `work` fact like everything else on
+  // this ladder, and this door is new enough (21 Sep 2026) that leaving it
+  // unclassified would widen the ungated set for no reason — the module's
+  // read right is what it needs, so it says so.
+  get_wave_phase_day_defaults: "work:read",
   set_audit_date: "processes:update",
   // A CONNECTION IS A SIGNPOST, and an update to the map that carries it. Not
   // `create`: nothing is authored, and gating it behind create would mean a

@@ -48,9 +48,12 @@
 // title, Start/Done, Assigned to, Deadline, Description, Effort and the dark
 // footer band all sit inside the one scrolling body, the same shape the
 // design proposal drew (nothing pinned inside the sheet itself, only the
-// sheet's OWN edge is fixed against the viewport). Assigned to, Deadline and
-// Description are three cards of ONE design now (Aurora, 22 Sep 2026), the
-// same `TicketSidePanel` shape the ticket's own side panels draw — see this
+// sheet's OWN edge is fixed against the viewport). Assigned to, Details
+// (the description) and Deadline are ONE card now (Aurora, 22 Sep 2026,
+// verbatim: "merge assigned to details and deadline in the same container
+// together (in this order)"), the same `TicketSidePanel` `Card` the sheet
+// already draws, called once rather than three times, its own kit
+// `Separator` between each of the three parts, no nested cards — see this
 // file's own body for the account.
 //
 // EFFORT IS THE SHARED `EffortCard` NOW (web/components/work/effort-card.tsx)
@@ -70,7 +73,8 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { CardTitle } from "@shared/ui/components/card/card"
+import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { Separator } from "@shared/ui/components/separator/separator"
 import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/sheet"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
@@ -79,7 +83,6 @@ import { Check, ArrowUUpLeft, PencilSimple, Trash } from "@shared/ui/foundations
 import { RecordActionsMenu, RecordFooterBand, type RecordAction } from "@/components/records/record-chrome"
 import { OverviewList } from "@/components/records/overview-list"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
-import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 import { EffortCard } from "@/components/work/effort-card"
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
 import { useTaskFormOptions } from "@/lib/use-task-form-options"
@@ -361,56 +364,87 @@ export function TaskSheet({
                   )}
                 </div>
 
-                {/* ASSIGNED TO, DESCRIPTION AND DEADLINE — three sections of
-                    ONE design (Aurora, 22 Sep 2026, this file's own header:
-                    "assigned to needs a background, same description, same
-                    deadline" / "description and deadline same design"): each
-                    a kit `Card` standing on the panel background, a small
-                    title, the content — the exact `TicketSidePanel` shape
-                    the ticket's own side panels already draw
-                    (`ticket-detail-body.tsx`), reused rather than
-                    reinvented, the same seam `story-detail.tsx` and
-                    `help-stakeholders.tsx` already stand on. */}
+                {/* ASSIGNED TO, DETAILS AND DEADLINE — merged into ONE card
+                    (Aurora, 22 Sep 2026, verbatim: "great work. however merge
+                    assigned to details and deadline in the same container
+                    together (in this order)"). `Card`'s own anatomy is the
+                    reason this is a merge rather than a rebuild — chapter
+                    13's own caption, quoted in `card.tsx`: "header, body, and
+                    footer are hairline-separated inside one 24px shell,
+                    never three stacked cards" — so this is the exact same
+                    `TicketSidePanel` `Card` (`variant="default"`) the sheet
+                    already stood three of, called ONCE, its own kit
+                    `Separator` between each part rather than a card edge. */}
+                <div data-slot="task-details-card">
+                  <Card variant="default">
+                    <CardContent className="flex flex-col gap-4 p-4">
+                      {/* ASSIGNED TO — read-only: editing the assignee is the
+                          form's own field now (`task-form-dialog.tsx`),
+                          reached through the pencil above. Its own eyebrow
+                          tile (the Stakeholders-style `PersonCard`,
+                          `help-stakeholders.tsx`'s `StakeholderTile`) already
+                          carries the "Assigned to" label in its own chip, so
+                          this first part draws no separate heading of its
+                          own — a second "Assigned to" above the tile would
+                          say the same word twice. */}
+                      <div data-slot="task-assignee-part">
+                        <PersonCard
+                          orientation="horizontal"
+                          size="row"
+                          mark={nameInitials(assigneeName ?? "")}
+                          markName={assigneeName ?? undefined}
+                          chip={<span className="text-micro text-muted-foreground uppercase">{t("Assigned to")}</span>}
+                          title={
+                            <CardTitle className="text-sm">
+                              {assigneeName || t("Nobody yet.")}
+                            </CardTitle>
+                          }
+                        />
+                      </div>
 
-                {/* ASSIGNED TO — read-only: editing the assignee is the
-                    form's own field now (`task-form-dialog.tsx`), reached
-                    through the pencil above. It keeps its own eyebrow tile
-                    (the Stakeholders-style `PersonCard`,
-                    `help-stakeholders.tsx`'s `StakeholderTile`) inside the
-                    card, Aurora's own words. */}
-                <div data-slot="task-assignee-card">
-                  <TicketSidePanel title={t("Assigned to")}>
-                    <PersonCard
-                      orientation="horizontal"
-                      size="row"
-                      mark={nameInitials(assigneeName ?? "")}
-                      markName={assigneeName ?? undefined}
-                      chip={<span className="text-micro text-muted-foreground uppercase">{t("Assigned to")}</span>}
-                      title={
-                        <CardTitle className="text-sm">
-                          {assigneeName || t("Nobody yet.")}
-                        </CardTitle>
-                      }
-                    />
-                  </TicketSidePanel>
-                </div>
+                      {/* DETAILS — the task's own description, renamed off
+                          "Description" now that it sits inside the merged
+                          card. Absent entirely when the task carries none,
+                          same as before. */}
+                      {task.detail && (
+                        <>
+                          <Separator />
+                          <div data-slot="task-details-part" className="flex flex-col gap-3">
+                            <h3 className="text-sm font-medium">{t("Details")}</h3>
+                            <RichText html={task.detail} />
+                          </div>
+                        </>
+                      )}
 
-                {/* DEADLINE — its own card now, the priority fact row it
-                    used to sit beside is GONE (the title row's own priority
-                    chip already says it, Aurora: "priority is already a
-                    chip, remove it from above deadline"). */}
-                <div data-slot="task-deadline-card">
-                  <TicketSidePanel title={t("Deadline")}>
-                    <p className="text-sm text-foreground">
-                      {task.dueOn ? formatDate(task.dueOn, lang) : t("No deadline set.")}
-                    </p>
-                  </TicketSidePanel>
+                      {/* DEADLINE — third and last. The priority fact row it
+                          used to sit beside is GONE (the title row's own
+                          priority chip already says it, Aurora: "priority is
+                          already a chip, remove it from above deadline").
+                          Drawn as the app's own fact row (R72: a heading
+                          immediately followed by a paragraph is a subtitle;
+                          `OverviewList`'s `<dt>`/`<dd>` pair, the same
+                          register the ticket side panel and the File part
+                          just below use, is not one). */}
+                      <Separator />
+                      <div data-slot="task-deadline-part">
+                        <OverviewList
+                          items={[
+                            {
+                              id: "deadline",
+                              label: t("Deadline"),
+                              value: task.dueOn ? formatDate(task.dueOn, lang) : t("No deadline set."),
+                            },
+                          ]}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 {/* THE FILE — when the task carries one. R40 pins its render
-                    to THIS file now that task-detail.tsx is gone. Not one of
-                    the three named cards, so it keeps the plain
-                    `OverviewList` fact-row shape it always had. */}
+                    to THIS file now that task-detail.tsx is gone. Not part of
+                    the merged Assigned to/Details/Deadline card, so it keeps
+                    the plain `OverviewList` fact-row shape it always had. */}
                 {task.fileUrl && (
                   <OverviewList
                     items={[
@@ -431,15 +465,6 @@ export function TaskSheet({
                       },
                     ]}
                   />
-                )}
-
-                {/* DESCRIPTION — the third of the three matching cards. */}
-                {task.detail && (
-                  <div data-slot="task-description-card">
-                    <TicketSidePanel title={t("Description")}>
-                      <RichText html={task.detail} />
-                    </TicketSidePanel>
-                  </div>
                 )}
 
                 {/* EFFORT — see this file's own header, "EFFORT IS THE

@@ -39,7 +39,7 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L42)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K60)
+- [4. Collections](#4-collections) (K1 to K62)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B49)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
@@ -5080,6 +5080,49 @@ before the 21 Sep 2026 fold ever moved it. Tests: `web/test/shape.test.ts` (the 
 its own node again, and the Value cell's own second line proven present for a type Details
 has something to say and absent for one it does not).
 
+**AMENDED YET AGAIN, 22 Sep 2026 (later the same day): the mark moves beside Value, Details
+returns as text only, and the header sort moves to the toolbar.** Aurora's ruling, verbatim:
+*"no: the icon/color next to the value in first column! details is the next column (however
+icon color its not a detail!) make status the second column, the rest ok. remove the sort from
+the headers and add it in toolbar!"* Two corrections in one sentence. First, what the previous
+reading's Value second line had actually been showing for four of the seeded types (Sprint
+type's own glyph, Story type's own glyph, Ticket type's own glyph, App stage's own dot) was
+never a DETAIL, it was the same kind of MARK `ChoiceGroupHome.colour`/`.icon` already draw
+beside a value's own name, so it moves there now (`choiceValueMark`, deep-link/shape.tsx), a
+`Swatch` for a colour/dot tone and an `Icon`/`SprintTypeGlyph` for a glyph, never a second line.
+Details returns as its own column, third (after Status, which keeps the second seat the morning
+reading above gave it), holding only what is left once the mark is gone: Sprint type's own
+day-count `Badge`, the one real case; Story type, Ticket type and App stage had nothing beyond
+the mark that just moved out, so their Details cell is now an honest empty one. Second, and
+unrelated to the column order: no header sorts any more, every `TableColumn` drops its
+`sort`/`sortType`/`sortKey`/`defaultDir`, and a toolbar `SortControl` takes over instead,
+offering **Name** (`valueText`) and **Added on** (`createdAtRaw`, the raw instant, never the
+formatted string), the same `CollectionConfig.sortable`/`sortOptions` seam Stories' own List
+view already drives its toolbar sort through (`shared/web/screen-engine/collection.ts`'s
+`selectRows`, executed by `CollectionFrame`, never a second sort engine). And because Added by
+and Added on stay split at seven named facts (Value, Status, Details, Where, Added by, Added on,
+Actions) the moment Details comes back as its own column, they fold back into one **Added**
+cell, creator's face and first name over the date, the exact shape the very first 21 Sep 2026
+reading of this rule shipped, before that same-day split, restored rather than reinvented.
+
+**Law, re-run a third time.** R82: value + status + details + where + added + actions is six
+columns, Details' return as its own column is paid for by folding Added by/Added on back into
+one Added cell, the same six-column accounting the very first 21 Sep 2026 reading held before
+the split. `Actions` counts toward the ceiling: `table-column-budget`'s own census
+(web/test/table-column-budget.test.ts) asks only whether every element of a `TableColumn[]`
+literal carries a `key` AND a `label` property assignment, and this table's own actions column
+always has both (`label: ""` included), which is what makes the fold necessary rather than
+optional: seven named facts across six seats. `sorted-columns-declare-their-type.test.ts`: no
+column declares a `sort` any more, so nothing here is compared in the browser by a header; the
+toolbar's two `SortOption`s read `valueText`/`createdAtRaw` directly off the row, the same raw
+fields the retired header sort's own `sortKey`s read, never the shaped `value`/`added` cells.
+`status-owns-the-chip.test.ts` (R86): App stage's dot moved from a `<Badge variant="status"
+dot={…}>` to a `<Swatch colour={…}>` beside the value, so it is a MARK now rather than a second
+coloured chip on the row; the census still passes it clean because the `Swatch` reads a local
+`stageTone` (named so its own resolved text still says "stage", the census's own oracle).
+Tests: `web/test/shape.test.ts` (the mark beside Value for Sprint/Story/Ticket type and App
+stage, Details' own text-only cell, and the folded Added cell).
+
 ---
 
 ### K60: every timer-start button reads "Start", with the stopwatch icon
@@ -5110,6 +5153,70 @@ string or `Play` icon, task detail/task form named out (another lane's own file)
 
 **Not a law.** No registry entry, a plain copy/icon rename recorded here for the next
 reader, checked only by the census test named above.
+
+---
+
+### K61: the billable flag on work logs is killed, not hidden
+
+**The rule.** Aurora's ruling, 22 Sep 2026, verbatim: *"remove the billable from logs, not
+hide, remove."*
+
+**The shape.** `WorkLog.billable` (`shared/types.ts`) is gone, along with every surface that
+read or wrote it: the time form's Billable switch (`web/components/work/time-form-dialog.tsx`),
+the Logs screen's "not billable" chip (`web/components/work/time-panel.tsx`), the `billable`
+field on `log_time`/`update_work_log` on both the web door
+(`workers/content/src/routes/work-logs.ts`, `workers/content/src/lib/work-logs.ts`) and the MCP
+tool catalogue (`shared/workers/tool-catalog.ts`'s `log_time`), the meeting-capture INSERT that
+used to mark every log it wrote billable (`workers/content/src/lib/meetings.ts`), the
+`work_logs.billable` facet (`shared/workers/query-grammar.ts`) and the automations census entry
+that named it (`shared/automations.ts`, renamed `meetings.time-log`). The column itself is
+dropped, not left unmounted: team migration `0115_the_billable_flag_is_killed`
+(`workers/tenancy/src/team-schema/migrations.ts`) runs `ALTER TABLE work_logs DROP COLUMN
+billable`. No hours summary ever split billable from non-billable time — `totalSeconds`
+(`WorkLogSummary`, `shared/types.ts`) was already one total — so nothing there needed changing.
+
+**Status: ruled, in build, 22 Sep 2026** (`workers/tenancy/src/team-schema/migrations.ts`,
+`workers/content/src/lib/work-logs.ts`, `web/components/work/time-form-dialog.tsx`,
+`web/components/work/time-panel.tsx`); proven by
+`workers/tenancy/test/migration-0115-billable-column-dropped.test.ts` and
+`workers/content/test/work-logs.test.ts`.
+
+**Not a law.** No registry entry, a field removal recorded here for the next reader, checked
+only by the migration and door tests named above.
+
+---
+
+### K62: the "not live" hint is a compact pill, bottom centre
+
+**The rule.** Aurora's ruling, 22 Sep 2026, verbatim, choosing option A off the side by side
+design page over a full width bar: *"for not live implement A Compact pill, bottom centre."*
+
+**The shape.** `LiveStatus` (`shared/web/live-status.tsx`) no longer draws an inline warning
+strip above a screen's own content, pushing it down while the socket is out. It is now a
+fixed, bottom centred pill in the kit's own toast register: `rounded-pill`, `bg-warning
+text-warning-foreground`, the kit's overlay shadow, the cloud icon it already used, one line
+("Not updating live right now.", shortened from the old two sentence strip so it reads like a
+toast rather than a paragraph), a Refresh action in the toast's own dense light wash button
+style, and a small close mark that hides it for this disconnection only (a fresh drop shows it
+again). Its base offset is the version toast's own, `var(--space-7)` on a wide screen and
+`var(--space-4)` on a phone, the same two tokens `<Toaster>` passes as `offset` and
+`mobileOffset`. Two more clearances stack on top through custom properties each shell sets on
+its own root wrapper, the same shape `app-shell.tsx`'s own `--shell-top` already uses:
+`--live-status-tab-clear` for the phone's own fixed bottom tab bar (agency only, zero at `md`;
+the portal's own bottom nav shows at every width, so its wrapper carries no `md` override), and
+`--live-status-band-clear`, raised only on a ticket screen through a
+`has-[[data-slot=ticket-footer-band]]` selector, so it clears R89's dark Latest activity /
+Record band without a prop the component would have no honest way to fill in on its own. Both
+shells now mount it as a sibling of the routed screen (`app-shell.tsx`, after `</ScreenShell>`;
+`portal-shell.tsx`, after `</main>`) rather than inside the page width column, so it never adds
+a box, a height or a width to whatever a screen is showing.
+
+**Status: ruled, in build, 22 Sep 2026** (`shared/web/live-status.tsx`,
+`web/components/shell/app-shell.tsx`, `web-portal/components/portal-shell.tsx`,
+`shared/i18n-seed.ts`); proven by `web/test/live-status-pill.test.tsx`.
+
+**Not a law.** No registry entry, a presentation change recorded here for the next reader,
+checked only by the test named above.
 
 ---
 
@@ -6976,6 +7083,16 @@ takes. Dated the same round as B41 above, and the ticket's own "Assigned to" car
 B41 as a story-side artifact — is what this round wires up for real: *"the story gets the same
 card."*
 
+**AMENDED, 22 Sep 2026 — the Related panels.** Aurora, verbatim: *"in stories if no related
+tickets hide that. same for related stories. only in stories."* The Related tickets panel, when
+the story has no ticket, renders nothing at all (no title, no empty state); the Related stories
+panel, when there are no sibling stories on that ticket, renders nothing at all. This rule
+applies only on the story page, never on the ticket page — the ticket page keeps both panels
+visible with their content or their empty state. R88 (empty-state single door) already names
+this pattern: when a section is empty, its panel's own header and the section's title both
+render nothing, and the single door in the body stands in for it. Here, no body exists to show
+("No related tickets" never appears, nor "No related stories") — the whole panel vanishes.
+
 **The data model.** Team migration 0112 gives `stories` one new column, `build_notes TEXT` —
 the identical storage `detail`/`acceptance_criteria` already use (rich text, sanitised into the
 `Notes` editor, list reads null it out the same way those two do, a by-id read keeps it whole).
@@ -7310,6 +7427,37 @@ unchanged), R59 (a form slides in, never centres — the row opens the existing 
 than a new modal), R16 (the one count register, now the title's own record count rather than
 an hour total).
 
+**Amended a fourth time, 22 Sep 2026 (same day, reviewing the deployed tiles).** Aurora,
+verbatim: *"good. add kind of card background behind cards, this is a metric, like in kit."*
+
+**What changed, this round.** The three stat tiles (Cycle time, Effort hours, Flow
+efficiency) drew no visible card fill. `StatGrid`'s own `tone` prop only reaches `Card`
+variant `default` ("quiet", `bg-surface-panel`), `brand` or `inverse`, never `raised`, and
+these tiles sit inside `EmptyGatedPanel`'s own `<Card variant="default">`, so a `default`
+tile nested inside a `default` panel painted the identical soft-paper tone over itself
+(measured contrast 1.000, the exact pairing `card.tsx`'s own header warns against: "off-beige
+over soft paper … only reads as raised when it sits inside a `--surface-panel` band"). Since
+`StatGrid` has no prop for the raised tone, each of the three tiles is now its own
+`<StatGrid items={[…]} surface="bare">` (the label/value register only, one item, no card of
+its own) wrapped by hand in the kit's own `<Card variant="raised">`, the kit's stat markup
+inside the kit's card, never a hand-rolled fill, border or radius. The three tiles are
+written out one by one rather than `.map()`-ed over an array, because a kit `<Card>` carrying
+React's own `key=` reads, to `web/test/rules.test.ts`'s R65 census, as a per-row record card
+that owes a chip a `<CardTitle>` to sit above; these three are fixed metrics, not rows, so
+naming each by hand keeps them off that census honestly instead of fighting it.
+
+**Status: amended and shipped, 22 Sep 2026.** `EffortCard` updated alone;
+`web/test/story-detail.test.tsx` and `web/test/ticket-detail-no-tabs.test.tsx` each gained a
+case proving a tile's own figure sits inside a `[data-slot="card"]` ancestor carrying
+`data-variant="raised"`.
+
+**Law.** Governed by kit-conformance (no raw borders, no hand-rolled background outside a
+kit token or variant), R97 (a count never gets its own card: unaffected, the tiles are
+measurements, not counts, and `COUNT_REGISTER_EXEMPT`'s entry for this file already covers
+them), R31 (two radii: the kit's own `raised` variant carries `--radius`, nothing new
+introduced), R65 (chip above title: the three tiles are named by hand, never keyed, so the
+record-card census does not reach them).
+
 ---
 
 ### B45: backlog tabs reordered, Everyone's renamed to All
@@ -7392,6 +7540,37 @@ substance; it draws no Card and no "Settings" heading of its own any more, since
 now says that once. The Overview tab keeps "Expected length" and draws the panel nowhere
 else. `web/test/wave-phase-days-panel.test.tsx` covers the panel and the new
 `WavePhaseDaysSheet`; `web/test/wave-detail.test.tsx` covers the gear opening it.
+
+**AMENDED 22 Sep 2026: the MODULE's own gear was still missing.** Aurora, verbatim: *"i
+still dont see the gear button on main page waves."* The gear the amendment above built
+opens a single WAVE's own phase days; she meant the Waves MODULE's own main (sidebar)
+screen (`waves-screen.tsx`), which — unlike every other module with something to set —
+carried no `<ModuleSettingsGear>` at all, R61's own two-door law standing unmet on this one
+module since the day the gear pattern shipped. Two things landed together, because R61
+holds them to one derivation: **(i)** `waves-screen.tsx`'s own `<CollectionHeading
+sectionKey="waves">` gains `action={<ModuleSettingsGear teamId={teamId} segment="waves"
+/>}`, the door out, last (and only) control in the action slot. **(ii)** `MODULE_SETTINGS`
+(`module-settings-screen.tsx`) gains a `"waves"` entry, one section, a new FOURTH `kind`
+(`"phaseDays"`, beside `vocabulary`/`automations`/`meetingTypes`) — a team-WIDE default,
+never a `selectable_data` group and never a switch — its own "Phase days" tab, drawn
+through `TeamPhaseDayDefaultsPanel` (`wave-phase-days-panel.tsx`), the identical seven-row
+`WavePhaseDaysPanel` body the per-wave sheet already draws, now standing on its own `Card`
+(R67 — a titled section stands on paper) rather than the sheet's own surface. **A new
+wave's per-wave days now start from the team's own default, not the code constant
+directly** — `PHASE_DAY_DEFAULTS` (`shared/waves.ts`) is the fallback OF the fallback,
+read only where the team has never set one either. Stored in the existing `automations`
+table (`workers/tenancy/src/lib/automations-config.ts`), module `"waves"`, reserved key
+`"phaseDayDefaults"` — the same shape `setAutomationOverride`'s own `overrides` key
+already takes in that column, so no migration was needed. Two new tenancy doors, `GET`/
+`POST /api/tenancy/waves/phase-day-defaults` (`work:read`/`work:update`, refusing a portal
+caller like every other wave door), and their MCP counterparts,
+`get_wave_phase_day_defaults`/`update_wave_phase_day_defaults`. The per-wave Settings
+sheet is unchanged — its own row still wins over the team default the moment somebody
+sets one. Tested: `workers/tenancy/test/waves.test.ts` (the team default itself, and that a
+new wave reads it before the code's placeholder), `web/test/wave-phase-days-panel.test.tsx`
+(`TeamPhaseDayDefaultsPanel`), `web/test/module-settings-waves-phase-days.test.tsx` (the
+page renders the seven rows and saves), `web/test/waves-screen-settings-gear.test.tsx` (the
+module screen's own gear); strings seeded (de/es/ca).
 
 ---
 
@@ -7531,6 +7710,25 @@ with the title rather than the chips row; the "…" menu opens on Delete alone, 
 item; no Priority fact row renders anywhere on the sheet; Assigned to, Deadline and
 Description render as three cards of the one `TicketSidePanel` shape, in that order; and
 the Effort section is absent when the task carries no logged time.
+
+**Amended again, 22 Sep 2026.** Aurora, verbatim, reading the three-card version back:
+*"great work. however merge assigned to details and deadline in the same container
+together (in this order)."*
+
+The three matching `TicketSidePanel` cards above (Assigned to, Deadline, Description)
+become ONE card — the same `TicketSidePanel` `Card`, called once rather than three
+times — holding, in this order: Assigned to (the eyebrow tile, its own "Assigned to"
+chip label standing in for a section heading, so none repeats it), Details (the
+description, renamed off "Description" now that it sits inside the merged card), then
+Deadline. The kit's own `Separator` sits between each of the three parts; no nested
+cards. The File row keeps its own place, immediately after the merged card, exactly
+where it sat after the old Deadline card.
+
+**Status: amended and shipped, 22 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`:
+the merged card renders as ONE kit `Card` (`data-slot="card"`, singular, inside the
+wrapper); Assigned to, Details and Deadline sit inside it in that order; exactly two
+`Separator`s divide the three parts; and the section order top to bottom stays title
+row, Start/Done, the merged card, Effort, the footer band last.
 
 ---
 
@@ -9906,14 +10104,14 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**264 rules.**
+**266 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L42 (42) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K60 (60) |
+| 4. Collections | K1 to K62 (62) |
 | 5. Buttons and actions | B1 to B49 (49) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |

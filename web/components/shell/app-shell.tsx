@@ -1448,8 +1448,20 @@ export function AppShell({
         the shell's inset for it. It was already declared here and had stopped
         being read by anything; it is live again, and it is why the bar's
         height is a variable rather than a literal. Zero at `md`, where the bar
-        is not drawn. */}
-    <div className="[--shell-top:3.75rem] md:[--shell-top:0px]">
+        is not drawn.
+
+        `--live-status-tab-clear` AND `--live-status-band-clear` are the same
+        shape, read by `shared/web/live-status.tsx` (K62) rather than by
+        anything in this file: its fixed, bottom centred pill needs to clear
+        the phone bottom tab bar below, and a ticket screen's own dark
+        footer band when its content draws one, and it has no way to know
+        either fact on its own. `--live-status-tab-clear` matches the tab
+        bar's own reservation one screen down (`pb-24`, this file), zero at
+        `md` where the bar is hidden; `--live-status-band-clear` only turns
+        on through `has-[[data-slot=ticket-footer-band]]`, R89's own marker
+        for the ticket page's Latest activity / Record band, so it is never
+        paid on a screen that draws no band. */}
+    <div className="[--shell-top:3.75rem] md:[--shell-top:0px] [--live-status-tab-clear:6rem] md:[--live-status-tab-clear:0px] has-[[data-slot=ticket-footer-band]]:[--live-status-band-clear:8rem]">
       {/* Mobile top bar, an explicit height, because `--shell-top` above is a
           promise about it. ScreenShell has no mobile-chrome concept of its
           own (the rail simply disappears below `md`, by the kit's own
@@ -2172,19 +2184,20 @@ export function AppShell({
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >
-          {/* IS THIS SCREEN STILL LIVE? Renders nothing while the team socket
-              is up, which is nearly always — so this adds no box, no height
-              and no width in the ordinary case, and R29's one page container
-              is the div it sits inside rather than anything it draws. It is
-              here, above the screen, because the thing it qualifies is
-              whatever the screen is showing: every list and every record on
-              this door is painted cache-first and kept fresh by that socket,
-              so when the socket is gone the warning belongs in front of all
-              of it rather than beside one collection. */}
-          <LiveStatus />
           {children}
         </div>
       </ScreenShell>
+
+      {/* IS THIS SCREEN STILL LIVE? A fixed, bottom centred pill (K62), a
+          sibling of the routed screen rather than nested inside its own page
+          width column, so it never adds a box, a height or a width to
+          whatever the screen is showing (R29's one page container is the
+          div `ScreenShell` above wraps, and this is not inside it). Renders
+          nothing while the team socket is up, which is nearly always: every
+          list and every record on this door is painted cache-first and kept
+          fresh by that socket, so when it is gone the warning floats over
+          all of it rather than beside one collection. */}
+      <LiveStatus />
 
       {/* Mobile bottom tabs — five slots, gated items hidden, and when there
        * are more sections than slots the fifth becomes More. The rail beside

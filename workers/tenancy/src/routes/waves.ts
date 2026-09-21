@@ -42,10 +42,12 @@ import type { D1Rest } from "@shared/workers/d1-rest"
 import {
   countWaves,
   createWave,
+  getTeamPhaseDayDefaults,
   getWave,
   listWaves,
   setSprintWave,
   setWaveActive,
+  updateTeamPhaseDayDefaults,
   updateWave,
   updateWavePhaseDays,
 } from "../lib/waves"
@@ -237,5 +239,33 @@ export async function postWavePhaseDays(request: Request, env: Env): Promise<Res
   const days = (Array.isArray(body.days) ? body.days : []) as { phaseType: unknown; days: unknown }[]
   const { accountId, phaseDays } = await updateWavePhaseDays(cfg, guard, scope, actor, { id: waveId, days })
   await publishChange(env, guard.teamId, "waves", waveId, "edit", accountId)
+  return json({ ok: true, phaseDays })
+}
+
+/** GET /api/tenancy/waves/phase-day-defaults, the team's OWN default days
+ * per phase type — Aurora's 21 Sep 2026 ruling, verbatim, closing the loop
+ * her 20 Sep 2026 one opened: "Make sure we can adjust this on the settings
+ * in Waves." Read is open to any member who may read `work` at all, the same
+ * posture `getAutomations` (config.ts) already takes for a module's other
+ * settings: what the team defaults its own numbers to is not behind the
+ * right to CHANGE them. No account fence — a default is team-wide, not a
+ * client's own. */
+export async function getWavePhaseDayDefaults(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "work", "read")
+  await agencyScope(cfg, guard)
+  return json({ phaseDays: await getTeamPhaseDayDefaults(cfg, guard) })
+}
+
+/** POST /api/tenancy/waves/phase-day-defaults — set the team's own default
+ * days for one or more phase types. Same right as a wave's own
+ * `postWavePhaseDays` above, because it is the same fact one level up: how
+ * many days a phase type gets, by default, on a wave nobody has touched the
+ * Settings sheet of yet. */
+export async function postWavePhaseDayDefaults(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard, actor, body } = await gatedBody<{ days?: unknown }>(request, env, "work", "update")
+  await agencyScope(cfg, guard)
+  const days = (Array.isArray(body.days) ? body.days : []) as { phaseType: unknown; days: unknown }[]
+  const phaseDays = await updateTeamPhaseDayDefaults(cfg, guard, actor, days)
+  await publishChange(env, guard.teamId, "wave_phase_day_defaults")
   return json({ ok: true, phaseDays })
 }

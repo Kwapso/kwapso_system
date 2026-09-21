@@ -315,7 +315,7 @@ async function transcriptOnScreen(id: string): Promise<{
 const meetingLogs = () =>
   db()
     .prepare(
-      `SELECT id, user_id, user_name, kind, seconds, billable, account_id, note, started_at, ended_at
+      `SELECT id, user_id, user_name, kind, seconds, account_id, note, started_at, ended_at
          FROM work_logs WHERE target_table = 'meetings' ORDER BY user_name`
     )
     .all() as {
@@ -324,7 +324,6 @@ const meetingLogs = () =>
     user_name: string
     kind: string
     seconds: number
-    billable: number
     account_id: string | null
     note: string
     started_at: string
@@ -481,7 +480,6 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
     // it, or only it — so a log written by a transcript that was not marked
     // would be indistinguishable from delivery work.
     expect(log.kind).toBe(MEETING_LOG_KIND)
-    expect(log.billable).toBe(1)
     // The MEETING's hour, not an invented one: inventing a finer figure out of a
     // transcript's timestamps would be inventing a fact.
     expect(log.seconds).toBe(3600)

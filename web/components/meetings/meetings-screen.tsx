@@ -762,8 +762,8 @@ export function MeetingsScreen({
       {/* R16: the strip below badges two exact server counts, so the heading
           stands down through the arbitration context rather than saying a
           number twice. */}
-      {/* THE GEAR (R61) — the transcript capture and the billable time it
-          writes are listed on this module's own settings page (R70). */}
+      {/* THE GEAR (R61) — the transcript capture and the time it writes
+          are listed on this module's own settings page (R70). */}
       <CollectionHeading sectionKey="meetings" total={total} action={<ModuleSettingsGear teamId={teamId} segment="meetings" />} />
 
       {/* R14's other half: the meetings list pages, and the meeting somebody digs for is

@@ -139,11 +139,14 @@
 // ── THE TOOLBAR (R48/R53) ────────────────────────────────────────────────────
 //
 // `RecordTable` → `CollectionFrame`'s own kit panel draws the search box
-// (R48's default) and the sort control is the table's own column headers
-// (R53's "a table already has its control" — no `SortControl` drawn beside
-// it, which would be a second control for one question). TWO filters: MODULE
-// (which settings page a group belongs to) and the one three-way STATUS facet
-// above.
+// (R48's default). THE SORT CONTROL USED TO BE THE TABLE'S OWN COLUMN
+// HEADERS (R53's "a table already has its control"). Aurora, 22 Sep 2026
+// (later), reversed it, verbatim: "remove the sort from the headers and add
+// it in toolbar!" No column below carries a `sort` any more; the toolbar's
+// own `<SortControl>` (`config.sortable`/`sortOptions`, below) offers Name
+// and Added on instead, see that config's own comment for the seam. TWO
+// filters: MODULE (which settings page a group belongs to) and the one
+// three-way STATUS facet above.
 //
 // ── `scope`, THE ONE MODULE-SETTINGS ALLOWED EDIT HERE, 15 SEP 2026 ─────────
 //
@@ -579,107 +582,74 @@ export function SettingsChoicesPanel({
   // plus the field word `shared/selectable-where.ts` derives off `shared/
   // selectable-homes.ts`.
   //
-  // THE ADDED BY / ADDED ON COLUMNS. K59, documents/UI-RULEBOOK.md, Aurora,
-  // 21 Sep 2026, later the same day as the Where ruling above: "ok split the
-  // who and date added in 2 columns." Until this change, "in choices also show
-  // columns added on and added by" (the SAME K59 sentence, a few hours
-  // earlier) had been answered with ONE folded cell: creator name over the
-  // date, `shapeChoicesTable`'s own `added` field, because that was what
-  // held the table at six under R82's ceiling: value + where + details +
-  // status + added + actions. Splitting the fold back into two real columns
-  // (`addedBy` face+first-name, `addedOn` the date alone, both below) is
-  // what she is asking for here, and it puts the table at SEVEN, one past the
-  // ceiling, so something else has to fold.
+  // THE ORDER AND THE FOLD, AS THEY STAND TODAY. K59, documents/UI-
+  // RULEBOOK.md, Aurora, 22 Sep 2026 (later the same day as the two readings
+  // that put Status back at its own seat and folded Details into Value,
+  // that history is this rulebook entry's own, read it there), verbatim:
+  // "no: the icon/color next to the value in first column! details is the
+  // next column (however icon color its not a detail!) make status the
+  // second column, the rest ok. remove the sort from the headers and add it
+  // in toolbar!" Two corrections:
   //
-  // STATUS IS BACK, ITS OWN COLUMN — K59, documents/UI-RULEBOOK.md, Aurora,
-  // 22 Sep 2026, verbatim: "ok, but keep status as its own column!" The 21
-  // Sep 2026 reading above (splitting Added into Added by/Added on) had
-  // folded Status into Value to hold the table at R82's six-column ceiling;
-  // her follow-up reading undoes exactly that and asks for Status back at
-  // the header row. Something still has to fold to stay at six, and this
-  // time it is DETAILS, into Value — the identical TECHNIQUE the tickets
-  // list already uses for its own Closed column (`tickets-collection.tsx`'s
-  // `closed` cell, "FOLDED INTO THIS ONE CELL RATHER THAN GIVEN A COLUMN OF
-  // ITS OWN … R82's own prescription for a fact that arrives once a table is
-  // already at the ceiling is 'fold the extra fact onto an existing column's
-  // own second line'"), read here exactly as written: the value's own name
-  // on the first line, Details as a muted second line beneath it
-  // (`shapeChoicesTable`'s `valueCell`, deep-link/shape.tsx). DETAILS is the
-  // column that folds rather than STATUS, for the reasons the 21 Sep reading
-  // named for the opposite pairing, read the other way round:
+  //   • THE COLUMN ORDER. What the previous reading's Value second line had
+  //     been showing for four of the seeded types (Sprint/Story/Ticket type's
+  //     own icon, App stage's own dot) was never a DETAIL, it was a MARK,
+  //     Aurora's own words, "icon color its not a detail", so it moves
+  //     beside the value's own name instead (`choiceValueMark`, deep-link/
+  //     shape.tsx), never a second line. Details returns to its own seat,
+  //     third (after Status, which keeps the second one the morning reading
+  //     gave it), holding only the text left once the mark is gone: Sprint
+  //     type's own day-count `Badge`, the one real case.
+  //   • ADDED BY / ADDED ON FOLD BACK TOGETHER. Details reclaiming a header
+  //     seat puts the table at SEVEN named facts again (Value, Status,
+  //     Details, Where, Added by, Added on, Actions) the moment the two
+  //     Added columns stay split, one past R82's six-column ceiling, so they
+  //     fold back into one **Added** cell (who, over when), the same shape
+  //     the very first 21 Sep 2026 reading of K59 shipped, before the
+  //     same-day split this rulebook entry's own history records.
+  //   • THE HEADER SORT MOVES TO THE TOOLBAR. "Remove the sort from the
+  //     headers and add it in toolbar", no `TableColumn` below carries a
+  //     `sort` any more (the affordance R53 calls "a table already has its
+  //     control" is retired for this one table, on her own instruction), and
+  //     `config.sortable`/`sortOptions` below draw a `<SortControl>` in the
+  //     toolbar instead, offering Name and Added on, the same
+  //     `CollectionConfig` seam Stories' own List view already drives its
+  //     toolbar sort through (`shared/web/screen-engine/collection.ts`'s
+  //     `selectRows`, run by `CollectionFrame`, never a second sort engine).
   //
-  //   • Details already carries NOTHING for most rows (this function's own
-  //     header, "THE DETAILS COLUMN": Industry, Country, the three "labels"
-  //     groups and more draw an honest empty cell), so a reader loses
-  //     nothing that was reliably there — unlike Status, which fills a real
-  //     word on every row.
-  //   • Status still filters: the toolbar's own three-way facet
-  //     (`statusState`, below) is untouched either way, so nothing a reader
-  //     could DO with either column is lost by this fold, only Details' own
-  //     seat at the header row.
-  //   • Value already carries a leading mark (a swatch or an icon, when the
-  //     group has one); a muted second line under the name is the same shape
-  //     one step further, and it is the exact stacking the tickets list
-  //     already puts a raised-on-style date under a raiser's name.
-  //
-  // The Module-into-Where fold below is unaffected and unrelated: two
-  // different facts folded into two different columns for two different
-  // reasons, on the same table, is not a pattern straining under its own
-  // rule. R82's own prescription is "fold the extra fact", stated once,
-  // applied here twice because two extra facts arrived.
+  // R82, RE-READ: `actions` counts toward the six-column ceiling.
+  // `table-column-budget`'s own census (web/test/table-column-budget.test.ts)
+  // asks only whether every element of a `TableColumn[]` literal carries a
+  // `key` AND a `label` property assignment, and this table's own `actions`
+  // entry below always has both (`label: ""` included), so seven NAMED
+  // facts is seven columns for this law's purposes, one past six, and the
+  // Added fold above is what holds the line rather than an optional tidy-up.
+  // The Module-into-Where fold is unaffected and unrelated: two different
+  // facts folded into two different columns for two different reasons, on
+  // the same table, is not a pattern straining under its own rule.
   const columns: TableColumn[] = [
-    { key: "value", label: t("Value"), sort: "value", searchKey: "valueText", sortKey: (r) => r.valueText },
-    {
-      key: "where",
-      label: t("Where"),
-      sort: "where",
-      searchKey: "whereText",
-      sortKey: (r) => r.whereText,
-      defaultDir: "asc",
-    },
-    // THE STATUS COLUMN, RESTORED — see above. `statusText` (the plain
-    // three-way word — Protected/Active/Inactive) is the sort key and the
-    // search key, since the cell itself (`status`) is a node, a `Badge`, not
-    // text, the same reason `value`/`where` above read a sibling `*Text`
-    // field rather than their own key.
-    {
-      key: "status",
-      label: t("Status"),
-      sort: "status",
-      searchKey: "statusText",
-      sortKey: (r) => r.statusText,
-      defaultDir: "asc",
-    },
-    // ADDED BY: the creator's face and first name. `shapeChoicesTable`'s own
-    // `addedByText` (the plain name, R54-trimmed) is both the sort key and
-    // the search key, since the cell itself (`addedBy`) is a node, not text,
-    // the same reason `value`/`where` above read a sibling `*Text` field
-    // rather than their own key.
-    {
-      key: "addedBy",
-      label: t("Added by"),
-      sort: "addedBy",
-      searchKey: "addedByText",
-      sortKey: (r) => r.addedByText,
-    },
-    // ADDED ON: the date alone now, its own column. `sortType: "date"` +
-    // `sortKey` reading the RAW instant (`createdAtRaw`, never the shaped
-    // `addedOn` string) is `sorted-columns-declare-their-type.test.ts`'s own
-    // law for exactly this shape. No `searchKey`: the cell IS its own plain
-    // text (`shapeChoicesTable`'s `addedOn` field), so the default (search
-    // what is drawn) is already correct.
-    {
-      key: "addedOn",
-      label: t("Added on"),
-      sort: "addedOn",
-      sortType: "date",
-      sortKey: (r) => r.createdAtRaw,
-      defaultDir: "asc",
-    },
-    // NO `label`/`sort` — an actions column is a control, never a fact to
+    { key: "value", label: t("Value"), searchKey: "valueText" },
+    // STATUS, THE SECOND COLUMN, her later reading, above. `statusText`
+    // (the plain three-way word, Protected/Active/Inactive) is the search
+    // key, since the cell itself (`status`) is a node, a `Badge`, not text,
+    // the same reason `value` above reads a sibling `*Text` field rather
+    // than its own key.
+    { key: "status", label: t("Status"), searchKey: "statusText" },
+    // DETAILS, THIRD: text only now (`choiceDetailsCell`'s own header, deep-
+    // link/shape.tsx). No `searchKey`/`sort`: the cell is a decoration (a
+    // duration badge, or nothing), never a fact this table orders or
+    // searches by, the same shape the `actions` column below has always
+    // taken and for the same reason.
+    { key: "details", label: t("Details") },
+    { key: "where", label: t("Where"), searchKey: "whereText" },
+    // ADDED, who over when, folded back into one cell (see above).
+    // `addedText` (the plain first name, R54-trimmed) is the search key,
+    // since the cell itself (`added`) is a node, not text.
+    { key: "added", label: t("Added"), searchKey: "addedText" },
+    // NO `label`/`sort`: an actions column is a control, never a fact to
     // order the table by (the same shape `record-table.tsx`'s OWN built-in
     // `actions` slot draws, used instead of that slot because its fixed
-    // labels cannot say "Activate" on one row and "Deactivate" on the next —
+    // labels cannot say "Activate" on one row and "Deactivate" on the next,
     // see this file's header).
     { key: "actions", label: "" },
   ]
@@ -753,12 +723,26 @@ export function SettingsChoicesPanel({
         ],
       },
     ],
-    // THE TABLE'S OWN HEADERS ARE THE SORT CONTROL (record-table.tsx) — a
-    // picker beside them would be a second control for one question, exactly
-    // the case `frameSortOptions` (web/lib/screens.ts) already carves out for
-    // every recipe-driven table.
-    sortable: false,
-    sortOptions: [],
+    // THE TOOLBAR'S OWN SORT CONTROL, NOT THE HEADERS. Aurora, 22 Sep 2026
+    // (later), this file's own header above has her verbatim ruling: "remove
+    // the sort from the headers and add it in toolbar!" No column above
+    // carries a `sort`, so `record-table.tsx`'s own header-click ordering
+    // never triggers (`live.by` stays `""`); `CollectionFrame` draws the
+    // `<SortControl>` instead (`config.sortable && config.sortOptions.length
+    // > 0`, shared/web/screen-engine/collection-frame.tsx) and executes the
+    // chosen order itself, through `selectRows` (shared/web/screen-engine/
+    // collection.ts), the same seam Stories' own table view already drives
+    // its toolbar sort through. Two options, both reading a RAW field the
+    // row already carries beside its shaped cell, never the shaped text
+    // (`valueText` beside `value`, `createdAtRaw` beside `added`, the same
+    // discipline the retired header sort's own `sortKey`s took, and ISO
+    // instants compare correctly as plain strings, so no `sortType` is
+    // needed here the way a `TableColumn` would have wanted one).
+    sortable: true,
+    sortOptions: [
+      { value: "valueText", label: t("Name") },
+      { value: "createdAtRaw", label: t("Added on"), defaultDir: "asc" },
+    ],
   }
 
   // THE DIALOG'S FIRST STEP — see this file's header. A `scope` resolves

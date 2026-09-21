@@ -1030,7 +1030,9 @@ export const SEED: Catalogue = {
   "+{n} more": { de: "+{n} weitere", es: "+{n} más", ca: "+{n} més"},
   "1 step takes longer than it used to and has no explanation yet.": { de: "1 Schritt dauert länger als früher und hat noch keine Erklärung.", es: "1 paso tarda más que antes y aún no tiene explicación.", ca: "1 pas triga més que abans i encara no té explicació."},
   "A block of delivery work for one account, with a start, an end and a price.": { de: "Ein Block an Lieferarbeit für einen Kunden, mit Beginn, Ende und Preis.", es: "Un bloque de trabajo de entrega para una cuenta, con un inicio, un final y un precio.", ca: "Un bloc de treball d'entrega per a un compte, amb un inici, un final i un preu."},
+  "A captured meeting writes one work log for each member who attended.": { de: "Ein erfasstes Meeting schreibt einen Arbeitseintrag fuer jedes Mitglied, das teilgenommen hat.", es: "Una reunión capturada escribe un registro de trabajo para cada miembro que asistio.", ca: "Una reunio capturada escriu un registre de treball per a cada membre que va assistir." },
   "A new version of the app is ready.": { de: "Eine neue Version der App ist bereit.", es: "Hay una nueva versión de la app lista.", ca: "Hi ha una nova versió de l'app a punt."},
+  "Not updating live right now.": { de: "Gerade keine Live-Aktualisierung.", es: "Ahora mismo sin actualización en vivo.", ca: "Ara mateix sense actualització en directe."},
   "A system we built for somebody. Processes live inside one.": { de: "Ein System, das wir für jemanden gebaut haben. Prozesse leben darin.", es: "Un sistema que construimos para alguien. Los procesos viven dentro de uno.", ca: "Un sistema que hem construït per a algú. Els processos viuen a dins."},
   "A way of working inside one of your apps. You'll add its steps next.": { de: "Eine Arbeitsweise innerhalb einer Ihrer Apps. Die Schritte fügen Sie als Nächstes hinzu.", es: "Una forma de trabajar dentro de una de tus apps. A continuación añadirás sus pasos.", ca: "Una manera de treballar dins d'una de les teves apps. Tot seguit hi afegiràs els passos."},
   "Accept": { de: "Annehmen", es: "Aceptar", ca: "Acceptar"},
@@ -1354,7 +1356,6 @@ export const SEED: Catalogue = {
   "folder": { de: "Ordner", es: "carpeta", ca: "carpeta"},
   "logged": { de: "erfasst", es: "registrado", ca: "registrat"},
   "no explanation yet": { de: "noch keine Erklärung", es: "sin explicación aún", ca: "encara sense explicació"},
-  "not billable": { de: "nicht abrechenbar", es: "no facturable", ca: "no facturable"},
   "not done now": { de: "wird nicht mehr gemacht", es: "ya no se hace", ca: "ja no es fa"},
   "not needed now": { de: "wird nicht mehr gebraucht", es: "ya no hace falta", ca: "ja no cal"},
   "running": { de: "läuft", es: "en curso", ca: "en curs"},
@@ -3078,15 +3079,18 @@ export const SEED: Catalogue = {
    * "aktualisiert sich gerade nicht" says that in the plain register the rest
    * of this file uses. Same choice in Spanish and Catalan: describe what has
    * stopped happening, rather than borrow an English adjective for it. */
-  "Not updating live right now. You may not be seeing the latest changes.": {
-    de: "Aktualisiert sich gerade nicht: du siehst möglicherweise nicht die neuesten Änderungen.",
-    es: "Ahora mismo no se actualiza solo: puede que no estés viendo los últimos cambios.",
-    ca: "Ara mateix no s'actualitza sol: potser no estàs veient els darrers canvis.",
-  },
   "Refresh": {
     de: "Aktualisieren",
     es: "Actualizar",
     ca: "Actualitza",
+  },
+  /* The LiveStatus pill's own close mark, renamed off "Close" (22 Sep 2026) so
+   * a workspace tab's own close button and this pill's are never the same
+   * word in one document-wide census. */
+  "Dismiss": {
+    de: "Ausblenden",
+    es: "Descartar",
+    ca: "Descartar",
   },
   /* ── THE TICKETS DASHBOARD (6 Sep 2026) ──────────────────────────────────
      Written here rather than left to accumulate as ceiling debt (R44), and for
@@ -3989,8 +3993,6 @@ export const SEED: Catalogue = {
   "A timer still running after eight hours is flagged for you to settle.": { de: "Eine Zeitmessung, die nach acht Stunden noch läuft, wird Ihnen zur Klärung gemeldet.", es: "Un cronómetro que sigue en marcha tras ocho horas se te señala para que lo resuelvas.", ca: "Un cronòmetre que continua en marxa després de vuit hores se't assenyala perquè el resolguis." },
   "Capture meeting transcripts": { de: "Terminmitschriften abholen", es: "Recoger transcripciones de reuniones", ca: "Recollir transcripcions de reunions" },
   "Every quarter of an hour we collect transcripts from connected accounts.": { de: "Alle Viertelstunde holen wir Mitschriften aus verbundenen Konten.", es: "Cada cuarto de hora recogemos transcripciones de las cuentas conectadas.", ca: "Cada quart d'hora recollim transcripcions dels comptes connectats." },
-  "Billable time from a meeting": { de: "Abrechenbare Zeit aus einem Termin", es: "Tiempo facturable de una reunión", ca: "Temps facturable d'una reunió" },
-  "A captured meeting writes one billable work log for each member who attended.": { de: "Ein abgeholter Termin schreibt je einen abrechenbaren Zeiteintrag für jedes teilnehmende Mitglied.", es: "Una reunión recogida escribe un registro de tiempo facturable por cada miembro que asistió.", ca: "Una reunió recollida escriu un registre de temps facturable per a cada membre que hi va assistir." },
   "It is the second half of the capture above and is written by the same statement. Switching it off alone would record the meeting and lose the hours it took, which is a half-finished record rather than a preference.": { de: "Es ist die zweite Hälfte der Abholung oben und wird von derselben Anweisung geschrieben. Einzeln abgeschaltet wäre der Termin festgehalten und die dafür aufgewendeten Stunden verloren: ein halb fertiger Datensatz, keine Einstellungssache.", es: "Es la segunda mitad de la recogida de arriba y la escribe la misma instrucción. Desactivarla por separado dejaría la reunión registrada y perdería las horas que costó, lo que es un registro a medias y no una preferencia.", ca: "És la segona meitat de la recollida de dalt i l'escriu la mateixa instrucció. Desactivar-la per separat deixaria la reunió registrada i perdria les hores que va costar, cosa que és un registre a mitges i no una preferència." },
   "Keep the knowledge base in step": { de: "Wissensdatenbank aktuell halten", es: "Mantener al día la base de conocimiento", ca: "Mantenir al dia la base de coneixement" },
   "Every quarter of an hour, the team's own records are re-read into it.": { de: "Alle Viertelstunde werden die eigenen Datensätze des Teams neu eingelesen.", es: "Cada cuarto de hora se vuelven a leer en ella los registros del propio equipo.", ca: "Cada quart d'hora s'hi tornen a llegir els registres del mateix equip." },
@@ -4424,6 +4426,11 @@ export const SEED: Catalogue = {
   "No waves or phases have a start date yet.": { de: "Noch keine Wave oder Phase mit Startdatum.", es: "Aún ninguna wave o fase tiene fecha de inicio.", ca: "Encara cap wave o fase té data d'inici." },
   "No work in this phase yet.": { de: "Noch keine Arbeit in dieser Phase.", es: "Aún no hay trabajo en esta fase.", ca: "Encara no hi ha feina en aquesta fase." },
   "Phase completed.": { de: "Phase abgeschlossen.", es: "Fase completada.", ca: "Fase completada." },
+  // THE WAVES MODULE SETTINGS PAGE'S OWN TAB/TITLE (Aurora, 21 Sep 2026: "Make
+  // sure we can adjust this on the settings in Waves") — the team's own
+  // default days per phase type, one level up from a single wave's own
+  // Settings sheet ("Phase type"/"Phase types" above).
+  "Phase days": { de: "Phasentage", es: "Días de fase", ca: "Dies de fase" },
   "Phase name": { de: "Phasenname", es: "Nombre de la fase", ca: "Nom de la fase" },
   "Phase planned, and it is in this wave.": { de: "Phase geplant, und sie ist in dieser Wave.", es: "Fase planificada, y está en esta wave.", ca: "Fase planificada, i és en aquesta wave." },
   "Phase reopened.": { de: "Phase wieder geöffnet.", es: "Fase reabierta.", ca: "Fase reoberta." },
@@ -4573,9 +4580,7 @@ export const SEED: Catalogue = {
   },
   "Nothing written yet.": { de: "Noch nichts geschrieben.", es: "Aún no hay nada escrito.", ca: "Encara no hi ha res escrit." },
   "Related tickets": { de: "Zugehörige Tickets", es: "Tickets relacionados", ca: "Tiquets relacionats" },
-  "No related tickets.": { de: "Keine zugehörigen Tickets.", es: "Sin tickets relacionados.", ca: "Sense tiquets relacionats." },
   "Related stories": { de: "Zugehörige Storys", es: "Historias relacionadas", ca: "Històries relacionades" },
-  "No related stories.": { de: "Keine zugehörigen Storys.", es: "Sin historias relacionadas.", ca: "Sense històries relacionades." },
   "Phase and wave": { de: "Phase und Wave", es: "Fase y Wave", ca: "Fase i Wave" },
   "None": { de: "Keine", es: "Ninguno", ca: "Cap" },
   "Cycle time": { de: "Durchlaufzeit", es: "Tiempo de ciclo", ca: "Temps de cicle" },
@@ -4589,6 +4594,7 @@ export const SEED: Catalogue = {
   // THE EFFORT CARD'S OWN EMPTY STATE (Aurora's ruling, 21 Sep 2026, B44
   // amended) — no door, words only.
   "No time logged yet.": { de: "Noch keine Zeit erfasst.", es: "Aún no hay tiempo registrado.", ca: "Encara no hi ha temps registrat." },
+  "Time logged from a meeting": { de: "Zeit erfasst von einem Meeting", es: "Tiempo registrado de una reunio", ca: "Temps registrat d'una reunio" },
 
   /* ── THE BACKLOG TAB'S OWN STATUS FACET (round 32, stories-screen.tsx) —
    * "In Review", Title Case, the facet's own short label beside Backlog/To

@@ -146,6 +146,7 @@ import { NoAccess } from "@/components/deep-link/screen-bits"
 import { ModuleAutomations } from "@/components/screens/module-automations"
 import { SettingsChoicesPanel } from "@/components/screens/settings-choices-panel"
 import { MeetingTypesPanel } from "@/components/team/internal-screens"
+import { TeamPhaseDayDefaultsPanel } from "@/components/work/wave-phase-days-panel"
 import type { Can, Right } from "@/lib/perms"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 import { usePermissions } from "@/lib/perms"
@@ -288,6 +289,21 @@ export type ModuleSettingsSection =
        * and it is `MeetingTypesPanel`'s own concern
        * (`web/components/team/internal-screens.tsx`) to fetch and shape. */
       kind: "meetingTypes"
+    })
+  | (ModuleSettingsSectionBase & {
+      /** A FOURTH KIND, 21 SEP 2026 — a team-wide DEFAULT, never a
+       * `selectable_data` group and never a switch. Aurora's ruling, closing
+       * the loop her 20 Sep 2026 one opened (the per-wave Settings sheet,
+       * B46, documents/UI-RULEBOOK.md): "Make sure we can adjust this on the
+       * settings in Waves." No fields of its own: today there is exactly one
+       * page with a `phaseDays` section (Waves) and it is
+       * `TeamPhaseDayDefaultsPanel`'s own concern
+       * (`web/components/work/wave-phase-days-panel.tsx`) to fetch, draw and
+       * save the seven rows. Its OWN tab, not "Choices" — the union member
+       * beside it is about a vocabulary a person adds rows to; this is seven
+       * fixed numbers, and stacking it under "Choices" would answer the
+       * tab's own question wrong. */
+      kind: "phaseDays"
     })
 
 export type ModuleSettingsPage = {
@@ -572,6 +588,28 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         types: ["Phase type"],
         title: "Phase types",
         create: true,
+      },
+    ],
+  },
+  {
+    // WAVES — the team's own DEFAULT days per phase type, never a
+    // `selectable_data` group. Aurora's ruling, 21 Sep 2026, verbatim,
+    // closing the loop her 20 Sep 2026 one opened (the per-wave Settings
+    // sheet a wave's own gear already opens, B46, documents/UI-RULEBOOK.md):
+    // "Make sure we can adjust this on the settings in Waves." Gated on
+    // `work:read`, the same right the per-wave Settings sheet's own view is
+    // gated on one screen over — writing (the Save button inside
+    // `TeamPhaseDayDefaultsPanel`) asks `work:update` itself, the same split
+    // every other module-settings page's `automations` section already
+    // takes between "may see this page" and "may change what's on it".
+    segment: "waves",
+    title: navPageTitle("waves"),
+    sections: [
+      {
+        key: "phase-days",
+        gate: { module: "work", right: "read" },
+        kind: "phaseDays",
+        title: "Phase days",
       },
     ],
   },
@@ -941,6 +979,13 @@ export function ModuleSettingsScreen({
   const meetingTypesSection = sections.find(
     (s): s is Extract<ModuleSettingsSection, { kind: "meetingTypes" }> => s.kind === "meetingTypes"
   )
+  // THE FOURTH KIND, 21 SEP 2026 — a team-wide default (Waves' own "Phase
+  // days"), never a vocabulary and never a switch. Its own tab, drawn only
+  // where `visibleModuleSettings` actually returns it, the identical refusal
+  // every other tab here already stands on.
+  const phaseDaysSection = sections.find(
+    (s): s is Extract<ModuleSettingsSection, { kind: "phaseDays" }> => s.kind === "phaseDays"
+  )
 
   // R16 — THE NUMBER ON EACH TAB, exactly once, through the one `formatCount`
   // seam.
@@ -1041,11 +1086,25 @@ export function ModuleSettingsScreen({
       badge: formatCount(choiceValueCount),
       badgeVariant: "" as const,
     })
+  // PHASE DAYS — its own tab, seven fixed numbers rather than a vocabulary a
+  // person adds rows to, so it carries no count badge (R97 — a number that
+  // does not COUNT anything wears none).
+  if (phaseDaysSection)
+    tabs.push({
+      value: "phaseDays",
+      label: t("Phase days"),
+      icon: "",
+      badge: "",
+      badgeVariant: "" as const,
+    })
 
   // Remembered per address (`/settings/<segment>`), like every other tab
   // strip in the app — a visit to Ticket settings and a visit to Account
   // settings do not share one memory slot.
-  const [tab, setTab] = useRemembered<string>("tab", automationsSection ? "automations" : "choices")
+  const [tab, setTab] = useRemembered<string>(
+    "tab",
+    automationsSection ? "automations" : phaseDaysSection ? "phaseDays" : "choices"
+  )
 
   // AN ADDRESS NOBODY HAS A PAGE FOR, and one a reader may not see, land in the
   // same place — and it is `NoAccess` rather than `NotFound` for both, because
@@ -1184,6 +1243,17 @@ export function ModuleSettingsScreen({
                 )}
               </div>
             )
+          // PHASE DAYS — the team's own defaults, the same seven-row panel a
+          // wave's own Settings sheet draws (wave-phase-days-panel.tsx),
+          // never a second editor for one fact. `TeamPhaseDayDefaultsPanel`
+          // asks `work:update` itself (its own `usePermissions` call, the
+          // same split `ModuleAutomations` already takes) — R61 holds THIS
+          // file to exactly one `can(` call, the one `visibleModuleSettings`
+          // already made above to decide whether this section is offered.
+          if (panel.value === "phaseDays")
+            return phaseDaysSection ? (
+              <TeamPhaseDayDefaultsPanel key={phaseDaysSection.key} teamId={teamId} />
+            ) : null
           return null
         })({ value: tab })}
       </div>

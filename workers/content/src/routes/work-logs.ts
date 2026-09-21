@@ -242,7 +242,6 @@ export async function postLogTime(request: Request, env: Env): Promise<Response>
     endedAt?: unknown
     note?: unknown
     kind?: unknown
-    billable?: unknown
   }>(request, env, "work", "create")
   await refusePortalCaller(cfg, guard)
   const target = requireTarget(
@@ -255,9 +254,6 @@ export async function postLogTime(request: Request, env: Env): Promise<Response>
     endedAt: requireMoment(body.endedAt, "Finished at"),
     note: optionalText(body.note, "Note", TEXT_LIMITS.long),
     kind: optionalText(body.kind, "Kind of work", TEXT_LIMITS.short),
-    // BILLABLE IS ON BY DEFAULT (BUILD-1 §5) — a plain switch, and the absence of
-    // the field means the ordinary case rather than the cautious one.
-    billable: body.billable !== false,
   })
   await publishChange(env, guard.teamId, "work_logs", id, "add", accountId ?? undefined)
   return logMutationReply(cfg, guard, id)
@@ -272,7 +268,6 @@ export async function postUpdateWorkLog(request: Request, env: Env): Promise<Res
     endedAt?: unknown
     note?: unknown
     kind?: unknown
-    billable?: unknown
   }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Work log", TEXT_LIMITS.short)
@@ -281,7 +276,6 @@ export async function postUpdateWorkLog(request: Request, env: Env): Promise<Res
     endedAt: optionalMoment(body.endedAt, "Finished at"),
     note: optionalText(body.note, "Note", TEXT_LIMITS.long),
     kind: optionalText(body.kind, "Kind of work", TEXT_LIMITS.short),
-    billable: typeof body.billable === "boolean" ? body.billable : undefined,
   })
   await publishChange(env, guard.teamId, "work_logs", id, "edit", accountId ?? undefined)
   return logMutationReply(cfg, guard, id)

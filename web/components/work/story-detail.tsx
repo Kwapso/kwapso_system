@@ -287,7 +287,11 @@ export function StoryDetailScreen({
   // THE DONE RULE, MIRRORED — the door refuses a `done` move while
   // `buildNotes` is empty (`refuseUndocumented`, workers/content/src/lib/
   // stories.ts); this button only reads the same fact back, R17's own "the
-  // door decides, the button mirrors it" split.
+  // door decides, the button mirrors it" split. TEXT ONLY, deliberately —
+  // the door's own `refuseUndocumented` reads nothing but the `build_notes`
+  // column, so a story documented entirely in images still refuses Done
+  // until there is prose to go with them. Never conflate this with
+  // `buildNotesSectionEmpty` below, which asks a different question.
   const buildNotesMissing = !story.buildNotes || !story.buildNotes.trim()
   const doneReason = buildNotesMissing
     ? t("Write the build notes before marking it done.")
@@ -367,17 +371,28 @@ export function StoryDetailScreen({
   // `EmptyGatedPanel`'s `empty` prop drops it, and the one "Write the build
   // notes" button is the whole panel. Once written, the pencil (not a
   // second create button) reopens the identical sheet.
+  //
+  // DEFECT (live proof, 21 Sep 2026): the empty door kept showing for a
+  // story that carried ATTACHMENTS but no prose — `buildNotesMissing` asks
+  // only about the TEXT column, which is right for the Done rule above (the
+  // door's own `refuseUndocumented` reads nothing else) and wrong for this
+  // section: a story documented with a screenshot and no caption is not
+  // nothing. The section is empty only when there is NEITHER text NOR an
+  // attachment; her ruling was "prose with images inline", prose above the
+  // gallery when there is any, the gallery alone otherwise, and the pencil
+  // still reopens the same sheet either way.
+  const buildNotesSectionEmpty = buildNotesMissing && buildNotesImages.length === 0
   const buildNotesPanel = (
     <EmptyGatedPanel
       title={t("Build notes")}
-      empty={buildNotesMissing}
+      empty={buildNotesSectionEmpty}
       action={
-        !buildNotesMissing ? (
+        !buildNotesSectionEmpty ? (
           <EditPenButton onClick={() => setBuildNotesOpen(true)} label={t("Edit the build notes")} />
         ) : undefined
       }
     >
-      {buildNotesMissing ? (
+      {buildNotesSectionEmpty ? (
         <CollectionEmptyState
           title={t("What was built, and how.")}
           description={t("Add images inline.")}
@@ -386,7 +401,7 @@ export function StoryDetailScreen({
         />
       ) : (
         <>
-          <RichText html={story.buildNotes ?? ""} />
+          {!buildNotesMissing && <RichText html={story.buildNotes ?? ""} />}
           {buildNotesImages.length > 0 && (
             <div className="flex flex-col gap-2">
               {buildNotesImages.map((a) => (
@@ -427,8 +442,8 @@ export function StoryDetailScreen({
   )
 
   const ticket = ticketQ.data
-  const relatedTicketsPanel = (
-    <TicketSidePanel title={t("Related tickets")} count={ticket ? formatCount(1) : formatCount(0)}>
+  const relatedTicketsPanel = ticket ? (
+    <TicketSidePanel title={t("Related tickets")} count={formatCount(1)}>
       {/* CATEGORY, AS A READ-ONLY FACT (Aurora's ruling, 21 Sep 2026, B43,
           verbatim: "you must detect it automatically. If it's related to a
           ticket, it's 'Client Requested.' If not, not."). The door derives
@@ -440,48 +455,47 @@ export function StoryDetailScreen({
         <span className="text-muted-foreground min-w-0 basis-[12rem] text-sm">{t("Category")}</span>
         <Badge variant="secondary">{story.category}</Badge>
       </div>
-      {ticket ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm">{ticketTitle(ticket)}</span>
-          {/* R94 (chip-order): id then status, through the one shared seam,
-              even on a list row rather than a record's own head. */}
-          {orderChips([
-            { kind: "id", node: <RecordRef key="id" value={ticket.ref} /> },
-            { kind: "status", node: ticketStatusCell(ticket.status, t) },
-          ])}
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-sm">{t("No related tickets.")}</p>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm">{ticketTitle(ticket)}</span>
+        {/* R94 (chip-order): id then status, through the one shared seam,
+            even on a list row rather than a record's own head. */}
+        {orderChips([
+          { kind: "id", node: <RecordRef key="id" value={ticket.ref} /> },
+          { kind: "status", node: ticketStatusCell(ticket.status, t) },
+        ])}
+      </div>
+    </TicketSidePanel>
+  ) : (
+    <TicketSidePanel title={t("Category")}>
+      {/* When there is no related ticket, the category still needs to display
+          as a standalone fact — the story is an "Enabler" not "Client Requested".
+          Show it in a minimal panel with just the category badge. */}
+      <Badge variant="secondary">{story.category}</Badge>
     </TicketSidePanel>
   )
 
-  const relatedStoriesPanel = (
+  const relatedStoriesPanel = relatedStories.length > 0 ? (
     <TicketSidePanel title={t("Related stories")} count={formatCount(relatedStories.length)}>
-      {relatedStories.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("No related stories.")}</p>
-      ) : (
-        relatedStories.map((s) => (
-          <div key={s.id} className="flex flex-wrap items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-sm">{s.title}</span>
-            {/* R94 (chip-order): id, status, type. */}
-            {orderChips([
-              { kind: "id", node: <RecordRef key="id" value={s.ref} /> },
-              {
-                kind: "status",
-                node: (
-                  <Badge key="status" variant="status" dot={storyStatusDotTone(s.status)}>
-                    {storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn })}
-                  </Badge>
-                ),
-              },
-              { kind: "type", node: storyTypeChip(s.storyType) as React.ReactElement | null },
-            ])}
-          </div>
-        ))
-      )}
+      {relatedStories.map((s) => (
+        <div key={s.id} className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm">{s.title}</span>
+          {/* R94 (chip-order): id, status, type. */}
+          {orderChips([
+            { kind: "id", node: <RecordRef key="id" value={s.ref} /> },
+            {
+              kind: "status",
+              node: (
+                <Badge key="status" variant="status" dot={storyStatusDotTone(s.status)}>
+                  {storyStatusWord(s.status, { startsOn: s.sprintStartsOn, endsOn: s.sprintEndsOn })}
+                </Badge>
+              ),
+            },
+            { kind: "type", node: storyTypeChip(s.storyType) as React.ReactElement | null },
+          ])}
+        </div>
+      ))}
     </TicketSidePanel>
-  )
+  ) : null
 
   const phaseAndWavePanel = (
     <TicketSidePanel title={t("Phase and wave")}>

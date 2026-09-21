@@ -29,6 +29,7 @@ import {
   runningTimersKey,
   storiesKey,
   workLogsKey,
+  workLogsTotalKey,
 } from "@/lib/live-resources"
 import type { RunningTimer } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
@@ -207,13 +208,36 @@ export function TimerBar({
 /** Everything a start or a stop makes stale, in one place, because four screens
  * do it and a screen that forgets one of them shows a timer that isn't running.
  * `recordTimeKey` is the record's OWN Time tab — the family the live registry
- * drops when a row of time moves, and the one a generic refresh does not name. */
+ * drops when a row of time moves, and the one a generic refresh does not name.
+ *
+ * DEFECT (live proof, 2026-09-21): the task sheet and the shared `EffortCard`
+ * stayed on the state from before a start/stop until a full reload. Two keys
+ * this function did NOT touch, both fed straight into what those two draw:
+ *
+ *   • `workLogsTotalKey` — the Effort card's own title count and a record's
+ *     Time tab badge (`meeting-detail.tsx`'s own read), a `total:` sidecar
+ *     OUTSIDE `TIME_SLICE_PREFIX` on purpose (R16 — it is a count, not a row
+ *     slice), so `invalidatePrefix(TIME_SLICE_PREFIX)` above never reached
+ *     it;
+ *   • the record's own EFFORT METRICS (`story:metrics:<id>`, `help:metrics:
+ *     <id>`) — the Cycle time / Effort hours / Flow efficiency tiles
+ *     `EffortCard`'s `metrics` prop draws, fed by a door of their own
+ *     (`getStoryMetrics`/`getTicketMetrics`) that a timer's start or stop
+ *     moves exactly as much as the rows underneath it, and which neither
+ *     `story-detail.tsx` nor `help-detail.tsx` re-fetches except through
+ *     their own `refresh()` (called after an edit or a status move, never
+ *     after a timer toggle). A task carries neither key (no metrics door of
+ *     its own — task-sheet.tsx's own header says why), so nothing is
+ *     invalidated for "tasks" and `EffortCard` draws no tiles for it either. */
 function refreshTimers(teamId: string, targetTable: string, targetId: string): void {
   invalidate(runningTimersKey(teamId))
   invalidate(workLogsKey(teamId))
   invalidate(storiesKey(teamId))
   invalidate(recordTimeKey(targetTable, targetId))
+  invalidate(workLogsTotalKey(targetTable, targetId))
   invalidatePrefix(TIME_SLICE_PREFIX)
+  if (targetTable === "stories") invalidate(`story:metrics:${targetId}`)
+  if (targetTable === "help") invalidate(`help:metrics:${targetId}`)
 }
 
 /** THE CLOCK ON ONE RECORD, NORMALIZED FOR A FOLDED MENU — extracted from

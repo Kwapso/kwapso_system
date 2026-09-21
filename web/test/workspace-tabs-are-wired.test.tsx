@@ -97,7 +97,18 @@ describe("the workspace tab strip", () => {
     // THE COUNT, said as a count: one close button per
     // three tabs. A strip
     // tab is drawn, fails here.
-    const closers = [...document.querySelectorAll("button[aria-label]")].filter((b) =>
+    //
+    // Scoped to the strip itself, the kit's own `<nav data-slot=
+    // "breadcrumb-folders">` (`shared/ui/components/breadcrumbs/
+    // breadcrumb-folders.tsx`), rather than the whole document. The
+    // floating `LiveStatus` pill (shared/web/live-status.tsx) also renders a
+    // dismiss control while the socket is down; that pill sits OUTSIDE this
+    // strip, as a sibling of the shell's own content, so a document-wide
+    // census of anything matching /close/i double-counts it as a fourth tab
+    // close. The strip is the only thing this assertion is about.
+    const strip = document.querySelector('[data-slot="breadcrumb-folders"]') as HTMLElement
+    expect(strip, "the tab strip must render").toBeTruthy()
+    const closers = [...strip.querySelectorAll("button[aria-label]")].filter((b) =>
       /close/i.test(b.getAttribute("aria-label") ?? "")
     )
     expect(closers.length, "one close button per open tab").toBe(3)

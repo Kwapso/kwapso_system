@@ -17,7 +17,6 @@
 //   • parallel timers on DIFFERENT targets are fine. The same person on the same
 //     target twice is refused by a partial unique index, so two clicks in the
 //     same instant cannot both win;
-//   • billable is a plain switch, ON by default;
 //   • a runaway timer is NEVER stopped for you. It is offered three one-tap
 //     answers on Monday morning instead (see resolveRunaway).
 
@@ -96,7 +95,6 @@ type LogRow = {
   started_at: string
   ended_at: string | null
   seconds: number
-  billable: number
   discarded_at: string | null
   account_id: string | null
 }
@@ -123,7 +121,7 @@ const REF_SQL = `CASE ${Object.keys(WORK_LOG_TARGETS)
   .join(" ")} END`
 
 const LOG_COLS = `w.id, w.target_table, w.target_id, w.user_id, w.user_name, w.kind, w.note,
-  w.started_at, w.ended_at, w.seconds, w.billable, w.discarded_at, w.account_id,
+  w.started_at, w.ended_at, w.seconds, w.discarded_at, w.account_id,
   ${LABEL_SQL} AS target_label, ${REF_SQL} AS target_ref`
 
 function toLog(r: LogRow): WorkLog {
@@ -140,7 +138,6 @@ function toLog(r: LogRow): WorkLog {
     startedAt: r.started_at,
     endedAt: r.ended_at,
     seconds: r.seconds,
-    billable: r.billable === 1,
     discarded: r.discarded_at != null,
     accountId: r.account_id,
   }
@@ -355,7 +352,7 @@ export async function listWorkLogs(
  *   • `total` is a BADGE. R16's amendment applies — counted exactly to
  *     TOTAL_COUNT_CAP, then reported as "at least", because past a million rows
  *     the badge renders "1m+" either way.
- *   • `totalSeconds` is BILLABLE TIME, and it stays EXACT. It is not a display
+ *   • `totalSeconds` is the WHOLE TOTAL, and it stays EXACT. It is not a display
  *     tally; it is the number an invoice is argued about. Wrapping it in the
  *     bounded subquery beside the count would have made it a PARTIAL SUM of hours,
  *     silently, with nothing on screen to say so — a display cap quietly becoming
@@ -650,8 +647,8 @@ export async function startTimer(
       cfg,
       guard.databaseId,
       `INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, user_name, kind, note,
-         started_at, seconds, billable, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(accountId)}, ${sqlString(input.targetTable)}, ${sqlString(input.targetId)}, ${sqlString(actor.id)}, ${sqlString(actor.name)}, ${sqlString(input.kind ?? null)}, ${sqlString(input.note ?? null)}, ${sqlString(now)}, 0, 1, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+         started_at, seconds, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(accountId)}, ${sqlString(input.targetTable)}, ${sqlString(input.targetId)}, ${sqlString(actor.id)}, ${sqlString(actor.name)}, ${sqlString(input.kind ?? null)}, ${sqlString(input.note ?? null)}, ${sqlString(now)}, 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
     )
   } catch (e) {
     // The unique index did its job: they already have one running on this exact
@@ -704,6 +701,48 @@ export async function stopTimer(
   return { moved: true, seconds, accountId: row.account_id }
 }
 
+/** STOP EVERY RUNNING TIMER ON ONE RECORD, whoever started it — the deletion
+ * path's own reason to touch a clock it does not own. `stopTimer` above
+ * refuses a timer that is not the CALLER's, because stopping your own timer
+ * is part of logging your own time; deleting the record it is running
+ * against is an administrative act on the whole row, not a personal stop, so
+ * this bypasses that ownership check and closes every log still open against
+ * the target. Reused by `deleteTask` (workers/content/src/lib/tasks.ts):
+ * deleting a task must not leave its `work_logs` row open for ever with
+ * nothing but `GET /api/content/work-logs/running` still able to see it.
+ *
+ * R17-shaped: `ended_at IS NULL` rides each UPDATE, so a timer someone else's
+ * tab stopped in the same instant moves zero rows here and is not reported as
+ * stopped twice. */
+export async function stopAllRunningTimersForTarget(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  target: { table: string; id: string }
+): Promise<{ id: string; seconds: number; accountId: string | null }[]> {
+  const running = await d1Query<LogRow>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${LOG_COLS} FROM work_logs w
+      WHERE w.target_table = ? AND w.target_id = ? AND w.ended_at IS NULL AND w.discarded_at IS NULL`,
+    [target.table, target.id]
+  )
+  const now = new Date().toISOString()
+  const stopped: { id: string; seconds: number; accountId: string | null }[] = []
+  for (const row of running) {
+    const seconds = secondsBetween(row.started_at, now)
+    const changed = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `UPDATE work_logs SET ended_at = ?, seconds = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
+        WHERE id = ? AND ended_at IS NULL RETURNING id`,
+      [now, seconds, now, actor.id, actor.email, actor.name, row.id]
+    )
+    if (changed[0]) stopped.push({ id: row.id, seconds, accountId: row.account_id })
+  }
+  return stopped
+}
+
 /** MANUAL ENTRY — always available (BUILD-1 §5), because half of real time is
  * remembered rather than clocked. A start and an end, and the duration is
  * computed from them here rather than accepted from the caller. */
@@ -718,7 +757,6 @@ export async function logTime(
     endedAt: string
     note?: string
     kind?: string
-    billable: boolean
   }
 ): Promise<{ id: string; seconds: number; accountId: string | null }> {
   const { accountId } = await targetOrThrow(cfg, guard, input.targetTable, input.targetId)
@@ -732,13 +770,13 @@ export async function logTime(
     cfg,
     guard.databaseId,
     `INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, user_name, kind, note,
-       started_at, ended_at, seconds, billable, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(accountId)}, ${sqlString(input.targetTable)}, ${sqlString(input.targetId)}, ${sqlString(actor.id)}, ${sqlString(actor.name)}, ${sqlString(input.kind ?? null)}, ${sqlString(input.note ?? null)}, ${sqlString(input.startedAt)}, ${sqlString(input.endedAt)}, ${seconds}, ${input.billable ? 1 : 0}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+       started_at, ended_at, seconds, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(accountId)}, ${sqlString(input.targetTable)}, ${sqlString(input.targetId)}, ${sqlString(actor.id)}, ${sqlString(actor.name)}, ${sqlString(input.kind ?? null)}, ${sqlString(input.note ?? null)}, ${sqlString(input.startedAt)}, ${sqlString(input.endedAt)}, ${seconds}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   return { id, seconds, accountId }
 }
 
-/** EDIT a log: its note, its kind of work, whether it is billable, and its two
+/** EDIT a log: its note, its kind of work, and its two
  * moments. "Log edits are permission-based and ALWAYS leave a trail" (BUILD-1
  * §5) — the permission is the door's (work:update), and this is the trail. It is an
  * activity row rather than a version history because the question anybody ever
@@ -748,7 +786,7 @@ export async function editWorkLog(
   guard: MemberGuard,
   actor: Actor,
   id: string,
-  input: { startedAt?: string; endedAt?: string; note?: string; kind?: string; billable?: boolean }
+  input: { startedAt?: string; endedAt?: string; note?: string; kind?: string }
 ): Promise<{ accountId: string | null }> {
   const rows = await d1Query<LogRow>(
     cfg,
@@ -764,12 +802,11 @@ export async function editWorkLog(
   // A RUNNING timer keeps running through an edit: only a stop ends one, so a
   // note typed mid-task cannot accidentally close it.
   const seconds = endedAt ? secondsBetween(startedAt, endedAt) : before.seconds
-  const billable = input.billable === undefined ? before.billable === 1 : input.billable
 
   await d1Query(
     cfg,
     guard.databaseId,
-    `UPDATE work_logs SET started_at = ?, ended_at = ?, seconds = ?, note = ?, kind = ?, billable = ?,
+    `UPDATE work_logs SET started_at = ?, ended_at = ?, seconds = ?, note = ?, kind = ?,
        updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
     [
@@ -778,7 +815,6 @@ export async function editWorkLog(
       seconds,
       input.note ?? before.note,
       input.kind ?? before.kind,
-      billable ? 1 : 0,
       new Date().toISOString(),
       actor.id,
       actor.email,
