@@ -43,7 +43,18 @@ describe("LiveStatus, the compact bottom centred pill", () => {
     const status = screen.getByRole("status")
     // Fixed to the viewport and centred, not a strip in the content flow.
     expect(status.className).toMatch(/\bfixed\b/)
-    expect(status.className).toMatch(/\binset-x-0\b/)
+    // `left-0 w-screen`, NOT `inset-x-0`. See the root-cause comment on this
+    // className in shared/web/live-status.tsx. `inset-x-0` (`left:0;
+    // right:0`) centred this pill 7.5px off true viewport centre on staging
+    // at 1440px, because `right: 0` on a fixed element resolves against
+    // `document.documentElement.clientWidth` once the root carries a
+    // non-visible `overflow-x` (globals.css's own "page does not scroll
+    // sideways" rule) rather than against the real viewport width. `vw` is
+    // unaffected, so an explicit `w-screen` plus a single `left-0` (nothing
+    // resolves against the narrowed right edge) is immune to the same bug.
+    expect(status.className).toMatch(/\bleft-0\b/)
+    expect(status.className).toMatch(/\bw-screen\b/)
+    expect(status.className).not.toMatch(/\binset-x-0\b/)
     expect(status.className).toMatch(/\bjustify-center\b/)
     expect(status.className).toMatch(/\bbottom-\[/)
     // jest-dom is deliberately not set up in this workspace (test/wave-detail.test.tsx):
@@ -117,5 +128,44 @@ describe("no shell mounts LiveStatus inline in its own content column", () => {
       const mounts = src.match(/<LiveStatus\s*\/>/g) ?? []
       expect(mounts, rel).toHaveLength(1)
     }
+  })
+})
+
+describe("--live-status-band-clear is measured, not guessed", () => {
+  const REPO_ROOT = join(__dirname, "..", "..")
+
+  // Staging measured the pill's bottom edge 160px above the viewport at
+  // 1440px and 240px at 760px on a ticket screen, both exactly the old
+  // flat `8rem` (128px) `has-[[data-slot=ticket-footer-band]]` guess plus
+  // the ordinary base offset and, on the phone width, the tab-clear term.
+  // That guess never tracked the band's own real height. Fixed by measuring
+  // it and publishing the real height plus one 16px gutter, so these
+  // assertions are a source census (jsdom does not lay out real pixel
+  // heights, so the measured NUMBER is not assertable here) that the flat
+  // guess is gone from app-shell.tsx and the measuring code is in place on
+  // the one component that owns the band.
+  it("app-shell.tsx no longer sets --live-status-band-clear off a has-[] guess", () => {
+    const src = readFileSync(join(REPO_ROOT, "web", "components", "shell", "app-shell.tsx"), "utf8")
+    expect(src).not.toMatch(/has-\[\[data-slot=ticket-footer-band\]\]:\[--live-status-band-clear:/)
+  })
+
+  it("ticket-detail-body.tsx measures its own footer band with a ResizeObserver and publishes height + 16px", () => {
+    const src = readFileSync(join(REPO_ROOT, "web", "components", "tickets", "ticket-detail-body.tsx"), "utf8")
+    expect(src).toMatch(/new ResizeObserver/)
+    expect(src).toMatch(/--live-status-band-clear/)
+    // The gutter is one 16px, added once, in code (not a second, bigger
+    // guess dressed up as a measurement): `height + 16`, not `height * `
+    // anything or a second constant stacked on top.
+    expect(src).toMatch(/height\s*\+\s*16/)
+    // Published on the one ancestor the pill (a sibling of ScreenShell in
+    // app-shell.tsx) and the band (deep inside ScreenShell's own body)
+    // actually share, a custom property only inherits down.
+    expect(src).toMatch(/documentElement\.style\.setProperty\(\s*"--live-status-band-clear"/)
+    // Cleared on unmount so a screen with no ticket band never inherits a
+    // stale clearance from the last ticket that was open.
+    expect(src).toMatch(/documentElement\.style\.removeProperty\("--live-status-band-clear"\)/)
+    // The measuring ref actually rides the band's own DOM node, the same
+    // one `data-slot="ticket-footer-band"` marks (R89's own marker).
+    expect(src).toMatch(/ref={footerBandRef}\s*\n\s*data-slot="ticket-footer-band"/)
   })
 })

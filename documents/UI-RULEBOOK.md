@@ -37,7 +37,7 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L42)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L43)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
 - [4. Collections](#4-collections) (K1 to K62)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B49)
@@ -1733,6 +1733,14 @@ live: no em dash anywhere a person reads.
 **Status: ruled and in build, 21 Sep 2026.** Three doors carry the check: a story's Done (`setStoryStatus`), a ticket's resolve (`setStatus`) and a ticket's archive (`setTicketArchived`). `tasks.ts`'s own Done door already carried this exact check, written inline before the shared helper existed, with its own note asking for the swap the moment it landed; that swap is a known pending site owned by the tasks lane, not made here.
 
 **Law.** [R99](../RULES.md) (`no-close-while-timer-runs`), a source census, `web/test/no-close-while-timer-runs.test.ts`, over `workers/content/src/lib`: every exported function that both compares a status to one of "done", "resolved", "closed" or "completed" and writes a closing column (`status`, `completed_at`, `archived_at`, `resolved`) must call `refuseWhileTimerRuns(`, or be named in the check's own `CLOSE_DOOR_EXEMPT`, keyed by `{file, fn}`, a dated reason and never a line number.
+
+---
+
+### L43: the no-containers experiment, grouped sections lose their box in the tickets module first
+
+**The ruling.** Aurora, verbatim, 21 Sep 2026: *"i am scarde about deploy8nig the o cntainers, is it possible to deploy in tickets module only? i wanna have it there, we review and iterate, and when good ship to the full app and update the ui kit and repo"*
+
+**What changes.** The no-containers change (removing the grouping card box around sections like Assigned to, Related stories, Related tickets, Stakeholders, Effort, Detail and similar sections on detail screens, so they sit on the paper background directly instead of on a raised card) ships to the tickets module first as an experiment, gets reviewed and iterated there, and only then rolls out to the whole app, the UI kit and the repo. Chips, tabs, buttons, tables, toolbars, tiles and the conversation card stay boxed as they are. The No Containers page (five staging screens redrawn) was validated by Aurora on 21 Sep 2026: *"artifact validated, go ahead and deploy tickets when ready"*. Status: design validated, build in the tickets module pending her live review.
 
 ---
 
@@ -5008,7 +5016,9 @@ never absent from a list read again. **Sort by name** was already the Value colu
 header (`sort: "value"`); **sort by created on** is the new Added column's header
 (`sortType: "date"`, comparing the raw instant, never the formatted date).
 
-**Status: ruled, in build, 21 Sep 2026** (`shared/selectable-where.ts`,
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed the Choices columns layout: Value with its mark, Status as the second column, Details, Where, Added, Actions, with sort moved to the toolbar.
+
+**Status: validated, 21 Sep 2026** (`shared/selectable-where.ts`,
 `web/components/deep-link/shape.tsx`'s `shapeChoicesTable`,
 `web/components/screens/settings-choices-panel.tsx`); worker change in
 `workers/tenancy/src/lib/selectable.ts`; tests in
@@ -5050,7 +5060,7 @@ above) both holding the line, still no `TABLE_COLUMN_BUDGET_EXEMPT` entry needed
 read for the PATTERN here rather than enforced on this cell, its own census is scoped to
 `<Select>`, never a table column, and R54 (first name only) still governs `addedByText`.
 
-**AMENDED AGAIN, 22 Sep 2026: Status is back to its own column, and Details folds into
+**AMENDED AGAIN, 21 Sep 2026: Status is back to its own column, and Details folds into
 Value instead.** Aurora's ruling, verbatim: *"ok, but keep status as its own column!"* The
 fold one paragraph up did not survive either: the `<Badge variant="status" dot={…}>` chip
 moves back off the Value cell and onto its own `status` column cell, restoring the header
@@ -5080,7 +5090,7 @@ before the 21 Sep 2026 fold ever moved it. Tests: `web/test/shape.test.ts` (the 
 its own node again, and the Value cell's own second line proven present for a type Details
 has something to say and absent for one it does not).
 
-**AMENDED YET AGAIN, 22 Sep 2026 (later the same day): the mark moves beside Value, Details
+**AMENDED YET AGAIN, 21 Sep 2026 (later the same day): the mark moves beside Value, Details
 returns as text only, and the header sort moves to the toolbar.** Aurora's ruling, verbatim:
 *"no: the icon/color next to the value in first column! details is the next column (however
 icon color its not a detail!) make status the second column, the rest ok. remove the sort from
@@ -5146,7 +5156,9 @@ which record it starts. Task detail's own button is a separate, same-day lane (i
 21 Sep 2026 ruling, "beside the mango Done") wiring a `startLabel`/`startIcon` override on
 the same shared control; it inherits this default for free and is not re-touched here.
 
-**Status: ruled, in build, 21 Sep 2026** (`web/components/shell/timer-bar.tsx`,
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed every timer-start button reads "Start" with the stopwatch icon.
+
+**Status: validated, 21 Sep 2026** (`web/components/shell/timer-bar.tsx`,
 `web/components/work/time-panel.tsx`); census in `web/test/timer-start-word.test.ts`, which
 walks every call site that wires a timer-start control and fails on a leftover "Start timer"
 string or `Play` icon, task detail/task form named out (another lane's own file).
@@ -5158,7 +5170,7 @@ reader, checked only by the census test named above.
 
 ### K61: the billable flag on work logs is killed, not hidden
 
-**The rule.** Aurora's ruling, 22 Sep 2026, verbatim: *"remove the billable from logs, not
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim: *"remove the billable from logs, not
 hide, remove."*
 
 **The shape.** `WorkLog.billable` (`shared/types.ts`) is gone, along with every surface that
@@ -5175,7 +5187,9 @@ dropped, not left unmounted: team migration `0115_the_billable_flag_is_killed`
 billable`. No hours summary ever split billable from non-billable time — `totalSeconds`
 (`WorkLogSummary`, `shared/types.ts`) was already one total — so nothing there needed changing.
 
-**Status: ruled, in build, 22 Sep 2026** (`workers/tenancy/src/team-schema/migrations.ts`,
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed billable is gone from work logs entirely, the column included.
+
+**Status: validated, 21 Sep 2026** (`workers/tenancy/src/team-schema/migrations.ts`,
 `workers/content/src/lib/work-logs.ts`, `web/components/work/time-form-dialog.tsx`,
 `web/components/work/time-panel.tsx`); proven by
 `workers/tenancy/test/migration-0115-billable-column-dropped.test.ts` and
@@ -5188,7 +5202,7 @@ only by the migration and door tests named above.
 
 ### K62: the "not live" hint is a compact pill, bottom centre
 
-**The rule.** Aurora's ruling, 22 Sep 2026, verbatim, choosing option A off the side by side
+**The rule.** Aurora's ruling, 21 Sep 2026, verbatim, choosing option A off the side by side
 design page over a full width bar: *"for not live implement A Compact pill, bottom centre."*
 
 **The shape.** `LiveStatus` (`shared/web/live-status.tsx`) no longer draws an inline warning
@@ -5211,7 +5225,9 @@ shells now mount it as a sibling of the routed screen (`app-shell.tsx`, after `<
 `portal-shell.tsx`, after `</main>`) rather than inside the page width column, so it never adds
 a box, a height or a width to whatever a screen is showing.
 
-**Status: ruled, in build, 22 Sep 2026** (`shared/web/live-status.tsx`,
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed the "not live" hint is a compact pill at the bottom centre in both apps, and the design page was deleted at her ask.
+
+**Status: validated, 21 Sep 2026** (`shared/web/live-status.tsx`,
 `web/components/shell/app-shell.tsx`, `web-portal/components/portal-shell.tsx`,
 `shared/i18n-seed.ts`); proven by `web/test/live-status-pill.test.tsx`.
 
@@ -7083,7 +7099,7 @@ takes. Dated the same round as B41 above, and the ticket's own "Assigned to" car
 B41 as a story-side artifact — is what this round wires up for real: *"the story gets the same
 card."*
 
-**AMENDED, 22 Sep 2026 — the Related panels.** Aurora, verbatim: *"in stories if no related
+**AMENDED, 21 Sep 2026 — the Related panels.** Aurora, verbatim: *"in stories if no related
 tickets hide that. same for related stories. only in stories."* The Related tickets panel, when
 the story has no ticket, renders nothing at all (no title, no empty state); the Related stories
 panel, when there are no sibling stories on that ticket, renders nothing at all. This rule
@@ -7171,6 +7187,8 @@ Save spreads the story's own current shape (the update door replaces every field
 only `buildNotes`, the same pattern `work-panels.tsx`'s own `toggleContributesToGoal` already
 takes for the identical reason.
 
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed stories hide Related tickets and Related stories when empty (round 36).
+
 **Status: ruled and shipped, 21 Sep 2026.** Team migration 0112, the door + its Done refusal,
 MCP parity, the one-page rewrite, `RecordDetailBody` extracted and reused, the Build notes
 sheet, the Metrics door, strings seeded (de/es/ca).
@@ -7252,7 +7270,9 @@ mounted elsewhere (the ticket's own attachments, `reply-composer.tsx`,
 `work-logs-panel.tsx`), and the thin story-side wrapper is exactly the shape a future
 standalone "Files and links" surface for a story would reach for again.
 
-**Status: ruled and shipped, 21 Sep 2026.** All four surfaces changed; `documents/MCP.md`
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed stories are English only, carry no goal, derive their category, and the Build notes sheet uses the kit's own drop zone.
+
+**Status: validated, 21 Sep 2026.** All four surfaces changed; `documents/MCP.md`
 and the tool catalogue updated for the derived category and the parked goal field; content
 tests covering category derivation on create, on an update that links a ticket, and on an
 update that drops one; web tests covering the parked goal surfaces, the absent translate
@@ -7316,7 +7336,9 @@ reasoned, permanent `empty={false}` (`EMPTY_TOOLBAR_EXEMPT`/`EMPTY_STATE_SINGLE_
 `shared/rules/registry.ts`) — the same reasoning `roles-matrix.tsx`'s own fixed-catalogue
 entry already argues: there is no collection here to be empty.
 
-**Status: ruled and shipped, 21 Sep 2026.** The Metrics panel removed, its three lines
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed effort metric tiles on raised kit cards, with the count beside the title like Stakeholders.
+
+**Status: validated, 21 Sep 2026.** The Metrics panel removed, its three lines
 merged into the Effort card, the count wired through the Stakeholders register, the Log
 time door rebuilt on `TimeFormDialog` directly, `web/test/story-detail.test.tsx` updated
 for the new panel order and the merged card.
@@ -7372,7 +7394,7 @@ count and the missing add button.
 exemption this time), R50 (empty-toolbar, the reasoned entries retired), R14 (paged rows,
 `<LoadMore>`), R35/R90 (a record's own face, on every row), R16 (the one count register).
 
-**Amended a third time, 22 Sep 2026 (reviewing the deployed card again).** Aurora, verbatim:
+**Amended a third time, 21 Sep 2026 (reviewing the deployed card again).** Aurora, verbatim:
 *"remove the pencil. when clicking one detail in slide in, and there have the option to
 edit. make the metrics cards inside the container, like in the metrics artifact you did for
 me! next to effort show the count of record, not the total hours (that has a metric on
@@ -7415,7 +7437,7 @@ The face on every row (R35/R90) and the load-more door (R14) are unchanged from 
 amendment; her second sentence this round ("when time logged... i want to see the avatar in
 each row") restates what was already shipped rather than asking for something new.
 
-**Status: amended and shipped, 22 Sep 2026.** `EffortCard` updated alone (its test files, and
+**Status: amended and shipped, 21 Sep 2026.** `EffortCard` updated alone (its test files, and
 `TimeFormDialog` reused unmodified); `web/test/story-detail.test.tsx` and
 `web/test/ticket-detail-no-tabs.test.tsx` updated for the record count, the stat tiles, the
 missing pencil, and the stricter zero-records case.
@@ -7427,7 +7449,7 @@ unchanged), R59 (a form slides in, never centres — the row opens the existing 
 than a new modal), R16 (the one count register, now the title's own record count rather than
 an hour total).
 
-**Amended a fourth time, 22 Sep 2026 (same day, reviewing the deployed tiles).** Aurora,
+**Amended a fourth time, 21 Sep 2026 (same day, reviewing the deployed tiles).** Aurora,
 verbatim: *"good. add kind of card background behind cards, this is a metric, like in kit."*
 
 **What changed, this round.** The three stat tiles (Cycle time, Effort hours, Flow
@@ -7446,7 +7468,7 @@ React's own `key=` reads, to `web/test/rules.test.ts`'s R65 census, as a per-row
 that owes a chip a `<CardTitle>` to sit above; these three are fixed metrics, not rows, so
 naming each by hand keeps them off that census honestly instead of fighting it.
 
-**Status: amended and shipped, 22 Sep 2026.** `EffortCard` updated alone;
+**Status: amended and shipped, 21 Sep 2026.** `EffortCard` updated alone;
 `web/test/story-detail.test.tsx` and `web/test/ticket-detail-no-tabs.test.tsx` each gained a
 case proving a tile's own figure sits inside a `[data-slot="card"]` ancestor carrying
 `data-variant="raised"`.
@@ -7519,7 +7541,9 @@ tab.
 ideal line now falls only on working days, flat across a Saturday or a Sunday inside the
 phase, off the same `isWorkingDay` the rest of this ruling reads through.
 
-**Status: ruled and shipped, 21 Sep 2026.** Defaults changed, `shared/working-days.ts`
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed phase days are working days (Monday to Friday), the prefill with the team default phase days, and the Timeline's expected spans, including the Waves main page module settings gear.
+
+**Status: validated, 21 Sep 2026.** Defaults changed, `shared/working-days.ts`
 added with its own unit tests, the prefill wired and tested, the Timeline's expected spans
 and the wave head's forecast total built and tested, the Settings panel's copy changed and
 its test updated, the burndown's ideal line fixed and tested, strings seeded (de/es/ca).
@@ -7541,7 +7565,7 @@ now says that once. The Overview tab keeps "Expected length" and draws the panel
 else. `web/test/wave-phase-days-panel.test.tsx` covers the panel and the new
 `WavePhaseDaysSheet`; `web/test/wave-detail.test.tsx` covers the gear opening it.
 
-**AMENDED 22 Sep 2026: the MODULE's own gear was still missing.** Aurora, verbatim: *"i
+**AMENDED 21 Sep 2026: the MODULE's own gear was still missing.** Aurora, verbatim: *"i
 still dont see the gear button on main page waves."* The gear the amendment above built
 opens a single WAVE's own phase days; she meant the Waves MODULE's own main (sidebar)
 screen (`waves-screen.tsx`), which — unlike every other module with something to set —
@@ -7666,7 +7690,9 @@ exist yet, so this mounts `WorkLogsPanel` read-only — `canLog={false}`,
 (`RecordFooterBand`) at the very end, the sheet's own last element. The sheet scrolls as
 one region — the R91 sheet exception, nothing pinned inside it.
 
-**Status: ruled and shipped, 21 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`: the
+**VALIDATED 21 Sep 2026.** Aurora reviewed staging this round and confirmed the task slide-in sheet with Assigned to, Details and Deadline merged into one container.
+
+**Status: validated, 21 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`: the
 sheet opens from a row click and from a deep link with no click at all; the section
 order top to bottom; the priority chip renders and no status chip does; Start precedes
 Done in the actions row's own DOM order; Done disables while a timer runs; Delete sits
@@ -7681,7 +7707,7 @@ button's tooltip), R84 (mango lives only in the screen's own title action slot �
 keeps it, Start is `variant="secondary"`), R98 (the kit's own button sizes, never
 `size="sm"`) and K19a (the priority chip's own four colours).
 
-**Amended, 22 Sep 2026.** Aurora, verbatim, reading the sheet back: *"on slide in detail
+**Amended, 21 Sep 2026.** Aurora, verbatim, reading the sheet back: *"on slide in detail
 pages, the ... button must be aligned with title, not with pills. priority is already a
 chip, remove it from above deadline. assigned to needs a background, same description,
 same deadline. description and deadline same design. bring the pencil icon out of the
@@ -7704,14 +7730,14 @@ sentence. (5) The Effort card's own emptiness and its per-row avatar are the sha
 `EffortCard`'s (`web/components/work/effort-card.tsx`) own job, owned by another lane —
 the sheet only mounts it, unchanged, exactly as before.
 
-**Status: amended and shipped, 22 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`:
+**Status: amended and shipped, 21 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`:
 the title row holds the title, the Edit pencil and the "…" menu, in that order, aligned
 with the title rather than the chips row; the "…" menu opens on Delete alone, no Edit
 item; no Priority fact row renders anywhere on the sheet; Assigned to, Deadline and
 Description render as three cards of the one `TicketSidePanel` shape, in that order; and
 the Effort section is absent when the task carries no logged time.
 
-**Amended again, 22 Sep 2026.** Aurora, verbatim, reading the three-card version back:
+**Amended again, 21 Sep 2026.** Aurora, verbatim, reading the three-card version back:
 *"great work. however merge assigned to details and deadline in the same container
 together (in this order)."*
 
@@ -7724,7 +7750,7 @@ Deadline. The kit's own `Separator` sits between each of the three parts; no nes
 cards. The File row keeps its own place, immediately after the merged card, exactly
 where it sat after the old Deadline card.
 
-**Status: amended and shipped, 22 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`:
+**Status: amended and shipped, 21 Sep 2026.** Proved by `web/test/task-sheet.test.tsx`:
 the merged card renders as ONE kit `Card` (`data-slot="card"`, singular, inside the
 wrapper); Assigned to, Details and Deadline sit inside it in that order; exactly two
 `Separator`s divide the three parts; and the section order top to bottom stays title
@@ -10104,12 +10130,12 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**266 rules.**
+**267 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L42 (42) |
+| 2. Page layout and width | L1 to L43 (43) |
 | 3. Detail screens | D1 to D23 (23) |
 | 4. Collections | K1 to K62 (62) |
 | 5. Buttons and actions | B1 to B49 (49) |

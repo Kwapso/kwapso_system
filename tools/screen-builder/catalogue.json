@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.144",
-  "sha": "823ae3bbd86a441fb664e4b9a6c8cd294852b928",
-  "syncedAt": "2026-09-20"
+  "tag": "v1.2.145",
+  "sha": "5222364e8f6ac0085cfded0bdb00f824c28775ca",
+  "syncedAt": "2026-09-21"
  },
- "generatedAt": "2026-09-20T19:54:12.292Z",
+ "generatedAt": "2026-09-21T11:12:33.557Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -13,7 +13,7 @@
   "withoutVariants": 77,
   "cvaSites": 54,
   "variantGroups": 81,
-  "variantOptions": 270,
+  "variantOptions": 271,
   "typedEnumProps": 46,
   "typedBooleanProps": 319,
   "compositions": 47,
@@ -1691,8 +1691,8 @@
     {
      "file": "components/card/card.tsx",
      "name": "cardVariants",
-     "line": 128,
-     "base": "flex flex-col rounded-[var(--radius)] text-card-foreground min-w-0",
+     "line": 140,
+     "base": "flex flex-col rounded-[var(--radius)] text-card-foreground min-w-0 group/card",
      "groups": [
       {
        "name": "variant",
@@ -1721,6 +1721,11 @@
          "name": "well",
          "classes": "bg-accent",
          "note": "Chapter 13's \"Well\" — secondary detail nested INSIDE a card. Same radius, no edge, no shadow. Added, not required; commission §2 rule 3 permits additions and the kit draws it. The drawn fill is a 4.5% charcoal wash and `--accent` is the palette's 5% wash; the gap is logged rather than a new token invented (GAPS-F CRD-4). NO `--badge-quiet-fill` REBIND HERE, DELIBERATELY. A well is a wash OVER its parent card's own paper, not a paper of its own — chapter 13 draws it nested inside a card that has already answered this question for itself (the `default`/`raised`/`brand`/`inverse` rebind above it in the tree), and a second rebind here would only ever repeat or fight that one. A Badge inside a well reads the enclosing card's own value, which is what a well being \"the same radius, no edge, no shadow\" as its card already promises."
+        },
+        {
+         "name": "plain",
+         "classes": "bg-transparent [--badge-quiet-fill:var(--surface-raised)]",
+         "note": "`plain`: no box at all. CLIENT RULING, 21 SEP 2026, VERBATIM: \"only the containers like the ones around assigned to, related stories, etc\" go, chips, tabs and the rest stay. A record page's grouping sections sit directly on the page's own white main content: no fill, no shadow, no stroke. Ink is still `text-card-foreground`, from the base class list above, because a plain card still holds a heading and body text that need an ink to read against even with no paper of its own. `--badge-quiet-fill` is left at `default`'s own value (`--surface-raised`), not re-bound: a `plain` card paints no paper of its own, so a Badge inside one sits on the PAGE's own ground, which is exactly the ground `default`'s rebind already answers for. Scoped to a single experiment in the tickets module's record page first (GAPS: not yet a system-wide replacement for `default`). See CHANGELOG v1.2.145."
         }
        ]
       }
@@ -9569,6 +9574,26 @@
     "inverse",
     "info",
     "status"
+   ]
+  },
+  {
+   "component": "card",
+   "kind": "values-differ",
+   "group": "variant",
+   "manifest": [
+    "default",
+    "raised",
+    "brand",
+    "inverse",
+    "well"
+   ],
+   "source": [
+    "default",
+    "raised",
+    "brand",
+    "inverse",
+    "well",
+    "plain"
    ]
   },
   {

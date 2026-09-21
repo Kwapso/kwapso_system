@@ -32,7 +32,7 @@ import {
   workLogsTotalKey,
 } from "@/lib/live-resources"
 import type { RunningTimer } from "@shared/types"
-import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
+import { invalidate, invalidatePrefix, primeCache, useCached } from "@shared/web/store"
 import { useAfterPaint } from "@shared/web/after-paint"
 import { useT } from "@shared/web/language"
 import type { HeadActionItem } from "@shared/web/head-actions"
@@ -148,17 +148,21 @@ export function TimerBar({
 
   if (running.length === 0) return null
 
-  async function stop(id: string) {
+  async function stop(timer: RunningTimer) {
     try {
-      await contentApi.stopTimer(id)
-      invalidate(runningTimersKey(teamId))
-      invalidate(workLogsKey(teamId))
-      invalidate(storiesKey(teamId))
-      // …and the Time tab of whatever this was timing. The realtime ping drops
-      // these too, but the person who pressed Stop is the one who will look
-      // straight at that tab, and a screen that waits on a round trip through
-      // the live layer to stop saying "running" is the bug this fixes.
-      invalidatePrefix(TIME_SLICE_PREFIX)
+      const { timers } = await contentApi.stopTimer(timer.id)
+      // THE SAME SEAM `useRecordTimerAction` USES BELOW, not a hand-picked
+      // subset of it (live proof, 21 Sep 2026). This used to invalidate only
+      // the running timers, the work-log list, the stories badge and the
+      // `time-of:` family — never `workLogsTotalKey` or a story's/ticket's
+      // own `story:metrics:`/`help:metrics:` keys, so stopping a clock from
+      // THIS pill (the header, rather than the record's own Start/Stop
+      // button) left the Effort card's title count and stat tiles stale
+      // until a reload: the exact defect `refreshTimers`'s own header names,
+      // left unfixed on this second path. One function says what a
+      // start/stop makes stale; this bar asks it too, rather than keeping a
+      // second, drifted copy of the list.
+      refreshTimers(teamId, timer.targetTable, timer.targetId, timers)
       toast.success(t("Timer stopped."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't stop that timer."))
@@ -180,7 +184,7 @@ export function TimerBar({
             running
             elapsed={elapsed * 1000}
             onRunningChange={(next) => {
-              if (!next) void stop(timer.id)
+              if (!next) void stop(timer)
             }}
             label={badgeName(timer)}
             stopLabel={t("Stop the timer")}
@@ -228,9 +232,33 @@ export function TimerBar({
  *     their own `refresh()` (called after an edit or a status move, never
  *     after a timer toggle). A task carries neither key (no metrics door of
  *     its own — task-sheet.tsx's own header says why), so nothing is
- *     invalidated for "tasks" and `EffortCard` draws no tiles for it either. */
-function refreshTimers(teamId: string, targetTable: string, targetId: string): void {
-  invalidate(runningTimersKey(teamId))
+ *     invalidated for "tasks" and `EffortCard` draws no tiles for it either.
+ *
+ * A SECOND DEFECT, SAME SHAPE (live proof, 21 Sep 2026, clause a): even with
+ * every right key named, `invalidate` alone only DROPS an entry and tells a
+ * subscriber to refetch (`shared/web/store.ts`) — it paints nothing until
+ * that refetch's own round trip lands. The task sheet's own Done button
+ * reads `runningTimersKey` through a SEPARATE `useCached` call
+ * (`task-sheet.tsx`), so after Start it stayed enabled, with no tooltip,
+ * for one whole extra network round trip after the timer had actually
+ * started — not a proof that ran too early, a real second wait nothing on
+ * screen explained. Both `startTimer` and `stopTimer` already answer with
+ * the fresh running-timers list in the SAME response
+ * (`{ timers }`, `web/lib/api/content.ts`), so a caller that has just
+ * awaited one hands it to `timers` here: `primeCache` writes it and
+ * notifies every subscriber SYNCHRONOUSLY, landing Done's disabled state
+ * (and this bar's own pill) in the SAME render cycle the door answered,
+ * never a second fetch for an answer already in hand. A caller with no
+ * answer to hand in (none left today, but the fallback stays honest for
+ * whatever calls this next) still invalidates. */
+function refreshTimers(
+  teamId: string,
+  targetTable: string,
+  targetId: string,
+  timers?: RunningTimer[]
+): void {
+  if (timers) primeCache(runningTimersKey(teamId), timers, true)
+  else invalidate(runningTimersKey(teamId))
   invalidate(workLogsKey(teamId))
   invalidate(storiesKey(teamId))
   invalidate(recordTimeKey(targetTable, targetId))
@@ -302,12 +330,16 @@ export function useRecordTimerAction({
     setBusy(true)
     try {
       if (mine) {
-        await contentApi.stopTimer(mine.id)
-        refreshTimers(teamId, targetTable, targetId)
+        // THE DOOR'S OWN ANSWER, HANDED STRAIGHT TO `refreshTimers` — see
+        // that function's own header (clause a). Priming with it lands the
+        // caller's Done/RecordTimerButton state in THIS render cycle,
+        // never a second round trip through invalidate-then-refetch.
+        const { timers } = await contentApi.stopTimer(mine.id)
+        refreshTimers(teamId, targetTable, targetId, timers)
         toast.success(t("Timer stopped."))
       } else {
-        await contentApi.startTimer(targetTable, targetId)
-        refreshTimers(teamId, targetTable, targetId)
+        const { timers } = await contentApi.startTimer(targetTable, targetId)
+        refreshTimers(teamId, targetTable, targetId, timers)
         toast.success(t("Timer started."))
       }
     } catch (err) {

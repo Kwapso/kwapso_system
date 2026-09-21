@@ -1457,11 +1457,22 @@ export function AppShell({
         footer band when its content draws one, and it has no way to know
         either fact on its own. `--live-status-tab-clear` matches the tab
         bar's own reservation one screen down (`pb-24`, this file), zero at
-        `md` where the bar is hidden; `--live-status-band-clear` only turns
-        on through `has-[[data-slot=ticket-footer-band]]`, R89's own marker
-        for the ticket page's Latest activity / Record band, so it is never
-        paid on a screen that draws no band. */}
-    <div className="[--shell-top:3.75rem] md:[--shell-top:0px] [--live-status-tab-clear:6rem] md:[--live-status-tab-clear:0px] has-[[data-slot=ticket-footer-band]]:[--live-status-band-clear:8rem]">
+        `md` where the bar is hidden.
+
+        `--live-status-band-clear` is NOT set here any more. It used to be a
+        flat `has-[[data-slot=ticket-footer-band]]:[…]8rem` guess, a fixed
+        128px for a band whose real height varies with what it draws,
+        which staging measured putting the pill 160px/240px above the
+        bottom, more than the band it was clearing, on every width.
+        `web/components/tickets/ticket-detail-body.tsx` now measures its own
+        footer band with a `ResizeObserver` and publishes the real height
+        plus one 16px gutter onto `document.documentElement` directly,
+        because the pill and the band sit in two different subtrees of this
+        div (the pill is `LiveStatus` below, a sibling of `ScreenShell`;
+        the band is deep inside `ScreenShell`'s own body) and a custom
+        property only inherits DOWN, so `<html>` is the one ancestor they
+        share. See that file's own comment for the whole account. */}
+    <div className="[--shell-top:3.75rem] md:[--shell-top:0px] [--live-status-tab-clear:6rem] md:[--live-status-tab-clear:0px]">
       {/* Mobile top bar, an explicit height, because `--shell-top` above is a
           promise about it. ScreenShell has no mobile-chrome concept of its
           own (the rail simply disappears below `md`, by the kit's own

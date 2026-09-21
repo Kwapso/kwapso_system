@@ -15,16 +15,19 @@
 // `var(--space-7)` up from the bottom on a wide screen, `var(--space-4)` on
 // a phone, the same two tokens `<Toaster>` already passes as `offset` and
 // `mobileOffset`. Two more clearances stack on top of that base, both read
-// off custom properties the two shells set on their own root wrapper rather
-// than computed here (the same seam app-shell.tsx already uses for
-// `--shell-top`): `--live-status-tab-clear`, for the phone's own fixed
-// bottom tab bar (agency only, zero at `md`; the portal's own bottom nav
-// shows at every width, so its wrapper sets the same property with no `md`
-// override), and `--live-status-band-clear`, raised only on a ticket
-// screen, whose dark Latest activity / Record band is the page's own
-// footer (R89) and is found through a `has-[[data-slot=ticket-footer-band]]`
-// selector rather than a prop, because this component has no way to know
-// what a screen it did not write is drawing below it.
+// off custom properties rather than computed here (the same seam
+// app-shell.tsx already uses for `--shell-top`): `--live-status-tab-clear`,
+// for the phone's own fixed bottom tab bar (agency only, zero at `md`; the
+// portal's own bottom nav shows at every width, so its wrapper sets the
+// same property with no `md` override), set once on each shell's own root
+// wrapper; and `--live-status-band-clear`, the ticket screen's own dark
+// Latest activity / Record band (R89), MEASURED rather than guessed.
+// `web/components/tickets/ticket-detail-body.tsx` publishes the band's
+// real height plus one 16px gutter onto `document.documentElement` with a
+// `ResizeObserver` (see that file's own comment), because this component
+// has no way to know what a screen it did not write is drawing below it,
+// and a flat guess (the old `8rem`) measured 160px/240px of clearance on
+// staging against a band that never needed that much.
 //
 // It carries the ONLY thing a person can do about it, the same remedy the
 // strip always offered: the socket is already reconnecting on its own
@@ -68,7 +71,27 @@ export function LiveStatus() {
     <div
       role="status"
       className={cn(
-        "pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-4",
+        // `left-0 w-screen`, NOT `inset-x-0`. Measured on staging at 1440px
+        // with a real vertical scrollbar: `inset-x-0` (`left:0; right:0`)
+        // centred this pill at x=712.5, 7.5px left of the true centre
+        // (720), while `window.innerWidth` genuinely read 1440. The cause
+        // is `web/app/globals.css`'s (and the portal's own copy's)
+        // `html, body { overflow-x: clip }`, load-bearing, "THE PAGE DOES
+        // NOT SCROLL SIDEWAYS. EVER.", not something this file may touch.
+        // Once the root carries a non-visible `overflow-x`, `right: 0` on a
+        // `position: fixed` descendant resolves against
+        // `document.documentElement.clientWidth` (1425, the viewport minus
+        // the scrollbar) rather than `window.innerWidth` (1440, the real
+        // viewport `position: fixed` is supposed to use), confirmed by a
+        // throwaway repro page carrying the same two root rules. `right: 0`
+        // is the half that reads the narrowed box; `left: 0` alone never
+        // does, because there is nothing on the right to resolve against
+        // the wrong edge. `w-screen` (`width: 100vw`) supplies the width
+        // instead, and `vw` is unaffected by the same bug (proved on the
+        // same repro page: a `left:0; width:100vw` pill centred at exactly
+        // 720 with the identical two root rules in play), so the flex
+        // child inside centres on the real viewport again.
+        "pointer-events-none fixed left-0 w-screen z-[70] flex justify-center px-4",
         "bottom-[calc(var(--space-4)+var(--live-status-tab-clear,0px)+var(--live-status-band-clear,0px))]",
         "md:bottom-[calc(var(--space-7)+var(--live-status-tab-clear,0px)+var(--live-status-band-clear,0px))]"
       )}

@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { clearCache } from "@shared/web/store"
 import type { WorkLog } from "@shared/types"
+import { EmptyGatedPanel } from "@/components/deep-link/screen-bits"
 
 const api = vi.hoisted(() => ({
   workLogs: [] as unknown[],
@@ -78,6 +79,50 @@ const SHORT_LOG: WorkLog = {
   discarded: false,
   accountId: null,
 }
+
+// PLAIN-SURFACE EXPERIMENT (rulebook L43) — `EmptyGatedPanel`'s own
+// `surface` prop, defaulting to `"boxed"` (today's markup, byte for byte)
+// with `"plain"` opting into the kit's `Card variant="plain"` and dropping
+// `CardContent`'s own `p-4`. R88's own header-drop-when-empty guard is
+// unchanged by either surface. See web/test/plain-surface-scope.test.ts for
+// the census that keeps the string scoped to the tickets module.
+describe("EmptyGatedPanel — surface", () => {
+  it("boxed (the default) carries data-variant=\"default\" and p-4 on its content", () => {
+    render(
+      <EmptyGatedPanel title="Related stories" empty={false}>
+        <div>row</div>
+      </EmptyGatedPanel>
+    )
+    const card = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
+    expect(card.getAttribute("data-variant")).toBe("default")
+    expect(card.getAttribute("data-surface")).toBeNull()
+    const content = card.querySelector('[data-slot="card-content"]') as HTMLElement
+    expect(content.className).toContain("p-4")
+  })
+
+  it("plain carries data-variant=\"plain\", data-surface=\"plain\", and no p-4 on its content", () => {
+    render(
+      <EmptyGatedPanel title="Related stories" empty={false} surface="plain">
+        <div>row</div>
+      </EmptyGatedPanel>
+    )
+    const card = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
+    expect(card.getAttribute("data-variant")).toBe("plain")
+    expect(card.getAttribute("data-surface")).toBe("plain")
+    const content = card.querySelector('[data-slot="card-content"]') as HTMLElement
+    expect(content.className).not.toContain("p-4")
+  })
+
+  it("R88 still drops the whole header when empty, in the plain surface too", () => {
+    render(
+      <EmptyGatedPanel title="Related stories" empty surface="plain">
+        <div>empty state</div>
+      </EmptyGatedPanel>
+    )
+    expect(screen.queryByText("Related stories")).toBeNull()
+    expect(screen.getByText("empty state")).toBeTruthy()
+  })
+})
 
 describe("a 3 second log — the tiles always render once a record exists", () => {
   it("shows real, non-blank figures — '0h' effort, near-zero cycle time, a real percentage — never nothing", async () => {
@@ -148,6 +193,66 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     await waitFor(() => {
       expect(screen.queryByText("Effort")).toBeNull()
       expect(screen.queryByText("Cycle time")).toBeNull()
+    })
+  })
+
+  // PLAIN-SURFACE EXPERIMENT (rulebook L43) — forwarded to `EmptyGatedPanel`
+  // (this card's own shell), never drawn by hand here.
+  it("forwards surface=\"plain\" to its own EmptyGatedPanel shell", async () => {
+    api.workLogs = [SHORT_LOG]
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+        surface="plain"
+      />
+    )
+    const card = (await screen.findByText("Effort")).closest('[data-slot="card"]') as HTMLElement
+    expect(card.getAttribute("data-variant")).toBe("plain")
+    expect(card.getAttribute("data-surface")).toBe("plain")
+  })
+
+  // BUBBLED TO THE CALLER — the same shape `WorkLogsPanel`'s own
+  // `onEmptyChange` already takes, read by a plain-surface side column to
+  // keep its own separator off a section that rendered nothing (see
+  // ticket-detail-body.tsx's `timeEmpty`).
+  it("calls onEmptyChange(true) once it has confirmed zero rows, and never renders the card", async () => {
+    api.workLogs = []
+    const onEmptyChange = vi.fn()
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: null, effortSeconds: 0, flowEfficiency: null }}
+        onEmptyChange={onEmptyChange}
+      />
+    )
+    await waitFor(() => {
+      expect(onEmptyChange).toHaveBeenCalledWith(true)
+    })
+    expect(screen.queryByText("Effort")).toBeNull()
+  })
+
+  it("calls onEmptyChange(false) once a record exists", async () => {
+    api.workLogs = [SHORT_LOG]
+    const onEmptyChange = vi.fn()
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+        onEmptyChange={onEmptyChange}
+      />
+    )
+    await waitFor(() => {
+      expect(onEmptyChange).toHaveBeenCalledWith(false)
     })
   })
 })

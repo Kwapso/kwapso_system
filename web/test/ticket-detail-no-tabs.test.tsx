@@ -408,7 +408,7 @@ describe("the two-column body renders all four panels", () => {
     // ALL FOUR IN ONE RENDER — no tab press got any of them onto the page.
   })
 
-  it("stands each panel on its own paper, on the bare page ground now (R67, amended 18 Sep 2026)", async () => {
+  it("stands each panel on its own paper — plain (rulebook L43) for Related stories/Effort/Stakeholders, still boxed for the conversation", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
@@ -417,18 +417,23 @@ describe("the two-column body renders all four panels", () => {
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
     )
-    // `default` (`--surface-panel`, soft paper), NOT `raised` (`--card`) —
-    // client ruling, 18 Sep 2026: "remove the 'overall' container, make
-    // each thing its own container, like tickets dashboard." `RecordScreen`
-    // no longer wraps this body in its own `--surface-panel` Card
-    // (`panelVisible={false}`), so these four now stand DIRECTLY on the
-    // page — and `--card`/`--background` are the SAME colour in light
-    // (ticket-detail-body.tsx's own header), so `raised` here would be the
-    // exact "container on its own ground" bug R67 exists to catch.
-    for (const card of [stories, time, stakeholders, conversation]) {
-      expect(card, "every one of the four panels stands on a real Card").toBeTruthy()
-      expect(card!.getAttribute("data-variant")).toBe("default")
+    // R67 (18 Sep 2026) put these four on `default` (`--surface-panel`, soft
+    // paper), NOT `raised` (`--card`), once `RecordScreen` stopped wrapping
+    // the body in its own outer Card. RULEBOOK L43 (Aurora, 21 Sep 2026) goes
+    // one step further for three of them: the grouping cards around Related
+    // stories, Effort and Stakeholders drop their box entirely —
+    // `Card variant="plain"` (kit v1.2.145, `surface="plain"` at
+    // help-detail.tsx's own call sites) — and sit directly on the page's own
+    // white main content. The conversation card is untouched by the ruling
+    // (help-detail.tsx never passes `surface` to `TicketConversationPanel`)
+    // and stays `default`, exactly R67's own answer.
+    for (const card of [stories, time, stakeholders]) {
+      expect(card, "every one of the three panels stands on a real Card").toBeTruthy()
+      expect(card!.getAttribute("data-variant")).toBe("plain")
+      expect(card!.getAttribute("data-surface")).toBe("plain")
     }
+    expect(conversation, "the conversation panel stands on a real Card").toBeTruthy()
+    expect(conversation!.getAttribute("data-variant")).toBe("default")
   })
 
   it("draws no second, outer panel card around the four of them (18 Sep 2026 container ruling)", async () => {

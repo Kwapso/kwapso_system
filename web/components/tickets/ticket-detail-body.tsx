@@ -54,6 +54,7 @@
 import * as React from "react"
 
 import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
+import { Separator } from "@shared/ui/components/separator/separator"
 import { useIsAtLeastLg } from "@/components/records/record-detail-body"
 
 /** Stable DOM anchors for the four panels a ticket's page draws, so a link
@@ -369,6 +370,7 @@ export function TicketDetailBody({
   composer,
   stories,
   time,
+  timeEmpty = false,
   stakeholders,
   footer,
 }: {
@@ -383,6 +385,18 @@ export function TicketDetailBody({
   composer: React.ReactNode
   stories: React.ReactNode
   time: React.ReactNode
+  /** BUBBLED FROM `EffortCard`'s OWN `onEmptyChange` (help-detail.tsx's
+   * ticket call) — true once the effort panel has CONFIRMED zero time
+   * logged and therefore rendered nothing at all (`EffortCard`'s own 22 Sep
+   * 2026 amendment: zero records draws NOTHING, not even a header). Read
+   * only by the plain-surface separator below (rulebook L43), to keep a
+   * hairline from stranding itself beside a section that is not actually on
+   * the page; it changes no layout of its own. Defaults to `false`, which is
+   * exactly right both while `EffortCard` is still loading (it shows a
+   * skeleton, so it IS on the page) and when `time` itself is `null`
+   * (`!canSeeTime` — caught by the plain `Boolean(time)` check below, not by
+   * this prop at all). */
+  timeEmpty?: boolean
   stakeholders: React.ReactNode
   /** THE BLACK BAND — built by `RecordFooterBand`
    * (`@/components/records/record-chrome`), this component's own LAST
@@ -390,6 +404,42 @@ export function TicketDetailBody({
   footer: React.ReactNode
 }) {
   const isAtLeastLg = useIsAtLeastLg()
+
+  // K62's own clearance for THIS screen: `shared/web/live-status.tsx`'s pill
+  // clears the band below by reading `--live-status-band-clear` off the
+  // shell root, and until this measured it that property was a flat
+  // `8rem` (128px) guess set by `app-shell.tsx`'s `has-[[data-slot=
+  // ticket-footer-band]]` selector, a fixed number for a band whose real
+  // height depends on what `RecordFooterBand` actually draws. Measured on
+  // staging that guess put the pill 160px above the bottom at `lg` and
+  // 240px on a phone, both exactly the old flat 128px plus the ordinary
+  // base offset (`--space-7`/`--space-4`) and the phone tab bar term,
+  // more clearance than the band it was clearing, on every width. This
+  // `ResizeObserver` publishes the band's own real height plus ONE 16px
+  // gutter instead, the same "leave a gutter, not a guess" shape
+  // `web-portal/components/portal-shell.tsx`'s own `--pinned-chrome-h`
+  // already uses for its measured header. Published on `documentElement`,
+  // not a ref this component owns: the pill lives in a wholly different
+  // subtree (a sibling of `<ScreenShell>` in `app-shell.tsx`, never a
+  // descendant of this band), and a custom property only inherits DOWN,
+  // so the one ancestor both subtrees share is `<html>`. Removed on
+  // unmount so a screen with no band never inherits a stale one.
+  const footerBandRef = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    const el = footerBandRef.current
+    if (!el) return
+    const publish = () => {
+      const height = Math.round(el.getBoundingClientRect().height)
+      document.documentElement.style.setProperty("--live-status-band-clear", `${height + 16}px`)
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty("--live-status-band-clear")
+    }
+  }, [])
 
   // TWO DIFFERENT CELLS, NOT ONE CLASS REUSED — at `lg` this is a GRID cell,
   // ROUND 27 (see this file's own header): `relative min-h-0`, NEVER
@@ -430,15 +480,43 @@ export function TicketDetailBody({
   // sum of them plus the `gap-6` between, and THAT is what the grid row
   // resolves to (`items-stretch` on the grid stretches the conversation
   // cell — which contributes no height of its own — to match it exactly).
+  // THE PLAIN-SURFACE SEPARATOR (rulebook L43) — ONE HAIRLINE BETWEEN
+  // CONSECUTIVE SECTIONS, NOTHING ABOVE THE FIRST, NOTHING BELOW THE LAST.
+  // Every one of the four sections below is `surface="plain"` at this file's
+  // one call site (help-detail.tsx): no box of its own any more, so the
+  // hairline the sections' own Card border used to draw between them has to
+  // be drawn explicitly, once, in the column that holds them — the kit's own
+  // `<Separator>`, never a border utility (the kit-conformance test forbids
+  // one). `sawVisible` skips a section whose own slot is genuinely ABSENT —
+  // `Boolean(node)` is `false` for `time` when `!canSeeTime` passed `null`,
+  // and `timeEmpty` (above) catches the OTHER way a section disappears,
+  // `EffortCard` itself confirming zero rows and rendering nothing — so a
+  // hidden section draws no separator on either side of it, and its two
+  // visible neighbours end up joined by exactly one line rather than two
+  // stranded ones.
+  const sections: { key: TicketPanelName; node: React.ReactNode; visible: boolean }[] = [
+    { key: "assignedTo", node: assignedTo, visible: Boolean(assignedTo) },
+    { key: "stories", node: stories, visible: Boolean(stories) },
+    { key: "time", node: time, visible: Boolean(time) && !timeEmpty },
+    { key: "stakeholders", node: stakeholders, visible: Boolean(stakeholders) },
+  ]
+  let sawVisibleSection = false
   const sidePanels = (
     <>
-      {/* ASSIGNED TO, FIRST. Aurora's ruling, 21 Sep 2026, verbatim: "nono
-          assigned to on the very top, a different card from stakeholders!"
-          Above Stories/Time/Stakeholders and everything else in this column. */}
-      <div id={TICKET_PANEL_ANCHOR.assignedTo}>{assignedTo}</div>
-      <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
-      <div id={TICKET_PANEL_ANCHOR.time}>{time}</div>
-      <div id={TICKET_PANEL_ANCHOR.stakeholders}>{stakeholders}</div>
+      {sections.map((section) => {
+        const separatorBefore = section.visible && sawVisibleSection
+        if (section.visible) sawVisibleSection = true
+        return (
+          <React.Fragment key={section.key}>
+            {separatorBefore && <Separator />}
+            {/* ASSIGNED TO, FIRST. Aurora's ruling, 21 Sep 2026, verbatim:
+                "nono assigned to on the very top, a different card from
+                stakeholders!" Above Stories/Time/Stakeholders and everything
+                else in this column. */}
+            <div id={TICKET_PANEL_ANCHOR[section.key]}>{section.node}</div>
+          </React.Fragment>
+        )
+      })}
     </>
   )
 
@@ -521,6 +599,7 @@ export function TicketDetailBody({
           pane's own ordinary bottom padding, exactly like every other
           record screen). */}
       <div
+        ref={footerBandRef}
         data-slot="ticket-footer-band"
         className="flex-none mt-auto w-full"
       >
@@ -538,6 +617,7 @@ export function TicketSidePanel({
   title,
   count,
   action,
+  surface = "boxed",
   children,
 }: {
   title: string
@@ -545,9 +625,39 @@ export function TicketSidePanel({
    * the caller's decision, never re-derived here) — "" draws nothing. */
   count?: string
   action?: React.ReactNode
+  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43, kit v1.2.145's `Card
+   * variant="plain"`) — `"boxed"` (the default) renders EXACTLY today's
+   * markup, variant default, same classNames, byte for byte. `"plain"`
+   * drops the box: `Card variant="plain"`, no `p-4` on the content so the
+   * kit's own zero inset applies and the section's text lines up with the
+   * column edge. Only tickets' own call sites (help-detail.tsx) pass
+   * `"plain"` — see `web/test/plain-surface-scope.test.ts`. */
+  surface?: "boxed" | "plain"
   children: React.ReactNode
 }) {
   const headingId = React.useId()
+  if (surface === "plain") {
+    return (
+      <Card variant="plain" data-surface="plain">
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+              <span className="truncate">{title}</span>
+              {count ? (
+                <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
+                  {count}
+                </span>
+              ) : null}
+            </h3>
+            {action}
+          </div>
+          <div role="group" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3">
+            {children}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
   return (
     <Card variant="default">
       <CardContent className="flex flex-col gap-3 p-4">

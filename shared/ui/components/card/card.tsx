@@ -52,6 +52,18 @@
      takes the ring, so nothing here clips it: the shell sets no
      `overflow: hidden` (the header and footer rules are inset shadows, not fills,
      so there is nothing to clip at the corner).
+   · A SIXTH VARIANT, `plain`, ADDED 21 SEP 2026: THE CLIENT'S RULING,
+     VERBATIM: "only the containers like the ones around assigned to,
+     related stories, etc" go, chips, tabs and the rest stay. A record
+     page's grouping sections (Assigned to, Stakeholders, Related tickets,
+     Related stories, Effort, Detail, Acceptance criteria, Build notes)
+     drop their box and sit directly on the page's own white main content;
+     everything else keeps its paper. `plain` paints no fill, no shadow and
+     no stroke, and its header, content and footer parts drop their
+     horizontal inset so the section's text lines up with the page column
+     (see each part's own comment). It exists for a scoped experiment in
+     the tickets module's record page first, not yet a system-wide
+     replacement for `default`. See CHANGELOG v1.2.145.
 
    RENDERING CONTEXT
    No `"use client"`. Every part forwards props and a ref and nothing else.
@@ -136,6 +148,11 @@ const cardVariants = cva(
     // A card holds tables, long words and truncating rows. Without this a
     // single unbreakable string makes the whole card wider than its column.
     "min-w-0",
+    // The named group `CardHeader`/`CardContent`/`CardFooter` key their own
+    // `plain` overrides off, below. Unconditional: cheap on the five
+    // variants that never read it, and the only way a part can detect its
+    // own shell without a prop every call site would have to repeat.
+    "group/card",
   ],
   {
     variants: {
@@ -226,6 +243,27 @@ const cardVariants = cva(
          * radius, no edge, no shadow" as its card already promises.
          */
         well: "bg-accent",
+        /**
+         * `plain`: no box at all. CLIENT RULING, 21 SEP 2026, VERBATIM:
+         * "only the containers like the ones around assigned to, related
+         * stories, etc" go, chips, tabs and the rest stay. A record page's
+         * grouping sections sit directly on the page's own white main
+         * content: no fill, no shadow, no stroke. Ink is still
+         * `text-card-foreground`, from the base class list above, because a
+         * plain card still holds a heading and body text that need an ink
+         * to read against even with no paper of its own.
+         *
+         * `--badge-quiet-fill` is left at `default`'s own value
+         * (`--surface-raised`), not re-bound: a `plain` card paints no
+         * paper of its own, so a Badge inside one sits on the PAGE's own
+         * ground, which is exactly the ground `default`'s rebind already
+         * answers for.
+         *
+         * Scoped to a single experiment in the tickets module's record
+         * page first (GAPS: not yet a system-wide replacement for
+         * `default`). See CHANGELOG v1.2.145.
+         */
+        plain: "bg-transparent [--badge-quiet-fill:var(--surface-raised)]",
       },
     },
     defaultVariants: { variant: "default" },
@@ -268,7 +306,11 @@ export interface CardProps
  * The boxed block.
  *
  * TEN STATES
- *  1. default        — variant fill at radius 24, no stroke.
+ *  1. default        — variant fill at radius 24, no stroke. Five of the
+ *                      six variants paint a fill; `plain` (21 Sep 2026,
+ *                      the client's ruling) paints none at all, so the
+ *                      page's own paper shows through, see that
+ *                      variant's own comment above.
  *  2. hover          — only with `interactive`: `--accent` on the three
  *                      neutral variants, elevation on all five. A named
  *                      token and a named shadow; never an opacity, never
@@ -386,6 +428,15 @@ Card.displayName = "Card";
  * shell". `--hairline-under` is the blessed same-tone hairline, at 8%,
  * not at the heavier `--hair-strong` that `Title` uses for a SECTION rule.
  *
+ * ON A `plain` SHELL (21 Sep 2026 ruling, see `Card`'s own comment): the
+ * horizontal inset drops to 0 at every breakpoint, so the title lines up
+ * with the page column instead of the card's own edge, and the bottom
+ * gap to whatever follows tightens to the page mock's own 12px
+ * (`--space-3`) instead of this band's usual 20. No hairline either: a
+ * plain section has no box to separate FROM. Detected off the shell's own
+ * `group/card` marker (`Card`'s own comment) via `group-data-*`, not a
+ * prop this part would need repeating at every call site.
+ *
  * TEN STATES — none apply. It is a band; its children carry their own.
  * THREE BREAKPOINTS — inset 24 to `lg:`, 32 above. See `Card`.
  * RTL — safe. `px-*` is padding-inline; the hairline is on the block axis.
@@ -399,6 +450,11 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
         "flex flex-col gap-[var(--space-1h)]",
         "px-6 pt-6 pb-5",
         "lg:px-[var(--space-7)] lg:pt-[var(--space-7)]",
+        // `plain`: horizontal inset gone at every breakpoint, and the
+        // bottom gap to the content below tightens to the page mock's
+        // 12px seam.
+        "group-data-[variant=plain]/card:px-0 group-data-[variant=plain]/card:pb-[var(--space-3)]",
+        "lg:group-data-[variant=plain]/card:px-0",
         /* Same-tone card separation — ch02's carve-out. The artifact draws it
            as `inset 0 -1px 0 var(--hair)`, never a `border` (review 1A · fix
            2); `--hairline-under` is that string, named.
@@ -424,8 +480,17 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
            `:not(:last-child)` is the whole fix: no prop, no value, no colour,
            no spacing, and no caller changes. A header followed by a body OR a
            footer still draws it, because in both cases there is something to
-           separate from. */
+           separate from.
+
+           ON A `plain` SHELL, NEVER: a plain section has no box, so there is
+           nothing to separate its own title from even when something
+           follows it. The override below matches this rule's own selector
+           shape (`group-data-[variant=plain]/card:` stacked with the same
+           `[&:not(:last-child)]` the base rule uses) so the two carry equal
+           specificity and the later one in source wins, the same guarantee
+           an ordinary `hover:` override relies on. */
         "[&:not(:last-child)]:shadow-[var(--hairline-under)]",
+        "group-data-[variant=plain]/card:[&:not(:last-child)]:shadow-none",
         className,
       )}
       {...props}
@@ -571,6 +636,17 @@ export interface CardContentProps extends React.ComponentPropsWithoutRef<"div"> 
  * Prose inside a card asks for `Text` or `Hint` from `typography`, which draw
  * exactly what chapter 13 draws. Logged as GAPS-F CRD-6.
  *
+ * ON A `plain` SHELL (21 Sep 2026 ruling, see `Card`'s own comment): the
+ * horizontal inset drops to 0 at every breakpoint, same as the header and
+ * footer, and the TOP of the vertical inset drops to 0 as well, at every
+ * breakpoint and regardless of `inset`, because `CardHeader` already
+ * spends the page mock's own 12px gap for whatever precedes this block,
+ * so stacking this band's own top inset on top of that would double the gap.
+ * The bottom of the vertical inset is untouched: with no footer beneath
+ * it, it is this section's own trailing space before the next plain
+ * section starts. Detected off the shell's own `group/card` marker, not a
+ * prop.
+ *
  * TEN STATES — none apply. It is an inset.
  * THREE BREAKPOINTS — horizontal is now FLAT (`CARD_CONTENT_INSET_X`, one
  * figure at every width — see that constant's own comment for the 17 Sep
@@ -585,7 +661,16 @@ const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
       ref={ref}
       data-slot="card-content"
       data-inset={inset}
-      className={cn("min-w-0 flex-1", CARD_CONTENT_INSET_Y[inset], CARD_CONTENT_INSET_X, className)}
+      className={cn(
+        "min-w-0 flex-1",
+        CARD_CONTENT_INSET_Y[inset],
+        CARD_CONTENT_INSET_X,
+        // `plain`: no horizontal inset, and no top inset (the header
+        // already supplies the 12px gap above this band).
+        "group-data-[variant=plain]/card:px-0 group-data-[variant=plain]/card:pt-0",
+        "lg:group-data-[variant=plain]/card:pt-0",
+        className,
+      )}
       {...props}
     />
   ),
@@ -600,6 +685,16 @@ CardContent.displayName = "CardContent";
  * something this band does for it.
  *
  * `gap-3` is chapter 13's own 12 between footer items.
+ *
+ * ON A `plain` SHELL (21 Sep 2026 ruling, see `Card`'s own comment): the
+ * horizontal inset drops to 0 at every breakpoint, and the TOP gap
+ * tightens to the page mock's own 12px (`--space-3`) instead of this
+ * band's usual 20, matching `CardHeader`'s own bottom-gap figure so the
+ * seam either side of a plain block's content is one consistent number.
+ * No hairline either: a plain section has no box to separate FROM. The
+ * bottom inset is untouched, the same trailing-space reasoning as
+ * `CardContent`'s own. Detected off the shell's own `group/card` marker,
+ * not a prop.
  *
  * TEN STATES — none apply. Its children are Buttons and carry all ten.
  * THREE BREAKPOINTS — inset 24 to `lg:`, 32 above. The row WRAPS rather than
@@ -619,6 +714,11 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
         "lg:px-[var(--space-7)] lg:pb-[var(--space-7)]",
         /* The shell's second hairline, drawn as the artifact draws it. */
         "shadow-[var(--hairline-over)]",
+        // `plain`: no horizontal inset, no hairline, and the top gap
+        // tightens to the page mock's own 12px seam.
+        "group-data-[variant=plain]/card:px-0 group-data-[variant=plain]/card:pt-[var(--space-3)]",
+        "group-data-[variant=plain]/card:shadow-none",
+        "lg:group-data-[variant=plain]/card:px-0",
         className,
       )}
       {...props}

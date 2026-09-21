@@ -377,6 +377,7 @@ export function AssignedToCard({
    * a picker of its own here, see this component's own header, "THE PEN,
    * THE SELECT AND 'USE THE APP'S LEAD' ARE GONE". */
   members,
+  surface = "boxed",
 }: {
   assigneeId?: string | null
   assigneeName?: string | null
@@ -384,6 +385,11 @@ export function AssignedToCard({
   appName?: string | null
   appAssigneeId?: string | null
   members?: AssignableMember[]
+  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43) — forwarded to this
+   * card's own `<TicketSidePanel>`. `"boxed"` (default) is today's markup;
+   * `"plain"` is the kit's `Card variant="plain"`. Only tickets' own call
+   * site (help-detail.tsx) passes `"plain"`. */
+  surface?: "boxed" | "plain"
 }) {
   const { t } = useLanguage()
 
@@ -406,7 +412,7 @@ export function AssignedToCard({
   const assigneeMember = (members ?? []).find((m) => m.id === assignee.id)
 
   return (
-    <TicketSidePanel title={t("Assigned to")} count={formatCount(assignee.id ? 1 : 0)}>
+    <TicketSidePanel title={t("Assigned to")} count={formatCount(assignee.id ? 1 : 0)} surface={surface}>
       {assignee.id ? (
         <StakeholderTile
           dataSlot="assignee-tile"

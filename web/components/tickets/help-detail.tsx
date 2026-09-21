@@ -512,6 +512,11 @@ export function HelpDetailScreen({
   // renamed or replaced — a second story on the same request is as ordinary as
   // the first, which is precisely what a conversion could never express.
   const [storyOpen, setStoryOpen] = React.useState(false)
+  // PLAIN-SURFACE SEPARATOR (rulebook L43) — bubbled up from `<EffortCard>`'s
+  // own `onEmptyChange`, so `<TicketDetailBody>`'s side-column hairline can
+  // skip the Effort section once it has confirmed there is nothing there
+  // (EffortCard's own 22 Sep 2026 amendment: zero records draws nothing).
+  const [effortEmpty, setEffortEmpty] = React.useState(false)
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
@@ -1815,8 +1820,14 @@ export function HelpDetailScreen({
             appName={ticket.appName}
             appAssigneeId={ticket.appAssigneeId}
             members={assignableMembers(membersQ.data)}
+            // THE TICKETS-MODULE EXPERIMENT (rulebook L43, Aurora's ruling,
+            // 21 Sep 2026): the grouping cards around Assigned to, Related
+            // stories, Effort and Stakeholders drop their box and sit
+            // directly on the page's own white main content.
+            surface="plain"
           />
         }
+        timeEmpty={effortEmpty}
         // THE BAND — R89 round 24, 19 Sep 2026. The SAME data the
         // `<RecordScreen>` call above already shapes for its own (now
         // switched-off, `footerVisible={false}`) copy of the footer, built
@@ -2080,6 +2091,9 @@ export function HelpDetailScreen({
             title={t("Related stories")}
             count={formatCount(storiesTotal)}
             empty={storiesPreviewQ.data !== undefined && storiesPreviewQ.data.length === 0}
+            // THE TICKETS-MODULE EXPERIMENT (rulebook L43) — see the
+            // `assignedTo` call above.
+            surface="plain"
             action={
               canWriteWork ? (
                 <AddButton
@@ -2259,6 +2273,10 @@ export function HelpDetailScreen({
               canEdit={canEditTime}
               members={membersQ.data}
               metrics={ticketMetricsQ.data}
+              // THE TICKETS-MODULE EXPERIMENT (rulebook L43) — see the
+              // `assignedTo` call above.
+              surface="plain"
+              onEmptyChange={setEffortEmpty}
             />
           ) : null
         }
@@ -2271,7 +2289,13 @@ export function HelpDetailScreen({
           // under the pills (`overviewItems`, above) is REMOVED, not
           // re-homed — see that comment's own header for which of its facts
           // now render nowhere else on this page.
-          <TicketSidePanel title={t("Stakeholders")} count={stakeholderBadge}>
+          <TicketSidePanel
+            title={t("Stakeholders")}
+            count={stakeholderBadge}
+            // THE TICKETS-MODULE EXPERIMENT (rulebook L43) — see the
+            // `assignedTo` call above.
+            surface="plain"
+          >
             {/* RAISED BY → EDITABLE, THROUGH THE EXISTING PATCH DOOR — client
                 ruling, 18 Sep 2026 ("raised by, there should be a dropdown").
                 `raisedByContactId`/`raisedByContactName` and the save callback

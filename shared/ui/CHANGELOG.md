@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### Added - Card gains a sixth variant, `plain`, a box that draws no box - v1.2.145
+
+The client's ruling, 21 Sep 2026, verbatim: "only the containers like the
+ones around assigned to, related stories, etc" go, chips, tabs and the
+rest stay. A record page's grouping sections (Assigned to, Stakeholders,
+Related tickets, Related stories, Effort, Detail, Acceptance criteria,
+Build notes) drop their box and sit directly on the page's own white main
+content; everything else keeps its paper.
+
+`variant="plain"` paints no fill, no shadow and no stroke (`bg-transparent`,
+nothing else): the page's own paper shows through. `--badge-quiet-fill`
+stays at `default`'s own value, `--surface-raised`, since a Badge inside a
+plain card sits on the page's own ground, the exact ground `default`
+already answers for. `hairline`, `interactive` and `selected` are
+untouched: they behave exactly as they do on `default`, nothing here
+special-cases them.
+
+`CardHeader`, `CardContent` and `CardFooter` detect a plain parent by
+themselves, off a `group/card` marker class now carried on the shell and
+read with `group-data-[variant=plain]/card:` utilities, the same
+convention `tabs.tsx` and `accordion.tsx` already use for a part that
+reads its own parent's state. No call site repeats a prop on every part.
+On a plain shell, all three parts drop their horizontal inset to 0 at
+every breakpoint, so a section's text lines up with the page column
+instead of the card's own edge; the header's own bottom gap and the
+footer's own top gap both tighten to the page mock's 12px seam
+(`--space-3`), and neither the header nor the footer draws its hairline,
+since a plain section has no box to separate from. Typography is
+untouched. Scoped to a single experiment in the tickets module's record
+page first, not yet a system-wide replacement for `default`.
+
+Five things now pinned in `check-card.mjs`, up from the inset-only check
+it carried before: the `plain` key exists and paints no `bg-*` fill and no
+`shadow-*`; the shell carries `group/card`; `CardHeader`/`CardContent`/
+`CardFooter` each carry the `group-data-[variant=plain]/card:px-0`
+override; the header and footer each cancel their own hairline on a plain
+shell; and `default`'s own class string is untouched. `npm run check` is
+green end to end, `tsc --noEmit` included.
+
 ### Added - Select trigger keeps the selected face (or icon) with no per-call-site prop, and SelectFace gains a glyph variant - v1.2.144
 
 Two rulings, Aurora, verbatim: "on every choice component where I can choose

@@ -160,6 +160,8 @@ export function EffortCard({
   canEdit,
   members,
   metrics,
+  surface = "boxed",
+  onEmptyChange,
 }: {
   targetTable: "stories" | "help" | "tasks"
   targetId: string
@@ -172,6 +174,19 @@ export function EffortCard({
    * that read is still in flight, or OMITTED ENTIRELY by a caller whose
    * record has no such door (a task) — see this file's own header. */
   metrics?: EffortMetrics
+  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43) — forwarded to this card's
+   * own `<EmptyGatedPanel>` shell. `"boxed"` (default) is today's markup;
+   * `"plain"` is the kit's `Card variant="plain"`. Only tickets' own call
+   * site (help-detail.tsx) passes `"plain"`. */
+  surface?: "boxed" | "plain"
+  /** BUBBLED UP, the same shape `WorkLogsPanel`'s own `onEmptyChange` already
+   * takes for the identical fact on a different record — true once this
+   * card has CONFIRMED zero time logged and therefore rendered NOTHING at
+   * all (see this file's own header, "ZERO RECORDS DRAWS NOTHING"). A
+   * caller with a plain-surface side column (`ticket-detail-body.tsx`'s
+   * `timeEmpty`) reads this to keep its own separator off a section that
+   * is not actually on the page. */
+  onEmptyChange?: (empty: boolean) => void
 }) {
   const { t } = useLanguage()
   const listKey = recordTimeKey(targetTable, targetId)
@@ -219,6 +234,16 @@ export function EffortCard({
   // resting list actually answers.
   const empty = rows !== undefined && rows.length === 0
 
+  // BUBBLED TO THE CALLER, the same `WorkLogsPanel`'s own `onEmptyChange`
+  // shape — a plain-surface side column reads this to keep its own
+  // separator off this section once it has confirmed there is nothing here
+  // to separate. Run every render (never after the early `return null`
+  // below): the rule of hooks, and also the only way a caller is told the
+  // card went FROM empty BACK to non-empty on a later render.
+  React.useEffect(() => {
+    if (rows !== undefined) onEmptyChange?.(empty)
+  }, [rows, empty, onEmptyChange])
+
   // ZERO RECORDS DRAWS NOTHING (22 Sep 2026 amendment) — not even
   // `EmptyGatedPanel`'s own header-only drop: the head's own Start/Stop
   // timer button is the one way in, and a sentence on this card saying so
@@ -227,7 +252,7 @@ export function EffortCard({
 
   return (
     <>
-      <EmptyGatedPanel title={t("Effort")} count={formatCount(recordCount)} empty={false}>
+      <EmptyGatedPanel title={t("Effort")} count={formatCount(recordCount)} empty={false} surface={surface}>
         {rows === undefined ? (
           <Skeleton variant="list" lines={3} />
         ) : (

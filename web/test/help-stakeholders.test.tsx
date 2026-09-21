@@ -76,7 +76,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpStakeholder } from "@shared/types"
 import { HelpStakeholders, AssignedToCard } from "@/components/tickets/help-stakeholders"
-import { TicketDetailBody, TICKET_PANEL_ANCHOR } from "@/components/tickets/ticket-detail-body"
+import { TicketDetailBody, TicketSidePanel, TICKET_PANEL_ANCHOR } from "@/components/tickets/ticket-detail-body"
 
 afterEach(cleanup)
 
@@ -95,6 +95,46 @@ const MAX: HelpStakeholder = {
   imageUrl: null,
   origin: "raiser",
 }
+
+// PLAIN-SURFACE EXPERIMENT (rulebook L43) — `TicketSidePanel`'s own
+// `surface` prop, defaulting to `"boxed"` (today's markup, byte for byte)
+// with `"plain"` opting into the kit's `Card variant="plain"` and dropping
+// `CardContent`'s own `p-4`. See web/test/plain-surface-scope.test.ts for
+// the census that keeps the string scoped to the tickets module.
+describe("TicketSidePanel — surface", () => {
+  it("boxed (the default) carries data-variant=\"default\" and p-4 on its content", () => {
+    render(<TicketSidePanel title="Stakeholders">content</TicketSidePanel>)
+    const card = screen.getByText("Stakeholders").closest('[data-slot="card"]') as HTMLElement
+    expect(card.getAttribute("data-variant")).toBe("default")
+    expect(card.getAttribute("data-surface")).toBeNull()
+    const content = card.querySelector('[data-slot="card-content"]') as HTMLElement
+    expect(content.className).toContain("p-4")
+  })
+
+  it("plain carries data-variant=\"plain\", data-surface=\"plain\", and no p-4 on its content", () => {
+    render(
+      <TicketSidePanel title="Stakeholders" surface="plain">
+        content
+      </TicketSidePanel>
+    )
+    const card = screen.getByText("Stakeholders").closest('[data-slot="card"]') as HTMLElement
+    expect(card.getAttribute("data-variant")).toBe("plain")
+    expect(card.getAttribute("data-surface")).toBe("plain")
+    const content = card.querySelector('[data-slot="card-content"]') as HTMLElement
+    expect(content.className).not.toContain("p-4")
+  })
+
+  it("still draws the title, the count and the children in both surfaces", () => {
+    render(
+      <TicketSidePanel title="Stakeholders" count="4" surface="plain">
+        <div>row</div>
+      </TicketSidePanel>
+    )
+    expect(screen.getByText("Stakeholders")).toBeTruthy()
+    expect(screen.getByText("4")).toBeTruthy()
+    expect(screen.getByText("row")).toBeTruthy()
+  })
+})
 
 describe("HelpStakeholders — the empty state", () => {
   it("says just the raiser and the admins so far, with no picker and no intro sentence", () => {
@@ -348,6 +388,24 @@ describe("AssignedToCard", () => {
     expect(screen.getByText("Nobody yet.")).toBeTruthy()
   })
 
+  // PLAIN-SURFACE EXPERIMENT (rulebook L43) — forwarded to `TicketSidePanel`
+  // (this card's own shell), never drawn by hand here.
+  it("forwards surface=\"plain\" to its own TicketSidePanel shell", () => {
+    render(<AssignedToCard surface="plain" />)
+    const card = assignedCard()
+    expect(card.getAttribute("data-variant")).toBe("plain")
+    expect(card.getAttribute("data-surface")).toBe("plain")
+    const content = card.querySelector('[data-slot="card-content"]') as HTMLElement
+    expect(content.className).not.toContain("p-4")
+  })
+
+  it("defaults to boxed when surface is not passed", () => {
+    render(<AssignedToCard />)
+    const card = assignedCard()
+    expect(card.getAttribute("data-variant")).toBe("default")
+    expect(card.getAttribute("data-surface")).toBeNull()
+  })
+
   it("shows the inherited line when the ticket has none of its own and the app does", () => {
     render(
       <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
@@ -591,5 +649,99 @@ describe("TicketDetailBody, Assigned to is the first panel in the side column", 
     expect(order.indexOf(assignedAnchor)).toBeLessThan(order.indexOf(storiesAnchor))
     expect(order.indexOf(storiesAnchor)).toBeLessThan(order.indexOf(timeAnchor))
     expect(order.indexOf(timeAnchor)).toBeLessThan(order.indexOf(stakeholdersAnchor))
+  })
+})
+
+// THE PLAIN-SURFACE SEPARATOR (rulebook L43) — one hairline between
+// consecutive sections in the side column, nothing above the first, nothing
+// below the last, and no stray hairline beside a section that rendered
+// nothing at all.
+describe("TicketDetailBody, the plain-surface separator between side-column sections", () => {
+  it("draws exactly one Separator between each of the four visible sections — three total, none above the first or below the last", () => {
+    render(
+      <TicketDetailBody
+        assignedTo={<div>ASSIGNED-MARK</div>}
+        thread={<div>thread</div>}
+        composer={<div>composer</div>}
+        stories={<div>STORIES-MARK</div>}
+        time={<div>TIME-MARK</div>}
+        stakeholders={<div>STAKEHOLDERS-MARK</div>}
+        footer={<div>footer</div>}
+      />
+    )
+    const assignedAnchor = document.getElementById(TICKET_PANEL_ANCHOR.assignedTo) as HTMLElement
+    const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
+    const sideColumn = assignedAnchor.parentElement as HTMLElement
+    const children = Array.from(sideColumn.children)
+    const separators = children.filter((c) => c.getAttribute("data-slot") === "separator")
+    expect(separators.length).toBe(3)
+    // Nothing above the first section, nothing below the last — scoped to
+    // the four tickets sections: below `lg` (jsdom's own default width) the
+    // conversation anchor shares this same parent, appended AFTER
+    // stakeholders (`{sidePanels}{conversation}`), so "the last child of the
+    // parent" is not the right question — "what sits right after
+    // stakeholders" is.
+    const assignedIdx = children.indexOf(assignedAnchor)
+    const stakeholdersIdx = children.indexOf(stakeholdersAnchor)
+    expect(assignedIdx).toBe(0)
+    expect(children[stakeholdersIdx + 1]?.getAttribute("data-slot")).not.toBe("separator")
+    // Alternating anchor/separator/anchor/separator/anchor/separator/anchor,
+    // over exactly the four tickets sections.
+    const ticketSlice = children.slice(assignedIdx, stakeholdersIdx + 1)
+    expect(ticketSlice.map((c) => c.getAttribute("data-slot") === "separator")).toEqual([
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+    ])
+  })
+
+  it("draws no stray separator around a section whose slot is absent (time === null)", () => {
+    render(
+      <TicketDetailBody
+        assignedTo={<div>ASSIGNED-MARK</div>}
+        thread={<div>thread</div>}
+        composer={<div>composer</div>}
+        stories={<div>STORIES-MARK</div>}
+        time={null}
+        stakeholders={<div>STAKEHOLDERS-MARK</div>}
+        footer={<div>footer</div>}
+      />
+    )
+    const assignedAnchor = document.getElementById(TICKET_PANEL_ANCHOR.assignedTo) as HTMLElement
+    const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
+    const sideColumn = assignedAnchor.parentElement as HTMLElement
+    const children = Array.from(sideColumn.children)
+    const separators = children.filter((c) => c.getAttribute("data-slot") === "separator")
+    // Only two separators now: assignedTo|stories and stories|stakeholders —
+    // the absent time section leaves no stray hairline on either side of it.
+    expect(separators.length).toBe(2)
+    const assignedIdx = children.indexOf(assignedAnchor)
+    const stakeholdersIdx = children.indexOf(stakeholdersAnchor)
+    expect(assignedIdx).toBe(0)
+    expect(children[stakeholdersIdx + 1]?.getAttribute("data-slot")).not.toBe("separator")
+  })
+
+  it("draws no stray separator around a section EffortCard confirmed empty (timeEmpty=true)", () => {
+    render(
+      <TicketDetailBody
+        assignedTo={<div>ASSIGNED-MARK</div>}
+        thread={<div>thread</div>}
+        composer={<div>composer</div>}
+        stories={<div>STORIES-MARK</div>}
+        time={<div>TIME-MARK</div>}
+        timeEmpty
+        stakeholders={<div>STAKEHOLDERS-MARK</div>}
+        footer={<div>footer</div>}
+      />
+    )
+    const assignedAnchor = document.getElementById(TICKET_PANEL_ANCHOR.assignedTo) as HTMLElement
+    const sideColumn = assignedAnchor.parentElement as HTMLElement
+    const children = Array.from(sideColumn.children)
+    const separators = children.filter((c) => c.getAttribute("data-slot") === "separator")
+    expect(separators.length).toBe(2)
   })
 })

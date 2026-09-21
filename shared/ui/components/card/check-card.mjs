@@ -117,6 +117,91 @@ if (!/CARD_CONTENT_INSET_X/.test(contentBody)) {
   );
 }
 
+/* ── 5 · THE `plain` VARIANT, ADDED v1.2.145 ─────────────────────────────
+   Client ruling, 21 Sep 2026: a record page's grouping sections lose their
+   box and sit directly on the page's own white main content; everything
+   else keeps its paper. Four things pinned:
+     a · `cardVariants`'s `variant` object declares a `plain` key, and its
+         class string carries no `bg-*` fill and no `shadow-*`: the shell
+         paints nothing.
+     b · The shell carries a `group/card` marker class, which is what lets
+         a part detect its own parent's variant with no prop to repeat.
+     c · `CardHeader`, `CardContent` and `CardFooter` each carry a
+         `group-data-[variant=plain]/card:px-0` override, the zeroed
+         horizontal inset, so a part cannot silently keep its box inset
+         while the shell around it goes bare.
+     d · A `default` shell's own class string is untouched: `plain` is an
+         addition, not a rewrite of the five existing variants. ──────── */
+const variantsBlock = src.slice(src.indexOf("variants: {"), src.indexOf("defaultVariants:"));
+
+if (!/plain:\s*"([^"]*)"/.test(variantsBlock)) {
+  findings.push(
+    "`cardVariants`'s `variant` object no longer declares a `plain` key: the sixth variant, the " +
+      "client's 21 Sep 2026 ruling, has no shape to render.",
+  );
+} else {
+  const plainClass = variantsBlock.match(/plain:\s*"([^"]*)"/)[1];
+  if (/\bbg-(?!transparent\b)[a-z-]/.test(plainClass)) {
+    findings.push(
+      `\`plain\`'s class string ("${plainClass}") carries a painted \`bg-*\` fill: a plain shell must ` +
+        "stay transparent so the page's own paper shows through.",
+    );
+  }
+  if (/\bshadow-/.test(plainClass)) {
+    findings.push(
+      `\`plain\`'s class string ("${plainClass}") carries a shadow utility, and a plain shell has no ` +
+        "shadow, same as it has no fill and no stroke.",
+    );
+  }
+}
+
+if (!/"group\/card"/.test(src.slice(src.indexOf("const cardVariants = cva("), src.indexOf("defaultVariants:")))) {
+  findings.push(
+    "`cardVariants`'s base class list no longer carries `\"group/card\"`: without this marker, " +
+      "`CardHeader`/`CardContent`/`CardFooter` have no way to detect a `plain` parent without a prop " +
+      "every call site would have to repeat.",
+  );
+}
+
+const headerBody = src.slice(src.indexOf("const CardHeader"), src.indexOf("CardHeader.displayName"));
+const contentBody2 = src.slice(src.indexOf("const CardContent"), src.indexOf("CardContent.displayName"));
+const footerBody = src.slice(src.indexOf("const CardFooter"), src.indexOf("CardFooter.displayName"));
+
+for (const [name, body] of [
+  ["CardHeader", headerBody],
+  ["CardContent", contentBody2],
+  ["CardFooter", footerBody],
+]) {
+  if (!/group-data-\[variant=plain\]\/card:px-0/.test(body)) {
+    findings.push(
+      `\`${name}\` no longer carries a \`group-data-[variant=plain]/card:px-0\` override: a plain ` +
+        "shell's parts must drop their horizontal inset to 0 so the text lines up with the page column.",
+    );
+  }
+}
+
+if (!/group-data-\[variant=plain\]\/card:\[&:not\(:last-child\)\]:shadow-none/.test(headerBody)) {
+  findings.push(
+    "`CardHeader` no longer cancels its own hairline on a `plain` shell: a plain section has no box " +
+      "to separate from, so it must draw no hairline under its title either.",
+  );
+}
+
+if (!/group-data-\[variant=plain\]\/card:shadow-none/.test(footerBody)) {
+  findings.push(
+    "`CardFooter` no longer cancels its own hairline on a `plain` shell, the same reasoning as the " +
+      "header's own hairline cancellation, above.",
+  );
+}
+
+/* ── A `default` shell is byte-identical to before this variant existed ── */
+if (!/default:\s*"bg-surface-panel \[--badge-quiet-fill:var\(--surface-raised\)\]"/.test(src)) {
+  findings.push(
+    "`cardVariants`'s `default` variant class string changed: adding `plain` must not touch the " +
+      "five existing variants.",
+  );
+}
+
 if (findings.length > 0) {
   console.error("FAIL card check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -124,5 +209,7 @@ if (findings.length > 0) {
 
 console.log(
   '`CardContent`\'s `inset` prop still declares "default"/"compact", defaults to "default", ' +
-    'resolves "compact" to a flat `--space-3` and leaves the horizontal inset unconditional: OK card check.',
+    'resolves "compact" to a flat `--space-3` and leaves the horizontal inset unconditional; the ' +
+    "`plain` variant paints no fill and no shadow, carries the `group/card` marker, and its parts " +
+    "zero their own horizontal inset and hairlines off that marker; `default` is untouched: OK card check.",
 );

@@ -547,14 +547,24 @@ const cardExportBlock = cardSrc.slice(cardSrc.lastIndexOf("export {"));
 if (!/CARD_CONTENT_INSET_X/.test(cardExportBlock)) {
   insetFindings.push(`${cardRel} does not export CARD_CONTENT_INSET_X from its own export block.`);
 }
+// Order, not an exact literal: "min-w-0 flex-1", then CARD_CONTENT_INSET_Y,
+// then CARD_CONTENT_INSET_X, then (v1.2.145, the `plain` variant) whatever
+// group-data overrides that variant needs, with `className` still last so a
+// caller's own override still wins over all of it. The three identifiers'
+// own order is what Ruling 2 actually pins; the classes a later variant adds
+// in between are that variant's business, not this check's.
+const cardContentBody = cardSrc.slice(
+  cardSrc.indexOf("const CardContent = React.forwardRef"),
+  cardSrc.indexOf("CardContent.displayName"),
+);
 if (
-  !/className=\{cn\("min-w-0 flex-1", CARD_CONTENT_INSET_Y\[inset\], CARD_CONTENT_INSET_X, className\)\}/.test(
-    cardSrc,
+  !/cn\(\s*"min-w-0 flex-1",\s*CARD_CONTENT_INSET_Y\[inset\],\s*CARD_CONTENT_INSET_X,[\s\S]*?className,\s*\)/.test(
+    cardContentBody,
   )
 ) {
   insetFindings.push(
-    `${cardRel}'s CardContent does not spend CARD_CONTENT_INSET_X for its own left/right padding — ` +
-      "a literal px-[...] here would silently stop matching what DENSITY_BODY reads.",
+    `${cardRel}'s CardContent does not spend CARD_CONTENT_INSET_X for its own left/right padding, in order, ` +
+      "ahead of className: a literal px-[...] here would silently stop matching what DENSITY_BODY reads.",
   );
 }
 // The `inset` prop (added for a compact CardContent body) must leave the

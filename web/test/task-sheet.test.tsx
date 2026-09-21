@@ -583,6 +583,100 @@ describe("the sheet reacts to a start/stop/done mutation in the same page load, 
       door.workLogs = savedLogs
     }
   })
+
+  // THE STAGING PROOF, REPRODUCED IN jsdom — a Playwright run against a
+  // FRESH task found (a) Done still enabled with no tooltip immediately
+  // after Start, (b) the Effort card's count and row landing but its stat
+  // tiles not, at settle time, after Stop, and (c) a fresh navigation right
+  // after Stop still finding the log "running". Read against the code:
+  // (a) was real staleness — `refreshTimers` (timer-bar.tsx) only
+  // INVALIDATED `runningTimersKey`, which drops the cache and schedules a
+  // refetch but paints nothing until that refetch's own round trip lands, a
+  // full second wait after the door that started the timer had already
+  // answered with the fresh list. Fixed by priming that key with the
+  // mutation's own `{ timers }` response instead. (b) does not reproduce on
+  // a TASK: `EffortCard` only draws its three stat tiles when its caller
+  // hands it a `metrics` prop, and `task-sheet.tsx` never does — a task has
+  // no cycle-time clock and no status-event trail (this file's own header,
+  // and effort-card.tsx's), so "0 of 3 tiles" is the permanent, correct
+  // state for a task, not a race — asserted below as an explicit negative
+  // rather than reproduced as a defect. (c) could not be reproduced from
+  // the code: `stop`'s own request is awaited before the next line runs,
+  // and nothing remounts the Start/Stop button between click and response
+  // — the most likely account is the proof navigating away before that
+  // await had resolved.
+  it("Start disables Done with the tooltip once the door resolves, then Stop lands the Effort card's count and row (no stat tiles — a task has none)", async () => {
+    const savedLogs = door.workLogs
+    door.workLogs = []
+    invalidate(recordTimeKey("tasks", "t1"))
+    invalidate(recordTimeSummaryKey("tasks", "t1"))
+    try {
+      const teamId = warmTeam([TASK])
+      render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+      await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+      const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
+      const actionsRow = document.querySelector('[data-slot="task-sheet-actions"]') as HTMLElement
+
+      const startButton = within(actionsRow)
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("Start")) as HTMLButtonElement
+      fireEvent.click(startButton)
+
+      // DONE DISABLED, ONCE THE DOOR RESOLVES — `findBy`/`waitFor`, never a
+      // sleep: this is exactly the assertion the staging proof's clause (a)
+      // ran too early for.
+      const doneButton = await waitFor(() => {
+        const b = within(actionsRow)
+          .getAllByRole("button")
+          .find((btn) => btn.textContent?.includes("Done")) as HTMLButtonElement | undefined
+        expect(b, "Done must still render, disabled, once Start resolves").toBeTruthy()
+        expect(b!.disabled).toBe(true)
+        return b as HTMLButtonElement
+      })
+      // THE TOOLTIP TRIGGER — Radix mounts `TooltipContent` only once opened
+      // (hover/focus), which jsdom cannot drive reliably (this file's own
+      // "disabled Done button's own tooltip" test, source-proven for the
+      // same reason); the wiring itself is provable here: the disabled
+      // button sits inside a real `TooltipTrigger`.
+      expect(doneButton.closest('[data-slot="task-sheet-actions"]')?.querySelector("[data-state]")).toBeTruthy()
+
+      const stopButton = await waitFor(() => {
+        const b = within(actionsRow)
+          .getAllByRole("button")
+          .find((btn) => btn.textContent?.includes("Stop"))
+        expect(b, "the Start button must flip to Stop once the timer is running").toBeTruthy()
+        return b as HTMLButtonElement
+      })
+      fireEvent.click(stopButton)
+
+      // THE EFFORT CARD'S COUNT AND ROW LAND TOGETHER, no reload — clause
+      // (b)'s count/row half, which the proof found correct.
+      const heading = await within(sheet).findByText("Effort")
+      await waitFor(() => expect(heading.closest("h3")?.textContent).toBe("Effort1"))
+      const list = document.querySelector('ul[class*="divide-y"]') as HTMLElement
+      expect(list, "the row list is drawn").toBeTruthy()
+      expect(within(list).getByText(/Ana/)).toBeTruthy()
+
+      // NO STAT TILES — a task carries neither a cycle-time clock nor a
+      // status-event trail, so `EffortCard` never receives `metrics` for
+      // one and draws none, forever, not only "at settle time".
+      expect(within(sheet).queryByText("Cycle time")).toBeNull()
+      expect(within(sheet).queryByText("Effort hours")).toBeNull()
+      expect(within(sheet).queryByText("Flow efficiency")).toBeNull()
+
+      // DONE RE-ENABLES ONCE THE STOP MUTATION RESOLVES — the timer this
+      // task's own clock was named on is gone, so R99 no longer refuses it.
+      await waitFor(() => {
+        const b = within(actionsRow)
+          .getAllByRole("button")
+          .find((btn) => btn.textContent?.includes("Done")) as HTMLButtonElement | undefined
+        expect(b, "Done must render again once Stop resolves").toBeTruthy()
+        expect(b!.disabled).toBe(false)
+      })
+    } finally {
+      door.workLogs = savedLogs
+    }
+  })
 })
 
 describe("Done flips to Reopen once the mutation resolves, no reload", () => {

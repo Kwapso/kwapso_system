@@ -393,6 +393,7 @@ export function EmptyGatedPanel({
   count,
   action,
   empty,
+  surface = "boxed",
   children,
 }: {
   title: string
@@ -404,9 +405,46 @@ export function EmptyGatedPanel({
    * "still loading": a header popping away and back while a read settles is
    * its own small bug, so a caller passes this only once it actually knows. */
   empty: boolean
+  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43, kit v1.2.145's `Card
+   * variant="plain"`) — `"boxed"` (the default) renders EXACTLY today's
+   * markup, variant default, same classNames, byte for byte. `"plain"`
+   * drops the box: `Card variant="plain"`, no `p-4` on the content so the
+   * kit's own zero inset applies, and R88's own header drop when empty
+   * (this component's central `{!empty &&` guard) is unchanged either way.
+   * Only tickets' own call sites (help-detail.tsx) pass `"plain"` — see
+   * `web/test/plain-surface-scope.test.ts`. */
+  surface?: "boxed" | "plain"
   children: React.ReactNode
 }) {
   const headingId = React.useId()
+  if (surface === "plain") {
+    return (
+      <Card variant="plain" data-surface="plain">
+        <CardContent className="flex flex-col gap-3">
+          {!empty && (
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+                <span className="truncate">{title}</span>
+                {count ? (
+                  <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
+                    {count}
+                  </span>
+                ) : null}
+              </h3>
+              {action}
+            </div>
+          )}
+          <div
+            role="group"
+            aria-labelledby={empty ? undefined : headingId}
+            className="flex min-w-0 flex-col gap-3"
+          >
+            {children}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
   return (
     <Card variant="default">
       <CardContent className="flex flex-col gap-3 p-4">
