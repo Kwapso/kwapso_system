@@ -795,16 +795,24 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
 
   // AMENDED AGAIN, 22 Sep 2026, same day: Aurora, verbatim, "good. add kind
   // of card background behind cards, this is a metric, like in kit." Each
-  // tile's own figure now sits inside the kit's `<Card variant="raised">`,
-  // proven by walking up from the value to the nearest `[data-slot="card"]`.
-  it("draws each metric tile inside the kit's own raised card, not bare", async () => {
+  // tile's own figure sits inside its own kit `<Card>`, proven by walking up
+  // from the value to the nearest `[data-slot="card"]`.
+  //
+  // THE TONE FLIPPED ON 21 SEP 2026 (rulebook L43) AND HER SENTENCE DID NOT.
+  // This read `"raised"` while the panel around the tiles was a painted card.
+  // The panel is plain now, so a tile's ground is the PAGE, and `raised`
+  // (`--card`) IS the page's own colour in light: the tiles would have
+  // measured 1.000 and been held up by their shadow alone. `default` is soft
+  // paper, 1.103 against the page, and it is what her own comparison already
+  // pointed at -- the kit's own `StatGrid` tile is a `Card variant="default"`.
+  it("draws each metric tile inside its own kit card, on soft paper, not bare", async () => {
     api.story = story({})
     api.metrics = FIXTURE_METRICS
     openStory()
     const cycleValue = await screen.findByText("2d 3h")
     const tileCard = cycleValue.closest('[data-slot="card"]')
     expect(tileCard).toBeTruthy()
-    expect(tileCard?.getAttribute("data-variant")).toBe("raised")
+    expect(tileCard?.getAttribute("data-variant")).toBe("default")
   })
 
   // AURORA, 21 SEP 2026, THE SAME ROUND: "ok, but i still want to see the

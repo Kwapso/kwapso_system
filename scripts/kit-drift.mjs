@@ -55,9 +55,35 @@ const out = []
 out.push(`\nkit-drift — app vs ${version.repo}`)
 out.push(`  pinned at ${version.tag} (${version.sha.slice(0, 7)}), synced ${version.syncedAt}\n`)
 
-/* -- 1 · has the KIT moved since we pinned it? ------------------------------ */
+/* -- 0 · was this tag vendored from a LOCAL clone, and is it on origin yet? -
+
+   sync-design.mjs's `--from <path>` vendors a tag straight out of a local kit
+   clone rather than GitHub, for a tag minted but deliberately not pushed yet
+   (client: "do not update the ui repo yet, we will first iterate on this").
+   VERSION.json then carries `"source": "local"`. That is expected mid-
+   iteration and must never fail this check — it only WARNS, so the push is
+   not forgotten once iteration is done. A finding here would make `--check`
+   red for the exact workflow `--from` exists to support. */
 
 const haveKit = existsSync(join(KIT, ".git"))
+
+if (version.source === "local") {
+  out.push(`0 · local source   VERSION.json says ${version.tag} was vendored with --from, from a LOCAL kit clone, not GitHub.`)
+  if (!haveKit) {
+    out.push(`                   kit clone not at ${KIT} — cannot check whether ${version.tag} reached origin yet`)
+  } else {
+    const onOrigin = git(KIT, "ls-remote", "--tags", "origin", version.tag)
+    if (onOrigin) {
+      out.push(`                   ${version.tag} IS on origin now — re-run sync-design.mjs without --from to clear this note`)
+    } else {
+      out.push(`                   WARNING (not a failure): ${version.tag} is not on origin yet — expected during`)
+      out.push(`                   iteration, but push it before any other app is pointed at this tag.`)
+    }
+  }
+  out.push("")
+}
+
+/* -- 1 · has the KIT moved since we pinned it? ------------------------------ */
 if (!haveKit) {
   out.push(`1 · kit clone      not at ${KIT} — sections 1 and 2 skipped`)
   out.push(`                   (clone it, or set KIT_REPO)`)

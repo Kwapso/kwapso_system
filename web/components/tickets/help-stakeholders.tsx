@@ -282,7 +282,14 @@ export function HelpStakeholders({
               18 Sep 2026: "who to keep in the loop should be horizontal"). No
               "×" — see this file's header on why the loop stays read-only. */}
           {loop.length > 0 && (
-            <Card data-slot="loop-card" variant="raised">
+            /* SOFT PAPER, NOT OFF-BEIGE — rulebook L43 going app wide, 21 Sep 2026.
+               `raised` is `--card`, which IS the page's own colour in light (#FFFEF9),
+               so on the plain ground this card now stands on it would measure 1.000 and
+               be held up by its shadow alone. `default` is soft paper, 1.103, the tone
+               every other object on this ground reads at. The Minimal Kit page named
+               this sweep: "check that nobody passed `raised` explicitly for a tile row
+               that used to sit on a panel". */
+            <Card data-slot="loop-card" variant="default">
               <CardContent className="flex flex-col gap-2 p-4">
                 <p className="text-micro text-muted-foreground uppercase">{t("On the loop")}</p>
                 <div className="flex flex-wrap gap-3">
@@ -381,7 +388,6 @@ export function AssignedToCard({
    * a picker of its own here, see this component's own header, "THE PEN,
    * THE SELECT AND 'USE THE APP'S LEAD' ARE GONE". */
   members,
-  surface = "boxed",
 }: {
   assigneeId?: string | null
   assigneeName?: string | null
@@ -389,11 +395,6 @@ export function AssignedToCard({
   appName?: string | null
   appAssigneeId?: string | null
   members?: AssignableMember[]
-  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43) — forwarded to this
-   * card's own `<TicketSidePanel>`. `"boxed"` (default) is today's markup;
-   * `"plain"` is the kit's `Card variant="plain"`. Only tickets' own call
-   * site (help-detail.tsx) passes `"plain"`. */
-  surface?: "boxed" | "plain"
 }) {
   const { t } = useLanguage()
 
@@ -416,7 +417,12 @@ export function AssignedToCard({
   const assigneeMember = (members ?? []).find((m) => m.id === assignee.id)
 
   return (
-    <TicketSidePanel title={t("Assigned to")} count={formatCount(assignee.id ? 1 : 0)} surface={surface}>
+    /* NO `surface` PROP ANY MORE — rulebook L43 went app wide on 21 Sep
+       2026 and `TicketSidePanel`'s own default is `"plain"`. The forwarding
+       prop this card carried for the tickets-only experiment had exactly one
+       caller, which passed the value that is now the default, so it was
+       retired rather than left as a second way to say nothing. */
+    <TicketSidePanel title={t("Assigned to")} count={formatCount(assignee.id ? 1 : 0)}>
       {assignee.id ? (
         <StakeholderTile
           dataSlot="assignee-tile"

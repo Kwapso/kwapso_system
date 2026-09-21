@@ -184,6 +184,15 @@ committed.
 Cloning needs the `alaap-kwapso` GitHub identity (the machine's default
 credential is a different account); the sync script's URL carries it.
 
+`node scripts/sync-design.mjs <tag> --from <path-to-local-kwapso-design-clone>`
+vendors from a local kit clone instead of GitHub, for a tag minted there but
+deliberately not pushed yet (a "do not update the ui repo, we will iterate
+first" client instruction). It is allowed only for that iteration window,
+before the tag reaches origin — the push must still happen before any other
+app is pointed at the tag. VERSION.json then carries `"source": "local"`, and
+`npm run kit:drift` warns (never fails) that the tag is not on origin until it
+is pushed.
+
 ## The pieces
 
 | Worker | Staging name | Production name | What it is |

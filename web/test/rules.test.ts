@@ -5394,10 +5394,26 @@ describe("RULES — the laws of the base", () => {
     }
     const dockAt = shell.indexOf('data-slot="screen-shell-aside-dock"')
     expect(dockAt, "R51 — screen-shell must render an aside dock").toBeGreaterThan(-1)
+    // THE BOTTOM GUTTER IS ZERO NOW, AND THE INVARIANT IS UNCHANGED — kit
+    // v1.2.149, 21 Sep 2026. Aurora, on the Minimal Kit page, verbatim:
+    // "implement the to the bottom edge for main content and assistant like
+    // in your previous artifact". This used to require the dock to pay
+    // `pb-[var(--shell-gutter)]`, "the same bottom gutter the content column
+    // pays" — and that sentence is the real law, not the token. The content
+    // column dropped its own bottom gutter under her ruling (its `py-` became
+    // a `pt-` only), so the two still agree; the value they agree on is now
+    // zero, and both reach the window's bottom edge, which is exactly what
+    // she asked for. The assertion is therefore the AGREEMENT, read off the
+    // kit's own source: neither the dock nor the content column may pay a
+    // bottom gutter while the other does not.
+    const dockPaysBottom = shell.slice(dockAt, dockAt + 500).includes("pb-[var(--shell-gutter)]")
+    const bodyAt = shell.indexOf("const BODY")
+    expect(bodyAt, "R51 — screen-shell must declare its content column's own class set").toBeGreaterThan(-1)
+    const columnPaysBottom = shell.slice(bodyAt, bodyAt + 3000).includes("py-[var(--shell-gutter)]")
     expect(
-      shell.slice(dockAt, dockAt + 500).includes("pb-[var(--shell-gutter)]"),
-      "R51 — the aside dock must pay `pb-[var(--shell-gutter)]`, the same bottom gutter the content column pays, or the assistant ends at the window's edge instead of level with the card"
-    ).toBe(true)
+      dockPaysBottom,
+      "R51 — the aside dock and the content column must agree about the bottom gutter, or the assistant ends somewhere the card does not. Today both pay nothing and both reach the window's bottom edge (the 21 Sep 2026 bottom-edge ruling); if the content column starts paying one again, the dock owes the same"
+    ).toBe(columnPaysBottom)
 
     // iii · THE SHAPE THAT SILENTLY DOES NOTHING. `0fr` inside a flex item is
     // floored at the item's own base size, so the column stays full width and

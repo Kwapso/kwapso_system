@@ -485,15 +485,23 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
 
   // AMENDED AGAIN, 22 Sep 2026, same day: Aurora, verbatim, "good. add kind
   // of card background behind cards, this is a metric, like in kit." Each
-  // tile's own figure now sits inside the kit's `<Card variant="raised">`,
-  // proven by walking up from the value to the nearest `[data-slot="card"]`.
-  it("draws each metric tile inside the kit's own raised card, not bare", async () => {
+  // tile's own figure sits inside its own kit `<Card>`, proven by walking up
+  // from the value to the nearest `[data-slot="card"]`.
+  //
+  // THE TONE FLIPPED ON 21 SEP 2026 (rulebook L43) AND HER SENTENCE DID NOT.
+  // This read `"raised"` while the panel around the tiles was a painted card.
+  // The panel is plain now, so a tile's ground is the PAGE, and `raised`
+  // (`--card`) IS the page's own colour in light: the tiles would have
+  // measured 1.000 and been held up by their shadow alone. `default` is soft
+  // paper, 1.103 against the page, and it is what her own comparison already
+  // pointed at -- the kit's own `StatGrid` tile is a `Card variant="default"`.
+  it("draws each metric tile inside its own kit card, on soft paper, not bare", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const cycleValue = await screen.findByText("1d 1h")
     const tileCard = cycleValue.closest('[data-slot="card"]')
     expect(tileCard).toBeTruthy()
-    expect(tileCard?.getAttribute("data-variant")).toBe("raised")
+    expect(tileCard?.getAttribute("data-variant")).toBe("default")
   })
 
   it("reads 'Not started' and 'No time log' before any work is logged, with the record count beside the title", async () => {
@@ -851,15 +859,33 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
     const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
-    const sideColumn = storiesAnchor.parentElement as HTMLElement
+    // TWO BOXES SINCE 21 SEP 2026, NOT ONE (rulebook L43, kit v1.2.149): the
+    // grid CELL, and the kit's own `RecordSections` inside it, which is the
+    // plain section stack that draws a hairline between consecutive visible
+    // sections. `ticket-detail-body.tsx` used to run that walk by hand in the
+    // cell itself; the kit owns the seam now, so the anchors' parent is the
+    // stack and the stack's parent is the cell. Round 27's real invariant is
+    // unchanged and is asserted on BOTH: neither may bound its own height or
+    // scroll, because the row is meant to resolve to the side column's own
+    // natural height.
+    const sectionStack = storiesAnchor.parentElement as HTMLElement
+    expect(sectionStack.getAttribute("data-slot"), "the stack is the kit's own RecordSections").toBe(
+      "record-sections"
+    )
+    const sideColumn = sectionStack.parentElement as HTMLElement
     expect(sideColumn.parentElement).toBe(grid)
-    expect(timeAnchor.parentElement).toBe(sideColumn)
-    expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
+    expect(timeAnchor.parentElement).toBe(sectionStack)
+    expect(stakeholdersAnchor.parentElement).toBe(sectionStack)
     expect(sideColumn.className).toContain("flex-col")
     expect(sideColumn.className).toContain("gap-6")
-    expect(sideColumn.className).not.toContain("h-full")
-    expect(sideColumn.className).not.toContain("min-h-0")
-    expect(sideColumn.className).not.toContain("overflow-y-auto")
+    expect(sectionStack.className, "the kit stack spends the same 24 as a token").toContain(
+      "gap-[var(--space-6)]"
+    )
+    for (const box of [sideColumn, sectionStack]) {
+      expect(box.className).not.toContain("h-full")
+      expect(box.className).not.toContain("min-h-0")
+      expect(box.className).not.toContain("overflow-y-auto")
+    }
   })
 
   it("the conversation card holds the composer again, as its own CardFooter, absolutely positioned to fill its cell — 'rewind here', by construction now", async () => {

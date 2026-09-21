@@ -265,6 +265,9 @@ import {
   type StatusStage,
 } from "../status-stepper/status-stepper";
 import { ScreenRegister } from "../screen-renderer/screen-renderer";
+/* `RecordSections`' seam - the one line two plain sections meet on. See that
+   component's own note at the foot of this file. */
+import { Separator } from "../separator/separator";
 
 /** Which body is drawn. Law 4: only the PANEL swaps. */
 export type RecordDetailState = "ready" | "loading" | "empty" | "error";
@@ -422,6 +425,35 @@ export interface RecordDetailProps
    * `aria-labelledby` — so nothing is hardcoded here.
    */
   tabsLabel?: string;
+
+  /**
+   * WHETHER REGION 3 IS A BOX - 21 SEP 2026, THE MINIMAL PASS. Client,
+   * verbatim: "go an implement this appwide", after "the goal: make a more
+   * minimal clean app".
+   *
+   * `"plain"` (THE DEFAULT) draws the panel as `Card variant="plain"`: no
+   * fill, no radius, no inset of its own, so the record's body sits
+   * directly on the pane and lines up with the title above it. `"paper"` is
+   * the soft paper slab of the K1 reversal, unchanged and reachable for a
+   * record drawn inside something that has not gone plain.
+   *
+   * THE K1 REVERSAL IS NOT OVERTURNED BY THIS, which is worth saying
+   * because `panelBody`'s own note argues hard for soft paper. Its argument
+   * was that an OFF-BEIGE panel on an off-beige pane measured 1.000 and "the
+   * record's body did not exist as a shape". That is an argument about
+   * which of two papers a painted panel takes, and it is still correct.
+   * This prop is about whether the panel is painted at all - a question the
+   * client has now answered for the whole app, and one 26.04 never asked.
+   *
+   * THE CARDS INSIDE IT ARE THE THING TO WATCH, and they are fine: they are
+   * `raised`, off-beige, and they lifted off soft paper at 1.103. On the
+   * plain panel they stand on the pane, which is off-beige too - so a
+   * `raised` card measures 1.000 there and a caller who has one should move
+   * it to `default`. `StatGrid`'s tiles already take `default` and flip on
+   * their own; `card.tsx`'s override 77 note carries the same warning for
+   * a pickable grid, in the same words, from a different direction.
+   */
+  surface?: "plain" | "paper";
 
   /* ---- Region 3 · the opaque panel ------------------------------------ */
   /** The panel's contents, when a tab carries no `content` of its own. */
@@ -683,6 +715,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       onTabChange,
       sticky = true,
       tabsLabel,
+      surface = "plain",
       panel,
       panelVisible = true,
       state = "ready",
@@ -808,10 +841,18 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
            `variant="default"` is `--surface-panel` with no lift, which is
            also what the specimen draws: a flat fill, no shadow, no stroke.
            The cards INSIDE it stay `raised` and are off-beige, which is the
-           next alternation and the one that now reads at 1.103. */
+           next alternation and the one that now reads at 1.103.
+
+           AND THE PANEL IS PLAIN BY DEFAULT SINCE 21 SEP 2026 - see the
+           `surface` prop for the ruling, and for why the paragraph above is
+           kept rather than deleted: it settles which paper a PAINTED panel
+           takes, which is a different question from whether one is painted,
+           and `surface="paper"` still reaches exactly the shape it argues
+           for. */
         <Card
-          variant="default"
+          variant={surface === "plain" ? "plain" : "default"}
           data-record-region="panel"
+          data-surface={surface}
           className="min-w-0"
         >
           <CardContent>{inner}</CardContent>
@@ -1072,6 +1113,49 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  Unbranched: in light it is 5% charcoal under a charcoal card,
                  which is what a raised block in that palette carries anyway. */
               "shadow-sm",
+              /* ── THE BAND IS A FULL ROW OF THE PANE, 21 SEP 2026. CLIENT,
+                 VERBATIM: "also, make footer not inside a container, but the
+                 full row side to side (within the main content)".
+
+                 IT IS THE ONE BOX THAT STAYS A BOX, which is exactly why it
+                 had to move. On a page where every other fill went
+                 transparent this band became the single strongest thing on
+                 the screen, and a charcoal slab inset 24px from both sides
+                 of an otherwise edge-to-edge page reads as a card that has
+                 been left behind rather than as the page's own foot.
+
+                 HOW IT BREAKS OUT WITHOUT KNOWING WHERE IT IS. The pane
+                 publishes its own gutter as `--pane-inset-x` (see
+                 `screen-shell.tsx`'s `BODY`); this band pulls itself back
+                 out by exactly that measure and then spends the same number
+                 again INSIDE, so the band's own text lands on the identical
+                 left edge as the h1 and the table above it. One property,
+                 read twice, in opposite directions - so the two can never
+                 disagree and no number is written here at all.
+
+                 THE FALLBACK IS 0, AND IT IS THE WHOLE SAFETY OF THIS.
+                 Outside a pane that publishes the property - a record drawn
+                 in a dialog, a sheet, a demo cell - `var(--pane-inset-x,
+                 0px)` resolves to nothing and the band draws exactly where
+                 it has always drawn. A kit part may not assume its host.
+
+                 THE CORNERS FOLLOW THE PANE'S OWN, for the same reason and
+                 by the same mechanism. `--radius-pane-edge` is a DECLARED
+                 token (tokens.css §Shape) whose own value is `--radius`, so
+                 this band keeps the one box radius everywhere by default and
+                 no fourth radius is introduced; the shell's body rebinds it
+                 to `0px` because the pane's own bottom edge is the window's
+                 bottom edge now (the 2026-09-21 bottom-edge ruling,
+                 `screen-shell.tsx`'s content column) and a rounded band
+                 under a squared pane reads as a rendering mistake rather
+                 than as a deliberate edge.
+
+                 THE 24 ABOVE IT IS UNTOUCHED, and so is the flush bottom
+                 edge: both were already right and the 21 Sep page says so in
+                 as many words. This changes the inline axis and the corners,
+                 nothing else. */
+              "-mx-[var(--pane-inset-x,0px)]",
+              "rounded-[var(--radius-pane-edge)]",
             )}
           >
             <CardContent
@@ -1080,7 +1164,17 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  wide 26 / 30 → 24 / 32, which is `CardContent`'s own step).
                  GAPS-DEF1 Q1. */
               className={cn(
-                "px-[var(--space-5)] py-[var(--space-4h)] lg:px-[var(--space-7)] lg:py-6",
+                /* THE INLINE HALF IS THE PANE'S GUTTER WHEN THERE IS ONE -
+                   21 SEP 2026, the other half of the band's own `-mx-`
+                   above. 27.8's own 20/32 stay as the fallbacks, so a band
+                   outside a pane is drawn exactly as the chapter draws it;
+                   inside one, both steps resolve to the pane's single
+                   number and the band's first word lands under the h1. The
+                   BLOCK axis is untouched: 27.8's 18 opening to 24 at `lg:`
+                   is the band's own height, not an alignment with anything
+                   beside it. */
+                "px-[var(--pane-inset-x,var(--space-5))] py-[var(--space-4h)]",
+                "lg:px-[var(--pane-inset-x,var(--space-7))] lg:py-6",
                 /* 27.8's grid, verbatim except for the unit: `repeat(auto-fit,
                    minmax(260px, 1fr))`. auto-fit is what makes "one column at
                    380" a property of the box rather than a breakpoint someone
@@ -1430,4 +1524,98 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
 
 RecordDetail.displayName = "RecordDetail";
 
-export { RecordDetail };
+/* ============================================================================
+   RecordSections - the plain section stack, and the sanctioned seam.
+
+   ADDED 21 SEP 2026, THE MINIMAL PASS. The 21 Sep page's own finding, from
+   two directions at once:
+
+     · on `Separator`: "Before: two fills with 24px of page between them, the
+       gap doing the separating. After: no fills, so the 24px gap alone reads
+       as one long section with two headings in it."
+     · on this component: "The 49px between plain sections is a gap with
+       nothing in it, so it needs the hairline … which the ticket page has
+       already had to draw by hand."
+
+   WHICH IS THE WHOLE REASON THIS IS A COMPONENT AND NOT A NOTE. The rule was
+   already being drawn - correctly - by one call site, by hand, which means
+   the next module to go plain would either draw it differently or forget it.
+   A seam between two sections is the stack's business, not each section's.
+
+   WHAT IT DRAWS. One column at `--space-6` (24, the client's chosen air for
+   the whole page), with `Separator` between CONSECUTIVE VISIBLE children:
+   never above the first, never below the last. `React.Children.toArray` is
+   what makes "visible" honest - it drops `null`, `undefined` and booleans,
+   so a section rendered as `{count > 0 && <Card …/>}` leaves no seam behind
+   when it disappears, which a `[&>*+*]` CSS sibling rule could not promise
+   because a `null` child still occupies a position in a caller's array only
+   until React drops it, and a `<></>` does not.
+
+   THE GAP IS SPLIT EVENLY BY THE FLEX GAP ITSELF - 24 above the rule, 24
+   below, which is the 49px the page measured between two plain sections with
+   the missing line now in the middle of it rather than a taller silence.
+
+   8%, NOT 20%. `Separator`'s `default` is `--border`; its `section` variant
+   is `--hair-strong`. The heavy one belongs UNDER A HEADING, which is where
+   `Title`'s own rule already spends it, and two heavy rules in one column
+   would fight each other for which of them means "a section starts here".
+
+   NO TOP GAP ON `Title`, WHICH THE PAGE ALSO OFFERED. Its note reads "Title
+   takes a top gap when it stands in a plain section, the same `--space-6`".
+   Put there, the number would be paid by every plain Title including the
+   first one in a column and the ones inside hosts that already space their
+   own children - a component adding leading air it cannot see the need for.
+   Put HERE it is paid exactly once per seam, by the object that knows how
+   many seams there are.
+
+   IT IS NOT WIRED INTO `RecordDetail` ITSELF, AND THAT IS DELIBERATE. This
+   kit draws a record's header, strip, panel and ink footer; the SIDE COLUMN
+   beside the conversation is assembled by the consuming app, which is the
+   only thing that knows which sections a given record type has and in what
+   order. So this is exported for that column to wrap, not a slot invented
+   here for a layout the kit does not own.
+   ========================================================================= */
+
+export interface RecordSectionsProps extends React.ComponentPropsWithoutRef<"div"> {
+  /**
+   * The seam's weight. `"hairline"` (the default) is `Separator`'s 8%.
+   * `"none"` keeps the rhythm and draws no rule, for a column whose sections
+   * are separated by something else already.
+   */
+  seam?: "hairline" | "none";
+}
+
+const RecordSections = React.forwardRef<HTMLDivElement, RecordSectionsProps>(
+  ({ className, children, seam = "hairline", ...props }, ref) => {
+    const sections = React.Children.toArray(children);
+
+    return (
+      <div
+        ref={ref}
+        data-slot="record-sections"
+        data-seam={seam}
+        className={cn("flex min-w-0 flex-col gap-[var(--space-6)]", className)}
+        {...props}
+      >
+        {sections.map((section, index) => (
+          <React.Fragment
+            key={
+              React.isValidElement(section) && section.key !== null
+                ? section.key
+                : `section-${String(index)}`
+            }
+          >
+            {index > 0 && seam === "hairline" ? (
+              <Separator data-slot="record-sections-seam" />
+            ) : null}
+            {section}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  },
+);
+
+RecordSections.displayName = "RecordSections";
+
+export { RecordDetail, RecordSections };

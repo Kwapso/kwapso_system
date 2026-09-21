@@ -1553,9 +1553,17 @@ describe("R83 self-check, second miss -- CollectionCard's own default pt- overri
     ).toMatch(/(?:^|\s)lg:pt-\[var\(--pinned-lead\)\]/)
   })
 
-  it("DOM: a real render of CollectionCard's CardContent carries both the unprefixed and the lg: pt- override", () => {
+  // `surface="boxed"` SPELLED OUT — rulebook L43 went app wide on 21 Sep 2026
+  // and `CollectionCard`'s own default is `"plain"`, which carries no inset
+  // of its own at all (the pane pays the side air now, and the 10px lead
+  // rides the frame's own `--pinned-lead` custom property). The `px-4 pb-4
+  // pt-[var(--pinned-lead)]` ladder this case is about belongs to the BOXED
+  // branch, which is still reachable and still has to be right; the source
+  // census above reads that branch's own literal, and this is the same
+  // branch rendered for real. Nothing about the fault it guards changed.
+  it("DOM: a real render of a boxed CollectionCard's CardContent carries both the unprefixed and the lg: pt- override", () => {
     const { container } = render(
-      <CollectionCard>
+      <CollectionCard surface="boxed">
         <div data-testid="child">child</div>
       </CollectionCard>
     )

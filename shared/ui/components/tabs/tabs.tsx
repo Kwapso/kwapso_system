@@ -341,6 +341,43 @@ const INDICATOR_SKIN = "bottom-0 h-[0.125rem] -mb-px bg-foreground";
  */
 export const TABS_STRIP_GAP = "pb-[var(--space-5)]";
 
+/**
+ * THE SAME GAP, FOR A STRIP WHOSE HOST IS PLAIN - 21 SEP 2026, AND THE NUMBER
+ * IS THE CLIENT'S OWN, MEASURED ON THE LIVE PRODUCT: "on tickets, reduce
+ * space above and under toolbar to 10px".
+ *
+ * WHAT THE JOIN USED TO BE MADE OF. Boxed, the distance from the strip to the
+ * first thing in a collection was this file's 20 PLUS the panel's own 14 to 20
+ * top inset, between 34 and 40 in all, and the panel's EDGE did most of the
+ * saying. Plain, the edge is gone and the panel's top inset goes with it
+ * (`collection-frame.tsx`'s own compound variants, same ruling), so this one
+ * padding is the whole join and her number is what it spends.
+ *
+ * SHE LOOKED AT THE LARGER NUMBER FIRST. Measured live before any of this,
+ * the strip closed at y 227.1 and the toolbar opened at y 237.1: a 10px join
+ * where the boxed one read as 34 to 40, arrived at by the consuming app's own
+ * lead rather than by this export. The reasonable-looking fix was to grow it
+ * back toward what the boxed join read as, and the page that proposed it drew
+ * both 20 and 24. Her answer was that 10 is the number she wants and that the
+ * app had already found it by accident.
+ *
+ * SO THE VALUE IS THE APP'S, AND THE OWNER IS THIS FILE'S, which is the half
+ * that was actually broken. A module that re-derives its own lead cannot
+ * receive a ruling made here, and the app's own version puts the 10 on the
+ * COLLECTION rather than on the strip - which this file's `TABS_STRIP_GAP`
+ * comment above already explains cannot survive: a distance that lives
+ * anywhere but the strip's own box stops holding the moment the strip goes
+ * sticky and freezes at the top of a scrolling pane. Same 10, on the box that
+ * gets pinned.
+ *
+ * `TOOLBAR_ROW_GAP` (`toolbar-row.tsx`) DOES NOT FOLLOW IT, and that is not
+ * drift. That one is the gap a toolbar standing ALONE pays under itself;
+ * inside a collection the host's own column gap is that distance, and on a
+ * plain panel the host now spends the same `--space-2h` below the toolbar
+ * that this spends above it. Her two numbers, one owner each.
+ */
+export const TABS_STRIP_GAP_PLAIN = "pb-[var(--space-2h)]";
+
 /* ============================================================================
    Tabs
    ========================================================================= */

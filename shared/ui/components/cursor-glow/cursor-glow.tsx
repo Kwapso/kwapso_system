@@ -188,6 +188,18 @@ const BLOOM_DECAY = 0.03; // per frame, pulling back to rest once it stops
 const BLOOM_MAX = 1;
 const BLOOM_SPIKE = 1; // on `pointerdown`
 
+/* IDLE THRESHOLDS — how close is "arrived", for a loop that must be allowed
+   to stop. `x`/`y` are percentages of the field's own box (0–100); a gap
+   under a hundredth of a percent is a fraction of a pixel on any screen this
+   ships to and is not a jump the eye can find. `bloom` is 0–1 and decays
+   toward 0 on every frame it runs, so the same kind of "close enough" bound
+   applies. Both are comfortably tighter than anything `toFixed(2)` /
+   `toFixed(3)` below can even represent as a change, so the loop never stops
+   one frame before the custom properties it writes would have visibly
+   moved. */
+const POSITION_EPSILON = 0.01;
+const BLOOM_EPSILON = 0.001;
+
 /* The pointer-tracking gradient's own strength as `--bloom` moves 0 → 1.
    Percentages, matching this file's other `color-mix` stops — see point 3
    in the header for why `--bloom` is connected here at all. */
@@ -252,29 +264,71 @@ const CursorGlow = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
       // independently at the CSS layer.
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
+      // NO FINE POINTER, NO FLOURISH — the second bail-out, same shape as
+      // the one above and checked for the same reason: a touch-only device
+      // has no `pointermove` stream (the header's own point on that, under
+      // "WHAT CARRIES OVER"), so the listeners and the rAF loop this file
+      // installs would sit there doing nothing all session. `(hover: hover)
+      // and (pointer: fine)` is the standard pairing — `pointer: fine`
+      // alone is still true for a stylus on some tablets — and is what
+      // singles out "a mouse or trackpad is actually driving this session."
+      // This inherits the exact same one-time-check gap the reduced-motion
+      // guard above documents: a session that starts touch-only and later
+      // gets a mouse plugged in (a docked tablet, say) will not grow the
+      // glow retroactively. Unlike reduced motion there is no CSS layer
+      // that can close this independently — but the field's defaults
+      // (`DEFAULT_MX`/`DEFAULT_MY`, `--bloom:0`) already render a static,
+      // correct-looking resting frame with no listener at all, so the
+      // miss is "no glow keeps up with a mouse that appeared mid-session,"
+      // never a broken or stale one.
+      if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
       let targetX = 50;
       let targetY = 38;
       let x = targetX;
       let y = targetY;
       let bloom = 0;
       let raf = 0;
+      let running = false;
 
-      const onMove = (event: PointerEvent) => {
-        // Percentage of THIS component's own box — see header point 2 on
-        // why that is not the same as the original's percentage of the
-        // viewport, and why it has to be measured fresh on every event
-        // rather than cached (the ground can resize under a rail/aside
-        // toggle without this component re-mounting).
-        const rect = field.getBoundingClientRect();
-        if (rect.width) targetX = ((event.clientX - rect.left) / rect.width) * 100;
-        if (rect.height) targetY = ((event.clientY - rect.top) / rect.height) * 100;
-        bloom = Math.min(BLOOM_MAX, bloom + BLOOM_GROWTH);
+      // MEASURED ONCE, REFRESHED ON RESIZE — not on every `pointermove`.
+      // `getBoundingClientRect` forces a synchronous layout read, and the
+      // old comment here was right that the measurement cannot be taken
+      // once at mount and never touched again (the ground can resize under
+      // a rail/aside toggle without this component re-mounting) — it was
+      // wrong about the fix being "measure on every event," which pays that
+      // layout cost hundreds of times a second for a box that is, almost
+      // always, not resizing. A `ResizeObserver` on the field plus a window
+      // resize listener catches every case that actually moves this box's
+      // edges (the rail/aside toggle included) with one measurement each,
+      // not one per pointer event. This box is `absolute inset-0` inside a
+      // ground that does not itself scroll — only ITS OWN size and the
+      // window's change where its edges are relative to the viewport, so
+      // resize is the complete set of events that can invalidate the cache.
+      let rect = field.getBoundingClientRect();
+      const measure = () => {
+        rect = field.getBoundingClientRect();
       };
+      const resizeObserver = new ResizeObserver(measure);
+      resizeObserver.observe(field);
+      window.addEventListener("resize", measure, { passive: true });
 
-      const onDown = () => {
-        bloom = BLOOM_SPIKE;
-      };
-
+      // IDLE, NOT ENDLESS — `tick` stops rescheduling itself once position
+      // and bloom have both settled (see `POSITION_EPSILON` /
+      // `BLOOM_EPSILON` above), instead of calling
+      // `requestAnimationFrame(tick)` unconditionally forever. `running`
+      // is the single source of truth for "is a frame already queued,"
+      // checked by `startLoop` before every schedule, so a burst of
+      // `pointermove` events during an already-running loop can only ever
+      // have one frame in flight at a time — and because `onMove`/`onDown`
+      // both call `startLoop` after touching `targetX`/`targetY`/`bloom`,
+      // a loop that went idle is always woken by the very event that gave
+      // it somewhere new to go, so it can never sit stopped while the
+      // pointer keeps moving. Declared as a `const` closure, not a
+      // `function` declaration, so TypeScript keeps narrowing `field` (the
+      // `if (!field) return` above) inside it — a hoisted function
+      // declaration loses that narrowing because it is reachable before the
+      // guard runs.
       const tick = () => {
         x += (targetX - x) * POSITION_LERP;
         y += (targetY - y) * POSITION_LERP;
@@ -286,16 +340,55 @@ const CursorGlow = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
         field.style.setProperty("--my", `${y.toFixed(2)}%`);
         field.style.setProperty("--bloom", bloom.toFixed(3));
 
+        const settled =
+          Math.abs(targetX - x) < POSITION_EPSILON &&
+          Math.abs(targetY - y) < POSITION_EPSILON &&
+          bloom < BLOOM_EPSILON;
+
+        if (settled) {
+          // No more three `setProperty` calls, no more rasterising the
+          // blurred layers above, until something gives this loop
+          // somewhere new to go. `running = false` is what lets
+          // `startLoop` schedule again instead of treating an idle loop as
+          // still in flight.
+          running = false;
+          return;
+        }
+
         raf = requestAnimationFrame(tick);
+      };
+
+      const startLoop = () => {
+        if (running) return;
+        running = true;
+        raf = requestAnimationFrame(tick);
+      };
+
+      const onMove = (event: PointerEvent) => {
+        // Percentage of THIS component's own box — see header point 2 on
+        // why that is not the same as the original's percentage of the
+        // viewport. `rect` is the cached measurement above, not a fresh
+        // read; see that comment for why a resize listener is enough.
+        if (rect.width) targetX = ((event.clientX - rect.left) / rect.width) * 100;
+        if (rect.height) targetY = ((event.clientY - rect.top) / rect.height) * 100;
+        bloom = Math.min(BLOOM_MAX, bloom + BLOOM_GROWTH);
+        startLoop();
+      };
+
+      const onDown = () => {
+        bloom = BLOOM_SPIKE;
+        startLoop();
       };
 
       window.addEventListener("pointermove", onMove, { passive: true });
       window.addEventListener("pointerdown", onDown, { passive: true });
-      raf = requestAnimationFrame(tick);
+      startLoop();
 
       return () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerdown", onDown);
+        window.removeEventListener("resize", measure);
+        resizeObserver.disconnect();
         cancelAnimationFrame(raf);
       };
     }, []);

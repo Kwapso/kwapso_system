@@ -291,36 +291,34 @@ export type FolderTabStrip = {
   config: TabsConfig
   value: string
   onValueChange: (value: string) => void
-  /** TICKETS-ONLY, 21 Sep 2026 — Aurora's ruling, verbatim: "on tickets,
-   * reduce space above and under toolbar to 10px." Measured live: the
-   * visible whitespace from the tab underline to the toolbar's own top was
-   * 30px, not 20 (the strip's own trailing `pb-[var(--tab-content-gap)]`,
-   * R63 part 3's tabs-to-container gap) plus 10 (`--toolbar-lead-gap`, R83
-   * ruling 7, paid by the card that follows). The "under" half was already
-   * the ruled 10px at the box level (`--toolbar-content-gap`) — what reads
-   * larger there is the kit `TableHead`'s own vertical centring inside the
-   * fixed 56px row, which is read-only (CLAUDE.md, `shared/ui/` is
-   * vendored).
-   *
-   * So only the ABOVE half moves, and only for the one strip that asked:
-   * `true` drops the strip's own trailing gap to zero, scoped the same way
-   * `CollectionCard`'s own `surface="plain"` is scoped — a flag on the ONE
-   * call site that wants it (`tickets-collection.tsx`), never a new
-   * default, because every other `renderFolderTabs` host still owes R63's
-   * ordinary 20px tabs-to-container gap. Board and split both render inside
-   * the same strip (tickets-collection.tsx draws one `renderFolderTabs`
-   * call outside its view switch), so they inherit the fix for free. */
-  tight?: boolean
 }
 
-/** Worn by a `tight` strip (above) alongside `PINNED_STRIP_MARK`, so
- * `globals.css` can correct `--pinned-chrome-h` for it too — that property
- * is computed off `--tab-content-gap` for every `.pinned-strip` container
- * (R63 part 3, `*:has(> .pinned-strip)` below), and a strip that pays no
- * trailing gap of its own would leave a 20px hole between the strip and a
- * PINNED toolbar the moment the page scrolls, even though the gap already
- * reads right at rest. A plain marker class, not a utility, the identical
- * shape `PINNED_STRIP_MARK` already is. */
+/** Worn by EVERY strip this file draws, alongside `PINNED_STRIP_MARK`, so
+ * `globals.css` can compute `--pinned-chrome-h` from the strip's own painted
+ * height alone — no trailing gap in the sum, because the strip pays none.
+ *
+ * IT WAS THE TICKETS-ONLY MARK UNTIL 21 SEP 2026, and it is the only path
+ * now. Aurora's ruling that made it (verbatim, over the live tickets list:
+ * "on tickets, reduce space above and under toolbar to 10px") was scoped to
+ * one call site while the plain surface was an experiment; the same day she
+ * took the experiment app wide ("go an implement this appwide") the ordinary
+ * 20px tabs-to-container gap had nothing left to be ordinary for. Every
+ * collection in both front doors now draws the same 10px rhythm above its
+ * toolbar, and the way it is spent is unchanged from the shape she validated
+ * live: the strip itself pays ZERO, and the collection card under it pays the
+ * whole `--toolbar-lead-gap` (10px) as real `padding-top`, which is what a
+ * pinned toolbar then reveals as its own peek (R63/R83, `web/app/globals.css`
+ * carries the argument at the rules that spend it).
+ *
+ * THE KIT NAMES THE SAME RHYTHM AS `TABS_STRIP_GAP_PLAIN` (`--space-2h`, 10px,
+ * tabs.tsx, v1.2.149) and spends it on the strip's own box instead. The two
+ * agree on the NUMBER and differ on the payer, and the app's payer is the one
+ * this door's own `--pinned-chrome-h` rules are built around — the correction
+ * below is exactly what makes the app's arrangement survive the strip going
+ * sticky, which is the objection the kit's own note raises against it.
+ *
+ * A plain marker class, not a utility, the identical shape `PINNED_STRIP_MARK`
+ * already is. */
 export const PINNED_STRIP_TIGHT_MARK = "pinned-strip-tight"
 
 /**
@@ -472,13 +470,17 @@ export function renderFolderTabs(strip: FolderTabStrip | undefined): React.React
   return (
     <TabsView
       // `cn` (tailwind-merge) drops the earlier `pb-[var(--tab-content-gap)]`
-      // for `pb-0` when `tight` — a JS-level merge, not a hope that the later
-      // class wins in the generated stylesheet's own emission order (PATTERN
-      // §4's own rule, restated at every call site that needs a real
-      // override rather than an additive class). `PINNED_STRIP_TIGHT_MARK`
-      // rides the same element so globals.css can correct `--pinned-chrome-h`
-      // for it (see that constant's own doc).
-      className={cn(STICKY_FOLDER_TABS, strip.tight && `pb-0 ${PINNED_STRIP_TIGHT_MARK}`)}
+      // for `pb-0` — a JS-level merge, not a hope that the later class wins in
+      // the generated stylesheet's own emission order (PATTERN §4's own rule,
+      // restated at every call site that needs a real override rather than an
+      // additive class). UNCONDITIONAL SINCE 21 SEP 2026: this was
+      // `strip.tight && …`, a per-call-site flag while the plain surface was
+      // a tickets-only experiment; the experiment is the app now (rulebook
+      // L43), so every host draws the one rhythm and there is no flag left to
+      // get wrong. `PINNED_STRIP_TIGHT_MARK` rides the same element so
+      // globals.css can compute `--pinned-chrome-h` for it (see that
+      // constant's own doc).
+      className={cn(STICKY_FOLDER_TABS, `pb-0 ${PINNED_STRIP_TIGHT_MARK}`)}
       config={strip.config}
       value={strip.value}
       onValueChange={strip.onValueChange}

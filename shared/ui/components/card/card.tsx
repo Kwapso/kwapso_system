@@ -253,17 +253,55 @@ const cardVariants = cva(
          * plain card still holds a heading and body text that need an ink
          * to read against even with no paper of its own.
          *
-         * `--badge-quiet-fill` is left at `default`'s own value
-         * (`--surface-raised`), not re-bound: a `plain` card paints no
-         * paper of its own, so a Badge inside one sits on the PAGE's own
-         * ground, which is exactly the ground `default`'s rebind already
-         * answers for.
+         * `--badge-quiet-fill` REBOUND TO SOFT PAPER, 21 SEP 2026 - AND THE
+         * SENTENCE THIS COMMENT USED TO CARRY WAS THE BUG. It read: "left at
+         * `default`'s own value (`--surface-raised`), not re-bound: a `plain`
+         * card paints no paper of its own, so a Badge inside one sits on the
+         * PAGE's own ground, which is exactly the ground `default`'s rebind
+         * already answers for." Every clause of that is true and the
+         * conclusion is backwards. `default`'s rebind answers for a Badge
+         * standing on `default`'s OWN soft paper, and the other paper from
+         * soft paper is off-beige. A plain card's ground is the PAGE, whose
+         * own paper is off-beige already - so "the other paper" runs the
+         * other way, and reusing `default`'s answer painted a chip the exact
+         * colour it was standing on.
+         *
+         * MEASURED LIVE on the tickets list before this line: inside a plain
+         * card `--badge-quiet-fill` resolved #FFFEF9 against a pane of
+         * rgb(255, 254, 249). Ratio 1.000. The only chips visible on the
+         * whole module were the black id chips, which paint
+         * `--surface-inverse` and are the one variant that never reads this
+         * property. Every stage chip, type chip and count pill was gone.
+         *
+         * `--surface-panel` - soft paper, the other paper tone from the
+         * page - is one line and brings all of them back, at the kit's own
+         * page/panel step of 1.103 light / 1.111 dark. It is the identical
+         * value `raised` rebinds to one variant up, for the identical
+         * reason: both stand on off-beige.
+         *
+         * WHY THE FIXED TOKEN AND NOT THE RELATIONAL `--surface-lift`. A
+         * plain card paints nothing, so §8 never fires ON it - the nearest
+         * ground-keyed ancestor is whatever the host happens to be, and a
+         * card whose chips change colour depending on how deeply somebody
+         * nested it is the class of surprise this variant exists to avoid.
+         * `Avatar`'s default DOES take the relational register in the same
+         * pass, and correctly: an avatar is handed to a ground it cannot
+         * see, while this rebind IS the ground statement. See tokens.css §4
+         * on `--surface-lift` for where that line is drawn.
+         *
+         * THE TITLE ROW IS UNTOUCHED AND THAT IS THE POINT. `CardTitle` is
+         * `text-lg` at Saans Medium on every variant; the plain overrides
+         * below take away insets, hairlines and fills and never a weight or
+         * a step, so a plain section's heading reads as a heading with no
+         * box under it. What separates two plain sections is `Separator`,
+         * which `RecordSections` (record-detail.tsx) now draws between them
+         * rather than every call site drawing it by hand.
          *
          * Scoped to a single experiment in the tickets module's record
          * page first (GAPS: not yet a system-wide replacement for
-         * `default`). See CHANGELOG v1.2.145.
+         * `default`). See CHANGELOG v1.2.145 and v1.2.149.
          */
-        plain: "bg-transparent [--badge-quiet-fill:var(--surface-raised)]",
+        plain: "bg-transparent [--badge-quiet-fill:var(--surface-panel)]",
       },
     },
     defaultVariants: { variant: "default" },
@@ -587,7 +625,33 @@ CardDescription.displayName = "CardDescription";
 
    VERTICAL IS UNTOUCHED — `py-6 lg:py-[var(--space-7)]`, the same two
    figures this file always spent, just no longer sharing one `p-*` utility
-   with the horizontal figure that moved. This ruling named "the sides." */
+   with the horizontal figure that moved. This ruling named "the sides."
+
+   ── THE ONE TOKEN BECAME TWO, 21 SEP 2026, AND THE SPLIT IS THE DECISION
+   WORTH ARGUING RATHER THAN THE NUMBER. Client, on the minimal pass: "the
+   same spacing thats now before the footer i want above nav and on sides,
+   bring more air", ruled to `--space-6` (24). That sentence is about the
+   PANE - the shell's own content column - and `screen-shell.tsx` now spends
+   its own `SHELL_CONTENT_INSET_X` (`px-[var(--space-6)]`) for it.
+
+   THIS CONSTANT DOES NOT FOLLOW IT TO 24, AND THE REASON IS THE WHOLE POINT
+   OF THE PASS. Part two of the 21 Sep page states it as arithmetic: a plain
+   card's horizontal inset is gone, so the page has to supply the 16 to 32px
+   the box used to, and 24 on the pane is what supplies it. A card that still
+   HAS its box has not given anything up - so a boxed `CardContent` inside a
+   24px pane would spend 24 + 24 = 48px of side air on a shape nobody asked
+   to widen, and it would do it while `CardHeader` and `CardFooter` one
+   screenful up still spend 24 to `lg:` and 32 above. The header would be
+   WIDER than the body it heads on every desktop card in both apps.
+
+   SO: the pane's gutter and the boxed card's body inset are no longer one
+   number, because the 21 Sep ruling gave them different jobs. Ruling 2's own
+   equality ("the sides should be the same as the margin on top of the
+   toolbar") is not broken by this - that equality was about the PANE's two
+   seams, and both of those still read one constant. `check-screen-shell.mjs`
+   pins the new constant by name at both ends exactly as it pinned this one.
+   A caller that genuinely wants a card body at the pane's own measure has
+   `className`, which is where a one-off has always belonged. */
 const CARD_CONTENT_INSET_X = "px-[var(--space-3)]";
 
 /**

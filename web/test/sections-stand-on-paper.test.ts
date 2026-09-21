@@ -1479,7 +1479,32 @@ describe("R67 — a titled section stands on paper", () => {
     return out
   }
 
-  type Finding = { where: string; bare: string[] }
+  /** A STROKE OR A HEX ON A SECTION — THE HALF OF R67 THAT SURVIVED L43.
+   *
+   * Aurora took the boxes off on 21 Sep 2026 ("go an implement this appwide"),
+   * so "this body is on the bare page ground" stopped being an offence and
+   * became the DEFAULT. What did not change is the other half of this law's
+   * own sentence, which until today had no census of its own because the fill
+   * was always there to do the separating: BUILD-A-SCREEN.md §6.1, "no CSS
+   * border, ever" - separation is a fill or an inset shadow, never a stroke -
+   * and R32's closed palette, never a hex literal. On a section that has given
+   * up its fill, a stroke is the thing somebody reaches for next, and it is
+   * the one move that would undo the whole pass.
+   *
+   * SCOPED TO THE SECTION'S OWN BOX AND ITS OWN BODIES, never the subtree: a
+   * field, a table cell or a kit control deeper inside carries its own edges
+   * and is not what this law is about. `border-none`/`border-0` are removals,
+   * not strokes. */
+  const STROKE = /(^|[\s:[])(border(?!-(?:none|0)\b)(?:-[a-z]+)?|outline(?:-[a-z]+)?)(\b|$)/
+  const HEX = /#[0-9a-fA-F]{3,8}\b/
+  function strokeOrHex(node: ts.Node): string | null {
+    const cls = classNameOf(node)
+    if (HEX.test(cls)) return "a hex literal"
+    if (STROKE.test(cls)) return "a stroke"
+    return null
+  }
+
+  type Finding = { where: string; bare: string[]; stroked: string[] }
   const titled: Finding[] = []
   const panelCensus = { hosts: 0, boxed: 0 }
   /** AMENDMENT 4's OWN COUNTERS, so its two halves can be proved to measure
@@ -1503,9 +1528,33 @@ describe("R67 — a titled section stands on paper", () => {
         for (let p: ts.Node | undefined = node; p && !boxed; p = p.parent)
           if ((ts.isJsxElement(p) || ts.isJsxSelfClosingElement(p)) && paints(p)) boxed = true
         // (b) the CollectionFrame shape — heading outside, every body on paper.
+        // KEPT, AND NO LONGER THE OFFENCE (L43, 21 Sep 2026): `bare` is still
+        // computed, still counted and still read by this file's own blindness
+        // tripwire, because the census having gone blind and the app having
+        // gone plain look identical from the outside and only this number
+        // tells them apart. What it no longer does is fail the build.
         const bare: string[] = []
+        const stroked: string[] = []
+        const sectionMark = strokeOrHex(node)
+        if (sectionMark)
+          stroked.push(
+            `<section> at line ${f.tree.getLineAndCharacterOfPosition(node.getStart()).line + 1} carries ${sectionMark}`
+          )
+        // ONE `bodies()` CALL, EXACTLY WHERE IT ALWAYS WAS. That function is
+        // not pure: amendment 7's own `unresolvedIdentifiers` counter ticks
+        // inside it, and this file's tripwire pins that number. A second walk
+        // for the stroke question would have tripled it against an app that
+        // had not changed — so the stroke scan rides the SAME loop, under the
+        // SAME `!boxed` guard, rather than beside it. A boxed section is still
+        // asked about its own box above; its bodies stand on real paper, which
+        // is the shape this law never had a complaint about, and a stroke
+        // reached for to get an edge back is by definition a thing that
+        // happens where the fill has gone.
         if (!boxed)
           for (const b of bodies(node)) {
+            const line = f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1
+            const mark = strokeOrHex(b)
+            if (mark) stroked.push(`<${tagName(b)}> at line ${line} carries ${mark}`)
             const t = tagName(b)
             if (carriesHeading(b)) continue
             if (t && PROSE.test(t)) continue
@@ -1514,9 +1563,9 @@ describe("R67 — a titled section stands on paper", () => {
             if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
             if (subtreePaints(b)) continue
             if (t && READABLE_PROSE.test(t)) amendment4.proseBare++
-            bare.push(`<${t}> at line ${f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1}`)
+            bare.push(`<${t}> at line ${line}`)
           }
-        titled.push({ where, bare })
+        titled.push({ where, bare, stroked })
       }
       ts.forEachChild(node, visit)
     }
@@ -1612,7 +1661,13 @@ describe("R67 — a titled section stands on paper", () => {
         if (!byPanel.has(value)) byPanel.set(value, [])
         byPanel.get(value)!.push(`<${t}> at line ${line}`)
       }
-      for (const [value, bare] of byPanel) panels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare })
+      // A TAB PANEL HAS NO `<section>` TAG OF ITS OWN TO CARRY A STROKE, so
+      // its `stroked` list is empty by construction. It is present rather than
+      // absent because the two censuses are concatenated below and one of them
+      // missing the field would read as "nothing found" instead of "nothing to
+      // find", which is this file's own recurring lesson.
+      for (const [value, bare] of byPanel)
+        panels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare, stroked: [] })
     }
     panelCensus.hosts++
     if (boxed) panelCensus.boxed++
@@ -1888,28 +1943,81 @@ describe("R67 — a titled section stands on paper", () => {
     ).toBe(1)
   })
 
-  it("sections-stand-on-paper: every titled section and every tab panel is contained, or says why not (R67)", () => {
+  // ── AMENDED A TENTH TIME, 21 SEP 2026 — THE PREMISE WAS OVERTURNED, NOT
+  //    WIDENED. Aurora, on the Minimal Kit page, verbatim: "go an implement
+  //    this appwide", and, for the whole pass, "the goal: make a more minimal
+  //    clean app" (rulebook L43).
+  //
+  //    THIS LAW'S FIRST SENTENCE WAS "each panel stands on paper; nothing is
+  //    drawn on the bare page ground", and it was HERS — five sayings in three
+  //    days, quoted in full in RULES.md's own R67 row ("nothing on top of white
+  //    background, its a rule!"). She has now ruled the other way, over the
+  //    whole app, with a validated page behind it. A law does not get to keep
+  //    enforcing a premise its author retired, so the clause that failed a
+  //    build for a bare body is GONE.
+  //
+  //    WHAT STILL HOLDS, AND IS NOW THE WHOLE OF THE OFFENCE: a section paints
+  //    the PAGE or the kit's PAPER - never a stroke, never a hex. That was
+  //    always this law's own sentence (BUILD-A-SCREEN.md §6.1, "no CSS border,
+  //    ever"; R32's closed palette) and it never had a census here, because
+  //    while every section carried a fill there was nothing for a stroke to be
+  //    the alternative TO. There is now: a section that has given up its box is
+  //    exactly where somebody reaches for an outline to get the edge back, and
+  //    one outline would undo the pass.
+  //
+  //    THE `<section>` CENSUS STAYS, WHOLE. Same subject (the literal
+  //    `<section>` tag, amendment 4), same walk, same per-branch `bodies()`,
+  //    same paint resolution, same tab-panel half, same tripwires. It admits
+  //    the page ground now - `bare` is still computed and still asserted to be
+  //    non-trivial below, because "the census went blind" and "the app went
+  //    plain" look identical from outside and that number is the only thing
+  //    that tells them apart.
+  it("sections-stand-on-paper: no titled section and no tab panel draws a stroke or a hex (R67, as amended by L43)", () => {
     // ONE CENSUS, TWO SUBJECTS. A titled `<section>` is keyed by its file; a tab
     // panel by `file#value`, because one file's tabs are not one decision.
-    const offenders = [...titled, ...panels].filter((s) => s.bare.length > 0)
+    const offenders = [...titled, ...panels].filter((s) => s.stroked.length > 0)
     const unexplained = offenders.filter((s) => !(s.where.split(":")[0] in UNCONTAINED_SECTION_OK))
     expect(
-      unexplained.map((s) => `${s.where} — on the bare page ground: ${s.bare.join(", ")}`),
-      "R67 — a titled section, or a tab panel, either IS a container or draws every one of its bodies " +
-        "inside one. Put the content on `--surface-panel` (the shape `CollectionFrame`, " +
-        "`web/components/team/team-panel.tsx` and `CardGrid tone=\"panel\"` all use — and note that " +
-        "`bg-card` is NOT one against the page: it is the page's own colour in light), or name the " +
-        "file (a section) or `file#tabValue` (a panel) in UNCONTAINED_SECTION_OK with the real reason:"
+      unexplained.map((s) => `${s.where} — ${s.stroked.join(", ")}`),
+      "R67 — a section paints the page or the kit's paper, never a stroke and never a hex. " +
+        "Separation is a fill or an inset shadow (BUILD-A-SCREEN.md §6.1), and a colour resolves " +
+        "through a token (R32). If the section needs an edge back, it needs the kit's paper " +
+        "(`variant=\"default\"`), not an outline. Otherwise name the file in UNCONTAINED_SECTION_OK " +
+        "with the real reason:"
     ).toEqual([])
 
-    // ROT-CHECKED, so the list can only shrink: a file whose sections are all
-    // contained now must lose its line rather than keep a pin nobody re-reads.
+    // ROT-CHECKED, so the list can only shrink: a file whose sections draw no
+    // stroke now must lose its line rather than keep a pin nobody re-reads.
     const claimed = new Set(offenders.map((s) => s.where.split(":")[0]))
     const stale = Object.keys(UNCONTAINED_SECTION_OK).filter((k) => !claimed.has(k))
     expect(
       stale,
-      "these UNCONTAINED_SECTION_OK entries match nothing any more — the sections are contained, so delete the entry:"
+      "these UNCONTAINED_SECTION_OK entries match nothing any more — delete the entry:"
     ).toEqual([])
+  })
+
+  // PROVED NOT VACUOUS, the same two-part way every other amendment in this
+  // file proves its own: the matcher really fires on the shapes it names, and
+  // really does not fire on the ones it must not.
+  it("the stroke/hex matcher catches what it names and nothing beside it", () => {
+    const fire = [
+      "rounded-[var(--radius)] border border-dashed p-4",
+      "border-b",
+      "outline outline-2",
+      "bg-[#FFFEF9] p-4",
+    ]
+    const quiet = [
+      "flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4",
+      "flex min-w-0 flex-col gap-6",
+      "border-none",
+      "border-0",
+      "shadow-[var(--hairline-under)]",
+      "bg-surface-panel",
+    ]
+    for (const c of fire)
+      expect(HEX.test(c) || STROKE.test(c), `must be caught: ${c}`).toBe(true)
+    for (const c of quiet)
+      expect(HEX.test(c) || STROKE.test(c), `must NOT be caught: ${c}`).toBe(false)
   })
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -2237,7 +2345,14 @@ describe("R67 — a titled section stands on paper", () => {
               if (collectionSubtreePaints(b)) continue
               byPanel.get(value)!.push(`<${t}> at line ${line}`)
             }
-            for (const [value, bare] of byPanel) stickyPanels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare })
+            // `stroked: []` — this SECOND census asks a different question
+            // (is a nested collection on its own card?) and has no `<section>`
+            // tag of its own to carry a stroke. Present rather than absent
+            // because it shares the `Finding` type with the census above, and
+            // an optional field would let a real stroke list go missing here
+            // without anything saying so.
+            for (const [value, bare] of byPanel)
+              stickyPanels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare, stroked: [] })
           }
         }
         ts.forEachChild(node, visit)

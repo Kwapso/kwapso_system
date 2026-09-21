@@ -1820,11 +1820,11 @@ export function HelpDetailScreen({
             appName={ticket.appName}
             appAssigneeId={ticket.appAssigneeId}
             members={assignableMembers(membersQ.data)}
-            // THE TICKETS-MODULE EXPERIMENT (rulebook L43, Aurora's ruling,
-            // 21 Sep 2026): the grouping cards around Assigned to, Related
-            // stories, Effort and Stakeholders drop their box and sit
-            // directly on the page's own white main content.
-            surface="plain"
+            // APP WIDE SINCE 21 SEP 2026 (rulebook L43) — the grouping
+            // cards around Assigned to, Related stories, Effort and
+            // Stakeholders sit directly on the page's own white main
+            // content. No prop says so any more: plain is the shells' own
+            // default now, everywhere, in both apps.
           />
         }
         timeEmpty={effortEmpty}
@@ -2091,9 +2091,6 @@ export function HelpDetailScreen({
             title={t("Related stories")}
             count={formatCount(storiesTotal)}
             empty={storiesPreviewQ.data !== undefined && storiesPreviewQ.data.length === 0}
-            // THE TICKETS-MODULE EXPERIMENT (rulebook L43) — see the
-            // `assignedTo` call above.
-            surface="plain"
             action={
               canWriteWork ? (
                 <AddButton
@@ -2273,9 +2270,6 @@ export function HelpDetailScreen({
               canEdit={canEditTime}
               members={membersQ.data}
               metrics={ticketMetricsQ.data}
-              // THE TICKETS-MODULE EXPERIMENT (rulebook L43) — see the
-              // `assignedTo` call above.
-              surface="plain"
               onEmptyChange={setEffortEmpty}
             />
           ) : null
@@ -2292,9 +2286,6 @@ export function HelpDetailScreen({
           <TicketSidePanel
             title={t("Stakeholders")}
             count={stakeholderBadge}
-            // THE TICKETS-MODULE EXPERIMENT (rulebook L43) — see the
-            // `assignedTo` call above.
-            surface="plain"
           >
             {/* RAISED BY → EDITABLE, THROUGH THE EXISTING PATCH DOOR — client
                 ruling, 18 Sep 2026 ("raised by, there should be a dropdown").

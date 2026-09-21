@@ -90,8 +90,15 @@ export function KnowledgeSourceCard({
 }) {
   const { t, lang } = useLanguage()
   return (
+    /* SOFT PAPER, NOT OFF-BEIGE — rulebook L43 going app wide, 21 Sep 2026.
+       `raised` is `--card`, which IS the page's own colour in light (#FFFEF9),
+       so on the plain ground this card now stands on it would measure 1.000 and
+       be held up by its shadow alone. `default` is soft paper, 1.103, the tone
+       every other object on this ground reads at. The Minimal Kit page named
+       this sweep: "check that nobody passed `raised` explicitly for a tile row
+       that used to sit on a panel". */
     <Card
-      variant="raised"
+      variant="default"
       interactive
       role="button"
       tabIndex={0}

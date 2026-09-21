@@ -202,6 +202,53 @@ if (!/default:\s*"bg-surface-panel \[--badge-quiet-fill:var\(--surface-raised\)\
   );
 }
 
+/* ── 6 · THE PLAIN SHELL'S CHIP FILL, v1.2.149 ───────────────────────────
+   THE DEFECT THIS PINS, MEASURED LIVE ON THE TICKETS LIST BEFORE THE FIX:
+   inside a `plain` Card, `--badge-quiet-fill` resolved #FFFEF9 against a
+   pane of rgb(255, 254, 249). Ratio 1.000. Every stage chip, type chip and
+   count pill on the module was invisible; the only chips left were the
+   black id chips, which paint `--surface-inverse` and are the one variant
+   that never reads this property.
+
+   WHY IT IS A SEPARATE ASSERTION FROM "no painted bg" ABOVE. A plain shell
+   paints no PAPER of its own and must still ANSWER the paper question for
+   the chips inside it, because a chip takes the other tone from its ground
+   and a plain card's ground is the page. Those two sentences pull in
+   opposite directions, which is exactly how the original line ended up
+   reusing `default`'s answer (`--surface-raised`, the page's own colour)
+   and calling it correct. The value is pinned by name, not merely its
+   presence: `--surface-panel` is soft paper, the other tone from the page,
+   and `--surface-raised` here is the bug verbatim. */
+const plainMatch = variantsBlock.match(/plain:\s*"([^"]*)"/);
+if (plainMatch !== null) {
+  const plainClass = plainMatch[1];
+  if (!/\[--badge-quiet-fill:var\(--surface-panel\)\]/.test(plainClass)) {
+    findings.push(
+      `\`plain\`'s class string ("${plainClass}") does not rebind --badge-quiet-fill to --surface-panel: ` +
+        "a plain shell's ground is the PAGE, whose other paper tone is soft paper. Leaving it at " +
+        "`default`'s own --surface-raised paints every quiet chip the exact colour it stands on (measured " +
+        "1.000 on the live tickets list, 21 Sep 2026).",
+    );
+  }
+}
+
+/* ── 7 · THE BOXED BODY INSET DID NOT FOLLOW THE PANE, v1.2.149 ──────────
+   On 21 Sep 2026 the pane's own gutter moved to `--space-6` and split away
+   from this export (`SHELL_CONTENT_INSET_X`, `compositions/templates/
+   screen-shell.tsx`). THIS constant did not move, and that is the half of
+   the split worth pinning from this side: a later edit that "restored the
+   equality" by widening a boxed card's body to 24 would put 48px of side
+   air inside every boxed card on a 24px pane, and would make `CardHeader`
+   (still `px-6 lg:px-[var(--space-7)]`) wider than the body it heads.
+   `check-screen-shell.mjs` pins the other half and the reason. */
+if (!/const CARD_CONTENT_INSET_X = "px-\[var\(--space-3\)\]";/.test(src)) {
+  findings.push(
+    "`CARD_CONTENT_INSET_X` is no longer `px-[var(--space-3)]` - the boxed card's own body inset did " +
+      "not move with the pane's gutter on 21 Sep 2026, and widening it to match would double the side " +
+      "air inside every boxed card and overrun CardHeader's own `px-6 lg:px-[var(--space-7)]`.",
+  );
+}
+
 if (findings.length > 0) {
   console.error("FAIL card check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -210,6 +257,9 @@ if (findings.length > 0) {
 console.log(
   '`CardContent`\'s `inset` prop still declares "default"/"compact", defaults to "default", ' +
     'resolves "compact" to a flat `--space-3` and leaves the horizontal inset unconditional; the ' +
-    "`plain` variant paints no fill and no shadow, carries the `group/card` marker, and its parts " +
-    "zero their own horizontal inset and hairlines off that marker; `default` is untouched: OK card check.",
+    "`plain` variant paints no fill and no shadow, carries the `group/card` marker, rebinds " +
+    "--badge-quiet-fill to soft paper so its chips are not the page's own colour, and its parts " +
+    "zero their own horizontal inset and hairlines off that marker; CARD_CONTENT_INSET_X is still " +
+    "--space-3, so the boxed body inset did not follow the pane to --space-6; `default` is " +
+    "untouched: OK card check.",
 );

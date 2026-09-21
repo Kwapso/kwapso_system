@@ -1062,7 +1062,15 @@ export function SettingsScreen({
                  fourteen module-settings descriptions ("every one of them
                  is a paraphrase of its own title"). A rule proven by a
                  machine does not also need to be narrated on the page. */
-              <Card>
+              /* PLAIN — rulebook L43 going app wide, 21 Sep 2026. This box is
+                 a collection frame (a toolbar over a wall of cards), which is
+                 exactly the shape the ruling took the paper off. It keeps
+                 `Card` rather than becoming a bare `<div>`, because the kit's
+                 `plain` variant is the one that also rebinds
+                 `--badge-quiet-fill` to `--surface-panel` so the module
+                 cards' own count chips stay visible on the page ground; a
+                 `<div>` would drop that with the fill. */
+              <Card variant="plain">
                 <CardContent className="flex min-w-0 flex-col gap-4">
                   {/* THE ROW AND THE WALL IN ONE UNGAPPED COLUMN — R49. The gap
                       between a toolbar and what it sits above is ONE number and
@@ -1229,16 +1237,23 @@ export function SettingsScreen({
                       `bg-surface-panel` inside this one would be the 1.000 all
                       over again, pointing the other way.
 
-                      THE TWO TONES STAY TWO. §2.6 gives the app two paper tones
-                      and no third, so the container takes the PANEL tone
-                      (`--surface-panel`) and the cards keep `raised` — soft
-                      paper under off-beige, which is the same pairing
-                      `CollectionFrame` and `TeamPanel` draw. Measured on the
-                      running page, both palettes: light panel #F7F2EB on page
-                      #FFFEF9 1.103, raised card #FFFEF9 on panel 1.103; dark
-                      panel #1C1B18 on page #141310 1.079, raised card #26241F on
-                      panel 1.111. The toolbar's own pill is `--surface-raised`
-                      and now reads against the same 1.103/1.111. */}
+                      THE TWO TONES STAY TWO, AND THEY SWAPPED ROUND ON 21 SEP
+                      2026 (rulebook L43). §2.6 gives the app two paper tones
+                      and no third. It USED to be the container on the PANEL
+                      tone with the cards `raised` on top of it — measured on
+                      the running page, both palettes: light panel #F7F2EB on
+                      page #FFFEF9 1.103, raised card #FFFEF9 on panel 1.103;
+                      dark panel #1C1B18 on page #141310 1.079, raised card
+                      #26241F on panel 1.111. The container is plain now, so
+                      there is no panel for a `raised` card to lift off and
+                      `--card` IS the page's own colour in light: the wall
+                      would have measured 1.000. The two tones are still two —
+                      the page and soft paper — with the cards on
+                      `variant="default"` (`GalleryCard`, its own note carries
+                      the sweep) reading the same 1.103 against the page that
+                      the panel used to read against it. The toolbar's own pill
+                      paints nothing at all now, by the same ruling
+                      (`paged-find.tsx`'s `ToolbarColumn`). */}
                     <CardGrid
                       fluid
                       minItemWidth={MIN_MODULE_CARD}

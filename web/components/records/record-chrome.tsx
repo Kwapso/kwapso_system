@@ -1508,7 +1508,25 @@ export function RecordFooterBand({
 }) {
   const { t, lang } = useLanguage()
   return (
-    <div className={cn("min-w-0 overflow-hidden rounded-t-[var(--radius)]", className)}>
+    /* NO CROP, AND NO RADIUS OF ITS OWN — 21 SEP 2026, kit v1.2.149.
+       This wrapper used to read `overflow-hidden rounded-t-[var(--radius)]`,
+       which squared the band's BOTTOM corners against the pane's own flush
+       bottom edge while leaving the top two rounded (R89 round 24). The kit
+       owns both facts now and owns them better: the band reads
+       `rounded-[var(--radius-pane-edge)]`, a DECLARED token whose own value is
+       `--radius` and which the shell's body rebinds to `0px`, so the band
+       squares all four corners inside a pane and keeps its box radius outside
+       one (a sheet, a dialog) without this wrapper deciding anything.
+
+       AND THE CROP HAD BECOME ACTIVELY WRONG. The band now pulls itself out
+       to the pane's own edge with `-mx-[var(--pane-inset-x,0px)]` — Aurora's
+       ruling, verbatim: "make footer not inside a container, but the full row
+       side to side (withing the main content)". `overflow: hidden` on the
+       element immediately around it clips exactly that escape, so the band
+       would have gone on reading as a 24px-inset slab on every record page
+       while the source said otherwise. `min-w-0` stays: it is a flex/grid
+       sizing floor, not paint. */
+    <div className={cn("min-w-0", className)}>
       {/* R52's own census matches every `<RecordDetail>` call site in the
           app and requires `RECORD_TITLE_TREATMENT` on all of them, so the
           two paths' title sizing cannot drift apart again — it does not

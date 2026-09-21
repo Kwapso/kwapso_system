@@ -1131,6 +1131,21 @@
   --radius-pill: 999px;   /* buttons, chips, tags, avatars    */
   --radius-bar:  var(--radius-sm);
   --radius-card: var(--radius);
+  /* --radius-pane-edge · NOT A FOURTH RADIUS, AND THE SHAPE LAW IS RIGHT TO
+     HAVE ASKED. Added 21 Sep 2026 with the bottom-edge ruling ("also
+     implement the to the bottom edge for main content and assistant"). It is
+     `--radius` here and everywhere by default, so nothing is introduced; what
+     it names is a RELATION, not a size - "whatever the pane's own outer
+     corner does, on the edge this thing is spanning to". The shell's body
+     rebinds it to 0 (screen-shell.tsx's `BODY`) because the pane's bottom
+     corners are square against the window now, so anything spanning the pane
+     to its edges squares off with it instead of guessing. Exactly the
+     mechanism §8 already uses for --btn-secondary-fill and --surface-lift,
+     applied to a corner rather than to a paper: the alternative was a part
+     writing `rounded-b-none` on the belief that it was inside a shell, which
+     is the coupling the kit's own pipeline direction forbids. One reader
+     today, `RecordDetail`'s ink footer band. */
+  --radius-pane-edge: var(--radius);
 
   /* ---- Leading aliases — the six named tiers behind the per-step values -- */
   --leading-tight:  1.02;
@@ -2548,6 +2563,33 @@
      or it is standing on its own colour — 1.000, the pair that put this
      token in the file. */
   --surface-lift:        var(--surface-panel);
+  /* AND THE SELECTED WASH WITH IT, 21 SEP 2026 - THE MINIMAL PASS.
+     Override 77 pinned `--surface-selected` at `--surface-raised` and said
+     so plainly: "a selected thing now measures 1.000 against the off-beige
+     body pane in light". That was survivable while every row stood inside a
+     soft-paper panel. The plain pass removes the panel, so the rows stand
+     on the pane itself and the 1.000 override 77 accepted in a corner is now
+     the ordinary case: measured live on the tickets list, `--surface-
+     selected` resolved #FFFEF9 against a pane of #FFFEF9 and a selected row
+     painted nothing at all.
+     The fix is the one this section already is: make the wash RELATIONAL
+     instead of fixed, exactly as `--surface-lift` above and exactly as
+     `SearchInput`'s own pill fill was made relational in v1.2.146. A
+     selected row takes the OTHER paper from the ground it stands on - soft
+     paper on the page, off-beige on a panel - which is the same pair, in
+     the same two directions, as the two lines above it.
+     OVERRIDE 77 IS NOT OVERTURNED. Its one standing achievement was ONE
+     answer for a chosen record: `TableRow`, `List`, `map`'s list row and
+     `Card` all read the string `bg-surface-selected` and every one of them
+     still does. Only the token's ADDRESS moved, from a fixed paper to a
+     relation, which is the move ruling 01 already made for a button and §4
+     already made for a lift. The root value in §4 is untouched, so a
+     selection outside any ground-keyed region still resolves to exactly the
+     colour override 77 chose.
+     MEASURED: 1.103 light / 1.111 dark against the off-beige pane, which is
+     the kit's own page/panel step and the figure register row 77 itself
+     calls the answer. */
+  --surface-selected:    var(--surface-panel);
 }
 
 /* Soft-paper grounds — the button takes off-beige. ch02: "Assign lifts off
@@ -2557,6 +2599,13 @@
 [data-ground="panel"] {
   --btn-secondary-fill:  var(--surface-raised);
   --surface-lift:        var(--surface-raised);
+  /* The other half of the 21 Sep relation - see the off-beige block above.
+     On soft paper a selected row takes off-beige, which is the value
+     override 77 chose and the one every row inside a collection panel has
+     been painting since. Nothing inside a panel changes colour today; the
+     line is written out so the relation is legible in both directions
+     rather than one being a rebind and the other a silence. */
+  --surface-selected:    var(--surface-raised);
 }
 
 /* ---- The ring lands on the SHAPE the reader sees ------------------------

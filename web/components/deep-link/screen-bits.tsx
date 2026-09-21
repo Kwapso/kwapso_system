@@ -220,14 +220,18 @@ export function LoadError({ what }: { what: string }) {
  *    over this card's own paper, which is the same colour and therefore no
  *    corner at all.
  *
- * THE TICKETS-MAIN EXPERIMENT, EXTENDED 21 SEP 2026 (rulebook L43, her own
- * words: "can yo do it also on tickets main?"). `surface="plain"` (only
- * `tickets-collection.tsx` and `tickets-dashboard.tsx` pass it —
- * `web/test/plain-surface-scope.test.tsx`) drops the box: `Card
+ * PLAIN IS THE DEFAULT, APP WIDE, SINCE 21 SEP 2026 (rulebook L43, her own
+ * words on the Minimal Kit page: "go an implement this appwide"). This began
+ * as a tickets-only experiment — "can yo do it also on tickets main?" — that
+ * two call sites opted into by spelling `surface="plain"`; it is the app's
+ * shape now and nothing spells it. The plain frame drops the box: `Card
  * variant="plain" data-surface="plain"`, no padding class on `CardContent`
- * at all, so a plain frame's toolbar and table sit flush with the page's own
- * content edge, horizontally, the way `TicketSidePanel`/`EmptyGatedPanel`
- * already sit for the record page.
+ * at all, so a frame's toolbar and table sit flush with the PANE's own
+ * content edge, horizontally — the pane pays that 24 once
+ * (`SHELL_CONTENT_INSET_X`, kit v1.2.149) rather than the card paying a
+ * second one inside it — the way `TicketSidePanel`/`EmptyGatedPanel` already
+ * sit for the record page. `surface="boxed"` is the opposite decision, still
+ * reachable, named in `PAPER_ON_PURPOSE` when a call site takes it.
  *
  * THE PINNED MECHANISM SURVIVES BOTH WAYS, AND FOR TWO DIFFERENT REASONS.
  * `--pinned-lead` stays on the card unconditionally, same value, same
@@ -262,38 +266,39 @@ export function LoadError({ what }: { what: string }) {
 // `}: { … }) {` parameter block puts exactly that unindented "}" three lines
 // in, on the destructured object's own close, and would truncate the census
 // before it ever saw the boxed branch's `--pinned-lead` declaration. `surface`
-// is documented in the block comment above instead. `"boxed"` (the default)
-// is today's markup, byte for byte; `"plain"` is the tickets-main experiment.
+// is documented in the block comment above instead.
+//
+// `"plain"` IS THE DEFAULT SINCE 21 SEP 2026 — rulebook L43, Aurora's own
+// words on the Minimal Kit page: "go an implement this appwide". The
+// experiment that started in the tickets module is the app's shape now, so a
+// collection frame paints nothing and the pane's own `--space-6` gutter is
+// the only side air the rows get. `"boxed"` survives as the OPPOSITE
+// decision, spelled at the call site and named in `PAPER_ON_PURPOSE`
+// (`shared/rules/registry.ts`) — a frame that genuinely stands on off-beige.
+// Nothing passes it today, and that is a census, not an accident:
+// `web/test/plain-surface-scope.test.tsx` reads the registry back.
 // WHICH SURFACE A `CollectionCard` IS DRAWING, published for whatever renders
 // inside it — so a piece of content nested arbitrarily deep (the empty body,
 // past the toolbar and a render-prop callback PagedFind composes, never a
 // direct child) can ask "am I sitting on a plain, transparent frame?" without
-// a runtime DOM lookup. Defaults to `"boxed"`: content that never renders
-// inside a `CollectionCard` at all (a test, a bespoke panel) reads the same
-// answer a boxed one would have given it, which is "you already have paper,
-// draw nothing extra."
-const CollectionCardSurfaceContext = React.createContext<"boxed" | "plain">("boxed")
+// a runtime DOM lookup. Defaults to `"plain"` since 21 Sep 2026, following
+// `CollectionCard`'s own default: content that never renders inside a
+// `CollectionCard` at all (a test, a bespoke panel) reads the same answer the
+// app's own frames now give it, which is "the page is the ground; draw your
+// own paper if you need one." The empty body is the one thing that does.
+const CollectionCardSurfaceContext = React.createContext<"boxed" | "plain">("plain")
 
-/** WHICH SURFACE THE NEAREST `CollectionCard` PUBLISHED — the same context
- * `CollectionEmptyBody` above reads, exported so a toolbar built OUTSIDE this
- * file (`paged-find.tsx`'s own hand-rolled pill) can key its painted register
- * off the frame it is actually standing in instead of spending it
- * unconditionally (R83, 21 Sep 2026 — "on tickets, reduce space above and
- * under toolbar to 10px": the pill's own `py-1.5`/`ps-4` painted register was
- * the 6px of slack on a frame that paints nothing to paint it against).
- *
- * A component calling this must itself be a descendant of `CollectionCard`'s
- * Provider in the RENDERED tree, not merely textually nested inside a value
- * that eventually becomes one — the same requirement `CollectionEmptyBody`
- * already carries. Called from a value built earlier in a parent's own
- * function body (before that parent returns its `<CollectionCard>` element)
- * reads the context's default, `"boxed"`, exactly as a render nested nowhere
- * near a `CollectionCard` would. */
-export function useCollectionCardSurface(): "boxed" | "plain" {
-  return React.useContext(CollectionCardSurfaceContext)
-}
+/* THE HOOK THAT READ THIS CONTEXT IS GONE, AND THE CONTEXT IS NOT.
+   `useCollectionCardSurface()` was exported here so `paged-find.tsx`'s own
+   hand-rolled toolbar pill could key its painted register off the frame it
+   stood in. That pill has no painted register any more (rulebook L43 went app
+   wide on 21 Sep 2026 and every frame is plain), so the hook had no caller and
+   was deleted rather than kept as a door nothing opens. The Provider stays,
+   because `CollectionEmptyBody` below still reads it: the empty state is the
+   one body that keeps its paper on a plain frame, and it has to learn that
+   from the frame rather than from a prop threaded past a render-prop callback. */
 
-export function CollectionCard({ children, surface = "boxed" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
+export function CollectionCard({ children, surface = "plain" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
   if (surface === "plain") {
     return (
       <CollectionCardSurfaceContext.Provider value="plain">
@@ -303,7 +308,16 @@ export function CollectionCard({ children, surface = "boxed" }: { children: Reac
       </CollectionCardSurfaceContext.Provider>
     )
   }
+  // THE BOXED BRANCH PUBLISHES ITS OWN ANSWER TOO, since the context's default
+  // flipped to `"plain"` on 21 Sep 2026. While `"boxed"` WAS the default, a
+  // boxed frame could rely on the Provider being absent and still be read
+  // correctly; now an absent Provider says "plain", so a boxed frame that
+  // published nothing would tell `CollectionEmptyBody` to wrap its zero state
+  // in a SECOND paper card nested inside this one — the card-inside-a-card
+  // CLAUDE.md's own `useKitPanel` note forbids. Caught by this file's own
+  // census test rather than found on a screen.
   return (
+    <CollectionCardSurfaceContext.Provider value="boxed">
     <Card
       className={
         `${PINNED_INSET_MARK} ` +
@@ -355,15 +369,16 @@ export function CollectionCard({ children, surface = "boxed" }: { children: Reac
           second number. */}
       <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">{children}</CardContent>
     </Card>
+    </CollectionCardSurfaceContext.Provider>
   )
 }
 
 /** THE EMPTY BODY'S OWN PAPER, ON A PLAIN FRAME (the tickets-main experiment,
- * `CollectionCard surface="plain"`, rulebook L43). A boxed `CollectionCard`
+ * `CollectionCard`'s own plain default, rulebook L43). A boxed `CollectionCard`
  * is already a `Card`, so its empty state (`CollectionEmptyState`,
  * shared/web/screen-engine/collection-frame.tsx, `data-slot=
  * "collection-empty-body"`) sits on real paper for free. `surface="plain"`
- * drops that Card for `variant="plain"` (transparent, no padding of its own)
+ * The plain default drops that Card to `variant="plain"` (transparent, no padding of its own)
  * so the toolbar and the table line up with the page's own edge — but a
  * facet with zero rows has no table, only the empty body, and that body
  * landed bare on the white page (measured live: fill `rgba(0, 0, 0, 0)`).
@@ -383,7 +398,8 @@ export function CollectionCard({ children, surface = "boxed" }: { children: Reac
  * publishes it (above), so this works however deep the call site nests it
  * (past a render-prop callback, in `tickets-collection.tsx`'s case) and
  * inside a bare test render with no real page around it. On a boxed frame
- * (the context's own default, "boxed") it renders `children` untouched: the
+ * (the opposite decision, spelled at a call site and named in
+ * `PAPER_ON_PURPOSE`) it renders `children` untouched: the
  * boxed `CollectionCard` is already the paper, and a second `Card` nested
  * inside it would be the card-inside-a-card CLAUDE.md's `useKitPanel` note
  * already forbids. */
@@ -515,7 +531,7 @@ export function EmptyGatedPanel({
   count,
   action,
   empty,
-  surface = "boxed",
+  surface = "plain",
   children,
 }: {
   title: string
@@ -527,14 +543,18 @@ export function EmptyGatedPanel({
    * "still loading": a header popping away and back while a read settles is
    * its own small bug, so a caller passes this only once it actually knows. */
   empty: boolean
-  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43, kit v1.2.145's `Card
-   * variant="plain"`) — `"boxed"` (the default) renders EXACTLY today's
-   * markup, variant default, same classNames, byte for byte. `"plain"`
-   * drops the box: `Card variant="plain"`, no `p-4` on the content so the
-   * kit's own zero inset applies, and R88's own header drop when empty
-   * (this component's central `{!empty &&` guard) is unchanged either way.
-   * Only tickets' own call sites (help-detail.tsx) pass `"plain"` — see
-   * `web/test/plain-surface-scope.test.tsx`. */
+  /** APP WIDE SINCE 21 SEP 2026 (rulebook L43, kit v1.2.149) — `"plain"` is
+   * the DEFAULT now: `Card variant="plain"`, no `p-4` on the content so the
+   * kit's own zero inset applies and the section's text lines up with the
+   * column edge. Aurora, on the Minimal Kit page: "go an implement this
+   * appwide". Every host of this shell — a ticket's Related stories, a
+   * story's build notes, a phase's burndown, the Effort card — is a grouping
+   * section around titled content, which is exactly what the ruling took the
+   * box off. `"boxed"` survives for the opposite case (a tile, a well, a
+   * conversation card, a dialog body), spelled at the call site and named in
+   * `PAPER_ON_PURPOSE` (`shared/rules/registry.ts`). R88's own header drop
+   * when empty (this component's central `{!empty &&` guard) is unchanged
+   * either way. */
   surface?: "boxed" | "plain"
   children: React.ReactNode
 }) {

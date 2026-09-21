@@ -260,14 +260,18 @@ export function TeamPhaseDayDefaultsPanel({ teamId }: { teamId: string }) {
   const phaseDays: WavePhaseDay[] =
     defaultsQ.data?.phaseDays ?? PHASE_TYPES.map((p) => ({ phaseType: p.name, days: PHASE_DAY_DEFAULTS[p.name] ?? 1 }))
 
-  // R67 — A TITLED SECTION STANDS ON PAPER, NOTHING ON THE BARE PAGE GROUND.
-  // `WavePhaseDaysPanel` draws no `Card` of its own any more (it moved into
-  // the sheet's own scrolling body, this file's own header) — right for a
-  // sheet, which is already its own surface, and wrong here, where this
-  // panel is the whole content of the "Phase days" TAB on an ordinary main
-  // screen. The kit `Card` (`bg-surface-panel` by default) is the container.
+  // R67, AS AMENDED BY L43 ON 21 SEP 2026 — a section paints the PAGE or the
+  // kit's paper, and the page is now the default answer. `WavePhaseDaysPanel`
+  // draws no `Card` of its own (it moved into the sheet's own scrolling body,
+  // this file's own header); this wrapper is what stands it up as the whole
+  // content of the "Phase days" TAB on an ordinary main screen. It was
+  // `bg-surface-panel` (the kit `Card`'s own default) until the plain surface
+  // went app wide; it is `variant="plain"` now, the same ground every other
+  // titled section in the app stands on. `Card` rather than a bare `<div>`
+  // for the same reason the Settings Modules panel keeps one: `plain` rebinds
+  // `--badge-quiet-fill` to `--surface-panel`, which a `<div>` would not.
   return (
-    <Card>
+    <Card variant="plain">
       <CardContent className="flex min-w-0 flex-col gap-4">
         <WavePhaseDaysPanel teamId={teamId} phaseDays={phaseDays} canEdit={canEdit} busy={busy} onSave={save} />
       </CardContent>

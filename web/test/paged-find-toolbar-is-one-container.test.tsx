@@ -20,9 +20,23 @@
 // This proves the same three properties `filter-row-is-the-kits.test.tsx`
 // proves for `ToolbarRow`, against `PagedFind`'s own DOM: the track never
 // moves when the panel opens, the panel is a normal-flow sibling that paints
-// no surface of its own, and the single merged container is the only element
-// that switches radius, off `Boolean` of the panel and never off a measured
-// height.
+// no surface of its own, and there is exactly ONE container holding both.
+//
+// AMENDED 21 SEP 2026 — THE CONTAINER PAINTS NOTHING NOW, AND THE RULING IS
+// STILL KEPT. Rulebook L43 went app wide and the toolbar's painted pill was
+// retired with it: kit v1.2.149's `CollectionFrame` defaults `toolbarGround`
+// to `"bare"`, over its own page's written recommendation, because Aurora
+// overruled that recommendation on the product ("on tickets, reduce space
+// above and under toolbar to 10px") — the kit's changelog records that what
+// read as loose was never a missing fill but this pill's own 6px inset
+// pushing 44px controls off the tabs and the table. So the three assertions
+// about WHICH box carries the fill and WHICH radius it switches to are gone:
+// there is no fill and no radius on any of the three elements, in either
+// state. Her 2026-09-03 ruling above is untouched and is still what this
+// file locks — "one single background or container, more like expand
+// behaviour rather than open-a-new-one" — and it is now satisfied the
+// strongest way available: the panel opens INSIDE the same container, in
+// normal flow, and there is no second box because there is no box.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
@@ -114,21 +128,19 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
     expect(track, "the track is a named child of the merged container").toBeTruthy()
     expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
 
-    // i · CLOSED: one container, pill-shaped, one fill — the track itself
-    // carries neither.
+    // i · CLOSED: one container, and nothing painted on it (L43, 21 Sep 2026).
     expect(document.querySelector('[data-slot="filter-bar-row"]'), "nothing is open yet").toBeNull()
-    expect(column!.className).toContain("bg-surface-raised")
-    expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
-      "rounded-pill"
+    expect(column!.className, "the container paints no fill of its own any more").not.toContain(
+      "bg-surface-raised"
+    )
+    expect(column!.className, "and no pill").not.toMatch(/(?:^|\s)rounded-pill(?:\s|$)/)
+    expect(column!.className, "and no box radius — a radius on an unpainted box draws nothing").not.toContain(
+      "rounded-[var(--radius)]"
     )
     expect(
-      column!.className,
-      "the two radii never both apply — collapsed is pill-only"
-    ).not.toContain("rounded-[var(--radius)]")
-    expect(
       track.className,
-      "the track paints no fill or shape of its own — the merged container does"
-    ).not.toMatch(/rounded-pill|bg-background|bg-\[var\(--surface-raised\)\]/)
+      "the track paints no fill or shape of its own either"
+    ).not.toMatch(/rounded-pill|bg-background|bg-surface-raised|bg-\[var\(--surface-raised\)\]/)
     const closedTrack = trackShape(track)
 
     openPanel()
@@ -162,26 +174,22 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
       "the open panel must not round its own corners — the merged container does"
     ).not.toMatch(/rounded-\[var\(--radius\)\]/)
 
-    // iv · OPEN: the SAME container switches shape.
-    expect(column!.className, "the container still owns the single background").toContain(
-      "bg-surface-raised"
+    // iv · OPEN: it is the SAME container, and it still paints nothing. The
+    // ruling's own words are "one single background or container" — with no
+    // background left, "one container" is the whole of it, and this is the
+    // assertion that keeps a second box from coming back when the panel opens.
+    expect(column!.contains(panelRow), "still one container, holding both").toBe(true)
+    expect(column!.className, "still no fill when a panel is open").not.toContain("bg-surface-raised")
+    expect(column!.className, "still no radius either").not.toMatch(
+      /(?:^|\s)rounded-pill(?:\s|$)|rounded-\[var\(--radius\)\]/
     )
-    expect(
-      column!.className,
-      "a panel is open — the container must switch to the box radius"
-    ).toContain("rounded-[var(--radius)]")
-    expect(
-      column!.className,
-      "the two radii never both apply — expanded drops the pill"
-    ).not.toMatch(/(?:^|\s)rounded-pill(?:\s|$)/)
 
-    // v · AND IT CLOSES BACK TO EXACTLY THE SAME PILL.
+    // v · AND IT CLOSES BACK TO EXACTLY THE SAME MARKUP.
     openPanel()
     await waitFor(() =>
       expect(document.querySelector('[data-slot="filter-bar-row"]')).toBeNull()
     )
     expect(trackShape(track)).toBe(closedTrack)
-    expect(column!.className).toContain("rounded-pill")
-    expect(column!.className).not.toContain("rounded-[var(--radius)]")
+    expect(column!.className).not.toContain("bg-surface-raised")
   })
 })

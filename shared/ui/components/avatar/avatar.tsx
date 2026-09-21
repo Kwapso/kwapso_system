@@ -118,8 +118,41 @@ const avatarVariants = cva(
         control: "size-[var(--avatar-control)] text-sm",
       },
       variant: {
-        /** `.kw-avatar` — raised paper, normal ink. */
-        default: "bg-card text-foreground",
+        /**
+         * `.kw-avatar` - raised paper, normal ink.
+         *
+         * THE FILL IS RELATIONAL NOW, 21 SEP 2026, AND IT IS THE SAME DEFECT
+         * `SearchInput` HAD IN v1.2.146. This read `bg-card`: a FIXED
+         * address at off-beige, which is also the colour of the body pane a
+         * face most often stands on. Measured live on the tickets list
+         * during the minimal pass, two of the three faces on screen painted
+         * rgb(255, 254, 249) against a pane of rgb(255, 254, 249) - ratio
+         * 1.000. The initials still read, because they are charcoal on
+         * white, so nothing looked broken: a person was simply two floating
+         * letters with no disc. Only the `inverse` face in the rail still
+         * read as a face at all.
+         *
+         * `--surface-lift` is the kit's own answer to exactly this question
+         * (tokens.css §4): "for the parts that are handed to a ground they
+         * cannot see". An avatar is the purest case of that - it is dropped
+         * into a rail, a table row, a chat bubble, a charcoal footer and a
+         * plain record section by callers who never tell it which - so it
+         * takes the OTHER paper from whatever §8 says it is standing on:
+         * soft paper on the page, off-beige inside a panel. Measured 1.103
+         * light / 1.111 dark in both directions.
+         *
+         * `bg-surface-lift`, THE NAMED CLASS, NEVER `bg-[var(--surface-
+         * lift)]`. tokens.css §8 keys its rebinds off class NAMES, and the
+         * arbitrary spelling paints the identical colour while taking the
+         * element out of every one of them - the failure `toolbar-row.tsx`
+         * documents at length and `screen-shell.tsx`'s `BODY` hit from the
+         * other side. The @theme bridge carries `--color-surface-lift` for
+         * this exact class.
+         *
+         * A FACE WITH A PHOTOGRAPH IS UNAFFECTED either way: the image
+         * covers the fill. This is the INITIALS face, which is most of them.
+         */
+        default: "bg-surface-lift text-foreground",
         /** `.kw-avatar--inverse` — charcoal fill, off-beige ink. */
         inverse: "bg-surface-inverse text-ink-on-inverse",
         /**

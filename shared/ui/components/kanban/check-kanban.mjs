@@ -119,13 +119,140 @@ if (!/onMouseDown=\{\s*pressable\s*\?\s*\(event\) => \{\s*if \(event\.button ===
   );
 }
 
+/* ============================================================================
+   THE LANE CHECK, ADDED 2026-09-21 - THE CLIENT'S "board A".
+
+   WHAT IT PINS, AND WHY EACH LINE IS A DIFFERENT WAY THE BOARD REGRESSES.
+   The board she rejected was not wrong in one place; it was a head with
+   nothing under it, a card with nothing behind it, and four empty-state
+   sentences sitting exactly where a first card belongs. Option A answers all
+   three with one shape, so all three have to be held.
+
+     5. THE LANE'S THREE FIGURES, together, on the column's own class list:
+        `bg-surface-panel` (soft paper, the other tone from the page),
+        `rounded-[var(--radius)]` (the one box radius, ruling 03) and
+        `p-[var(--space-2h)]` (10, the same step the board already spends
+        BETWEEN two lanes). Any one of them alone is not a lane: a fill with
+        no radius is a band, a radius with no inset is a hairline's job.
+     6. `columnGround` DEFAULTS TO `"lane"`. The prop existing is not the
+        ruling; the DEFAULT is, because "go an implement this appwide" is
+        about what a board draws when nobody passes anything. `"bare"` must
+        still be reachable - a board on a soft paper panel measures 1.000
+        with a lane and needs the old drawing.
+     7. THE HEAD DROPS ITS OWN HORIZONTAL INSET INSIDE A LANE. The 6px was
+        standing in for a band that is now back; paying both seats the dot
+        16px in while every card under it starts at 10, which is the
+        "floating label" fault re-created one level down.
+     8. THE EMPTY COLUMN IS TOP ALIGNED. `EmptyRegister` must declare a
+        `place` and the column must pass `"lane"`: the 48px top inset put
+        the sentence at exactly the height a reader expects the first card.
+        And the register must KEEP a `min-h-` floor, because it is also the
+        drop target for the first card into an empty column and a one-line
+        strip is not something a pointer can find.
+     9. THE COLUMN WIDTH AND THE SCROLL ARE UNTOUCHED. Option A's own
+        caption is explicit that the board still scrolls; a lane is a fill
+        and an inset and does not get to change what a board measures.
+   ========================================================================= */
+
+const COLUMN_BLOCK_START = src.indexOf("function Column(");
+const columnSrc = COLUMN_BLOCK_START === -1 ? "" : src.slice(COLUMN_BLOCK_START, src.indexOf("function BoardCard("));
+
+// (5) THE LANE'S THREE FIGURES, on one line, applied through the `lane` flag.
+if (
+  !/lane &&\s*"rounded-\[var\(--radius\)\] bg-surface-panel p-\[var\(--space-2h\)\]"/.test(columnSrc)
+) {
+  findings.push(
+    `${rel}'s Column does not paint the lane as \`lane && "rounded-[var(--radius)] bg-surface-panel ` +
+      'p-[var(--space-2h)]"` - option A is soft paper at the one box radius with the 10 inset, and all ' +
+      "three figures together are what make a head read as the top of a column instead of a stray label.",
+  );
+}
+
+// (5b) AND IT DECLARES ITSELF A SOFT-PAPER GROUND, or every relational token
+// under it (a face's --surface-lift, a chosen card's --surface-selected, a
+// column action's --btn-secondary-fill) keeps answering for the page while
+// standing on a panel's colour.
+if (!/data-ground=\{lane \? "panel" : undefined\}/.test(columnSrc)) {
+  findings.push(
+    `${rel}'s Column does not carry \`data-ground={lane ? "panel" : undefined}\` - tokens.css §8 keys ` +
+      "its relational rebinds off a class name or that attribute, so a lane that paints soft paper " +
+      "without declaring it hands every token underneath the page's answer inside a panel's colour.",
+  );
+}
+
+// (6) THE DEFAULT IS THE RULING.
+if (!/columnGround = "lane",/.test(src)) {
+  findings.push(
+    `${rel} does not default \`columnGround\` to "lane" - the client's 21 Sep 2026 board ruling is about ` +
+      "what a board draws when nobody passes anything, not about a prop existing.",
+  );
+}
+if (!/columnGround\?:\s*"lane" \| "bare";/.test(src)) {
+  findings.push(
+    `${rel} does not declare \`columnGround?: "lane" | "bare"\` - the bare column is the right drawing ` +
+      "for a board still standing on a soft paper panel, where a lane measures 1.000, and removing the " +
+      "escape hatch would strand that caller.",
+  );
+}
+
+// (7) THE HEAD ALIGNS WITH THE CARDS INSIDE A LANE.
+if (!/lane \? "px-0" : "px-\[var\(--space-1h\)\]"/.test(columnSrc)) {
+  findings.push(
+    `${rel}'s column header does not read \`lane ? "px-0" : "px-[var(--space-1h)]"\` - the 6px inset was ` +
+      "standing in for the column band that is now back, and paying both seats the dot 16px from the " +
+      "lane's edge while every card under it starts at 10.",
+  );
+}
+
+// (8) THE EMPTY COLUMN IS A LINE AT THE TOP, AND IT IS STILL A DROP TARGET.
+if (!/place\?:\s*"block" \| "lane";/.test(src)) {
+  findings.push(
+    `${rel}'s EmptyRegister does not declare \`place?: "block" | "lane"\` - the whole-board register and ` +
+      "the one inside a column are two different objects and stopped sharing an inset on 21 Sep 2026.",
+  );
+}
+if (!/<EmptyRegister place="lane">/.test(columnSrc)) {
+  findings.push(
+    `${rel}'s Column does not render \`<EmptyRegister place="lane">\` - the 48px top inset put the ` +
+      "sentence at exactly the height a reader expects the first card, four or five times over.",
+  );
+}
+const emptyRegisterSrc = src.slice(
+  src.indexOf("function EmptyRegister("),
+  src.indexOf("THE ERROR REGISTER IS THE SHARED ONE"),
+);
+if (!/min-h-\[calc\(var\(--space-8\)\*2\)\]/.test(emptyRegisterSrc)) {
+  findings.push(
+    `${rel}'s EmptyRegister lost its \`min-h-[calc(var(--space-8)*2)]\` floor on the lane-aligned branch - ` +
+      "the register is also the drop target for the first card into an empty column, and a one-line " +
+      "strip is not something a pointer can reliably find.",
+  );
+}
+
+// (9) THE MEASURE AND THE SCROLL DID NOT MOVE.
+if (!/columnWidth = "18rem",/.test(src)) {
+  findings.push(
+    `${rel} no longer defaults \`columnWidth\` to "18rem" - option A keeps the board's own measure; a ` +
+      "lane is a fill and an inset and does not get to change what a board measures.",
+  );
+}
+if (!/snap-x snap-mandatory gap-\[var\(--space-2h\)\] overflow-x-auto overflow-y-hidden/.test(src)) {
+  findings.push(
+    `${rel}'s board row no longer scrolls on the inline axis at the --space-2h gap - 27.24's beyond-four-` +
+      "columns rule and option A's own caption both keep the board scrolling horizontally.",
+  );
+}
+
 if (findings.length > 0) {
-  console.error("FAIL kanban card-event check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
+  console.error("FAIL kanban check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
 }
 
 console.log(
-  "OK kanban card-event check: KanbanCardSelectEvent is declared, onCardSelect's (card, column, event) signature " +
-    "is consistent across all three declaration sites, onClick/onKeyDown both forward their own event, and " +
-    "onAuxClick + the middle-mousedown preventDefault both forward the same callback.",
+  "OK kanban check: KanbanCardSelectEvent is declared, onCardSelect's (card, column, event) signature " +
+    "is consistent across all three declaration sites, onClick/onKeyDown both forward their own event, " +
+    "onAuxClick + the middle-mousedown preventDefault both forward the same callback; and the column is " +
+    "a soft paper lane at the one box radius with the 10 inset, declaring its own ground, defaulting to " +
+    '"lane" with "bare" still reachable, its head aligned with its cards, its empty register a top-aligned ' +
+    "line that is still a findable drop target, and the board's measure and inline scroll untouched.",
 );

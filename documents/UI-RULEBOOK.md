@@ -1763,6 +1763,32 @@ live: no em dash anywhere a person reads.
 
 **Her review of the tickets pages after the toolbar rhythm, 21 Sep 2026.** Aurora, verbatim: *"i really loev the dircteion in which we are going, look sso minimal and clean / but the board component look sso bad :// / please, in artifact go and fix it / also, the ocntent on the main component need a bit more spacing on the sides / i am scraed making this switch will make us have to review all componets!! / for this reason, create an artifact with all components in ui kit that would change (the unchaged do not touch them) and show it to me / do think in ui! so do not just remove the container but make adaptations needed / the goal: make a more minimal clean app / the same spacing thats now before the footer i want above nav and on sides, bring more air"* **Reading it.** The direction is validated. The board needs a real design on the white ground, drawn in a page first. The content pane gets the same air above the nav row and on both sides as it has before the footer band. Before the switch goes app wide, a page inventories every kit component whose look changes under the plain surface, each with the adaptation it needs; unchanged families are left alone. Status: page in progress, decisions pending.
 
+**Her decisions on the Minimal Kit page, 21 Sep 2026.** Aurora, verbatim: *"* board A / * space 6 / go an imlpement tis appwide, also implement the to the bottom edge for main content and assistant like in yur previous artifact / also, make footer not inside a container, but the full row side to side (withing the main content) / use subagents / do think a lot abouot each component, what this minimalising means so that it siill works / do not update the ui repo yet, we will first iterate on this"* **Reading it.** The experiment ends and the plain surface goes app wide: boards take option A (soft paper lanes, white raised cards with the hairline edge, the head inside the lane, a quiet placeholder at the top of an empty lane); the content pane's air is space-6 (24px) above the nav row and on both sides, the same as before the footer band; the main content pane and the assistant reach the viewport bottom with no gutter; the dark footer band spans the pane edge to edge as a full row; the kit changes are committed and tagged locally and synced, not pushed, until she closes the iteration.
+
+**Status, 21 Sep 2026.** App wide, kit v1.2.149 local. The kit side is done and pulled
+(`shared/ui/VERSION.json`; its CHANGELOG's top entry is the index to the ten parts). The
+app side is done in both front doors: `CollectionCard`, `TicketSidePanel` and
+`EmptyGatedPanel` all default to plain, so every module's grouping sections and every
+collection frame in `web/` and `web-portal/` render plain without a call site naming it;
+the toolbar's painted pill is retired; the collection tab strip's `tight` rhythm is the
+only one left; the record footer band spans the pane edge to edge; the boards take the
+kit's soft paper lanes by default. The tag is local and unpushed, at her instruction: *"do
+not update the ui repo yet, we will first iterate on this"*.
+
+**OVERTURNED under this ruling: K1, the collection panel keeps the card's paper
+(2026-08-23).** The kit's own K1 reversal is what gave a collection frame its soft paper
+slab in the first place, and every "the frame is the paper" sentence in this rulebook and
+in the kit descends from it. It is overturned here rather than edited there: its words
+stay exactly as written, because they are the record of what was decided in August and of
+why the frame looked the way it did for a month, and a ruling that rewrites the ruling it
+replaces leaves nobody able to see that anything changed. What is true after 21 Sep 2026
+is this paragraph: a collection's frame paints nothing, and the soft paper the K1 reversal
+put there is reachable but unused (`CollectionFrame panel="paper"`, `CollectionCard
+surface="boxed"`) for a frame that genuinely stands on off-beige. The same overturning
+reaches [R67](../RULES.md) (`sections-stand-on-paper`), whose first sentence was "each
+panel stands on paper" and whose surviving clause is now "a section paints the page or the
+kit's paper, never a stroke, never a hex".
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order

@@ -194,7 +194,12 @@ describe("R89 — footer-on-the-edge", () => {
     const fnAt = chrome.indexOf("export function RecordFooterBand")
     expect(fnAt, "record-chrome.tsx must export RecordFooterBand — the second, footer-only RecordDetail call").toBeGreaterThan(-1)
     const fnEnd = chrome.indexOf("\n}\n", fnAt)
-    const fnBody = chrome.slice(fnAt, fnEnd)
+    // COMMENTS STRIPPED — this function's own note quotes the two classes it
+    // no longer carries (`overflow-hidden rounded-t-[var(--radius)]`), which
+    // is the house discipline for an overturned argument and is exactly what
+    // a raw `includes` would then find. `keepLength` so the slice arithmetic
+    // above and every offset below still line up.
+    const fnBody = stripComments(chrome.slice(fnAt, fnEnd), { keepLength: true })
     expect(fnBody.includes("<RecordDetail"), "RecordFooterBand must call the kit's own RecordDetail directly").toBe(true)
     expect(fnBody.includes("panelVisible={false}"), "RecordFooterBand's own RecordDetail call must turn the panel off — no title/hero/tabs are passed either, so the panel is the only region that could otherwise draw").toBe(
       true
@@ -204,11 +209,26 @@ describe("R89 — footer-on-the-edge", () => {
     // renders.
     expect(fnBody.includes("title="), "RecordFooterBand must not pass a title — that would draw a second band region").toBe(false)
     expect(fnBody.includes("hero="), "RecordFooterBand must not pass a hero — that would draw a second hero region").toBe(false)
-    // THE FLUSH BOTTOM EDGE — R31's own named exception for a surface that
-    // meets the screen's true bottom, cropped from outside since the kit's
-    // own footer Card carries no prop to narrow its radius to one edge.
-    expect(fnBody.includes("overflow-hidden"), "RecordFooterBand must crop the kit's own four-corner-radius footer card").toBe(true)
-    expect(fnBody.includes("rounded-t-[var(--radius)]"), "the crop must leave only the TOP radius, R31's own named exception for a flush bottom edge").toBe(true)
+    // THE FLUSH BOTTOM EDGE, AND THE FULL-ROW BAND — BOTH THE KIT'S OWN NOW
+    // (v1.2.149, 21 Sep 2026). This used to assert the opposite: an
+    // `overflow-hidden rounded-t-[var(--radius)]` crop, applied from outside,
+    // because the kit's footer Card carried no prop to narrow its radius to
+    // one edge. It does now — `rounded-[var(--radius-pane-edge)]`, a declared
+    // token the shell's body rebinds to `0px` — and the band ALSO pulls itself
+    // out to the pane's edge with `-mx-[var(--pane-inset-x,0px)]` under
+    // Aurora's ruling "make footer not inside a container, but the full row
+    // side to side (withing the main content)". A crop on the element
+    // immediately around it would clip exactly that escape, so the two
+    // classes are now FORBIDDEN here rather than required. Both directions
+    // are asserted: the app must not re-round the band and must not clip it.
+    expect(
+      fnBody.includes("overflow-hidden"),
+      "RecordFooterBand must NOT crop — overflow:hidden here clips the band's own -mx escape to the pane edge"
+    ).toBe(false)
+    expect(
+      fnBody.includes("rounded-t-[var(--radius)]"),
+      "RecordFooterBand must NOT re-round the band — the kit squares it against the pane through --radius-pane-edge, and keeps its box radius outside a pane through the same token's own fallback"
+    ).toBe(false)
   })
 
   it("record-chrome.tsx's RecordScreen carries a footerVisible passthrough, forwarded to the kit's RecordChrome", () => {

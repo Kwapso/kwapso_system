@@ -311,6 +311,36 @@ export interface TableHeaderProps extends React.ComponentPropsWithoutRef<"thead"
    * cannot (GAPS-D TBL-2).
    */
   sticky?: boolean;
+  /**
+   * HOW TALL THE HEADER ROW IS - 21 SEP 2026, THE MINIMAL PASS.
+   *
+   * `"label"` (THE DEFAULT) is `--control-height-dense`: the header reads as
+   * a label strip over the data. `"row"` is `--control-height-row`, the 56
+   * this band took until today, for a caller who genuinely wants the header
+   * to share the record row's measure.
+   *
+   * WHY IT CHANGED. The header row was `--control-height-row` - EXACTLY a
+   * data row's height - and that was survivable while the table stood
+   * inside a soft paper panel, where the panel's own edge said where the
+   * collection began. On the plain ground it is the first thing on the pane
+   * and it measured, live on the tickets list at 1440, 56 tall against rows
+   * of 56: a reader's eye met a first record that happened to be written in
+   * micro caps. The 21 Sep page draws the fix as one number, "Header 34 tall
+   * … so it stops matching a 56 row."
+   *
+   * 32, NOT 34, AND THAT IS DELIBERATE. `--control-height-dense` is 32 and
+   * it is a declared rung of ruling 30's control ladder; 34 is not, and this
+   * kit does not mint a sixth control height to land 2px closer to a drawing
+   * measured at a different root size. The thing the page is actually asking
+   * for is that the header stop equalling a row, which a whole rung down
+   * does more plainly than a 2px trim would.
+   *
+   * THE HAIRLINE IS UNTOUCHED. `TableHead` already draws
+   * `--hairline-under-strong`, the 20% section rule, at the foot of every
+   * heading cell, and it survives the switch exactly as the row hairlines
+   * do - which is why this prop changes a height and nothing else.
+   */
+  rowHeight?: "label" | "row";
 }
 
 /**
@@ -347,12 +377,25 @@ export interface TableHeaderProps extends React.ComponentPropsWithoutRef<"thead"
  * RTL — safe. `top-0` is on the block axis; nothing is placed by side.
  */
 const TableHeader = React.forwardRef<HTMLTableSectionElement, TableHeaderProps>(
-  ({ className, sticky = false, ...props }, ref) => (
+  ({ className, sticky = false, rowHeight = "label", ...props }, ref) => (
     <thead
       ref={ref}
       data-slot="table-header"
       data-sticky={sticky ? "" : undefined}
-      className={cn(sticky && "sticky top-0 z-10 bg-background", className)}
+      data-row-height={rowHeight}
+      className={cn(
+        sticky && "sticky top-0 z-10 bg-background",
+        /* The property `TableRow` reads through its own fallback. Set on
+           the BAND, not on the row, so a caller still writes an ordinary
+           `<TableRow>` inside a header and gets the label measure without
+           knowing this prop exists. `"row"` writes the property anyway,
+           at the value the fallback already holds, so the two branches are
+           one mechanism rather than one mechanism and one silence. */
+        rowHeight === "label"
+          ? "[--table-row-height:var(--control-height-dense)]"
+          : "[--table-row-height:var(--control-height-row)]",
+        className,
+      )}
       {...props}
     />
   ),
@@ -576,13 +619,25 @@ const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(
         data-state={isSelected ? "selected" : passed}
         aria-disabled={disabled || undefined}
         className={cn(
-          // 56 — `--control-height-row`, ruling 28. The one fixed height here.
+          /* 56 - `--control-height-row`, ruling 28. STILL THE ONE FIXED
+             HEIGHT A RECORD ROW TAKES, and still written here rather than
+             per call site.
+
+             READ THROUGH A FALLBACK SINCE 21 SEP 2026, so that ONE band can
+             ask for a shorter row without every `<tr>` in the table learning
+             about it: `TableHeader` sets `--table-row-height` on its own
+             `<thead>` and the rows inside it inherit it (see that
+             component's `rowHeight`). Nothing else in the kit sets the
+             property, so every other row resolves the fallback and measures
+             exactly what it measured before - the token, unchanged, by the
+             same name. A caller that wants a shorter DATA row still has
+             `className`, which is where a one-off has always belonged. */
           /* ch17: "8% hairline under each row". Drawn as the artifact draws
              it — `inset 0 -1px 0 var(--hair)`, never a `border` (review 1A ·
              fix 2). It goes on the CELLS rather than the `<tr>`: a collapsed
              table does not paint a box-shadow on a row box, and the run of
              cells is the same line. */
-          "h-[var(--control-height-row)] [&>*]:shadow-[var(--hairline-under)]",
+          "h-[var(--table-row-height,var(--control-height-row))] [&>*]:shadow-[var(--hairline-under)]",
           state === "default" && ROW_DEFAULT,
           state === "selected" && ROW_SELECTED,
           state === "disabled" && ROW_DISABLED,

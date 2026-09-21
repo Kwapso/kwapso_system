@@ -2,6 +2,257 @@
 
 ## Unreleased
 
+### Changed - The minimal pass: plain by default, board lanes, air, footer row - v1.2.149 - 2026-09-21
+
+The client, verbatim, in one sitting: *"i really loev the dircteion in which
+we are going, look sso minimal and clean / but the board component look sso
+bad :// ... also, the ocntent on the main component need a bit more spacing on
+the sides ... do think in ui! so do not just remove the container but make
+adaptations needed / the goal: make a more minimal clean app / the same
+spacing thats now before the footer i want above nav and on sides, bring more
+air"*, then her decisions on the page that answered it: *"board A / space 6 /
+go an implement this appwide, also implement the to the bottom edge for main
+content and assistant like in your previous artifact / also, make footer not
+inside a container, but the full row side to side (within the main content) /
+do think a lot about each component, what this minimalising means so that it
+still works"*.
+
+Ten changes, one per part of that ruling. Every one of them is argued in the
+file it lands in, at the line it lands on; this entry is the index, not the
+argument.
+
+**1 · Plain is the default for a collection's panel and a record's body.**
+`CollectionFrame` takes `panel?: "plain" | "paper"` (default `"plain"`) and
+`RecordDetail` takes `surface?: "plain" | "paper"` (default `"plain"`). A
+plain panel keeps its own VERTICAL air and pays no horizontal inset - the
+pane pays that now, and the page's own caption is the arithmetic: "Pane edge
+to the h1 and to the table's first cell 24", one 24, not two - and it INVERTS
+`--btn-secondary-fill` and `--badge-quiet-fill` rather than dropping them,
+because a control on soft paper takes off-beige and a control on the page
+takes soft paper. It carries `data-ground="page"` so tokens.css §8 can still
+see a region that paints nothing. `"paper"` is ruling J2's and the K1
+reversal's own drawing, unchanged, for a frame or a record that genuinely
+stands on off-beige.
+
+**2 · The board is option A: every column is a soft paper lane.**
+`Kanban` takes `columnGround?: "lane" | "bare"` (default `"lane"`). The lane
+is `bg-surface-panel` at `--radius` with a `--space-2h` inset, the head inside
+it, and the white `raised` cards lifting off it at the same 1.103 they read at
+inside the old panel. The head drops its own 6px horizontal inset inside a
+lane, because that 6 was standing in for the band that is now back and paying
+both would seat the dot 16px in while every card starts at 10. The empty
+column's `py-[var(--space-8)]` is gone: `EmptyRegister` takes
+`place?: "block" | "lane"`, and the lane-aligned one is a 13px tertiary line
+at the top that KEEPS its `min-h-[calc(var(--space-8)*2)]` floor, because it
+is also the drop target for the first card. The column measure, the
+`--space-2h` gap and the inline scroll are untouched - option A's own caption
+says the board still scrolls, and a lane is a fill and an inset. `"bare"` is
+the previous drawing, kept for a board still standing on a painted panel where
+a lane would measure 1.000 against its own ground.
+
+**3 · The two invisible things, which were bugs and not taste.** Inside a
+`plain` Card, `--badge-quiet-fill` resolved to the page's own colour - measured
+1.000 live on the tickets list, so every stage chip, type chip and count pill
+on the module was gone and only the black id chips survived. It rebinds to
+`--surface-panel` now. `Avatar`'s `default` read `bg-card`, a fixed address at
+the same off-beige as the pane, so two of the three faces on that page painted
+1.000 and a person was two floating letters with no disc; it reads
+`bg-surface-lift`, the relational register `SearchInput` took in v1.2.146.
+
+**4 · The selected wash follows its ground.** `--surface-selected` joins
+`--surface-lift` in tokens.css §8: soft paper on an off-beige ground, off-beige
+on a soft paper one. Override 77's one standing achievement - ONE answer for a
+chosen record, four call sites reading `bg-surface-selected` - is untouched;
+only the token's address moved, from a fixed paper to a relation. The
+contrast law's own exemption for the 1.000 that override 77 accepted is
+RETIRED, by that law's own rot check, because the pair no longer exists.
+
+**5 · The toolbar stays unpainted, and the air around it is her 10.** The 21
+Sep page recommended the opposite in writing, with a measurement behind it (on
+the live tickets list the toolbar track painted rgba(0, 0, 0, 0) with no row
+wrapper at all, so five controls floated on white with nothing holding them),
+and she overruled it the same day on the product: *"on tickets, reduce space
+above and under toolbar to 10px"*. What read as loose was never the missing
+fill; it was a painted pill's own 6px inset pushing 44px controls to 16 and
+17px off the tabs and the table, with a 56px table header centring 11px text
+under them. So `CollectionFrame` takes `toolbarGround?: "bare" | "page" |
+"panel"` with `"bare"` as the default (the pill is reachable, it is just not
+what a collection draws), the plain panel drops its TOP inset as well as its
+sides and tightens its column gap to `--space-2h`, and `TABS_STRIP_GAP_PLAIN`
+(`--space-2h`) joins `TABS_STRIP_GAP` (`--space-5`). Her two numbers get one
+owner each, and the one above the toolbar is padding on the STRIP'S own box,
+not on the collection, because a distance that lives anywhere else stops
+holding the moment the strip goes sticky - the argument `tabs.tsx` already
+makes at length, and the half the consuming app's own version of this fix
+could not keep.
+
+**6 · The table's header stops being a row.** `TableHeader` takes
+`rowHeight?: "label" | "row"` (default `"label"`): `--control-height-dense`
+instead of `--control-height-row`, so a header strip stops measuring exactly
+what a record row measures. 32 and not the page's drawn 34, because 32 is a
+declared rung of ruling 30's ladder and this kit does not mint a sixth control
+height to land 2px closer. This is the third thing her 10px note was actually
+looking at, named in the app's own commit for the same ruling: "the kit's 56px
+header row centres its 11px text, which is what reads as extra space".
+
+**7 · The air: the pane spends 24 on its sides and above the nav row.**
+`screen-shell.tsx` declares `SHELL_CONTENT_INSET_X` (`px-[var(--space-6)]`),
+spent by `DENSITY_BODY` and `DENSITY_TRAIL`, and `DENSITY_GUTTER_TOP`
+(`--shell-gutter-top: --space-6`), spent by the content column and by
+`ASIDE_TAB` so the two columns' tabs still start at one y. `--shell-gutter`
+itself stays `--space-4`: it is also the measure between the rail and the card
+and between the card and the assistant, which the page keeps at 16.
+
+**8 · `CARD_CONTENT_INSET_X` did NOT follow the pane to 24, and that split is
+deliberate.** The 17 Sep ruling made the pane's gutter and a boxed card's body
+inset one export so they could not drift; the 21 Sep ruling gives them
+different jobs for the first time, because a plain section has no box left to
+pay its side air and a card that still has its box has given nothing up. A
+boxed `CardContent` at 24 inside a 24px pane would spend 48 on a shape nobody
+asked to widen, and would be narrower than its own `CardHeader`
+(`px-6 lg:px-[var(--space-7)]`) on every desktop card. Ruling 2's equality is
+unharmed: both seams it named were the PANE's, and both still read one
+constant.
+
+**9 · The ink footer is a full row of the pane.** `BODY` publishes
+`--pane-inset-x` (its own gutter) and `--radius-pane-edge` (`0px`);
+`RecordDetail`'s band pulls itself out by exactly the first and spends it
+again inside, so it spans the pane while its first word still lands under the
+h1, and it squares its corners off with the pane's own. Both are read through
+fallbacks (`0px` and `--radius`), so a record drawn in a dialog or a demo cell
+is untouched. `--radius-pane-edge` is declared in tokens.css §Shape at
+`var(--radius)`: not a fourth radius, a RELATION, and the shape law was right
+to demand it be named on the `--radius-*` ladder.
+
+**10 · The bottom edge.** The content column's `py-[var(--shell-gutter)]`
+becomes `pt-[var(--shell-gutter-top)]` and the aside dock drops its
+`pb-[var(--shell-gutter)]`, so the card and the assistant both reach the
+window's bottom edge - both measured 16px short of it before, at 1440x900 and
+1991x842. `CARD_FLUSH` (`rounded-b-none`) squares the card's foot, the same
+move `CARD_JOINED` already makes at the leading corner and for the same reason:
+the radius is given back where another object is joined, and the window is an
+object. The 2026-09-04 ruling that ties the two columns together is kept, not
+overturned - the value they agree on is now zero.
+
+**And one new part.** `RecordSections` (exported from `record-detail.tsx`) is
+the plain section stack: one column at `--space-6` with a `Separator` between
+consecutive VISIBLE children, never above the first or below the last. The
+page measured 49px between two plain sections with nothing in it; this is the
+same 49 with the missing line in the middle of it. The seam is the 8%
+`default`, not the 20% `section` rule, which belongs under a heading where
+`Title` already spends it. It is exported rather than wired into
+`RecordDetail`, because the side column beside the conversation is assembled
+by the consuming app and the kit does not own that layout.
+
+**Checks.** `check-card.mjs` gains the plain chip fill and the unmoved boxed
+inset; `check-kanban.mjs` gains the lane's three figures, its declared ground,
+its default, the head's alignment, the top-aligned empty register with its
+drop floor, and the untouched measure and scroll; `check-screen-shell.mjs`
+gains a whole air/bottom-edge block and a toolbar-rhythm block, and has its
+inset checks rebased onto `SHELL_CONTENT_INSET_X` at both ends;
+`check-contrast.mjs` loses an exemption. Every one of the twenty-five new
+assertions was proved by breaking exactly what it guards and watching the
+check fail. `npm run check` and `npm run build` are
+green end to end.
+
+### Fixed - FormSection's divided rule no longer draws through its own legend - v1.2.147 - 2026-09-21
+
+`FormSection`'s `divided` prop painted `shadow-[var(--hairline-over)]` —
+an INSET box-shadow, at `--hair`, on the fieldset's own border-box top
+edge — plus `pt-[var(--space-6)]` to push flow content clear of it.
+Padding moves flow content; it cannot move a shadow. A `<legend>` is laid
+out by the browser to straddle its parent fieldset's own top edge, the
+exact pixel the shadow was drawn on, so a section with `divided` and
+`title` together drew the rule straight through the heading — reproducible
+from the kit's own `compositions/templates/form-screen.tsx`, which passes
+both independently per section.
+
+The client's own words on separators, elsewhere, taken as the ruling here
+too: "Separators work as their own component and therefore have their own
+level or own sequence, and do not occur side by side with anything else
+across any screen size." A FIRST ATTEMPT swapped the shadow for a real
+`Separator` but kept it as the fieldset's own first child — measured live
+in the demo, that still failed: a `<legend>` is hoisted to a fieldset's
+rendered top by the browser regardless of how many non-legend siblings
+precede it inside the SAME fieldset, so the rule landed at 24px inside the
+fieldset, directly under the heading instead of above it. The rule now
+renders through a `Fragment`, as a REAL PRECEDING SIBLING of the
+`<fieldset>` rather than as fieldset content, so nothing inside the
+fieldset can out-rank it. `<legend>` stays the fieldset's own direct child
+throughout (a `<legend>` one element deeper is not a fieldset's legend to
+a screen reader at all), so nothing about the section's accessible name
+changes.
+
+The spacing is inherited, not rebuilt. `Form` already wraps every
+top-level section in one flex column at `gap-[var(--space-6)]`; a
+`Fragment`'s children render as ordinary items of that same column, so the
+separator picks up one `--space-6` gap on each side for free — one from
+whatever precedes it (the previous section, or nothing) to the rule, one
+from the rule to this fieldset's own top, where the legend already sits.
+That is the same total the old shadow-plus-padding spent (one
+`--space-6` from `Form`'s own gap between sections, one `--space-6` of
+this fieldset's own padding), with no new margin or gap utility invented
+to get there. The two cases that were never broken — `divided` alone, and
+`title` alone — render unchanged.
+
+Verified live, not just reasoned about: measured in the kit's own demo
+(the three real `FormSection`s on the Form page) with the separator and
+each fieldset's `getBoundingClientRect()`. Every divided section's
+separator sits above its fieldset (a negative offset relative to the
+fieldset's own top), every gap between a section's end, a separator and
+the next section's top measures the same 22.5px (`--space-6` at the
+demo's 15px root), and the two undivided-adjacent cases keep the single
+`--space-6` they always had.
+
+`npm run check` is green end to end, `tsc --noEmit` included.
+
+### Fixed - CursorGlow idles its rAF loop, caches its rect and skips coarse pointers, forever, not once - v1.2.148 - 2026-09-21
+
+Three real costs, all present since the loop was restored: `tick`
+rescheduled itself unconditionally, so it ran every frame for the life of
+the tab even long after the pointer stopped and every value had settled,
+writing three custom properties a frame into a layer big enough and
+blurred enough that each write re-rasterises it; `onMove` called
+`field.getBoundingClientRect()` on every `pointermove`, a forced
+synchronous layout read, on an event this file's own header already says
+"can fire hundreds of times a second"; and none of it was gated on having
+a pointer stream to justify it at all, so a desktop session paid for a
+flourish a tablet or phone session never could have needed in the first
+place, which is exactly the device split a real app reported.
+
+`tick` now stops rescheduling itself once position and bloom have both
+settled within a small, per-value epsilon (`POSITION_EPSILON`,
+`BLOOM_EPSILON`), and a `running` flag is the one place that decides
+whether a frame is already queued. `onMove`/`onDown` call the same
+`startLoop()` after touching a target or bloom, so a loop that went idle
+is always woken by the very event that gave it somewhere new to go, and
+`startLoop()`'s own `running` check means a burst of events during an
+already-running loop can never queue a second one.
+
+`getBoundingClientRect()` is now read once at mount and cached, refreshed
+by a `ResizeObserver` on the field plus a window resize listener — the
+existing comment's own reasoning (the ground can resize under a
+rail/aside toggle without this component re-mounting) is exactly what a
+`ResizeObserver` is for; it was the "measure on every event" half of that
+comment that was wrong, not the "cannot cache once at mount and never
+touch it again" half.
+
+Neither the listeners nor the loop install at all without
+`(hover: hover) and (pointer: fine)`, checked the same way and right next
+to this file's existing `prefers-reduced-motion` bail-out. It inherits
+that same guard's one documented gap — a `matchMedia` check made once at
+mount does not notice the media condition changing live — but here the
+miss is benign: the field's own static defaults already render a
+correct-looking resting frame with no listener running, so a session that
+starts touch-only and later gains a mouse simply keeps that resting frame
+rather than growing a glow, never a stale or broken one.
+
+The flourish itself is untouched: same two blurred layers, same colours,
+same blur radii, same drift animation, same bloom growth and decay,
+`prefers-reduced-motion` handling unchanged.
+
+`npm run check` is green end to end, `tsc --noEmit` included.
+
 ### Fixed - toolbar search fill, kanban stage mark and board edge, head actions centred - v1.2.146 - 2026-09-21
 
 Four of the client's own rulings, 21 Sep 2026, verbatim, each the kit's to answer against the tickets module's `Card variant="plain"` ground:

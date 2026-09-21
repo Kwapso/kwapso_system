@@ -15,6 +15,26 @@
  * .test.ts) and goes red if anything under shared/ui/ was hand-edited since —
  * a local edit to the kit must be made upstream instead, or the fork drifts.
  *
+ * --from <path>   VENDOR FROM A LOCAL CLONE INSTEAD OF GITHUB, for a tag that
+ * is minted locally but deliberately not pushed yet (client: "do not update
+ * the ui repo yet, we will first iterate on this"). The default two-URL
+ * GitHub path above is untouched — `--from` is opt-in, one extra argument:
+ *
+ *     node scripts/sync-design.mjs v1.2.149 --from ../kwapso-design
+ *
+ * This clones the TAG out of the local working copy at that path (a plain
+ * local `git clone --branch`, no network, no identity) rather than out of
+ * `origin`, so an unpushed tag vendors exactly as a pushed one would.
+ * VERSION.json then carries `"source": "local"` (the default GitHub path
+ * writes `"source": "github"`) so the next reader — and `kit:drift`, see its
+ * own header — knows this vendored copy did not come from the remote and the
+ * tag still owes the kit repo a push. `--from` is for iterating BEFORE that
+ * push, never a substitute for it: push the tag to origin before any other
+ * app is pointed at it, and re-run this script without `--from` once it is
+ * (the hash will not change, only VERSION.json's `source`/`sha` bookkeeping
+ * — both already agree, since the local clone and origin share history once
+ * pushed).
+ *
  * shared/ui/ is also excluded from this repo's oxlint (.oxlintrc.json), for
  * the same reason node_modules is: it is a DEPENDENCY. Its own repo lints it;
  * linting a vendored copy we may not edit would only produce unactionable red.
@@ -46,7 +66,7 @@ import { execSync } from "node:child_process"
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
-import { join, dirname, relative } from "node:path"
+import { join, dirname, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -121,41 +141,83 @@ export function contentHash(dir) {
 }
 
 const main = async () => {
+  // --from <path> is the only flag; everything else on the line is positional
+  // (the tag). Parsed out first so `tag` below never sees the flag's own
+  // tokens.
+  const rawArgs = process.argv.slice(2)
+  const fromFlagAt = rawArgs.indexOf("--from")
+  const fromPath = fromFlagAt === -1 ? null : rawArgs[fromFlagAt + 1]
+  if (fromFlagAt !== -1 && !fromPath) {
+    console.error("usage: node scripts/sync-design.mjs [<tag>] --from <path-to-local-kit-clone>")
+    process.exit(1)
+  }
+  const positional = rawArgs.filter((_, i) => i !== fromFlagAt && i !== fromFlagAt + 1)
+
   const pinned = existsSync(join(TARGET, "VERSION.json"))
     ? JSON.parse(readFileSync(join(TARGET, "VERSION.json"), "utf8")).tag
     : null
-  const tag = process.argv[2] ?? pinned
+  const tag = positional[0] ?? pinned
   if (!tag) {
-    console.error("usage: node scripts/sync-design.mjs <tag>   (no VERSION.json to default from)")
+    console.error("usage: node scripts/sync-design.mjs <tag> [--from <path>]   (no VERSION.json to default from)")
     process.exit(1)
   }
 
   const tmp = mkdtempSync(join(tmpdir(), "kwapso-design-"))
   try {
-    console.log(`sync-design: cloning Kwapso/kwapso-ui-ux at ${tag} …`)
-    // GIT_TERMINAL_PROMPT=0 turns a hung password prompt into a fast failure,
-    // which is what makes trying the second URL possible at all.
-    const failures = []
     let cloned = false
-    for (const repo of REPOS) {
+    if (fromPath) {
+      // LOCAL SOURCE — for a tag minted in the kit repo and deliberately not
+      // pushed yet. A plain local `git clone --branch` against a path on
+      // disk needs no network and no identity: git treats the path exactly
+      // like a remote and can see any tag committed there, pushed or not.
+      const resolvedFrom = resolve(fromPath)
+      if (!existsSync(join(resolvedFrom, ".git")))
+        throw new Error(`sync-design --from: ${resolvedFrom} is not a git repository`)
+      console.log(`sync-design: cloning LOCAL ${resolvedFrom} at ${tag} (source: local, not origin) …`)
       try {
-        execSync(`git clone --quiet --depth 1 --branch ${tag} ${repo} ${tmp}/kit`, {
+        execSync(`git clone --quiet --depth 1 --branch ${tag} ${resolvedFrom} ${tmp}/kit`, {
           stdio: ["ignore", "ignore", "pipe"],
-          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
         })
         cloned = true
-        break
       } catch (err) {
-        failures.push(`  ${repo}\n    ${String(err.stderr ?? err.message).trim().split("\n")[0]}`)
+        throw new Error(
+          `sync-design --from: tag ${tag} not found in the local clone at ${resolvedFrom}.\n` +
+            `  ${String(err.stderr ?? err.message).trim().split("\n")[0]}\n` +
+            "  Check the tag was actually committed there (git tag --points-at HEAD)."
+        )
       }
-    }
-    if (!cloned)
-      throw new Error(
-        `sync-design: neither remote answered for ${tag}.\n${failures.join("\n")}\n` +
-          "  Both URLs are tried on purpose — see the note beside REPOS. If the\n" +
-          "  identity URL prompts, file the `alaap-kwapso` credential; if the plain\n" +
-          "  one 404s, your default account cannot see the repository."
+      console.log(
+        "sync-design: NOTE — this tag is vendored from a local clone and may not be on GitHub yet. " +
+          "Push it to origin before any other app consumes this tag; `npm run kit:drift` will warn " +
+          "(not fail) about this until then."
       )
+    } else {
+      console.log(`sync-design: cloning Kwapso/kwapso-ui-ux at ${tag} …`)
+      // GIT_TERMINAL_PROMPT=0 turns a hung password prompt into a fast failure,
+      // which is what makes trying the second URL possible at all.
+      const failures = []
+      for (const repo of REPOS) {
+        try {
+          execSync(`git clone --quiet --depth 1 --branch ${tag} ${repo} ${tmp}/kit`, {
+            stdio: ["ignore", "ignore", "pipe"],
+            env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+          })
+          cloned = true
+          break
+        } catch (err) {
+          failures.push(`  ${repo}\n    ${String(err.stderr ?? err.message).trim().split("\n")[0]}`)
+        }
+      }
+      if (!cloned)
+        throw new Error(
+          `sync-design: neither remote answered for ${tag}.\n${failures.join("\n")}\n` +
+            "  Both URLs are tried on purpose — see the note beside REPOS. If the\n" +
+            "  identity URL prompts, file the `alaap-kwapso` credential; if the plain\n" +
+            "  one 404s, your default account cannot see the repository.\n" +
+            "  If this tag is only committed locally and not pushed yet, use\n" +
+            "  --from <path-to-local-kit-clone> instead."
+        )
+    }
     const sha = execSync(`git -C ${tmp}/kit rev-parse HEAD`).toString().trim()
 
     for (const entry of DELIVERED)
@@ -183,6 +245,11 @@ const main = async () => {
           sha,
           hash,
           syncedAt: new Date().toISOString().slice(0, 10),
+          // "local" when vendored via --from (an unpushed tag, iterated from a
+          // local kit clone); "github" for the ordinary origin clone above.
+          // kit-drift.mjs reads this to warn, not fail, that a local-sourced
+          // tag is not yet on origin.
+          source: fromPath ? "local" : "github",
           iconArt: { count: readdirSync(join(TARGET, "foundations", "icons")).filter((f) => f.endsWith(".svg")).length, source: "kwapso-ui-ux" },
         },
         null,

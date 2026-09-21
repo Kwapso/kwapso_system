@@ -537,30 +537,115 @@ const collectionFrameVariants = cva(
    · No `overflow: hidden`. A clipped panel would shave the global focus ring
      off the first control in the toolbar and off the first and last row.
    -------------------------------------------------------------------------- */
+/* ── THE PANEL GOES PLAIN BY DEFAULT, 21 SEP 2026 - THE MINIMAL PASS.
+   CLIENT, VERBATIM: "go an implement this appwide", after "the goal: make a
+   more minimal clean app".
+
+   THE PANEL WAS NEVER JUST A FILL, WHICH IS THE WHOLE DIFFICULTY. It
+   supplied THREE things at once and the 21 Sep page measured all three
+   going at once when a caller simply stopped painting it: the soft paper,
+   the 24/32 inset, and the two rebinds that tell a control inside it which
+   tone to take. A `surface="plain"` that only dropped the fill would drop
+   the other two by accident.
+
+   SO THE PLAIN PANEL KEEPS THE INSET AND INVERTS THE REBINDS RATHER THAN
+   DROPPING THEM. On soft paper a control takes off-beige; on the page a
+   control takes soft paper. That is ruling 01 read in the other direction,
+   not a new rule - and it is the same inversion `ToolbarRow`'s `page` and
+   `panel` grounds already carry one file over. Measured before the fix, on
+   the live tickets list: `--badge-quiet-fill` inside a plain collection
+   resolved #FFFEF9 against a pane of rgb(255, 254, 249), 1.000, and every
+   quiet chip on the module was invisible.
+
+   `data-ground="page"` BESIDE THE INVERSION, for the same reason the lane
+   in `kanban.tsx` carries `data-ground="panel"`: tokens.css §8 keys
+   `--btn-secondary-fill`, `--surface-lift` and (since 21 Sep)
+   `--surface-selected` off a class name or that attribute, and a panel that
+   paints nothing has no class for §8 to see. The attribute is how a
+   transparent region still declares what it is standing on, so a face, a
+   lift and a selected row all get the page's answer instead of the last
+   answer some ancestor happened to leave behind.
+
+   NO RADIUS AND NO INSET-OWNED EDGE, DELIBERATELY. A radius on a
+   transparent box is a promise nothing keeps. What used to say where the
+   collection began and ended is now the rows' own hairlines above and
+   below, which `Table` already draws and which survive the switch
+   untouched. */
 const collectionPanelVariants = cva(
-  [
-    "relative z-[2] flex min-w-0 flex-col",
-    "rounded-[var(--radius)] bg-surface-panel text-foreground",
-    /* A control in the toolbar stands on soft paper, so its fill is the other
-       tone — off-beige. CH27.1 draws exactly that opposition on this toolbar:
-       "both keeping their round off-beige well, which is what makes them read
-       as buttons on a soft-paper toolbar". Before the K1 reversal these two
-       lines said the opposite, and the toolbar's buttons were soft paper on
-       off-beige, which is the sentence backwards. */
-    "[--btn-secondary-fill:var(--surface-page)]",
-    /* RENAMED FROM `--pill-fill`, 19 Sep 2026 — CHANGELOG v1.2.132. Same
-       value. */
-    "[--badge-quiet-fill:var(--surface-page)]",
-  ],
+  ["relative z-[2] flex min-w-0 flex-col"],
   {
     variants: {
+      /** See `CollectionFrameProps.panel`. */
+      surface: {
+        /**
+         * The soft paper panel, ruling J2's own drawing, unchanged to the
+         * byte and reachable by prop.
+         */
+        paper: [
+          "rounded-[var(--radius)] bg-surface-panel text-foreground",
+          /* A control in the toolbar stands on soft paper, so its fill is the
+             other tone - off-beige. CH27.1 draws exactly that opposition on
+             this toolbar: "both keeping their round off-beige well, which is
+             what makes them read as buttons on a soft-paper toolbar". Before
+             the K1 reversal these two lines said the opposite, and the
+             toolbar's buttons were soft paper on off-beige, which is the
+             sentence backwards. */
+          "[--btn-secondary-fill:var(--surface-page)]",
+          /* RENAMED FROM `--pill-fill`, 19 Sep 2026 - CHANGELOG v1.2.132.
+             Same value. */
+          "[--badge-quiet-fill:var(--surface-page)]",
+        ],
+        /**
+         * No paper. The rows and the toolbar stand on the pane itself, and
+         * the two rebinds run the other way: a control on the page takes
+         * soft paper. See this block's own note above.
+         */
+        plain: [
+          "bg-transparent text-foreground",
+          "[--btn-secondary-fill:var(--surface-panel)]",
+          "[--badge-quiet-fill:var(--surface-panel)]",
+        ],
+      },
       /** The card inset, matching the frame's own density step for step. */
       density: {
         default: "gap-5 p-6 lg:p-[var(--space-7)]",
         compact: "gap-4 p-5",
       },
     },
-    defaultVariants: { density: "default" },
+    /* ── WHAT A PLAIN PANEL STOPS PAYING, AND THE ONE NUMBER IT KEEPS.
+
+       THE SIDES GO. The 21 Sep page's candidate-one caption states the
+       target as a number: "Pane edge to the h1 and to the table's first
+       cell 24." ONE 24, and it is the pane's. A plain panel that also spent
+       24 (32 above `lg:`) would put the first cell 48 or 56 in from the
+       pane's edge and break the one alignment the whole air argument is
+       about, the h1 and the table's first column reading one left edge.
+
+       THE TOP GOES, AND THE COLUMN GAP DROPS TO 10. CLIENT, 21 SEP 2026,
+       AFTER that page and measured on the live product: "on tickets, reduce
+       space above and under toolbar to 10px". That ruling supersedes the
+       page's own "keeps the inset" on the block-START, and it has to,
+       because the two cannot both be true: a 24 or 32 top inset here, plus
+       the tab strip's own gap above it, put the toolbar between 34 and 40
+       under the tabs. With this top inset gone the STRIP owns the whole
+       distance above the toolbar (`TABS_STRIP_GAP_PLAIN`, 10) and this
+       column's own gap owns the whole distance below it (`--space-2h`, 10),
+       so her two numbers are one step each with one owner each.
+
+       THE BOTTOM STAYS, and it is the reasoning `CardContent`'s own `plain`
+       override already spends: with nothing beneath it, that one is this
+       region's trailing space before whatever follows the pager, and
+       nothing else pays it.
+
+       `density="compact"`'s `gap-4` moves with the default's `gap-5`, for
+       the same ruling. A compact collection is denser, not differently
+       ruled, and two answers to "how far under the toolbar" is exactly the
+       drift her own number was given to end. */
+    compoundVariants: [
+      { surface: "plain", density: "default", class: "px-0 lg:px-0 pt-0 lg:pt-0 gap-[var(--space-2h)]" },
+      { surface: "plain", density: "compact", class: "px-0 pt-0 gap-[var(--space-2h)]" },
+    ],
+    defaultVariants: { surface: "plain", density: "default" },
   },
 );
 
@@ -609,6 +694,55 @@ export interface CollectionFrameProps
   formatCount?: (value: number) => string;
   /** The heavy hairline under the heading row. On, as chapter 13 draws it. */
   rule?: boolean;
+
+  /**
+   * WHETHER THE ONE PANEL IS A BOX - 21 SEP 2026, THE MINIMAL PASS.
+   * `"plain"` (THE DEFAULT, the client's "go an implement this appwide")
+   * paints nothing: the toolbar and the rows stand on the pane, the two
+   * paper rebinds invert, and the panel keeps only its own vertical air.
+   * `"paper"` is ruling J2's soft paper panel, unchanged and reachable for a
+   * frame that genuinely stands on off-beige with nothing else between it
+   * and the page. See `collectionPanelVariants` for the whole argument.
+   *
+   * IT ALSO DECIDES TWO THINGS THAT USED TO BE HARD CODED, because both
+   * were answers to "what has already been painted here":
+   *  · `toolbarGround`'s own default - see that prop.
+   *  · which register an empty, loading or failed collection draws. A
+   *    plain frame takes `CollectionRegister variant="block"`, the one
+   *    register that deliberately keeps its paper while everything around
+   *    it goes transparent: a boundary around nothing, with no boundary, is
+   *    just nothing, and three lines of text in the middle of a white field
+   *    reads as a page that failed rather than as a place that is empty.
+   */
+  panel?: "plain" | "paper";
+  /**
+   * WHAT THE TOOLBAR ROW STANDS ON. `"bare"` is the default on both panel
+   * surfaces, and on a PLAIN one that is a client ruling rather than an
+   * inheritance.
+   *
+   * THE 21 SEP PAGE RECOMMENDED THE OPPOSITE AND SHE OVERRULED IT THE SAME
+   * DAY, ON THE LIVE PRODUCT. The page's argument was good and is worth
+   * keeping: measured on the tickets list, the toolbar track painted
+   * rgba(0, 0, 0, 0) with no row wrapper at all, so search, Filter, the
+   * order control, the view switch and the plus floated as five separate
+   * pills on white with nothing holding them, and it called that the one
+   * place where going plain made the page BUSIER rather than quieter. Her
+   * answer, verbatim and after seeing it: "on tickets, reduce space above
+   * and under toolbar to 10px". Not a pill: less air. What was reading as
+   * loose was the 6px inset inside a painted pill pushing 44px controls to
+   * 16 and 17px from the tabs and the table, and a 56px table header row
+   * centring its 11px text under them.
+   *
+   * SO THE PAINT STAYS OFF AND THE AIR COMES IN, which is what the plain
+   * panel's own compound variants and `TABS_STRIP_GAP_PLAIN` now spend. A
+   * group of five controls 10px under the tabs and 10px above the rows IS
+   * a row; it did not need a fill to become one.
+   *
+   * Pass a value to override: `"page"` for the soft paper pill on an
+   * off-beige ground, `"panel"` for a row standing on soft paper. Both
+   * remain exactly what `ToolbarRow` has always drawn.
+   */
+  toolbarGround?: "bare" | "page" | "panel";
 
   /** The optional figure strip between the heading and the tabs. Usually a `StatGrid`. */
   figures?: React.ReactNode;
@@ -845,6 +979,8 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
       countLabel = "records",
       formatCount,
       rule = true,
+      panel: panelSurface = "plain",
+      toolbarGround,
       figures,
       tabs,
       value,
@@ -903,17 +1039,48 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
        same-specificity classes racing each other. */
     const bodyState = loading ? "loading" : error ? "error" : empty ? "empty" : "default";
 
+    /* THE REGISTER KEEPS ITS PAPER ON A PLAIN FRAME - 21 SEP 2026. `inline`
+       is `.kw-empty`, the lighter register, and it is right INSIDE a painted
+       panel, where "a panel-toned card on a panel-toned band is invisible in
+       light" (see `registerVariants`). With the panel gone that reasoning
+       inverts: the register is standing on the pane, nothing else on the
+       screen is painted, and the one job this object has is to draw a
+       boundary around nothing. Measured live before this line: the register
+       painted rgba(0, 0, 0, 0) at radius 0 with a 48px 24px inset - three
+       lines of text in the middle of a white field, which reads as a page
+       that failed rather than as a place that is empty. `block` is
+       `.kw-register`: soft paper at 24 with the `--space-7` inset, inside
+       the plain frame. */
+    const registerVariant = panelSurface === "plain" ? "block" : "inline";
+
     let body: React.ReactNode = children;
     if (bodyState === "loading") {
       body =
         loadingState ??
-        (<CollectionRegister tone="busy" eyebrow={loadingLabel} busyLabel={loadingLabel} />);
+        (<CollectionRegister
+          variant={registerVariant}
+          tone="busy"
+          eyebrow={loadingLabel}
+          busyLabel={loadingLabel}
+        />);
     } else if (bodyState === "error") {
       body =
         errorState ??
-        (<CollectionRegister tone="error" eyebrow={errorLabel} body={errorBody} />);
+        (<CollectionRegister
+          variant={registerVariant}
+          tone="error"
+          eyebrow={errorLabel}
+          body={errorBody}
+        />);
     } else if (bodyState === "empty") {
-      body = emptyState ?? <CollectionRegister tone="quiet" eyebrow={emptyLabel} body={emptyBody} />;
+      body =
+        emptyState ??
+        (<CollectionRegister
+          variant={registerVariant}
+          tone="quiet"
+          eyebrow={emptyLabel}
+          body={emptyBody}
+        />);
     }
 
     return (
@@ -1029,7 +1196,13 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
               this panel by being inside the body, not by a fourth slot. */}
           <div
             data-slot="collection-frame-panel"
-            className={collectionPanelVariants({ density })}
+            data-surface={panelSurface}
+            /* `data-ground` IS THE PLAIN PANEL'S ONLY WAY TO BE SEEN BY
+               tokens.css §8 - see `collectionPanelVariants`' own note. A
+               `paper` panel needs nothing here: its `bg-surface-panel` class
+               is already one of the names §8 keys on. */
+            data-ground={panelSurface === "plain" ? "page" : undefined}
+            className={collectionPanelVariants({ surface: panelSurface, density })}
           >
             {/* CH27.5's band. Inside the panel, above the toolbar, and
                 drawn only when a composition passes one — the archive tab
@@ -1060,18 +1233,44 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
                 that a bug somebody can fix rather than a component somebody
                 has to rewrite.
 
-                NOTHING HERE CHANGES SHAPE. The row is `ground="bare"` because
-                this frame's own panel already paints the soft paper it stands
-                on and already spends `gap-5` under it, which is the same
-                number the standalone row pays as its own trailing margin. The
-                panel a toolbar control opens stays THIS file's `toolbarPanel`,
-                a sibling below, for the same reason: there is already a place
-                in flow here, and routing it through the row would nest it a
-                box deeper for nothing. `data-slot` is passed through so the
-                element keeps the name every probe has always known it by. */}
+                THE GROUND IS STILL `bare`, AND IT IS A PROP NOW - 21 SEP
+                2026. The reason this line has always given is unchanged on
+                a PAPER panel and is kept verbatim: "the row is
+                `ground="bare"` because this frame's own panel already paints
+                the soft paper it stands on and already spends `gap-5` under
+                it, which is the same number the standalone row pays as its
+                own trailing margin."
+
+                ON A PLAIN PANEL THAT SENTENCE IS FALSE AND THE ANSWER IS
+                THE SAME ANYWAY, which is the part worth writing down.
+                Nothing has painted, so the 21 Sep page argued the row
+                should take its soft paper pill back - a toolbar is a group,
+                and five controls floating on white are not one. The client
+                saw exactly that and ruled the other way the same day, on
+                the live product: "on tickets, reduce space above and under
+                toolbar to 10px". What read as loose was never the missing
+                fill; it was a painted pill's own 6px inset pushing 44px
+                controls to 16 and 17px off the tabs and the table, with a
+                56px table header centring 11px text under them. Take the
+                air out and the group reads as a row with no box at all.
+
+                SO `ground` IS A PROP WITH `bare` AS ITS DEFAULT rather
+                than a hard coded value: the pill is still the right answer
+                for a row standing alone on a page, and this frame is no
+                longer the only caller allowed an opinion. The 10px above
+                and below are spent by the two owners that survive a sticky
+                strip - `TABS_STRIP_GAP_PLAIN` on the strip, and this
+                panel's own column gap - not by a margin on the row.
+
+                The panel a toolbar control opens stays THIS file's
+                `toolbarPanel`, a sibling below, for the same reason as
+                before: there is already a place in flow here, and routing it
+                through the row would nest it a box deeper for nothing.
+                `data-slot` is passed through so the element keeps the name
+                every probe has always known it by. */}
             <ToolbarRow
               data-slot="collection-frame-toolbar"
-              ground="bare"
+              ground={toolbarGround ?? "bare"}
               search={search}
               filters={filters}
               period={period}

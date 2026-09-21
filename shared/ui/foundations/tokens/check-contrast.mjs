@@ -1000,20 +1000,40 @@ const EXEMPT = [
       "need to read; making it legible is how a disabled control stops " +
       "looking disabled.",
   },
-  {
-    tier: "boundary",
-    fg: "--surface-selected",
-    bg: ["--card", "--surface-raised", "--background", "--popover"],
-    why:
-      "RULED D15-B, 2026-08-27, register row 77 — the client took the " +
-      "artifact's lift after seeing it drawn AND MEASURED in red on " +
-      "verify/decide-3.html §D15. tokens.css §4 records the consequence in " +
-      "her own terms: 'a selected thing now measures 1.000 against the " +
-      "off-beige body pane in light, 1.000 against an unselected raised card " +
-      "in BOTH palettes'. This is the one 1.000 in the system that a person " +
-      "chose with the number in front of her. It is exempt because it was " +
-      "ruled, not because it is fine.",
-  },
+  /* ── THE SECOND ENTRY IS RETIRED, 21 SEP 2026, AND THIS CHECK IS WHAT
+     CAUGHT IT. It read, in full:
+
+       { tier: "boundary", fg: "--surface-selected",
+         bg: ["--card", "--surface-raised", "--background", "--popover"],
+         why: "RULED D15-B, 2026-08-27, register row 77 - the client took
+         the artifact's lift after seeing it drawn AND MEASURED in red on
+         verify/decide-3.html §D15. tokens.css §4 records the consequence in
+         her own terms: 'a selected thing now measures 1.000 against the
+         off-beige body pane in light, 1.000 against an unselected raised
+         card in BOTH palettes'. This is the one 1.000 in the system that a
+         person chose with the number in front of her. It is exempt because
+         it was ruled, not because it is fine." }
+
+     THE PAIR IT EXCUSED NO LONGER EXISTS. `--surface-selected` became
+     relational in the 21 Sep minimal pass (tokens.css §8, beside
+     `--surface-lift`, for the same reason and in the same two directions):
+     a selected row now takes the OTHER paper from the ground it stands on,
+     so on `--card`/`--surface-raised`/`--background` it is soft paper and
+     measures the kit's own page/panel step rather than the ground's own
+     colour. This run reports it in the QUIET band with its number, which is
+     where a real surface step belongs.
+
+     D15-B IS NOT OVERTURNED BY DELETING THIS. The client chose a LIFT off
+     the panel and she still has one; what she was shown in red was the
+     side effect of spelling that lift as a fixed address, and the plain
+     pass turned that side effect from a corner case into the ordinary one
+     (every row on every collection standing on the pane). The entry's own
+     last sentence - "exempt because it was ruled, not because it is fine" -
+     is why it could be retired the moment it stopped being needed rather
+     than defended.
+
+     The list shrinks by one. It is down to the disabled-ink entry above,
+     which is stated in tokens.css's own declaration. */
 ];
 
 function exemptionFor(pair, tier) {

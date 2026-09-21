@@ -509,6 +509,32 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   and Contacts measured 44 / 20). Fixed once in `web/app/globals.css`: `.pinned-strip +
   [data-slot="card"]` zeroes both the card's real `padding-top` and the R63 `--pinned-lead`
   property together. Proved by `web/test/toolbar-lead-gap-card.test.tsx`.
+  **AMENDED AGAIN 21 Sep 2026 — the strip pays NOTHING and the card pays the whole 10px.**
+  Aurora, verbatim, on the live tickets list: "on tickets, reduce space above and under
+  toolbar to 10px", and then, the same day, over the whole app: "go an implement this
+  appwide" (rulebook L43). The strip's own trailing `pb-[var(--tab-content-gap)]` (20px) was
+  stacking on the card's 10px lead for 30px above the toolbar. `renderFolderTabs`
+  (`shared/web/screen-engine/tabs-view.tsx`) now merges `pb-0` and `PINNED_STRIP_TIGHT_MARK`
+  over every strip it draws — this was a `tight` flag on the one tickets call site and is
+  unconditional now, so "the strip pays its own trailing gap once" above is HISTORY: on a
+  collection strip that number is zero, and `--tab-content-gap` survives only as the source
+  of `--record-tab-gap` on a record's own floated strip. `globals.css` keeps one
+  `--pinned-chrome-h` rule, keyed to the tight mark, so a PINNED toolbar clears exactly the
+  strip's own painted height; the ordinary `calc(tab-strip-h + tab-content-gap)` rule is
+  deleted. Proved by `web/test/strip-gap.test.tsx` (renamed from `tickets-strip-gap.test.tsx`
+  the day the scope went).
+- **A section paints the page or the kit's paper, never a stroke and never a hex (R67, as
+  amended 21 Sep 2026).** This law used to read "each panel stands on paper; nothing is drawn
+  on the bare page ground", from five sayings of one sentence in three days. Aurora overturned
+  it app wide on 21 Sep 2026 (rulebook L43): plain is the DEFAULT now, through the shells' own
+  defaults (`CollectionCard`, `TicketSidePanel`, `EmptyGatedPanel`), so a grouping section in
+  any module of either front door paints nothing and no call site names it. What survives is
+  the other half: separation is a fill or an inset shadow, never a stroke, and a colour
+  resolves through a token, never a hex. The opposite census is `PAPER_ON_PURPOSE`
+  (`shared/rules/registry.ts`): every `<Card>` that still paints soft paper says which of the
+  five things it is that a grouping section is not — a conversation card, an empty or error
+  state, a tile, a well, or a not-a-section. (`sections-stand-on-paper`,
+  `web/test/sections-stand-on-paper.test.ts`; `web/test/plain-surface-scope.test.tsx`)
 - **Every rail destination is named in one word (R85).** The client's ruling, 17 Sep 2026,
   verbatim: "in the navigation bar, we only have one-word names ... an alternative for work
   logs." Every `NAV` entry with a real `group` and every sidebar `TEAM_SECTIONS` row titles in

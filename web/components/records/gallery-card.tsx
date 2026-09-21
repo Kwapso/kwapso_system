@@ -77,7 +77,17 @@ export function GalleryCard({
   )
 
   return (
-    <Card variant="raised" className={cn("hover:bg-accent motion-hover", className)}>
+    /* SOFT PAPER, NOT OFF-BEIGE — rulebook L43 going app wide, 21 Sep 2026.
+       This card used to stand inside a painted collection frame, where
+       `raised` (`--card`, off-beige) read 1.221 against soft paper. The
+       frame is plain now, so its ground is the PAGE, and `--card` IS the
+       page's own colour in light (#FFFEF9): `raised` here would measure
+       1.000 and the card would be held up by its shadow alone. `default`
+       is soft paper, the same 1.103 the search pill and every other
+       object on this ground reads at. The Minimal Kit page named exactly
+       this sweep: "check that nobody passed `raised` explicitly for a
+       tile row that used to sit on a panel". */
+    <Card variant="default" className={cn("hover:bg-accent motion-hover", className)}>
       {href ? (
         // THROUGH THE URL SEAM (web/test/rich-text.test.ts) — every caller of
         // this shared card builds `href` from a fixed segment/route table

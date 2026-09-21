@@ -80,16 +80,17 @@ const SHORT_LOG: WorkLog = {
   accountId: null,
 }
 
-// PLAIN-SURFACE EXPERIMENT (rulebook L43) — `EmptyGatedPanel`'s own
-// `surface` prop, defaulting to `"boxed"` (today's markup, byte for byte)
-// with `"plain"` opting into the kit's `Card variant="plain"` and dropping
-// `CardContent`'s own `p-4`. R88's own header-drop-when-empty guard is
-// unchanged by either surface. See web/test/plain-surface-scope.test.tsx for
-// the census that keeps the string scoped to the tickets module.
+// THE PLAIN SURFACE, APP WIDE (rulebook L43, 21 Sep 2026) — `EmptyGatedPanel`
+// defaults to plain now. The two cases below used to read the other way round
+// (boxed was the default and plain was the tickets-only opt-in); the ruling
+// swapped them, so the DEFAULT case asserts the plain drawing and `boxed`
+// survives as the opposite decision a call site spells and
+// `PAPER_ON_PURPOSE` names. R88's own header-drop-when-empty guard is
+// unchanged by either surface.
 describe("EmptyGatedPanel — surface", () => {
-  it("boxed (the default) carries data-variant=\"default\" and p-4 on its content", () => {
+  it("boxed (spelled at the call site) carries data-variant=\"default\" and p-4 on its content", () => {
     render(
-      <EmptyGatedPanel title="Related stories" empty={false}>
+      <EmptyGatedPanel title="Related stories" empty={false} surface="boxed">
         <div>row</div>
       </EmptyGatedPanel>
     )
@@ -100,9 +101,9 @@ describe("EmptyGatedPanel — surface", () => {
     expect(content.className).toContain("p-4")
   })
 
-  it("plain carries data-variant=\"plain\", data-surface=\"plain\", and no p-4 on its content", () => {
+  it("plain (the default, no prop at all) carries data-variant=\"plain\", data-surface=\"plain\", and no p-4 on its content", () => {
     render(
-      <EmptyGatedPanel title="Related stories" empty={false} surface="plain">
+      <EmptyGatedPanel title="Related stories" empty={false}>
         <div>row</div>
       </EmptyGatedPanel>
     )
@@ -113,9 +114,9 @@ describe("EmptyGatedPanel — surface", () => {
     expect(content.className).not.toContain("p-4")
   })
 
-  it("R88 still drops the whole header when empty, in the plain surface too", () => {
+  it("R88 still drops the whole header when empty, on the plain default too", () => {
     render(
-      <EmptyGatedPanel title="Related stories" empty surface="plain">
+      <EmptyGatedPanel title="Related stories" empty>
         <div>empty state</div>
       </EmptyGatedPanel>
     )
@@ -196,9 +197,14 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     })
   })
 
-  // PLAIN-SURFACE EXPERIMENT (rulebook L43) — forwarded to `EmptyGatedPanel`
-  // (this card's own shell), never drawn by hand here.
-  it("forwards surface=\"plain\" to its own EmptyGatedPanel shell", async () => {
+  // PLAIN BY DEFAULT, NO PROP AT ALL — rulebook L43 went app wide on 21 Sep
+  // 2026 and `EmptyGatedPanel`'s own default is `"plain"`. This assertion used
+  // to pass `surface="plain"` and prove the card FORWARDED it; the forwarding
+  // prop had exactly one caller, which passed the value that is now the
+  // default, so it was retired with the experiment. What is worth asserting
+  // now is that the card draws no box when nobody says anything — which is
+  // the whole of the ruling from this component's point of view.
+  it("draws its shell plain with no surface prop at all", async () => {
     api.workLogs = [SHORT_LOG]
     render(
       <EffortCard
@@ -207,7 +213,6 @@ describe("a 3 second log — the tiles always render once a record exists", () =
         canEdit={false}
         members={[]}
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
-        surface="plain"
       />
     )
     const card = (await screen.findByText("Effort")).closest('[data-slot="card"]') as HTMLElement

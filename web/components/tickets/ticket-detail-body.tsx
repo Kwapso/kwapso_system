@@ -54,7 +54,10 @@
 import * as React from "react"
 
 import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
-import { Separator } from "@shared/ui/components/separator/separator"
+/* THE PLAIN SECTION STACK IS THE KIT'S OWN (v1.2.149) — see the note beside
+   `sidePanels` below. It replaced this file's hand-rolled `<Separator>` walk,
+   so the separator import went with it. */
+import { RecordSections } from "@shared/ui/components/record-detail/record-detail"
 import { useIsAtLeastLg } from "@/components/records/record-detail-body"
 
 /** Stable DOM anchors for the four panels a ticket's page draws, so a link
@@ -446,42 +449,53 @@ export function TicketDetailBody({
   // cell — which contributes no height of its own — to match it exactly).
   // THE PLAIN-SURFACE SEPARATOR (rulebook L43) — ONE HAIRLINE BETWEEN
   // CONSECUTIVE SECTIONS, NOTHING ABOVE THE FIRST, NOTHING BELOW THE LAST.
-  // Every one of the four sections below is `surface="plain"` at this file's
-  // one call site (help-detail.tsx): no box of its own any more, so the
-  // hairline the sections' own Card border used to draw between them has to
-  // be drawn explicitly, once, in the column that holds them — the kit's own
-  // `<Separator>`, never a border utility (the kit-conformance test forbids
-  // one). `sawVisible` skips a section whose own slot is genuinely ABSENT —
-  // `Boolean(node)` is `false` for `time` when `!canSeeTime` passed `null`,
-  // and `timeEmpty` (above) catches the OTHER way a section disappears,
-  // `EffortCard` itself confirming zero rows and rendering nothing — so a
-  // hidden section draws no separator on either side of it, and its two
-  // visible neighbours end up joined by exactly one line rather than two
-  // stranded ones.
+  // Every one of the four sections below is plain (`TicketSidePanel`'s own
+  // default since the 21 Sep app-wide ruling): no box of its own any more, so
+  // the hairline the sections' own Card border used to draw between them has
+  // to be drawn explicitly, once, in the column that holds them.
+  //
+  // THE COLUMN IS THE KIT'S NOW, NOT THIS FILE'S — `RecordSections`
+  // (`shared/ui/components/record-detail/record-detail.tsx`, v1.2.149) is
+  // that exact stack: one flex column at `--space-6` with a `Separator`
+  // between consecutive VISIBLE children, never above the first and never
+  // below the last, at the 8% `default` weight rather than the 20% `section`
+  // rule (which belongs under a heading, where `Title` already spends it).
+  // The kit's own changelog says why it exists rather than staying a note
+  // here: "The rule was already being drawn - correctly - by one call site,
+  // by hand, which means the next module to go plain would either draw it
+  // differently or forget it." This file WAS that call site; the hand-rolled
+  // `sawVisibleSection` walk it used to run is deleted, not wrapped.
+  //
+  // VISIBILITY IS EXPRESSED AS A NULL CHILD, which is what `RecordSections`
+  // reads (`React.Children.toArray` drops `null`/`undefined`/booleans). Two
+  // ways a section disappears and both have to reach the stack as nothing at
+  // all: `Boolean(node)` is `false` for `time` when `!canSeeTime` passed
+  // `null`, and `timeEmpty` (above) catches the other one, `EffortCard`
+  // itself confirming zero rows and rendering nothing. A `<div id=…>` around
+  // an absent section would be a real child and would leave a stranded rule
+  // beside it, which is exactly the bug the hand-rolled walk existed to
+  // avoid — so the wrapper is built only for a section that is actually
+  // there.
   const sections: { key: TicketPanelName; node: React.ReactNode; visible: boolean }[] = [
     { key: "assignedTo", node: assignedTo, visible: Boolean(assignedTo) },
     { key: "stories", node: stories, visible: Boolean(stories) },
     { key: "time", node: time, visible: Boolean(time) && !timeEmpty },
     { key: "stakeholders", node: stakeholders, visible: Boolean(stakeholders) },
   ]
-  let sawVisibleSection = false
   const sidePanels = (
-    <>
-      {sections.map((section) => {
-        const separatorBefore = section.visible && sawVisibleSection
-        if (section.visible) sawVisibleSection = true
-        return (
-          <React.Fragment key={section.key}>
-            {separatorBefore && <Separator />}
-            {/* ASSIGNED TO, FIRST. Aurora's ruling, 21 Sep 2026, verbatim:
-                "nono assigned to on the very top, a different card from
-                stakeholders!" Above Stories/Time/Stakeholders and everything
-                else in this column. */}
-            <div id={TICKET_PANEL_ANCHOR[section.key]}>{section.node}</div>
-          </React.Fragment>
-        )
-      })}
-    </>
+    <RecordSections className="min-w-0">
+      {sections.map((section) =>
+        section.visible ? (
+          /* ASSIGNED TO, FIRST. Aurora's ruling, 21 Sep 2026, verbatim:
+             "nono assigned to on the very top, a different card from
+             stakeholders!" Above Stories/Time/Stakeholders and everything
+             else in this column. */
+          <div key={section.key} id={TICKET_PANEL_ANCHOR[section.key]}>
+            {section.node}
+          </div>
+        ) : null
+      )}
+    </RecordSections>
   )
 
   // R89'S OWN SOURCE-SCAN PROOF STAYS ON THIS FILE, LITERALLY — every one of
@@ -580,7 +594,7 @@ export function TicketSidePanel({
   title,
   count,
   action,
-  surface = "boxed",
+  surface = "plain",
   children,
 }: {
   title: string
@@ -588,13 +602,16 @@ export function TicketSidePanel({
    * the caller's decision, never re-derived here) — "" draws nothing. */
   count?: string
   action?: React.ReactNode
-  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43, kit v1.2.145's `Card
-   * variant="plain"`) — `"boxed"` (the default) renders EXACTLY today's
-   * markup, variant default, same classNames, byte for byte. `"plain"`
-   * drops the box: `Card variant="plain"`, no `p-4` on the content so the
+  /** APP WIDE SINCE 21 SEP 2026 (rulebook L43, kit v1.2.149) — `"plain"` is
+   * the DEFAULT now: `Card variant="plain"`, no `p-4` on the content so the
    * kit's own zero inset applies and the section's text lines up with the
-   * column edge. Only tickets' own call sites (help-detail.tsx) pass
-   * `"plain"` — see `web/test/plain-surface-scope.test.tsx`. */
+   * column edge. Aurora, on the Minimal Kit page: "go an implement this
+   * appwide". Every host of this shell is a grouping section around titled
+   * content — a ticket's Assigned to and Stakeholders, a story's Detail,
+   * Acceptance criteria, Related tickets, Category, Related stories, Phase
+   * and wave — which is exactly what the ruling took the box off. `"boxed"`
+   * survives for the opposite case, spelled at the call site and named in
+   * `PAPER_ON_PURPOSE` (`shared/rules/registry.ts`). */
   surface?: "boxed" | "plain"
   children: React.ReactNode
 }) {

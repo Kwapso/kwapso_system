@@ -1629,7 +1629,19 @@ export function AppShell({
            rail overrides above give: `shared/ui/` is vendored and pinned and a
            hand-edit fails web/test/vendored-kit.test.ts. Owed upstream — "a
            scroller's own padding must not sit between a sticky child and the
-           clip" is the kit's sentence to write, not this file's. */
+           clip" is the kit's sentence to write, not this file's.
+
+           THE BOTTOM EDGE IS THE KIT'S OWN NOW, kit v1.2.149. The app-side
+           override that used to sit here (six arbitrary-variant classes:
+           zeroing the content column's and the aside dock's bottom gutter,
+           and squaring the two corners that meet the window's bottom edge)
+           is gone — `ScreenShell` draws the flush foot itself:
+           `compositions/templates/screen-shell.tsx`'s content column carries
+           only `pt-[var(--shell-gutter-top)]` (no bottom padding), the aside
+           dock's own className pays no `pb-` either, and `screen-shell-
+           content` always carries `CARD_FLUSH` (`rounded-b-none`). See
+           `web/test/shell-bottom-edge.test.ts`, which now censuses the kit's
+           source for exactly this instead of this file's className. */
         className="pt-[var(--shell-top)] [&_[data-slot=screen-shell-body]]:pt-0"
         spine={spine}
         rail={railContent}

@@ -944,11 +944,14 @@ import { Avatar, AvatarFallback } from "../../components/avatar/avatar";
 import { Badge } from "../../components/badge/badge";
 import { BreadcrumbFolders } from "../../components/breadcrumbs/breadcrumb-folders";
 import { Button } from "../../components/button/button";
-// `CARD_CONTENT_INSET_X` only — this file renders no `Card` of its own.
-// Imported, not restated, so `DENSITY_BODY`'s own horizontal figure and
-// `CardContent`'s can never drift apart. See `DENSITY_BODY`'s own comment
-// (17 Sep 2026 evening, Ruling 2) for why.
-import { CARD_CONTENT_INSET_X } from "../../components/card/card";
+/* `CARD_CONTENT_INSET_X` WAS IMPORTED HERE UNTIL 21 SEP 2026, and the import
+   is GONE rather than left unused: this file's pane inset is
+   `SHELL_CONTENT_INSET_X` now, declared beside `DENSITY_TRAIL`/`DENSITY_BODY`
+   which are its only two readers. The 17 Sep ruling that made the two one
+   export is not undone - see `SHELL_CONTENT_INSET_X`'s own comment for why
+   the 21 Sep air ruling gave the pane and the boxed card different jobs, and
+   why "one token, two seams" now means the pane's TWO seams rather than the
+   pane's and the card's. This file still renders no `Card` of its own. */
 import { CursorGlow } from "../../components/cursor-glow/cursor-glow";
 import {
   Sheet,
@@ -2009,6 +2012,25 @@ const CARD = cn(
    that made the mobile trail, in a file it correctly would not reach into. */
 const CARD_JOINED = "md:rounded-ss-none";
 
+/* THE FOOT IS JOINED TOO, 21 SEP 2026 - and it is the same rule as
+   `CARD_JOINED` above, applied to the other end of the card for the same
+   reason. That block's own sentence is the whole argument: "the corner is
+   removed BECAUSE another object is joined there". The content column stopped
+   paying a bottom gutter in this edit (client: "implement the to the bottom
+   edge for main content and assistant"), so the card's bottom edge and the
+   window's bottom edge are now one line - and a radius drawn on a corner with
+   nothing on the far side of it reads as a rendering mistake rather than as a
+   deliberate edge. Written as a removal after `rounded-[var(--radius)]`, the
+   same shape `CARD_JOINED` takes, so no fifth radius is invented and the two
+   remaining corners keep `--radius` exactly as before.
+
+   UNCONDITIONAL, UNLIKE `CARD_JOINED`, and the difference is real rather than
+   an inconsistency. The leading corner's joint depends on whether a
+   breadcrumb exists and on the width, so it is a ternary at the call site.
+   The window's bottom edge is there on every screen, at every width, whether
+   or not anything else is: the card always ends against it now. */
+const CARD_FLUSH = "rounded-b-none";
+
 /* ----------------------------------------------------------------------------
    THE TRAIL'S OWN GAP TO WHAT FOLLOWS IT — since the 17 Sep AFTERNOON ruling
    moved the trail INSIDE the card, "what follows" is the head (`band`, or
@@ -2142,6 +2164,28 @@ const TRAIL_GAP = "mb-[var(--space-4)]";
 const BODY = cn(
   "min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-raised",
   "[--badge-quiet-fill:var(--surface-panel)]",
+  /* ── THE PANE PUBLISHES ITS OWN GUTTER, 21 SEP 2026.
+     `DENSITY_BODY` spends `SHELL_CONTENT_INSET_X` as padding here; this
+     line says the same number out loud as a property, so a part INSIDE the
+     pane that needs to break out of the inset and then pay it back can do
+     so without a literal and without knowing which shell it is in.
+     `RecordDetail`'s ink footer is the one part that does - the client's
+     "make footer not inside a container, but the full row side to side
+     (within the main content)" - and it reads this property twice, once
+     negative on the margin and once positive on its own content, so the
+     band spans the pane while its text still lands under the h1.
+     ONE NUMBER, TWO READERS, AND NO SECOND SPELLING OF IT: the padding and
+     the property are both `--space-6`, and a part that wants the pane's
+     gutter asks the pane rather than re-deriving it.
+     `--radius-pane-edge` IS THE COMPANION AND IT IS `0px` ON PURPOSE. The
+     pane's own bottom corners are square now (`CARD_FLUSH`), because the
+     card's bottom edge is the window's; anything that spans the pane to its
+     edges has to square off with it or the two shapes disagree about where
+     the page ends. Outside a pane both properties are simply absent and
+     every reader falls back to what it drew before - see `RecordDetail`'s
+     band for the fallbacks. */
+  "[--pane-inset-x:var(--space-6)]",
+  "[--radius-pane-edge:0px]",
 );
 
 /* ----------------------------------------------------------------------------
@@ -2202,7 +2246,16 @@ const RAIL_COLUMN = cn("p-[var(--rail-inset)]");
    column's. `BreadcrumbFolders` (inside `ASIDE_TAB`) keeps its own internal
    tab padding (`px-5`) regardless — that is the label's OWN breathing room,
    never this column's, exactly as it already is for the content trail. */
-const ASIDE_TAB = cn("pt-[var(--aside-inset)]");
+/* `--shell-gutter-top`, NOT `--aside-inset`, SINCE 21 SEP 2026. The block
+   above states the invariant this line exists to keep: "the two columns'
+   tabs start at the same measured y (both are `--shell-gutter`/
+   `--aside-inset` below the row they share)". The content column's own top
+   gutter moved to `--shell-gutter-top` (24) under that day's air ruling, so
+   this one moves with it - the invariant is about the two being ONE measure,
+   not about which measure it is. `--aside-inset` keeps its own value and its
+   own job (it is still what the dock spends on the inline axis); it simply
+   stops being the thing that answers "how far down does a tab start". */
+const ASIDE_TAB = cn("pt-[var(--shell-gutter-top)]");
 /* NO BLOCK-END HERE ANY MORE, AND THAT IS A CORRECTION OF MY OWN OVER-FIX.
    This paid `pb-[var(--aside-inset)]` for as long as the DOCK paid nothing at
    the bottom — the body's own padding was what stopped the panel running to
@@ -2614,6 +2667,43 @@ const DENSITY_GUTTER: Record<ScreenDensity, string> = {
   calm: "[--shell-gutter:var(--space-4)]",
 };
 
+/* ----------------------------------------------------------------------------
+   `--shell-gutter-top` - THE AIR ABOVE THE NAV ROW, 21 SEP 2026.
+
+   CLIENT, VERBATIM: "the same spacing thats now before the footer i want
+   above nav and on sides, bring more air", ruled to `--space-6` (24).
+
+   MEASURED BEFORE, ON T0001 AT 1440: the window's top edge to the top of the
+   folder tab strip - the first thing in the shell - was 16, which is
+   `--shell-gutter`, and the air before the black band was 24. Her sentence is
+   the request to make those one number, and the number she named is the
+   larger of the two.
+
+   A SEPARATE TOKEN RATHER THAN MOVING `--shell-gutter` ITSELF, and the reason
+   is in the same ruling's other half. She asked for more air above and on the
+   SIDES of the content; the shell gutter is also the measure BETWEEN the rail
+   and the card, and between the card and the assistant, and the 21 Sep page's
+   own 760 renders keep it at 16 there ("Pane 761 by 726 inside the shell's own
+   16px gutter"). Widening one token would have moved four seams to answer a
+   ruling about one. The sides she means are the PANE's, which
+   `SHELL_CONTENT_INSET_X` owns, and the top is this.
+
+   THE ASIDE READS THE SAME TOKEN, WHICH IS WHAT KEEPS THE STANDING INVARIANT
+   TRUE. `ASIDE_TAB` pays the block-start for the assistant's column exactly
+   as this pays it for the content's, and the two columns' tabs "start at the
+   same measured y" by construction, not by two literals agreeing - see
+   `ASIDE_TAB`'s own comment and `verify/shell-chat/`. Moving one without the
+   other would put the assistant's folder tab 8px above the breadcrumb's.
+
+   THERE IS NO BOTTOM COUNTERPART, DELIBERATELY. The content column used to
+   pay this measure as `py-`, top and bottom alike; the bottom half is gone
+   entirely under the same day's bottom-edge ruling - see THE CONTENT COLUMN
+   in the render. */
+const DENSITY_GUTTER_TOP: Record<ScreenDensity, string> = {
+  comfortable: "[--shell-gutter-top:var(--space-6)]",
+  calm: "[--shell-gutter-top:var(--space-6)]",
+};
+
 /* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` above:
    the card's own head padding is one of the "strip/card ... paddings" the
    brief names alongside `--shell-gutter` as a contributor to the blank space
@@ -2668,13 +2758,16 @@ const DENSITY_HEADER: Record<ScreenDensity, string> = {
    already agree with EACH OTHER — this was never a title-vs-chip mismatch,
    only a trail-vs-both one).
 
-   THE FIX IS THE IDENTIFIER, NOT A NEW NUMBER — same standard
-   `CARD_CONTENT_INSET_X`'s own import already set for `DENSITY_BODY`: this
-   record now spends the SAME `CARD_CONTENT_INSET_X` `DENSITY_BODY` spends,
-   rather than a second copy of `DENSITY_HEADER`'s figure, so the trail's
-   left edge and the body's own left edge cannot drift apart again — a
-   change to the one token moves both. `check-screen-shell.mjs` pins the
-   import, not just the value, for exactly that reason.
+   THE FIX IS THE IDENTIFIER, NOT A NEW NUMBER - the same standard
+   `DENSITY_BODY` already set: this record spends the SAME constant
+   `DENSITY_BODY` spends, rather than a second copy of `DENSITY_HEADER`'s
+   figure, so the trail's left edge and the body's own left edge cannot
+   drift apart again - a change to the one constant moves both.
+   `check-screen-shell.mjs` pins the identifier at both sites for exactly
+   that reason. (That constant was `CARD_CONTENT_INSET_X` until 21 Sep 2026
+   and is `SHELL_CONTENT_INSET_X` now; the figure moved from `--space-3` to
+   `--space-6` with it, and the paragraph above's own 231-against-223
+   measurement is the state before THIS fix, not before that one.)
 
    A HEADER-BAND SCREEN THAT ALSO PASSES `trail` is NOT solved by this —
    flagged, not fixed, in the CHANGELOG: such a screen would still have
@@ -2688,9 +2781,49 @@ const DENSITY_HEADER: Record<ScreenDensity, string> = {
    ruling's own paragraph, below the `TRAIL_GAP` constant, for the halving
    this record's `pt` already carries); only `px` is touched by today's
    ruling. */
+/* ----------------------------------------------------------------------------
+   `SHELL_CONTENT_INSET_X` - THE PANE'S OWN GUTTER, NAMED HERE FROM 21 SEP
+   2026. CLIENT, VERBATIM: "also, the ocntent on the main component need a bit
+   more spacing on the sides", and then the number: "the same spacing thats
+   now before the footer i want above nav and on sides, bring more air",
+   ruled to `--space-6` (24).
+
+   WHAT IT REPLACES AND WHY THE REPLACEMENT IS A SPLIT RATHER THAN AN EDIT.
+   Until today this was `CARD_CONTENT_INSET_X`, imported from `card.tsx`: ONE
+   export read by the boxed card's own body inset AND by the pane, so ruling
+   2's "the sides should be the same as the margin on top of the toolbar"
+   could not drift. The 21 Sep ruling gives the two seams different jobs for
+   the first time - the pane has to pay the air a plain section no longer
+   has, and a card that still has its box has given nothing up - so moving
+   the shared token would have widened every boxed `CardContent` in both apps
+   to answer a ruling about the page. `card.tsx`'s own comment on
+   `CARD_CONTENT_INSET_X` carries the arithmetic.
+
+   RULING 2's EQUALITY SURVIVES THE SPLIT, which is the thing worth checking
+   rather than assuming. That ruling was about the PANE's two seams - its
+   sides and its top - and both of them still read one constant:
+   `DENSITY_BODY` below and `DENSITY_TRAIL` above both spend this, so the
+   trail's arrows, the record's h1, the table's first cell and the ink
+   footer's first word all land on one left edge. `check-screen-shell.mjs`
+   pins the identifier at every one of those sites by name, exactly as it
+   pinned the old one.
+
+   MEASURED BEFORE: 12px from the pane's own edge to the h1 and to the
+   table's edge, identical on both sides (`--space-3`). After: 24. The 21 Sep
+   page's own arithmetic for why that is the right doubling - a plain card's
+   horizontal inset went to 0, and boxed it had been spending between 16 and
+   32 - is in part two of that page and is not restated here.
+
+   ONE FIGURE AT EVERY WIDTH, NO PHONE STEP-DOWN. The page draws the chosen
+   value at 760 as well as 1440 and keeps 24 on both sides at both ("24 above
+   the nav, 24 on both sides, 24 before the band"), and the phone's own air
+   is `--shell-gutter`, OUTSIDE the pane, which this ruling does not touch.
+   A second figure below `md` would be a number nobody asked for. */
+const SHELL_CONTENT_INSET_X = "px-[var(--space-6)]";
+
 const DENSITY_TRAIL: Record<ScreenDensity, string> = {
-  comfortable: cn(CARD_CONTENT_INSET_X, "pt-[var(--space-2h)]"),
-  calm: cn(CARD_CONTENT_INSET_X, "pt-[var(--space-2h)]"),
+  comfortable: cn(SHELL_CONTENT_INSET_X, "pt-[var(--space-2h)]"),
+  calm: cn(SHELL_CONTENT_INSET_X, "pt-[var(--space-2h)]"),
 };
 
 /* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` and
@@ -2731,26 +2864,32 @@ const DENSITY_TRAIL: Record<ScreenDensity, string> = {
    margin you now have on top of the toolbar" — 12px nominal, 13.5px at this
    app's root — not the 36 the first pass named.
 
-   ONE TOKEN, TWO SEAMS, IMPORTED RATHER THAN RESTATED. The app's own
+   ONE TOKEN, TWO SEAMS, NAMED RATHER THAN RESTATED. The app's own
    `padding-top` override cannot be read from here — it lives in
    `web/app/globals.css`, outside this repo, and a kit file may not couple
    itself to an app-only custom property name (the direction of this kit's
    own pipeline runs kit -> app, never the other way) — but the NUMBER it
-   lands on is already a token this kit owns. `CARD_CONTENT_INSET_X`
-   (`components/card/card.tsx`) is that token, spent by `CardContent`'s own
-   left/right padding; this record imports the SAME identifier rather than
-   repeating the literal `px-[var(--space-3)]`, so "the collection card's
-   horizontal inset" and "the screen-shell content inset" the ruling asked
-   to compare are the one export, not two strings that happen to agree
-   today and drift the next time either file is touched.
-   `check-screen-shell.mjs` and `card.tsx`'s own check both pin the import,
-   not just the value, for exactly that reason.
+   lands on is a token this kit owns, so the kit can spend it by name.
+
+   THE TOKEN THIS RECORD SPENDS IS `SHELL_CONTENT_INSET_X` SINCE 21 SEP
+   2026, AND IT IS `--space-6`, NOT `--space-3`. Until then it was
+   `CARD_CONTENT_INSET_X`, imported from `card.tsx`, so the pane's inset and
+   a boxed card's body inset could not drift. The 21 Sep air ruling gave
+   them different jobs for the first time - a plain section has no box left
+   to pay its side air, a boxed card still has one - so the two split and
+   the pane's copy moved up two rungs. Ruling 2's own equality is unharmed:
+   "the collection card's horizontal inset" and "the screen-shell content
+   inset" it asked to compare were both PANE seams, and both still read the
+   one constant, as `DENSITY_TRAIL` directly above does.
+   `check-screen-shell.mjs` pins the identifier at every site, not just its
+   value, for exactly that reason. See `SHELL_CONTENT_INSET_X`'s own
+   comment.
 
    VERTICAL (`py`) IS UNCHANGED from the figures immediately above — this
    ruling named only "the sides." */
 const DENSITY_BODY: Record<ScreenDensity, string> = {
-  comfortable: cn(CARD_CONTENT_INSET_X, "py-[var(--space-5)] lg:py-[var(--space-6)]"),
-  calm: cn(CARD_CONTENT_INSET_X, "py-[var(--space-4)] lg:py-[var(--space-5)]"),
+  comfortable: cn(SHELL_CONTENT_INSET_X, "py-[var(--space-5)] lg:py-[var(--space-6)]"),
+  calm: cn(SHELL_CONTENT_INSET_X, "py-[var(--space-4)] lg:py-[var(--space-5)]"),
 };
 
 /* The air between the three things the body can hold — the figure strip, the
@@ -4227,6 +4366,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
         className={cn(
           SCREEN,
           DENSITY_GUTTER[density],
+          DENSITY_GUTTER_TOP[density],
           DENSITY_RAIL[density],
           DENSITY_ASIDE[density],
         )}
@@ -4535,10 +4675,40 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             THE INLINE GUTTERS ARE PAID BY WHOEVER IS THERE TO PAY THEM. A
             dock pays its own side at `md` and up; below `md` the docks are
             gone, so this column pays both. Written as literal `md:` variants
-            because Tailwind scans source text — see the note at the top. */}
+            because Tailwind scans source text - see the note at the top.
+
+            ── THE BLOCK AXIS IS NO LONGER SYMMETRIC, 21 SEP 2026, AND BOTH
+            HALVES MOVED FOR DIFFERENT CLIENT RULINGS ON THE SAME DAY.
+
+            THE TOP: `--shell-gutter-top` (24) instead of `--shell-gutter`
+            (16). "the same spacing thats now before the footer i want above
+            nav and on sides, bring more air." See `DENSITY_GUTTER_TOP` for
+            why that is a second token rather than a wider `--shell-gutter`.
+
+            THE BOTTOM: GONE. "also implement the to the bottom edge for main
+            content and assistant like in your previous artifact." This
+            column's `py-` was what insets the card from the window's bottom
+            edge as well as its top; with it removed the card's bottom edge
+            IS the window's bottom edge, and the mango ground disappears
+            entirely under it. The aside dock's own `pb-[var(--shell-gutter)]`
+            goes in the same edit and for the same ruling - the two have been
+            tied together since 2026-09-04 ("make it exactly as the main
+            content"), and moving one without the other is what produced the
+            "assistant container is still not same length as main content"
+            report two days later. Both measured 16px short of the viewport
+            bottom at 1440x900 and 1991x842 before this; both are flush now.
+
+            AND THE CARD'S BOTTOM CORNERS SQUARE OFF WITH IT - `CARD_FLUSH`,
+            below. A rounded corner at the window's edge reads as a rendering
+            mistake rather than as a deliberate flush edge, which is the one
+            objection the exploration drawing raised against this shape and
+            answered in the same breath. It is the same move the card's own
+            leading corner already makes where the folder tab is welded to
+            it: the radius is given back exactly where another object is
+            joined, and the window is an object. */}
         <div
           className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col py-[var(--shell-gutter)]",
+            "flex min-h-0 min-w-0 flex-1 flex-col pt-[var(--shell-gutter-top)]",
             railNode ? "ps-[var(--shell-gutter)] md:ps-0" : "ps-[var(--shell-gutter)]",
             /* `lg:` AND NOT `md:` ON THE TRAILING SIDE SINCE 2026-09-04, AND
                THE TWO SIDES ARE ASYMMETRIC ON PURPOSE. The rule has not
@@ -4846,7 +5016,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             data-slot="screen-shell-content"
             data-level="card"
             data-joined={breadcrumb ? "" : undefined}
-            className={cn(CARD, breadcrumb ? CARD_JOINED : undefined)}
+            className={cn(CARD, CARD_FLUSH, breadcrumb ? CARD_JOINED : undefined)}
           >
             {/* THE TRAIL — back/forward plus the text trail, now the card's
                 OWN first row. See the `trail` prop's own doc for the 17 Sep
@@ -5170,8 +5340,30 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                  puts the tab's control level with the breadcrumb (18.75) and
                  the body's top level with the card's (47.33). A top padding
                  here double-counts that. Measured both ways before settling
-                 on `pb-`. */
-              "relative flex flex-none pb-[var(--shell-gutter)] ps-[var(--shell-gutter)]",
+                 on `pb-`.
+
+                 ── AND THE `pb-` IS GONE AS OF 21 SEP 2026, WHICH RETIRES
+                 THE PARAGRAPH ABOVE WITHOUT CONTRADICTING IT. Client: "also
+                 implement the to the bottom edge for main content and
+                 assistant like in your previous artifact." The 2026-09-04
+                 ruling this padding was added for - "the assistant frame is
+                 too long and it exits the screen. make it exactly as the
+                 main content" - is not overturned; it is a ruling that the
+                 two columns END TOGETHER, and they still do. The main
+                 content column dropped its own bottom gutter in the same
+                 edit (see THE CONTENT COLUMN in the render), so the value
+                 they now agree on is zero and the assistant reaches the
+                 window's bottom edge exactly as the card does. Keeping this
+                 line would have reopened the 2026-09-06 report from the
+                 other side: "assistant container is still not same length as
+                 main content / now its too short."
+
+                 THE TOP IS STILL NOT AN OVERSIGHT, for the original reason:
+                 the aside pays its top gutter inside `ASIDE_TAB`, which is
+                 what puts its folder tab level with the breadcrumb. That
+                 line now reads `--shell-gutter-top` so the two stay level
+                 through the air ruling as well. */
+              "relative flex flex-none ps-[var(--shell-gutter)]",
 
               /* ── IT OVERLAYS BELOW `lg`, AND IT IS DRAWN AT EVERY WIDTH.
                  TWO CHANGES, 2026-09-04, AND BOTH ARE MEASUREMENTS RATHER

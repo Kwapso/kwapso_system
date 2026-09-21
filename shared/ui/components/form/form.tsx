@@ -78,6 +78,7 @@ import { cn } from "../../lib/utils";
 import { ActionRow } from "../action-row/action-row";
 import { Alert, AlertDescription, AlertTitle } from "../alert/alert";
 import { Button, buttonVariants } from "../button/button";
+import { Separator } from "../separator/separator";
 import { Headline, Hint, Text } from "../typography/typography";
 
 /* ============================================================================
@@ -221,35 +222,82 @@ export interface FormSectionProps
  */
 const FormSection = React.forwardRef<HTMLFieldSetElement, FormSectionProps>(
   ({ className, title, description, columns, divided = false, children, ...props }, ref) => (
-    <fieldset
-      ref={ref}
-      data-slot="form-section"
-      className={cn(
-        "min-w-0 border-0 p-0",
-        // `.kw-modal__fields` — a column at --space-4 between the head and
-        // the grid. The grid supplies its own row gap below.
-        "flex flex-col gap-4",
-        divided && "shadow-[var(--hairline-over)] pt-[var(--space-6)]",
-        className,
-      )}
-      {...props}
-    >
-      {title !== undefined && title !== null ? (
-        <legend className="min-w-0 p-0">
-          <Headline as="div" size="h4">
-            {title}
-          </Headline>
-        </legend>
-      ) : null}
+    /* THE RULE HAS TO BE OUTSIDE THE `<fieldset>`, NOT PAINTED ON IT AND NOT
+       RENDERED INSIDE IT EITHER — a second attempt at this fix got that
+       wrong, and it is worth the record. `divided` originally added
+       `shadow-[var(--hairline-over)]`, an INSET box-shadow painted at the
+       fieldset's own border-box top edge, plus `pt-space-6` to push flow
+       content clear of it. Padding cannot move a shadow, and a `<legend>` is
+       laid out by the BROWSER to straddle a fieldset's top edge — the exact
+       pixel the shadow was drawn on — so `title` and the rule collided every
+       time both were set.
 
-      {description !== undefined && description !== null ? (
-        <Text as="p" size="sm" tone="secondary" className="min-w-0">
-          {description}
-        </Text>
-      ) : null}
+       The first fix swapped the shadow for a real `Separator`, but left it
+       as the fieldset's OWN first child. That does not work: a `<legend>`
+       is hoisted to the fieldset's rendered top by the browser regardless of
+       how many non-legend siblings precede it inside the same fieldset — the
+       spec picks the first `legend` CHILD, not the first child. Measured
+       live in the demo, the separator landed at 24px INSIDE the fieldset,
+       directly under the heading it was meant to sit above — the collision
+       was gone, but the rule now separated the heading from its own fields
+       instead of separating this section from the one before it.
 
-      <div data-slot="form-grid" className={cn(formGridClasses(columns))}>{children}</div>
-    </fieldset>
+       So the rule is a REAL PRECEDING SIBLING of the `<fieldset>`, rendered
+       through a `Fragment` rather than as fieldset content — `<legend>`
+       stays the fieldset's own direct child throughout, which is required
+       for a screen reader to read it as the group's name at all (RULES: a
+       `<legend>` nested one element deeper is not a fieldset's legend).
+
+       THE SPACING IS NOT REBUILT, IT IS INHERITED. `Form` already wraps
+       every top-level section in one flex column at `gap-[var(--space-6)]`
+       (`inferredSectioned`, below). A `Fragment`'s children are not a DOM
+       wrapper — they render as ordinary flex items of that same column, so
+       adding one more item (the separator) before this section's `fieldset`
+       gives it exactly one more `--space-6` gap on each side, for free: one
+       `--space-6` from whatever precedes it (the previous section, or
+       nothing, if this is the form's first section) to the rule, and
+       another `--space-6` from the rule to this fieldset's own top — which
+       is where the legend already sits. That is the same total, `2 ×
+       --space-6`, the old shadow-plus-padding spent (one `--space-6` from
+       `Form`'s own gap between sections, one `--space-6` of this fieldset's
+       own padding) — no new margin, no new gap utility, nothing hand-tuned.
+       `decorative` stays at `Separator`'s own default (`true`): the
+       section's name is read from the legend, and the rule carries no
+       information of its own. */
+    <React.Fragment>
+      {divided ? <Separator /> : null}
+
+      <fieldset
+        ref={ref}
+        data-slot="form-section"
+        className={cn(
+          "min-w-0 border-0 p-0",
+          // `.kw-modal__fields` — a column at --space-4 between the head and
+          // the grid. The grid supplies its own row gap below. Unchanged by
+          // this fix: `divided`'s own space now comes from `Form`'s outer
+          // gap around the separator above, not from anything in here.
+          "flex flex-col gap-4",
+          className,
+        )}
+        {...props}
+      >
+        {title !== undefined && title !== null ? (
+          <legend className="min-w-0 p-0">
+            <Headline as="div" size="h4">
+              {title}
+            </Headline>
+          </legend>
+        ) : null}
+
+        {description !== undefined && description !== null ? (
+          <Text as="p" size="sm" tone="secondary" className="min-w-0">
+            {description}
+          </Text>
+        ) : null}
+
+        <div data-slot="form-grid" className={cn(formGridClasses(columns))}>{children}</div>
+      </fieldset>
+    </React.Fragment>
   ),
 );
 

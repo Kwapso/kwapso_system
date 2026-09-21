@@ -83,6 +83,18 @@
      header already says its name, but not that it currently holds nothing.
      One prop for the whole board, not per column: a board where one column
      was bare and its neighbour drew a box would read as a bug, not a style.
+   · A COLUMN IS A SOFT PAPER LANE, 2026-09-21 - the client's "board A" on
+     the "Minimal Kit" page, chosen after the plain pass left the board's
+     heads and cards floating on a white field with nothing holding them.
+     The lane is `--surface-panel` at `--radius` with a `--space-2h` inset,
+     the head inside it, and the white `raised` cards lifting off it at the
+     same 1.103 they read at inside the old panel. `columnGround="bare"`
+     keeps the previous drawing for a board that still stands on soft paper,
+     where a lane would measure 1.000 - which is the measurement the bare
+     column was introduced for and is not overturned, only re-grounded. The
+     whole argument, the fault list it answers and the three figures are at
+     `Column`'s own "THE COLUMN IS A LANE" note; the empty column's 48px top
+     inset goes with it, at `EmptyRegister`.
 
    RENDERING CONTEXT
    `"use client"`. State for the card being carried, handlers made during
@@ -258,13 +270,55 @@ export type KanbanCardSelectEvent =
    Kept at the kit's full inset inside a column rather than shrunk, and for a
    reason beyond fidelity: the empty block is also the DROP TARGET for the
    first card into an empty column, and a 12-tall strip is not something a
-   pointer can reliably find. */
-function EmptyRegister({ children }: { children: React.ReactNode }) {
+   pointer can reliably find.
+
+   ── A SECOND PLACE, `lane`, ADDED 21 SEP 2026. CLIENT'S BOARD RULING,
+   OPTION A. The 21 Sep page measured the defect on the live board and it is
+   this register's `py-[var(--space-8)]`: "the empty register keeps its full
+   48px top and bottom inset, so the sentence lands 48px below the head, four
+   times, at exactly the height a reader expects the first card. Four
+   sentences competing with one card." Option A's own caption names the fix
+   in a line: "one 13px tertiary line at the top, 6px under the head, not
+   48px."
+
+   SO THE TWO USES SPLIT RATHER THAN THE ONE SHAPE BEING RETUNED. `block` is
+   this register standing IN PLACE OF A WHOLE BOARD - a region of its own,
+   which is what the 48/24 inset was drawn for and where it is still right.
+   `lane` is this register standing INSIDE one column of a board that is
+   otherwise full, where it is not a region at all: it is a caption under a
+   head, and the lane around it (see `Column`) already pays the inset the
+   `px-6` used to stand in for.
+
+   THE DROP TARGET SURVIVES THE SHRINK, which is the one thing the old
+   comment was genuinely protecting. `min-h-[calc(var(--space-8)*2)]` is the
+   SAME floor the `bare` branch below already spends for the same reason, so
+   a lane-aligned register is still 96 tall to a pointer while reading as one
+   line to an eye. Nothing gets a 12-tall strip.
+
+   13, NOT 14. `text-caption` is the kit's 13 rung and it is what the page's
+   own caption asks for; `text-sm` (14) stays on `block`, where the register
+   is carrying a region rather than annotating a column. */
+function EmptyRegister({
+  children,
+  place = "block",
+}: {
+  children: React.ReactNode;
+  /** `"block"` - the whole-board register, at `.kw-empty`'s own inset.
+      `"lane"` - one empty column inside a full board: top aligned, 13, and
+      no inset of its own because the lane already paid it. */
+  place?: "block" | "lane";
+}) {
   return (
     <div
       data-slot="kanban-empty"
+      data-place={place}
       /* Left-aligned -- 27.21, DEF-2. */
-      className="flex flex-col items-start gap-2 px-6 py-[var(--space-8)] text-start text-sm text-ink-tertiary"
+      className={cn(
+        "flex flex-col items-start gap-2 text-start text-ink-tertiary",
+        place === "lane"
+          ? "min-h-[calc(var(--space-8)*2)] text-caption"
+          : "px-6 py-[var(--space-8)] text-sm",
+      )}
     >
       {children}
     </div>
@@ -369,6 +423,29 @@ export interface KanbanProps extends Omit<React.ComponentPropsWithoutRef<"div">,
    * all), which is a different register entirely.
    */
   emptyColumns?: "register" | "bare";
+  /**
+   * WHAT A COLUMN STANDS ON - the 21 Sep 2026 board ruling, option A.
+   *
+   * `"lane"` (THE DEFAULT) is the client's chosen shape: each column is a
+   * soft paper lane at the box radius with a `--space-2h` inset, the head
+   * inside it, and the white cards lifting off it. See `Column`'s own
+   * "THE COLUMN IS A LANE" note for the whole argument, the measurement it
+   * replaces and the reason the old bare column was right until the frame
+   * under it went transparent.
+   *
+   * `"bare"` is the previous drawing, kept and reachable: no fill, no
+   * radius, no inset, head and cards straight on whatever the host painted.
+   * It is the right value for a board that still stands inside a painted
+   * panel - a lane on a soft paper panel is the 1.000 collision the bare
+   * column was introduced to fix, and this prop is how a caller in that
+   * position says so without every board in the app having to.
+   *
+   * THE NARROW RENDER IGNORES THIS. Below 45rem there is one column, it
+   * fills the width and it draws no head (27.24, the stage is a field
+   * above it) - a full-width soft paper slab with nothing to separate it
+   * from would be furniture around a single list. See `Column`.
+   */
+  columnGround?: "lane" | "bare";
   /**
    * What a screen reader hears as a card's role. The platform has no "card
    * you can move", so it is said in words — and it must be translatable.
@@ -512,6 +589,7 @@ const Kanban = React.forwardRef<HTMLDivElement, KanbanProps>(
       emptyColumnLabel = "Nothing here",
       emptyLabel = "No columns yet",
       emptyColumns = "register",
+      columnGround = "lane",
       cardRoleLabel = "Movable card",
       moveHintLabel = "Use the arrow keys to move this card between columns.",
       formatMoveAnnouncement,
@@ -653,6 +731,7 @@ const Kanban = React.forwardRef<HTMLDivElement, KanbanProps>(
         over={over}
         emptyColumnLabel={emptyColumnLabel}
         emptyColumns={emptyColumns}
+        columnGround={columnGround}
         cardRoleLabel={cardRoleLabel}
         moveHintLabel={moveHintLabel}
         onCardSelect={onCardSelect}
@@ -784,6 +863,7 @@ function Column({
   over,
   emptyColumnLabel,
   emptyColumns,
+  columnGround,
   cardRoleLabel,
   moveHintLabel,
   onCardSelect,
@@ -804,6 +884,8 @@ function Column({
   emptyColumnLabel: string;
   /** See `KanbanProps.emptyColumns` — `"register"` draws `EmptyRegister`, `"bare"` an unstyled `aria-label`led drop zone. */
   emptyColumns: "register" | "bare";
+  /** See `KanbanProps.columnGround` - `"lane"` paints the soft paper lane, `"bare"` paints nothing. */
+  columnGround: "lane" | "bare";
   cardRoleLabel: string;
   moveHintLabel: string;
   onCardSelect?: (card: KanbanCard, column: KanbanColumn, event: KanbanCardSelectEvent) => void;
@@ -816,10 +898,14 @@ function Column({
   const count = column.count ?? cards.length;
   const droppable = movable && column.locked !== true;
   const isOver = droppable && over === column.id;
+  /* The lane is a WIDE-BOARD shape. See `KanbanProps.columnGround` and the
+     lane note below for why the narrow render keeps the bare column. */
+  const lane = columnGround === "lane" && !narrow;
 
   return (
     <section
       data-slot="kanban-column"
+      data-ground={lane ? "panel" : undefined}
       data-locked={column.locked === true ? "" : undefined}
       /* `.motion-drop-target` owns the `--accent` wash and its timing; this
          file only sets the attribute it selects on. */
@@ -850,28 +936,98 @@ function Column({
         narrow
           ? "flex w-full min-w-0 flex-col gap-2"
           : "flex w-[var(--kw-kanban-col)] shrink-0 snap-start flex-col gap-2",
-        /* THE COLUMN IS BARE — no fill, no radius, no inset. CH19 view 02
-           draws the head and the cards as siblings straight on the frame's
-           soft paper; there is no column band in the chapter at all.
+        /* THE COLUMN IS A LANE AGAIN - CLIENT RULING, 21 SEP 2026, OPTION A
+           ON THE "MINIMAL KIT" PAGE. Her word, on the board as it renders
+           after the plain pass: "the board component look sso bad ://",
+           then "board A".
 
-           This file previously painted `bg-surface-panel` at the card radius
-           and gave the reason as PATTERN §11 legibility — "what makes the
-           `--card` cards inside it visible in LIGHT". THAT REASON DIED WITH
-           THE K1 REVERSAL (override 15): the frame's own panel is now
-           `--surface-panel`, so a `--surface-panel` column band measured
-           1.000 against the ground it stood on — invisible — while the
-           `--card` cards it was there to lift already read at 1.103 light /
-           1.111 dark against that same soft paper on their own. The band was
-           doing nothing but adding a 12 inset the chapter does not draw.
-           GAPS-FIDELITY-DE L-17. */
+           WHAT THIS BLOCK USED TO SAY, AND WHY IT WAS RIGHT UNTIL IT WAS
+           NOT. Verbatim: "THE COLUMN IS BARE - no fill, no radius, no inset.
+           CH19 view 02 draws the head and the cards as siblings straight on
+           the frame's soft paper; there is no column band in the chapter at
+           all. This file previously painted `bg-surface-panel` at the card
+           radius … THAT REASON DIED WITH THE K1 REVERSAL (override 15): the
+           frame's own panel is now `--surface-panel`, so a `--surface-panel`
+           column band measured 1.000 against the ground it stood on -
+           invisible - while the `--card` cards it was there to lift already
+           read at 1.103 light / 1.111 dark against that same soft paper on
+           their own. The band was doing nothing but adding a 12 inset the
+           chapter does not draw." GAPS-FIDELITY-DE L-17.
+
+           EVERY WORD OF THAT IS STILL TRUE OF A BOARD ON A SOFT PAPER PANEL,
+           WHICH IS WHY `columnGround="bare"` KEEPS IT AND THE PROP EXISTS.
+           What changed is the ground, not the arithmetic: the collection's
+           panel is plain now, so the board stands on the PAGE. A soft paper
+           lane on the page measures the kit's own page/panel step, 1.103
+           light / 1.111 dark - the exact figure the sentence above uses to
+           prove the lane was pointless, read one paper along.
+
+           WHAT WAS ACTUALLY WRONG WITHOUT IT, measured on staging at 1440 by
+           the 21 Sep page and worth keeping because "it looked bad" is not a
+           fault list. Six heads of a dot, a name and an 11px count, 24 tall,
+           with nothing under them and nothing beside them, read as six stray
+           labels rather than as the tops of six columns; and a single 288px
+           card with a 5% shadow, alone in a 1,221px field, read as a floating
+           rectangle because the shadow was the only thing separating it from
+           the page.
+
+           THE LANE FIXES BOTH AT ONCE AND KEEPS THE ONE RELATIONSHIP THAT
+           ALREADY WORKED. The head goes INSIDE the lane, so it is the top of
+           a shape instead of a label on nothing; and the white `raised`
+           cards lift off the soft paper exactly as they did inside the old
+           frame, at the same 1.103, so nothing about a card had to change.
+
+           THE THREE FIGURES ARE THE PAGE'S OWN CAPTION, and none of them is
+           new to this kit: `--radius` (24, the one box radius, ruling 03),
+           `bg-surface-panel` (soft paper, the other paper from the page) and
+           `--space-2h` (10) for the inset, which is the SAME step the board
+           already spends between two lanes - so the air inside a lane and
+           the air between two lanes are one number rather than two.
+
+           NO STROKE, DELIBERATELY. CH13's subtitle is the whole of it:
+           "Colour separates, strokes don't". The lane is separated from the
+           page by its fill and from its neighbour by the gap.
+
+           THE COLUMN WIDTH AND THE SCROLL ARE UNTOUCHED - `w-[var(--kw-
+           kanban-col)] shrink-0 snap-start`, the board's own `overflow-x`,
+           and 27.24's "beyond four columns the board scrolls horizontally".
+           The page's caption states that plainly for option A: seven lanes
+           still measure 2,076px at the default, so the board still scrolls
+           and the fade at the edge is the real render. A lane is a fill and
+           an inset; it does not get to change what a board measures.
+
+           `data-ground="panel"` IS NOT DECORATION. tokens.css §8 keys its
+           rebinds off `.bg-surface-panel` AND `[data-ground="panel"]`, and
+           the attribute is written beside the class so the column reads as a
+           declared soft paper ground to every relational token underneath
+           it - `--btn-secondary-fill` for a `column.action`, `--surface-lift`
+           for a face on a card, `--surface-selected` for a chosen one. A
+           lane that painted soft paper without saying so would hand every
+           one of them the page's answer inside a panel's colour, which is
+           the 1.000 class of bug this file's own history is made of. */
+        lane && "rounded-[var(--radius)] bg-surface-panel p-[var(--space-2h)]",
       )}
     >
       {/* `padding: 4px 6px` — CH19 view 02's own head inset, which the column
           band's 12 had been standing in for. THE NARROW RENDER DRAWS NO HEAD:
           the stage field above the cards already says the name and the count
-          (27.24), and a second head under it would say it twice. */}
+          (27.24), and a second head under it would say it twice.
+
+          INSIDE A LANE THE HORIZONTAL HALF OF IT GOES, 21 SEP 2026, and this
+          comment's own first sentence is why: the 6 was standing in for a
+          band's inset, and the band is back. Paying both would seat the dot
+          16px from the lane's edge while every card under it starts at 10,
+          so the head would read as indented rather than as the top of the
+          column - which is the fault option A exists to fix, reintroduced
+          one level down. The 4 on the block axis stays: that one is the
+          head's own height, not a stand-in for anything. */}
       {narrow ? null : (
-      <header className="flex min-w-0 items-center gap-2 px-[var(--space-1h)] py-1">
+      <header
+        className={cn(
+          "flex min-w-0 items-center gap-2 py-1",
+          lane ? "px-0" : "px-[var(--space-1h)]",
+        )}
+      >
         {/* 27.24: "Column headers take the status dot, the name in words and
             a quiet count." The dot never speaks alone — the name is beside
             it (ruling 26). */}
@@ -939,7 +1095,14 @@ function Column({
               className="min-h-[calc(var(--space-8)*2)]"
             />
           ) : (
-            <EmptyRegister>
+            /* `place="lane"` INSIDE A BOARD, ALWAYS - 21 SEP 2026, and it is
+               not gated on `columnGround`. The 48px inset this replaces was
+               wrong for the same reason in both drawings: it put the
+               sentence at exactly the height a reader expects the first
+               card, four or five times over, so the empty columns shouted
+               louder than the full one. A lane makes that more obvious; it
+               did not make it true. See `EmptyRegister`'s own note. */
+            <EmptyRegister place="lane">
               <span role="status">{column.emptyLabel ?? emptyColumnLabel}</span>
             </EmptyRegister>
           )

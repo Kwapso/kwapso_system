@@ -52,6 +52,7 @@ const TRAIL_LINE_FILE = path.join(HERE, "..", "..", "components", "breadcrumbs",
 const RAIL_FILE = path.join(HERE, "rail.tsx");
 const COLLECTION_FRAME_FILE = path.join(HERE, "..", "..", "components", "collection-frame", "collection-frame.tsx");
 const TOOLBAR_ROW_FILE = path.join(HERE, "..", "..", "components", "toolbar-row", "toolbar-row.tsx");
+const TABS_FILE = path.join(HERE, "..", "..", "components", "tabs", "tabs.tsx");
 
 const src = fs.readFileSync(FILE, "utf8");
 const rel = path.relative(process.cwd(), FILE);
@@ -71,6 +72,8 @@ const collectionFrameSrc = fs.readFileSync(COLLECTION_FRAME_FILE, "utf8");
 const collectionFrameRel = path.relative(process.cwd(), COLLECTION_FRAME_FILE);
 const toolbarRowSrc = fs.readFileSync(TOOLBAR_ROW_FILE, "utf8");
 const toolbarRowRel = path.relative(process.cwd(), TOOLBAR_ROW_FILE);
+const tabsSrc = fs.readFileSync(TABS_FILE, "utf8");
+const tabsRel = path.relative(process.cwd(), TABS_FILE);
 
 // Each pattern is a working CODE SHAPE the resize feature needs — a
 // declaration, a prop signature, or a call-site — not a bare identifier, so
@@ -255,13 +258,24 @@ console.log(
    header states for every check in this script. */
 const trailSpacingFindings = [];
 
+/* `SHELL_CONTENT_INSET_X`, NOT `CARD_CONTENT_INSET_X`, SINCE 21 SEP 2026 -
+   the pane's gutter and the boxed card's body inset stopped being one export
+   when the air ruling gave them different jobs. The SHAPE this pattern pins
+   is unchanged and is the whole point of it: `DENSITY_TRAIL` must still be
+   built on the SAME identifier `DENSITY_BODY` is built on, so the trail's
+   arrows and the body's own left edge cannot drift apart. Only the name of
+   that identifier moved. See `screen-shell.tsx`'s own
+   `SHELL_CONTENT_INSET_X` comment, and the inset check further down this
+   file, which pins both ends of the new constant exactly as it pinned the
+   old one. */
 const DENSITY_TRAIL_PATTERN =
-  /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\(CARD_CONTENT_INSET_X, "pt-\[var\(--space-2h\)\]"\),\s*calm: cn\(CARD_CONTENT_INSET_X, "pt-\[var\(--space-2h\)\]"\),\s*\};/;
+  /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\(SHELL_CONTENT_INSET_X, "pt-\[var\(--space-2h\)\]"\),\s*calm: cn\(SHELL_CONTENT_INSET_X, "pt-\[var\(--space-2h\)\]"\),\s*\};/;
 if (!DENSITY_TRAIL_PATTERN.test(src)) {
   trailSpacingFindings.push(
     `DENSITY_TRAIL in ${rel} does not read the 18 Sep evening ruling's flat pt-[var(--space-2h)] (10px above the ` +
-      "trail, half of S3's 20) at both densities, built on cn(CARD_CONTENT_INSET_X, ...) — see the 18 Sep MORNING " +
-      "ruling's own check, further down this file, for why px is CARD_CONTENT_INSET_X and not a literal any more.",
+      "trail, half of S3's 20) at both densities, built on cn(SHELL_CONTENT_INSET_X, ...) - see the 18 Sep MORNING " +
+      "ruling's own check, further down this file, for why px is the shell's own inset constant and not a literal, " +
+      "and the 21 Sep air ruling for why that constant is no longer CARD_CONTENT_INSET_X.",
   );
 }
 
@@ -525,15 +539,33 @@ console.log(
    See `DENSITY_BODY`'s own comment in `screen-shell.tsx` for the full
    derivation and why the app's own override cannot be read from this repo.
 
-   ONE TOKEN, TWO SEAMS, CHECKED AS AN IMPORT — NOT TWO LITERALS THAT AGREE
-   BY COINCIDENCE. `CARD_CONTENT_INSET_X` (`components/card/card.tsx`) is
-   the single export both `CardContent`'s own padding and `screen-shell.tsx`'s
-   `DENSITY_BODY` read; this check pins THREE things, each catching a
-   different way the two could drift apart again: (1) `card.tsx` exports
-   `CARD_CONTENT_INSET_X` reading `px-[var(--space-3)]`, (2) `CardContent`'s
-   own className actually uses that identifier (not a literal it happens to
-   match today), and (3) `screen-shell.tsx` imports the same identifier AND
-   spends it inside `DENSITY_BODY`, at both densities. */
+   ONE TOKEN, TWO SEAMS, CHECKED BY IDENTIFIER - NOT LITERALS THAT AGREE BY
+   COINCIDENCE. That was the standard this block set and it is unchanged;
+   WHICH two seams changed on 21 Sep 2026.
+
+   UNTIL THEN the pair was the boxed card's own body inset and the pane's,
+   held together by one export, `CARD_CONTENT_INSET_X`. The minimal pass gave
+   those two different jobs - the pane has to pay the side air a plain
+   section no longer has, a card that still has its box has given nothing up
+   - so `screen-shell.tsx` declares `SHELL_CONTENT_INSET_X` (`--space-6`) and
+   `card.tsx` keeps `CARD_CONTENT_INSET_X` (`--space-3`). Both files carry
+   the arithmetic.
+
+   SO THIS CHECK NOW PINS FOUR THINGS, and the first two are what stop the
+   split from being an excuse to stop checking either half:
+     1 · `card.tsx` still exports `CARD_CONTENT_INSET_X = "px-[var(--space-3)]"`
+         and `CardContent` still spends it BY IDENTIFIER. The boxed card's
+         inset did not move, and a later edit that quietly moved it would be
+         Ruling 2 undone from the other side.
+     2 · `screen-shell.tsx` declares `SHELL_CONTENT_INSET_X` reading
+         `px-[var(--space-6)]` - the client's own chosen number for the
+         pane's sides, 21 Sep 2026.
+     3 · `DENSITY_BODY` is built on that identifier at both densities.
+     4 · `DENSITY_TRAIL` is built on the SAME identifier (pinned further up
+         this file), which is the equality that actually matters now: the
+         pane's two seams, its sides and the trail above it, read one
+         constant, so the h1, the table's first cell and the trail's arrows
+         cannot drift apart. */
 const insetFindings = [];
 
 const CARD_CONTENT_INSET_X_PATTERN = /const CARD_CONTENT_INSET_X = "px-\[var\(--space-3\)\]";/;
@@ -578,15 +610,32 @@ if (!/const CARD_CONTENT_INSET_Y_DEFAULT = "py-6 lg:py-\[var\(--space-7\)\]";/.t
   );
 }
 
-if (!/import \{ CARD_CONTENT_INSET_X \} from "\.\.\/\.\.\/components\/card\/card";/.test(src)) {
-  insetFindings.push(`${rel} does not import CARD_CONTENT_INSET_X from components/card/card.`);
+/* THE PANE'S OWN CONSTANT, DECLARED IN THIS FILE RATHER THAN IMPORTED SINCE
+   21 SEP 2026 - see this block's own header. The value is pinned, not just
+   the name: `--space-6` is the number the client chose out loud ("the same
+   spacing thats now before the footer i want above nav and on sides"), and a
+   later edit that moved it should have to come back here and say so. */
+if (!/const SHELL_CONTENT_INSET_X = "px-\[var\(--space-6\)\]";/.test(src)) {
+  insetFindings.push(
+    `${rel} does not declare SHELL_CONTENT_INSET_X = "px-[var(--space-6)]" - the pane's own gutter, ruled ` +
+      "21 Sep 2026, and the one constant DENSITY_BODY and DENSITY_TRAIL must both be built on.",
+  );
+}
+/* AND THE OLD IMPORT MUST BE GONE. Leaving it behind would be the exact
+   failure the split was made to avoid: two constants in scope, both
+   plausible, and nothing saying which of the pane's seams reads which. */
+if (/import \{ CARD_CONTENT_INSET_X \} from "\.\.\/\.\.\/components\/card\/card";/.test(src)) {
+  insetFindings.push(
+    `${rel} still imports CARD_CONTENT_INSET_X - the pane's inset is SHELL_CONTENT_INSET_X since 21 Sep 2026, ` +
+      "and a second inset constant in scope here is how the two seams drift apart again.",
+  );
 }
 const DENSITY_BODY_PATTERN =
-  /const DENSITY_BODY: Record<ScreenDensity, string> = \{\s*comfortable: cn\(CARD_CONTENT_INSET_X, "py-\[var\(--space-5\)\] lg:py-\[var\(--space-6\)\]"\),\s*calm: cn\(CARD_CONTENT_INSET_X, "py-\[var\(--space-4\)\] lg:py-\[var\(--space-5\)\]"\),\s*\};/;
+  /const DENSITY_BODY: Record<ScreenDensity, string> = \{\s*comfortable: cn\(SHELL_CONTENT_INSET_X, "py-\[var\(--space-5\)\] lg:py-\[var\(--space-6\)\]"\),\s*calm: cn\(SHELL_CONTENT_INSET_X, "py-\[var\(--space-4\)\] lg:py-\[var\(--space-5\)\]"\),\s*\};/;
 if (!DENSITY_BODY_PATTERN.test(src)) {
   insetFindings.push(
-    `DENSITY_BODY in ${rel} does not build both densities from cn(CARD_CONTENT_INSET_X, "py-…") — ` +
-      "the imported token must be the sole horizontal inset, at both densities, with vertical rhythm unchanged.",
+    `DENSITY_BODY in ${rel} does not build both densities from cn(SHELL_CONTENT_INSET_X, "py-…") - ` +
+      "the pane's own constant must be the sole horizontal inset, at both densities, with vertical rhythm unchanged.",
   );
 }
 
@@ -606,8 +655,10 @@ if (insetFindings.length > 0) {
 }
 
 console.log(
-  "OK screen-shell content-inset check: card.tsx exports CARD_CONTENT_INSET_X (px-[var(--space-3)]), " +
-    "CardContent spends it, and DENSITY_BODY imports and spends the SAME identifier at both densities.",
+  "OK screen-shell content-inset check: card.tsx exports CARD_CONTENT_INSET_X (px-[var(--space-3)]) and " +
+    "CardContent spends it, so the boxed card's body inset did not follow the pane; screen-shell.tsx declares " +
+    "SHELL_CONTENT_INSET_X (px-[var(--space-6)]), no longer imports the card's, and DENSITY_BODY spends the " +
+    "shell's own constant at both densities.",
 );
 
 /* ============================================================================
@@ -625,17 +676,25 @@ console.log(
    instead of the token that actually governs the title it sits above.
 
    THE FIX IS THE IDENTIFIER — `DENSITY_TRAIL`'s own `px` must be built from
-   the SAME `CARD_CONTENT_INSET_X` import `DENSITY_BODY` already reads
-   (checked above), not a second copy of `DENSITY_HEADER`'s larger figure and
-   not a hand-typed literal that merely matches it today. Checked as an
-   import-plus-usage pair, the same standard the content-inset check above
-   holds `DENSITY_BODY` to, so the trail's left edge and the body's own left
-   edge cannot drift apart independently again. */
+   the SAME constant `DENSITY_BODY` already reads (checked above), not a
+   second copy of `DENSITY_HEADER`'s larger figure and not a hand-typed
+   literal that merely matches it today. Checked as a declaration-plus-usage
+   pair, the same standard the content-inset check above holds
+   `DENSITY_BODY` to, so the trail's left edge and the body's own left edge
+   cannot drift apart independently again.
+
+   THAT CONSTANT IS `SHELL_CONTENT_INSET_X` SINCE 21 SEP 2026, AND THE
+   MEASUREMENT ABOVE IS HISTORY RATHER THAN A TARGET. The 21 Sep air ruling
+   moved the pane's gutter from `--space-3` to `--space-6` and split it away
+   from `card.tsx`'s own export, so both figures in the 231-against-223 line
+   above are now stale; what this check is FOR is unchanged, and is the only
+   thing it ever pinned - the two seams read one name. See
+   `screen-shell.tsx`'s `SHELL_CONTENT_INSET_X` comment. */
 const trailInsetParityFindings = [];
 
-if (!/const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\(CARD_CONTENT_INSET_X,/.test(src)) {
+if (!/const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\(SHELL_CONTENT_INSET_X,/.test(src)) {
   trailInsetParityFindings.push(
-    `DENSITY_TRAIL in ${rel} does not build its px from cn(CARD_CONTENT_INSET_X, …) — the trail slot's own ` +
+    `DENSITY_TRAIL in ${rel} does not build its px from cn(SHELL_CONTENT_INSET_X, …) - the trail slot's own ` +
       "left edge must read the SAME identifier DENSITY_BODY's px does (18 Sep morning ruling: the pill and the " +
       "title must end at the same point on the left), not a copy of DENSITY_HEADER's larger figure.",
   );
@@ -649,7 +708,7 @@ if (!/const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\
 if (/const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[/.test(src)) {
   trailInsetParityFindings.push(
     `DENSITY_TRAIL in ${rel} reads a literal "px-[...]" again — the 18 Sep morning ruling replaced it with the ` +
-      "imported CARD_CONTENT_INSET_X specifically so the trail and the body inset cannot drift apart.",
+      "shell's own inset constant specifically so the trail and the body inset cannot drift apart.",
   );
 }
 
@@ -662,9 +721,10 @@ if (trailInsetParityFindings.length > 0) {
 }
 
 console.log(
-  "OK screen-shell trail/body inset-parity check: DENSITY_TRAIL builds its px from the same imported " +
-    "CARD_CONTENT_INSET_X identifier DENSITY_BODY spends, so the trail field's left edge and the title/chip left " +
-    "edge cannot drift apart (measured live: 231px vs 223px before the fix, on a ticket record).",
+  "OK screen-shell trail/body inset-parity check: DENSITY_TRAIL builds its px from the same " +
+    "SHELL_CONTENT_INSET_X constant DENSITY_BODY spends, so the trail field's left edge and the title/chip left " +
+    "edge cannot drift apart (measured live: 231px vs 223px before the 18 Sep fix; the constant itself moved to " +
+    "--space-6 on 21 Sep, which moves both seams together by construction).",
 );
 
 /* ============================================================================
@@ -1391,13 +1451,20 @@ if (/\[--pill-fill:/.test(cardSrc)) {
   badgeQuietFillFindings.push(`${cardRel} carries a [--pill-fill:…] rebind — see the screen-shell.tsx finding above for why this must read --badge-quiet-fill.`);
 }
 
-// collection-frame.tsx — tone: "page", tone: "panel" and the panel itself.
+/* collection-frame.tsx - tone: "page", tone: "panel", and the panel's own
+   two surfaces. FOUR SINCE 21 SEP 2026, not three: `collectionPanelVariants`
+   stopped carrying its rebind in a base class list and now answers the
+   question per surface, because a `paper` panel and a `plain` one stand on
+   opposite grounds and a chip takes the other tone from each. The floor
+   stays the assertion - every ground in this file rebinds, none is left to
+   inherit whatever an ancestor happened to set. */
 const collectionFrameBadgeQuietFillCount = (collectionFrameSrc.match(/\[--badge-quiet-fill:var\(--surface-(?:panel|page)\)\]/g) ?? []).length;
-if (collectionFrameBadgeQuietFillCount < 3) {
+if (collectionFrameBadgeQuietFillCount < 4) {
   badgeQuietFillFindings.push(
-    `${collectionFrameRel} does not carry three [--badge-quiet-fill:…] rebinds (tone: "page", tone: "panel" and ` +
-      `collectionPanelVariants' own base class list — found ${collectionFrameBadgeQuietFillCount}) — all three used ` +
-      "to rebind --pill-fill for the identical reason --btn-secondary-fill sits beside each of them.",
+    `${collectionFrameRel} does not carry four [--badge-quiet-fill:…] rebinds (tone: "page", tone: "panel", and ` +
+      `collectionPanelVariants' surface: paper / surface: plain - found ${collectionFrameBadgeQuietFillCount}) - ` +
+      "every one of them rebinds for the identical reason --btn-secondary-fill sits beside it, and a plain panel " +
+      "needs its own because it paints no class §8 could key on.",
   );
 }
 if (/\[--pill-fill:/.test(collectionFrameSrc)) {
@@ -1450,8 +1517,244 @@ if (badgeQuietFillFindings.length > 0) {
 
 console.log(
   "OK badge-quiet-fill rebind check: screen-shell.tsx's SCREEN/CARD/BODY, card.tsx's default/raised/brand/" +
-    "inverse variants, collection-frame.tsx's tone: page/panel and its panel, record-detail.tsx's ink-footer " +
+    "inverse variants, collection-frame.tsx's tone: page/panel and both of its panel surfaces, record-detail.tsx's ink-footer " +
     "well, and toolbar-row.tsx's ground: page/panel all rebind --badge-quiet-fill to the surface one rung away " +
     "from their own ground — the 19 Sep 2026 ruling's five-file follow-up, plus the card.tsx rebind the ruling " +
     "actually reported — and no file still carries the old, now-inert --pill-fill rebind.",
+);
+
+/* ============================================================================
+   THE 21 SEP 2026 AIR AND BOTTOM-EDGE CHECK - TWO CLIENT RULINGS, ONE DAY.
+
+   HER WORDS, VERBATIM:
+     · "the same spacing thats now before the footer i want above nav and on
+        sides, bring more air"  (ruled to --space-6, 24)
+     · "also implement the to the bottom edge for main content and assistant
+        like in your previous artifact"
+     · "also, make footer not inside a container, but the full row side to
+        side (within the main content)"
+
+   MEASURED BEFORE, ON T0001 AT 1440 BY 900: the window's top edge to the
+   folder tab strip was 16 and the air before the black band was 24; the
+   content column and the assistant's own outer edge both stopped 16px short
+   of the viewport's bottom edge (confirmed again at 1991 by 842); the ink
+   band sat inset 24 from both sides of the pane it stood in.
+
+   SEVEN THINGS PINNED, each a different way one of the three could regress
+   while the other two stayed green - which is the failure mode that matters
+   here, because all three are one shape to a reader and three separate lines
+   of code.
+   ========================================================================= */
+const airFindings = [];
+
+/* 1 · THE TOP IS ITS OWN TOKEN, AT THE NUMBER SHE NAMED. A second token
+   rather than a wider `--shell-gutter` because the shell gutter is also the
+   measure between the rail and the card and between the card and the
+   assistant, and the 21 Sep page keeps those at 16. */
+if (
+  !/const DENSITY_GUTTER_TOP: Record<ScreenDensity, string> = \{\s*comfortable: "\[--shell-gutter-top:var\(--space-6\)\]",\s*calm: "\[--shell-gutter-top:var\(--space-6\)\]",\s*\};/.test(
+    src,
+  )
+) {
+  airFindings.push(
+    `${rel} does not declare DENSITY_GUTTER_TOP at [--shell-gutter-top:var(--space-6)] at both densities - ` +
+      "the air above the nav row is the client's own 24, ruled 21 Sep 2026, and it is a separate token from " +
+      "--shell-gutter precisely so widening it does not move the rail and assistant seams with it.",
+  );
+}
+if (!/DENSITY_GUTTER_TOP\[density\],/.test(src)) {
+  airFindings.push(`${rel} declares DENSITY_GUTTER_TOP but never spends it on the screen - the token is inert.`);
+}
+
+/* 2 · THE CONTENT COLUMN PAYS THE TOP AND NOTHING AT THE BOTTOM. `py-` here
+   is the regression: it was what insets the card from the window's bottom
+   edge as well as its top, and restoring it puts the mango ground back under
+   the card's foot. */
+if (!/"flex min-h-0 min-w-0 flex-1 flex-col pt-\[var\(--shell-gutter-top\)\]",/.test(src)) {
+  airFindings.push(
+    `${rel}'s content column does not read pt-[var(--shell-gutter-top)] with no bottom padding - a py- here ` +
+      "insets the card from the window's BOTTOM edge too, which is the 21 Sep bottom-edge ruling undone.",
+  );
+}
+
+/* 3 · THE ASSISTANT ENDS WHERE THE CARD ENDS, WHICH IS NOW THE WINDOW. The
+   2026-09-04 ruling ("make it exactly as the main content") is kept by the
+   two columns agreeing, and they now agree on zero. A `pb-` returning on the
+   dock alone reopens the 2026-09-06 report from the other side. */
+if (/data-slot="screen-shell-aside-dock"[\s\S]{0,4000}?pb-\[var\(--shell-gutter\)\]/.test(src)) {
+  airFindings.push(
+    `${rel}'s aside dock carries a pb-[var(--shell-gutter)] again - the content column pays no bottom gutter ` +
+      "since 21 Sep 2026, so a dock that pays one makes the assistant end 16px above the card, which is " +
+      'exactly the 2026-09-06 report ("assistant container is still not same length as main content").',
+  );
+}
+
+/* 4 · THE TWO COLUMNS' TABS STILL START AT THE SAME y. This is the standing
+   invariant `ASIDE_TAB`'s own comment states and `verify/shell-chat/` proves;
+   it survives the air ruling only if the aside reads the SAME token the
+   content column's top gutter now reads. */
+if (!/const ASIDE_TAB = cn\("pt-\[var\(--shell-gutter-top\)\]"\);/.test(src)) {
+  airFindings.push(
+    `${rel}'s ASIDE_TAB does not read pt-[var(--shell-gutter-top)] - the content column's own top gutter moved ` +
+      "to that token on 21 Sep 2026, and a tab strip left on --aside-inset sits 8px above the breadcrumb.",
+  );
+}
+
+/* 5 · THE CARD'S FOOT SQUARES OFF WHERE IT MEETS THE WINDOW, and it is
+   applied, not merely declared. A rounded corner at the window's edge reads
+   as a rendering mistake rather than a deliberate flush edge. */
+if (!/const CARD_FLUSH = "rounded-b-none";/.test(src)) {
+  airFindings.push(`${rel} does not declare CARD_FLUSH = "rounded-b-none" - the card's foot is the window's edge now.`);
+}
+if (!/cn\(CARD, CARD_FLUSH, breadcrumb \? CARD_JOINED : undefined\)/.test(src)) {
+  airFindings.push(
+    `${rel} does not spend CARD_FLUSH on the card - unconditionally, unlike CARD_JOINED, because the window's ` +
+      "bottom edge is there on every screen at every width whether or not anything else is.",
+  );
+}
+
+/* 6 · THE PANE PUBLISHES ITS OWN GUTTER AND ITS OWN EDGE RADIUS, which is
+   the only way a part inside it can span it without writing a literal or
+   assuming which shell it is in. */
+if (!/"\[--pane-inset-x:var\(--space-6\)\]",/.test(src)) {
+  airFindings.push(
+    `${rel}'s BODY does not publish [--pane-inset-x:var(--space-6)] - it must say its own gutter out loud, at ` +
+      "the same number DENSITY_BODY spends as padding, or the ink band cannot break out of it and pay it back.",
+  );
+}
+if (!/"\[--radius-pane-edge:0px\]",/.test(src)) {
+  airFindings.push(
+    `${rel}'s BODY does not publish [--radius-pane-edge:0px] - the pane's own bottom corners are square against ` +
+      "the window now, and anything spanning the pane to its edges has to square off with it.",
+  );
+}
+
+/* 7 · AND THE BAND READS BOTH, IN BOTH DIRECTIONS. The negative margin and
+   the inner padding are one property read twice; either alone is a bug - the
+   first would put the band's text hard against the window, the second would
+   change nothing at all. */
+if (!/"-mx-\[var\(--pane-inset-x,0px\)\]",/.test(recordDetailSrc)) {
+  airFindings.push(
+    `${recordDetailRel}'s ink footer does not pull itself out by -mx-[var(--pane-inset-x,0px)] - the client asked ` +
+      'for "the full row side to side (within the main content)", and the 0px fallback is what keeps a record ' +
+      "drawn outside a pane (a dialog, a demo cell) exactly where it always drew.",
+  );
+}
+if (
+  !/"px-\[var\(--pane-inset-x,var\(--space-5\)\)\] py-\[var\(--space-4h\)\]",/.test(recordDetailSrc) ||
+  !/"lg:px-\[var\(--pane-inset-x,var\(--space-7\)\)\] lg:py-6",/.test(recordDetailSrc)
+) {
+  airFindings.push(
+    `${recordDetailRel}'s ink footer does not spend the pane's own gutter back inside itself at both steps - ` +
+      "without it the band spans the pane but its first word lands at the window's edge instead of under the h1. " +
+      "27.8's 20/32 stay as the fallbacks so a band outside a pane is drawn as the chapter draws it.",
+  );
+}
+if (!/"rounded-\[var\(--radius-pane-edge\)\]",/.test(recordDetailSrc)) {
+  airFindings.push(
+    `${recordDetailRel}'s ink footer does not read rounded-[var(--radius-pane-edge)] - a rounded band under a ` +
+      "squared pane reads as a rendering mistake, and the token's own root value is --radius so nothing changes " +
+      "anywhere else.",
+  );
+}
+
+if (airFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell air/bottom-edge check (21 Sep 2026 rulings):\n" +
+      airFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell air/bottom-edge check: the air above the nav is --shell-gutter-top (--space-6) at both " +
+    "densities and is spent on the screen; the content column pays that top and no bottom gutter, and the aside " +
+    "dock pays none either, so the card and the assistant both reach the window's bottom edge together; " +
+    "ASIDE_TAB reads the same top token, so the two columns' tabs still start at one y; CARD_FLUSH squares the " +
+    "card's foot unconditionally; and the pane publishes --pane-inset-x and --radius-pane-edge, which " +
+    "record-detail.tsx's ink band reads in both directions so it spans the pane while its text stays under the h1.",
+);
+
+/* ============================================================================
+   THE 21 SEP 2026 TOOLBAR-RHYTHM CHECK - HER NUMBER, AND ITS TWO OWNERS.
+
+   CLIENT, VERBATIM, ON THE LIVE PRODUCT AND AFTER THE PAGE THAT PROPOSED THE
+   OPPOSITE: "on tickets, reduce space above and under toolbar to 10px".
+
+   WHY IT NEEDS A CHECK AT ALL. The 21 Sep page recommended the other answer
+   in writing, with a measurement behind it ("a group of five floating pills
+   is not a toolbar"), and that recommendation is still sitting in the
+   artifact. A later reader with the page in hand and not the ruling would
+   reasonably put the pill back, and every one of the three lines below would
+   have to move for that to look right, so the three are pinned together.
+
+   THE TWO OWNERS, AND WHY NEITHER IS THE ROW ITSELF. A toolbar's trailing
+   margin (`TOOLBAR_ROW_GAP`) is what a row standing ALONE pays; inside a
+   collection the host's column gap is that distance. And the distance ABOVE
+   belongs to the tab strip's own box, never to the collection, because a gap
+   that lives anywhere else stops holding the moment the strip goes sticky -
+   `tabs.tsx`'s own `TABS_STRIP_GAP` comment makes that argument at length and
+   the consuming app's first version of this fix put the 10 on the collection
+   instead.
+   ========================================================================= */
+const toolbarRhythmFindings = [];
+
+/* 1 - THE STRIP'S OWN 10, on the box that gets pinned. */
+if (!/export const TABS_STRIP_GAP_PLAIN = "pb-\[var\(--space-2h\)\]";/.test(tabsSrc)) {
+  toolbarRhythmFindings.push(
+    `${tabsRel} does not export TABS_STRIP_GAP_PLAIN = "pb-[var(--space-2h)]" - 10px is the client's own ` +
+      "number for the space above a toolbar, and it is padding on the STRIP so it survives the strip going sticky.",
+  );
+}
+/* And the boxed value is untouched: a paper panel's join is unchanged. */
+if (!/export const TABS_STRIP_GAP = "pb-\[var\(--space-5\)\]";/.test(tabsSrc)) {
+  toolbarRhythmFindings.push(
+    `${tabsRel}'s TABS_STRIP_GAP is no longer pb-[var(--space-5)] - the plain host got a second value, not a ` +
+      "replacement, and a boxed collection's own join did not move.",
+  );
+}
+
+/* 2 - THE PLAIN PANEL DROPS ITS TOP INSET AND TIGHTENS ITS COLUMN GAP. Either
+   one left behind reopens the 34-to-40 join her number replaced. */
+if (
+  !/\{ surface: "plain", density: "default", class: "px-0 lg:px-0 pt-0 lg:pt-0 gap-\[var\(--space-2h\)\]" \},/.test(
+    collectionFrameSrc,
+  ) ||
+  !/\{ surface: "plain", density: "compact", class: "px-0 pt-0 gap-\[var\(--space-2h\)\]" \},/.test(collectionFrameSrc)
+) {
+  toolbarRhythmFindings.push(
+    `${collectionFrameRel}'s plain panel does not drop its horizontal AND top insets and tighten its column gap ` +
+      "to --space-2h at both densities - a top inset here stacks on the strip's own gap and puts the toolbar " +
+      "between 34 and 40 under the tabs again, which is the join the client's 10px replaced.",
+  );
+}
+
+/* 3 - AND THE ROW STAYS UNPAINTED BY DEFAULT. The pill is reachable, and it
+   is not what a collection draws. */
+if (!/ground=\{toolbarGround \?\? "bare"\}/.test(collectionFrameSrc)) {
+  toolbarRhythmFindings.push(
+    `${collectionFrameRel} does not pass ground={toolbarGround ?? "bare"} to its ToolbarRow - the 21 Sep page ` +
+      'recommended the soft paper pill and the client overruled it the same day ("reduce space above and under ' +
+      'toolbar to 10px"): what read as loose was the pill\'s own 6px inset, not a missing fill.',
+  );
+}
+if (!/toolbarGround\?:\s*"bare" \| "page" \| "panel";/.test(collectionFrameSrc)) {
+  toolbarRhythmFindings.push(
+    `${collectionFrameRel} does not declare toolbarGround?: "bare" | "page" | "panel" - the pill stays reachable ` +
+      "by prop; only the default is the ruling.",
+  );
+}
+
+if (toolbarRhythmFindings.length > 0) {
+  console.error(
+    "FAIL toolbar-rhythm check (21 Sep 2026 ruling):\n" + toolbarRhythmFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK toolbar-rhythm check: TABS_STRIP_GAP_PLAIN is the client's 10px as padding on the strip's own box (and " +
+    "TABS_STRIP_GAP's boxed 20 is untouched), the plain collection panel drops its horizontal and top insets and " +
+    "tightens its column gap to the same 10 at both densities, and the toolbar row stays unpainted by default " +
+    "with the soft paper pill still reachable through toolbarGround.",
 );

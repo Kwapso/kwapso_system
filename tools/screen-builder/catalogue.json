@@ -1,25 +1,25 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.146",
-  "sha": "917dfc2af1602e967a4acd40c7523c3b1969c705",
+  "tag": "v1.2.149",
+  "sha": "e2ba03022c3a2a4080384a6080c4d8e728d93f98",
   "syncedAt": "2026-09-21"
  },
- "generatedAt": "2026-09-21T12:58:42.634Z",
+ "generatedAt": "2026-09-21T18:15:33.880Z",
  "counts": {
   "components": 120,
   "hooks": 2,
   "withVariants": 43,
   "withoutVariants": 77,
   "cvaSites": 54,
-  "variantGroups": 81,
-  "variantOptions": 271,
-  "typedEnumProps": 46,
+  "variantGroups": 82,
+  "variantOptions": 273,
+  "typedEnumProps": 52,
   "typedBooleanProps": 319,
   "compositions": 47,
   "icons": 1514,
-  "tokens": 372,
-  "tokenDeclarations": 572,
+  "tokens": 373,
+  "tokenDeclarations": 575,
   "unresolved": 0
  },
  "components": [
@@ -860,8 +860,8 @@
        "options": [
         {
          "name": "default",
-         "classes": "bg-card text-foreground",
-         "note": "`.kw-avatar` — raised paper, normal ink."
+         "classes": "bg-surface-lift text-foreground",
+         "note": "`.kw-avatar` - raised paper, normal ink. THE FILL IS RELATIONAL NOW, 21 SEP 2026, AND IT IS THE SAME DEFECT `SearchInput` HAD IN v1.2.146. This read `bg-card`: a FIXED address at off-beige, which is also the colour of the body pane a face most often stands on. Measured live on the tickets list during the minimal pass, two of the three faces on screen painted rgb(255, 254, 249) against a pane of rgb(255, 254, 249) - ratio 1.000. The initials still read, because they are charcoal on white, so nothing looked broken: a person was simply two floating letters with no disc. Only the `inverse` face in the rail still read as a face at all. `--surface-lift` is the kit's own answer to exactly this question (tokens.css §4): \"for the parts that are handed to a ground they cannot see\". An avatar is the purest case of that - it is dropped into a rail, a table row, a chat bubble, a charcoal footer and a plain record section by callers who never tell it which - so it takes the OTHER paper from whatever §8 says it is standing on: soft paper on the page, off-beige inside a panel. Measured 1.103 light / 1.111 dark in both directions. `bg-surface-lift`, THE NAMED CLASS, NEVER `bg-[var(--surface- lift)]`. tokens.css §8 keys its rebinds off class NAMES, and the arbitrary spelling paints the identical colour while taking the element out of every one of them - the failure `toolbar-row.tsx` documents at length and `screen-shell.tsx`'s `BODY` hit from the other side. The @theme bridge carries `--color-surface-lift` for this exact class. A FACE WITH A PHOTOGRAPH IS UNAFFECTED either way: the image covers the fill. This is the INITIALS face, which is most of them."
         },
         {
          "name": "inverse",
@@ -1724,8 +1724,8 @@
         },
         {
          "name": "plain",
-         "classes": "bg-transparent [--badge-quiet-fill:var(--surface-raised)]",
-         "note": "`plain`: no box at all. CLIENT RULING, 21 SEP 2026, VERBATIM: \"only the containers like the ones around assigned to, related stories, etc\" go, chips, tabs and the rest stay. A record page's grouping sections sit directly on the page's own white main content: no fill, no shadow, no stroke. Ink is still `text-card-foreground`, from the base class list above, because a plain card still holds a heading and body text that need an ink to read against even with no paper of its own. `--badge-quiet-fill` is left at `default`'s own value (`--surface-raised`), not re-bound: a `plain` card paints no paper of its own, so a Badge inside one sits on the PAGE's own ground, which is exactly the ground `default`'s rebind already answers for. Scoped to a single experiment in the tickets module's record page first (GAPS: not yet a system-wide replacement for `default`). See CHANGELOG v1.2.145."
+         "classes": "bg-transparent [--badge-quiet-fill:var(--surface-panel)]",
+         "note": "`plain`: no box at all. CLIENT RULING, 21 SEP 2026, VERBATIM: \"only the containers like the ones around assigned to, related stories, etc\" go, chips, tabs and the rest stay. A record page's grouping sections sit directly on the page's own white main content: no fill, no shadow, no stroke. Ink is still `text-card-foreground`, from the base class list above, because a plain card still holds a heading and body text that need an ink to read against even with no paper of its own. `--badge-quiet-fill` REBOUND TO SOFT PAPER, 21 SEP 2026 - AND THE SENTENCE THIS COMMENT USED TO CARRY WAS THE BUG. It read: \"left at `default`'s own value (`--surface-raised`), not re-bound: a `plain` card paints no paper of its own, so a Badge inside one sits on the PAGE's own ground, which is exactly the ground `default`'s rebind already answers for.\" Every clause of that is true and the conclusion is backwards. `default`'s rebind answers for a Badge standing on `default`'s OWN soft paper, and the other paper from soft paper is off-beige. A plain card's ground is the PAGE, whose own paper is off-beige already - so \"the other paper\" runs the other way, and reusing `default`'s answer painted a chip the exact colour it was standing on. MEASURED LIVE on the tickets list before this line: inside a plain card `--badge-quiet-fill` resolved #FFFEF9 against a pane of rgb(255, 254, 249). Ratio 1.000. The only chips visible on the whole module were the black id chips, which paint `--surface-inverse` and are the one variant that never reads this property. Every stage chip, type chip and count pill was gone. `--surface-panel` - soft paper, the other paper tone from the page - is one line and brings all of them back, at the kit's own page/panel step of 1.103 light / 1.111 dark. It is the identical value `raised` rebinds to one variant up, for the identical reason: both stand on off-beige. WHY THE FIXED TOKEN AND NOT THE RELATIONAL `--surface-lift`. A plain card paints nothing, so §8 never fires ON it - the nearest ground-keyed ancestor is whatever the host happens to be, and a card whose chips change colour depending on how deeply somebody nested it is the class of surprise this variant exists to avoid. `Avatar`'s default DOES take the relational register in the same pass, and correctly: an avatar is handed to a ground it cannot see, while this rebind IS the ground statement. See tokens.css §4 on `--surface-lift` for where that line is drawn. THE TITLE ROW IS UNTOUCHED AND THAT IS THE POINT. `CardTitle` is `text-lg` at Saans Medium on every variant; the plain overrides below take away insets, hairlines and fills and never a weight or a step, so a plain section's heading reads as a heading with no box under it. What separates two plain sections is `Separator`, which `RecordSections` (record-detail.tsx) now draws between them rather than every call site drawing it by hand. Scoped to a single experiment in the tickets module's record page first (GAPS: not yet a system-wide replacement for `default`). See CHANGELOG v1.2.145 and v1.2.149."
         }
        ]
       }
@@ -2539,9 +2539,24 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "collectionPanelVariants",
-     "line": 540,
-     "base": "relative z-[2] flex min-w-0 flex-col rounded-[var(--radius)] bg-surface-panel text-foreground [--btn-secondary-fill:var(--surface-page)] [--badge-quiet-fill:var(--surface-page)]",
+     "line": 574,
+     "base": "relative z-[2] flex min-w-0 flex-col",
      "groups": [
+      {
+       "name": "surface",
+       "options": [
+        {
+         "name": "paper",
+         "classes": "rounded-[var(--radius)] bg-surface-panel text-foreground [--btn-secondary-fill:var(--surface-page)] [--badge-quiet-fill:var(--surface-page)]",
+         "note": "The soft paper panel, ruling J2's own drawing, unchanged to the byte and reachable by prop."
+        },
+        {
+         "name": "plain",
+         "classes": "bg-transparent text-foreground [--btn-secondary-fill:var(--surface-panel)] [--badge-quiet-fill:var(--surface-panel)]",
+         "note": "No paper. The rows and the toolbar stand on the pane itself, and the two rebinds run the other way: a control on the page takes soft paper. See this block's own note above."
+        }
+       ]
+      },
       {
        "name": "density",
        "options": [
@@ -2559,9 +2574,25 @@
       }
      ],
      "defaults": {
+      "surface": "plain",
       "density": "default"
      },
-     "compound": [],
+     "compound": [
+      {
+       "when": {
+        "surface": "plain",
+        "density": "default"
+       },
+       "classes": "px-0 lg:px-0 pt-0 lg:pt-0 gap-[var(--space-2h)]"
+      },
+      {
+       "when": {
+        "surface": "plain",
+        "density": "compact"
+       },
+       "classes": "px-0 pt-0 gap-[var(--space-2h)]"
+      }
+     ],
      "unresolved": [],
      "usedBy": [
       "CollectionFrame"
@@ -2604,6 +2635,27 @@
        "optional": true,
        "kind": "boolean",
        "note": "The heavy hairline under the heading row. On, as chapter 13 draws it."
+      },
+      {
+       "name": "panel",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "plain",
+        "paper"
+       ],
+       "note": "WHETHER THE ONE PANEL IS A BOX - 21 SEP 2026, THE MINIMAL PASS. `\"plain\"` (THE DEFAULT, the client's \"go an implement this appwide\") paints nothing: the toolbar and the rows stand on the pane, the two paper rebinds invert, and the panel keeps only its own vertical air. `\"paper\"` is ruling J2's soft paper panel, unchanged and reachable for a frame that genuinely stands on off-beige with nothing else between it and the page. See `collectionPanelVariants` for the whole argument. IT ALSO DECIDES TWO THINGS THAT USED TO BE HARD CODED, because both were answers to \"what has already been painted here\": · `toolbarGround`'s own default - see that prop. · which register an empty, loading or failed collection draws. A plain frame takes `CollectionRegister variant=\"block\"`, the one register that deliberately keeps its paper while everything around it goes transparent: a boundary around nothing, with no boundary, is just nothing, and three lines of text in the middle of a white field reads as a page that failed rather than as a place that is empty."
+      },
+      {
+       "name": "toolbarGround",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "bare",
+        "page",
+        "panel"
+       ],
+       "note": "WHAT THE TOOLBAR ROW STANDS ON. `\"bare\"` is the default on both panel surfaces, and on a PLAIN one that is a client ruling rather than an inheritance. THE 21 SEP PAGE RECOMMENDED THE OPPOSITE AND SHE OVERRULED IT THE SAME DAY, ON THE LIVE PRODUCT. The page's argument was good and is worth keeping: measured on the tickets list, the toolbar track painted rgba(0, 0, 0, 0) with no row wrapper at all, so search, Filter, the order control, the view switch and the plus floated as five separate pills on white with nothing holding them, and it called that the one place where going plain made the page BUSIER rather than quieter. Her answer, verbatim and after seeing it: \"on tickets, reduce space above and under toolbar to 10px\". Not a pill: less air. What was reading as loose was the 6px inset inside a painted pill pushing 44px controls to 16 and 17px from the tabs and the table, and a 56px table header row centring its 11px text under them. SO THE PAINT STAYS OFF AND THE AIR COMES IN, which is what the plain panel's own compound variants and `TABS_STRIP_GAP_PLAIN` now spend. A group of five controls 10px under the tabs and 10px above the rows IS a row; it did not need a fill to become one. Pass a value to override: `\"page\"` for the soft paper pill on an off-beige ground, `\"panel\"` for a row standing on soft paper. Both remain exactly what `ToolbarRow` has always drawn."
       },
       {
        "name": "loading",
@@ -4949,6 +5001,16 @@
        "note": "How an empty COLUMN draws, board-wide. `\"register\"` (default, every existing caller unchanged) is `EmptyRegister` — the box and the words. `\"bare\"` (2026-09-15 ruling, \"when empty, don't show anything at this stage\") drops both: an unstyled zone at the same inset stands in, still a real drop target and still `aria-label`led with the same words, so the column can be found by a pointer or a screen reader — only the BOX is gone. Does not touch the BOARD's own empty state (no columns at all), which is a different register entirely."
       },
       {
+       "name": "columnGround",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "lane",
+        "bare"
+       ],
+       "note": "WHAT A COLUMN STANDS ON - the 21 Sep 2026 board ruling, option A. `\"lane\"` (THE DEFAULT) is the client's chosen shape: each column is a soft paper lane at the box radius with a `--space-2h` inset, the head inside it, and the white cards lifting off it. See `Column`'s own \"THE COLUMN IS A LANE\" note for the whole argument, the measurement it replaces and the reason the old bare column was right until the frame under it went transparent. `\"bare\"` is the previous drawing, kept and reachable: no fill, no radius, no inset, head and cards straight on whatever the host painted. It is the right value for a board that still stands inside a painted panel - a lane on a soft paper panel is the 1.000 collision the bare column was introduced to fix, and this prop is how a caller in that position says so without every board in the app having to. THE NARROW RENDER IGNORES THIS. Below 45rem there is one column, it fills the width and it draws no head (27.24, the stage is a field above it) - a full-width soft paper slab with nothing to separate it from would be furniture around a single list. See `Column`."
+      },
+      {
        "name": "loading",
        "optional": true,
        "kind": "boolean",
@@ -5934,6 +5996,10 @@
     {
      "name": "RecordDetail",
      "file": "components/record-detail/record-detail.tsx"
+    },
+    {
+     "name": "RecordSections",
+     "file": "components/record-detail/record-detail.tsx"
     }
    ],
    "cva": [],
@@ -5962,6 +6028,16 @@
        "note": "Pin the strip while the panel scrolls. On by default — the kit calls the region \"sticky tab strip\" in its own caption. Turn it off inside a scrolling drawer, where a second sticky layer fights the drawer's own."
       },
       {
+       "name": "surface",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "plain",
+        "paper"
+       ],
+       "note": "WHETHER REGION 3 IS A BOX - 21 SEP 2026, THE MINIMAL PASS. Client, verbatim: \"go an implement this appwide\", after \"the goal: make a more minimal clean app\". `\"plain\"` (THE DEFAULT) draws the panel as `Card variant=\"plain\"`: no fill, no radius, no inset of its own, so the record's body sits directly on the pane and lines up with the title above it. `\"paper\"` is the soft paper slab of the K1 reversal, unchanged and reachable for a record drawn inside something that has not gone plain. THE K1 REVERSAL IS NOT OVERTURNED BY THIS, which is worth saying because `panelBody`'s own note argues hard for soft paper. Its argument was that an OFF-BEIGE panel on an off-beige pane measured 1.000 and \"the record's body did not exist as a shape\". That is an argument about which of two papers a painted panel takes, and it is still correct. This prop is about whether the panel is painted at all - a question the client has now answered for the whole app, and one 26.04 never asked. THE CARDS INSIDE IT ARE THE THING TO WATCH, and they are fine: they are `raised`, off-beige, and they lifted off soft paper at 1.103. On the plain panel they stand on the pane, which is off-beige too - so a `raised` card measures 1.000 there and a caller who has one should move it to `default`. `StatGrid`'s tiles already take `default` and flip on their own; `card.tsx`'s override 77 note carries the same warning for a pickable grid, in the same words, from a different direction."
+      },
+      {
        "name": "panelVisible",
        "optional": true,
        "kind": "boolean",
@@ -5984,6 +6060,23 @@
        "optional": true,
        "kind": "boolean",
        "note": "The reader may not see the footer AT ALL. Distinct from `auditVisible`, which hides only the Record column: a route that shows a client their own record hides the internal log with `activityVisible`, and a route that may show neither hides the card."
+      }
+     ]
+    },
+    {
+     "file": "components/record-detail/record-detail.tsx",
+     "type": "RecordSectionsProps",
+     "variantsFrom": [],
+     "props": [
+      {
+       "name": "seam",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "hairline",
+        "none"
+       ],
+       "note": "The seam's weight. `\"hairline\"` (the default) is `Separator`'s 8%. `\"none\"` keeps the rhythm and draws no rule, for a column whose sections are separated by something else already."
       }
      ]
     }
@@ -7668,6 +7761,16 @@
        "optional": true,
        "kind": "boolean",
        "note": "Pin the header to the top of the scroll container. Off by default: a sticky header only means anything inside a bounded, vertically scrolling box, and most tables in these apps scroll the page instead. A sticky header must be opaque or the rows read straight through it. It takes `--background`, the page paper. A table dropped on a card passes `className=\"bg-card\"` — a surface swap the call site knows and this file cannot (GAPS-D TBL-2)."
+      },
+      {
+       "name": "rowHeight",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "label",
+        "row"
+       ],
+       "note": "HOW TALL THE HEADER ROW IS - 21 SEP 2026, THE MINIMAL PASS. `\"label\"` (THE DEFAULT) is `--control-height-dense`: the header reads as a label strip over the data. `\"row\"` is `--control-height-row`, the 56 this band took until today, for a caller who genuinely wants the header to share the record row's measure. WHY IT CHANGED. The header row was `--control-height-row` - EXACTLY a data row's height - and that was survivable while the table stood inside a soft paper panel, where the panel's own edge said where the collection began. On the plain ground it is the first thing on the pane and it measured, live on the tickets list at 1440, 56 tall against rows of 56: a reader's eye met a first record that happened to be written in micro caps. The 21 Sep page draws the fix as one number, \"Header 34 tall … so it stops matching a 56 row.\" 32, NOT 34, AND THAT IS DELIBERATE. `--control-height-dense` is 32 and it is a declared rung of ruling 30's control ladder; 34 is not, and this kit does not mint a sixth control height to land 2px closer to a drawing measured at a different root size. The thing the page is actually asking for is that the header stop equalling a row, which a whole rung down does more plainly than a 2px trim would. THE HAIRLINE IS UNTOUCHED. `TableHead` already draws `--hairline-under-strong`, the 20% section rule, at the foot of every heading cell, and it survives the switch exactly as the row hairlines do - which is why this prop changes a height and nothing else."
       }
      ]
     },
@@ -7764,6 +7867,10 @@
    "exports": [
     {
      "name": "TABS_STRIP_GAP",
+     "file": "components/tabs/tabs.tsx"
+    },
+    {
+     "name": "TABS_STRIP_GAP_PLAIN",
      "file": "components/tabs/tabs.tsx"
     },
     {

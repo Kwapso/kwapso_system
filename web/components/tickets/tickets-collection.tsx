@@ -1411,24 +1411,22 @@ export function TicketsCollection({
             hand. Same three arguments, one seam, and the difference disappears
             rather than being maintained. */}
         <div className="flex flex-col">
-          {/* `tight` — Aurora, 21 Sep 2026: "on tickets, reduce space above
-              and under toolbar to 10px." The strip's own trailing gap (R63
-              part 3, 20px) was stacking on top of the card's 10px lead
-              (R83 ruling 7) for 30px total above the toolbar; `tight` drops
-              the strip's own half to zero so only the ruled 10px remains.
-              Scoped to this one call site (`FolderTabStrip.tight`,
-              shared/web/screen-engine/tabs-view.tsx) — every other
-              `renderFolderTabs` host keeps the ordinary 20px. Covers board
-              and split for free: both render inside this same strip. */}
+          {/* NO `tight` FLAG ANY MORE — Aurora's 21 Sep ruling ("on tickets,
+              reduce space above and under toolbar to 10px") was scoped to
+              this one call site while the plain surface was a tickets-only
+              experiment. The same day she took the experiment app wide, so
+              `renderFolderTabs` draws that rhythm for every host and there is
+              nothing left for this screen to ask for. The strip pays zero and
+              the card under it pays the ruled 10px; board and split are
+              covered for free, both render inside this same strip. */}
           {renderFolderTabs({
             config: tabsConfig,
             value: facet,
             onValueChange: (v) => setFacet(v as HelpFacet),
-            tight: true,
           })}
 
           {facet === TRIAGE ? (
-            <CollectionCard surface="plain">
+            <CollectionCard>
               {/* THE TOOLBAR, WITH ITS OWN SEARCH — CLIENT RULING, 2026-09-03,
                   SUPERSEDING THE "BUTTON ONLY" NOTE THIS USED TO CARRY. Triage
                   still has no `<PagedFind>` to share a search box with (it is
@@ -1499,7 +1497,7 @@ export function TicketsCollection({
               ticketTotal={totals.help}
             />
           ) : scopedQ.error ? (
-            <CollectionCard surface="plain">
+            <CollectionCard>
               <ShapeStateBody
                 shape="collectionScreen"
                 state="error"
@@ -1615,7 +1613,7 @@ export function TicketsCollection({
               // (`collection-content.tsx`'s own `wrap`): zero gap to the tab row
               // above, which is this component's own flex column rather than a
               // second `gap-*` here.
-              wrap={(inner) => <CollectionCard surface="plain">{inner}</CollectionCard>}
+              wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
             >
               {(found) => {
                 const rows = found.active ? found.rows : scopedQ.data

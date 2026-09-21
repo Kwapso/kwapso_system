@@ -96,14 +96,18 @@ const MAX: HelpStakeholder = {
   origin: "raiser",
 }
 
-// PLAIN-SURFACE EXPERIMENT (rulebook L43) — `TicketSidePanel`'s own
-// `surface` prop, defaulting to `"boxed"` (today's markup, byte for byte)
-// with `"plain"` opting into the kit's `Card variant="plain"` and dropping
-// `CardContent`'s own `p-4`. See web/test/plain-surface-scope.test.tsx for
-// the census that keeps the string scoped to the tickets module.
+// THE PLAIN SURFACE, APP WIDE (rulebook L43, 21 Sep 2026) — `TicketSidePanel`
+// defaults to plain now. These two cases used to read the other way round
+// (boxed was the default, plain the tickets-only opt-in); the ruling swapped
+// them, so the DEFAULT case asserts the plain drawing and `boxed` survives as
+// the opposite decision a call site spells and `PAPER_ON_PURPOSE` names.
 describe("TicketSidePanel — surface", () => {
-  it("boxed (the default) carries data-variant=\"default\" and p-4 on its content", () => {
-    render(<TicketSidePanel title="Stakeholders">content</TicketSidePanel>)
+  it("boxed (spelled at the call site) carries data-variant=\"default\" and p-4 on its content", () => {
+    render(
+      <TicketSidePanel title="Stakeholders" surface="boxed">
+        content
+      </TicketSidePanel>
+    )
     const card = screen.getByText("Stakeholders").closest('[data-slot="card"]') as HTMLElement
     expect(card.getAttribute("data-variant")).toBe("default")
     expect(card.getAttribute("data-surface")).toBeNull()
@@ -111,12 +115,8 @@ describe("TicketSidePanel — surface", () => {
     expect(content.className).toContain("p-4")
   })
 
-  it("plain carries data-variant=\"plain\", data-surface=\"plain\", and no p-4 on its content", () => {
-    render(
-      <TicketSidePanel title="Stakeholders" surface="plain">
-        content
-      </TicketSidePanel>
-    )
+  it("plain (the default, no prop at all) carries data-variant=\"plain\", data-surface=\"plain\", and no p-4 on its content", () => {
+    render(<TicketSidePanel title="Stakeholders">content</TicketSidePanel>)
     const card = screen.getByText("Stakeholders").closest('[data-slot="card"]') as HTMLElement
     expect(card.getAttribute("data-variant")).toBe("plain")
     expect(card.getAttribute("data-surface")).toBe("plain")
@@ -124,9 +124,9 @@ describe("TicketSidePanel — surface", () => {
     expect(content.className).not.toContain("p-4")
   })
 
-  it("still draws the title, the count and the children in both surfaces", () => {
+  it("still draws the title, the count and the children on the plain default", () => {
     render(
-      <TicketSidePanel title="Stakeholders" count="4" surface="plain">
+      <TicketSidePanel title="Stakeholders" count="4">
         <div>row</div>
       </TicketSidePanel>
     )
@@ -397,26 +397,28 @@ describe("AssignedToCard", () => {
     render(<AssignedToCard />)
     const card = assignedCard()
     expect(card).toBeTruthy()
-    expect(card.getAttribute("data-variant")).toBe("default")
+    // PLAIN SINCE 21 SEP 2026 (rulebook L43) — this asserted `"default"`
+    // while `TicketSidePanel`'s own default was boxed. The card is still the
+    // card and still the top-level one; what changed is that it paints
+    // nothing, which is the whole ruling.
+    expect(card.getAttribute("data-variant")).toBe("plain")
     expect(screen.getByText("Nobody yet.")).toBeTruthy()
   })
 
-  // PLAIN-SURFACE EXPERIMENT (rulebook L43) — forwarded to `TicketSidePanel`
-  // (this card's own shell), never drawn by hand here.
-  it("forwards surface=\"plain\" to its own TicketSidePanel shell", () => {
-    render(<AssignedToCard surface="plain" />)
+  // PLAIN BY DEFAULT, NO PROP AT ALL — rulebook L43 went app wide on 21 Sep
+  // 2026 and `TicketSidePanel`'s own default is `"plain"`. These two cases
+  // used to be "forwards surface=\"plain\"" and "defaults to boxed"; the
+  // forwarding prop had exactly one caller, which passed the value that is
+  // now the default, so it was retired with the experiment and the second
+  // case asserted the opposite of the ruling. One case now, and it is the
+  // ruling: nobody says anything and the card draws no box.
+  it("draws its shell plain with no surface prop at all", () => {
+    render(<AssignedToCard />)
     const card = assignedCard()
     expect(card.getAttribute("data-variant")).toBe("plain")
     expect(card.getAttribute("data-surface")).toBe("plain")
     const content = card.querySelector('[data-slot="card-content"]') as HTMLElement
     expect(content.className).not.toContain("p-4")
-  })
-
-  it("defaults to boxed when surface is not passed", () => {
-    render(<AssignedToCard />)
-    const card = assignedCard()
-    expect(card.getAttribute("data-variant")).toBe("default")
-    expect(card.getAttribute("data-surface")).toBeNull()
   })
 
   it("shows the inherited line when the ticket has none of its own and the app does", () => {
@@ -677,6 +679,19 @@ describe("TicketDetailBody, Assigned to is the first panel in the side column", 
 // consecutive sections in the side column, nothing above the first, nothing
 // below the last, and no stray hairline beside a section that rendered
 // nothing at all.
+//
+// THE SEAM IS THE KIT'S SINCE 21 SEP 2026 (v1.2.149). `ticket-detail-body.tsx`
+// used to run its own `sawVisibleSection` walk and draw a bare `<Separator>`;
+// it hands the column to `RecordSections` now, which draws the same rule
+// between consecutive VISIBLE children and marks it
+// `data-slot="record-sections-seam"` (its `data-slot` lands after the kit
+// `Separator`'s own, so the seam's mark is the one that survives). These
+// assertions therefore look for THAT slot rather than a bare `"separator"` —
+// which also makes them prove the kit component is what drew the rule, not a
+// hand-rolled copy that happens to look like one. The side column is now
+// `RecordSections`' own box, so below `lg` the conversation is its SIBLING
+// rather than its last child, and the old "what sits right after
+// stakeholders" hedge is no longer needed.
 describe("TicketDetailBody, the plain-surface separator between side-column sections", () => {
   it("draws exactly one Separator between each of the four visible sections — three total, none above the first or below the last", () => {
     render(
@@ -694,7 +709,7 @@ describe("TicketDetailBody, the plain-surface separator between side-column sect
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
     const sideColumn = assignedAnchor.parentElement as HTMLElement
     const children = Array.from(sideColumn.children)
-    const separators = children.filter((c) => c.getAttribute("data-slot") === "separator")
+    const separators = children.filter((c) => c.getAttribute("data-slot") === "record-sections-seam")
     expect(separators.length).toBe(3)
     // Nothing above the first section, nothing below the last — scoped to
     // the four tickets sections: below `lg` (jsdom's own default width) the
@@ -705,11 +720,12 @@ describe("TicketDetailBody, the plain-surface separator between side-column sect
     const assignedIdx = children.indexOf(assignedAnchor)
     const stakeholdersIdx = children.indexOf(stakeholdersAnchor)
     expect(assignedIdx).toBe(0)
-    expect(children[stakeholdersIdx + 1]?.getAttribute("data-slot")).not.toBe("separator")
-    // Alternating anchor/separator/anchor/separator/anchor/separator/anchor,
-    // over exactly the four tickets sections.
-    const ticketSlice = children.slice(assignedIdx, stakeholdersIdx + 1)
-    expect(ticketSlice.map((c) => c.getAttribute("data-slot") === "separator")).toEqual([
+    expect(stakeholdersIdx, "stakeholders is the column's last child — nothing below the last").toBe(
+      children.length - 1
+    )
+    // Alternating anchor/seam/anchor/seam/anchor/seam/anchor, over exactly
+    // the four tickets sections.
+    expect(children.map((c) => c.getAttribute("data-slot") === "record-sections-seam")).toEqual([
       false,
       true,
       false,
@@ -736,14 +752,16 @@ describe("TicketDetailBody, the plain-surface separator between side-column sect
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
     const sideColumn = assignedAnchor.parentElement as HTMLElement
     const children = Array.from(sideColumn.children)
-    const separators = children.filter((c) => c.getAttribute("data-slot") === "separator")
+    const separators = children.filter((c) => c.getAttribute("data-slot") === "record-sections-seam")
     // Only two separators now: assignedTo|stories and stories|stakeholders —
     // the absent time section leaves no stray hairline on either side of it.
     expect(separators.length).toBe(2)
     const assignedIdx = children.indexOf(assignedAnchor)
     const stakeholdersIdx = children.indexOf(stakeholdersAnchor)
     expect(assignedIdx).toBe(0)
-    expect(children[stakeholdersIdx + 1]?.getAttribute("data-slot")).not.toBe("separator")
+    expect(stakeholdersIdx, "stakeholders is still the last child, with no rule under it").toBe(
+      children.length - 1
+    )
   })
 
   it("draws no stray separator around a section EffortCard confirmed empty (timeEmpty=true)", () => {
@@ -762,7 +780,7 @@ describe("TicketDetailBody, the plain-surface separator between side-column sect
     const assignedAnchor = document.getElementById(TICKET_PANEL_ANCHOR.assignedTo) as HTMLElement
     const sideColumn = assignedAnchor.parentElement as HTMLElement
     const children = Array.from(sideColumn.children)
-    const separators = children.filter((c) => c.getAttribute("data-slot") === "separator")
+    const separators = children.filter((c) => c.getAttribute("data-slot") === "record-sections-seam")
     expect(separators.length).toBe(2)
   })
 })

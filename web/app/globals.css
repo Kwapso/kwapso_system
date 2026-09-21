@@ -98,6 +98,18 @@
    which is the whole point of the ruling — "change the rule and apply it
    everywhere". It lives on `:root` rather than in either component because
    those two have no shared ancestor nearer than the document.
+
+   ONE SIDE LEFT IT ON 21 SEP 2026 (rulebook L43, the plain surface going app
+   wide). A COLLECTION's strip pays no trailing gap at all any more:
+   `renderFolderTabs` merges `pb-0` over this token for every host, and the
+   10px above a toolbar is paid by the collection card's own `padding-top`
+   instead (`--toolbar-lead-gap`, the rules further down). So this token now
+   has exactly one payer, `--record-tab-gap` on a RECORD's floated strip, and
+   the "both sides read it" sentence above is history rather than today's
+   wiring. It is NOT retired and NOT renamed: the record strip's distance is
+   unchanged by this ruling, the name is read by `record-chrome.tsx` and by
+   `design-scale.test.ts`'s own seam check, and a token with one payer is
+   still the right shape for a number a second strip could ask for again.
    ========================================================================= */
 :root {
   --tab-content-gap: var(--space-5);
@@ -267,30 +279,37 @@
   --pinned-inset-x: 0px;
 }
 
-*:has(> .pinned-strip) {
-  --pinned-chrome-h: calc(var(--tab-strip-h) + var(--tab-content-gap));
-}
-
 /* ============================================================================
-   THE TICKETS STRIP PAYS NO TRAILING GAP OF ITS OWN (R83, tickets-only,
-   21 Sep 2026). Aurora, verbatim: "on tickets, reduce space above and under
-   toolbar to 10px." Measured live at 1440x900: the strip's own trailing
-   `pb-[var(--tab-content-gap)]` (20px, the rule above) stacked on top of the
-   card's own 10px `--toolbar-lead-gap` lead for 30px total above the
-   toolbar. `FolderTabStrip.tight` (shared/web/screen-engine/tabs-view.tsx)
-   drops that trailing padding to zero on the ONE strip that asks for it,
-   marked `.pinned-strip-tight` alongside `.pinned-strip` so no other host of
-   `renderFolderTabs` is touched.
+   A COLLECTION STRIP PAYS NO TRAILING GAP OF ITS OWN — APP WIDE, 21 SEP 2026
+   (R83, rulebook L43). Aurora, verbatim: "on tickets, reduce space above and
+   under toolbar to 10px", then, the same day, over the whole app: "go an
+   implement this appwide".
+   ============================================================================
+   Measured live at 1440x900 before the fix: the strip's own trailing
+   `pb-[var(--tab-content-gap)]` (20px) stacked on top of the card's own 10px
+   `--toolbar-lead-gap` lead for 30px total above the toolbar. The strip drops
+   that trailing padding to zero — `renderFolderTabs`
+   (shared/web/screen-engine/tabs-view.tsx) merges `pb-0` over it for EVERY
+   host now, not the one that used to ask — and the card under it pays the
+   ruled 10px, whole, as real `padding-top` (the rules below).
 
-   `--pinned-chrome-h` NEEDS THE SAME CORRECTION, OR ONLY THE RESTING STATE
-   IS FIXED. The rule above computes it off `--tab-content-gap` for every
-   `.pinned-strip` container regardless — so a tight strip's own painted
-   height shrank by 20px while the property a PINNED toolbar reads as its
-   `top` did not, opening a 20px hole between the strip and the toolbar the
-   moment the page scrolls, even though the two sit flush at rest. Keyed to
-   the same tight marker, and MORE SPECIFIC than the rule above (two classes
-   inside `:has()` beat one), so it wins on the one container that carries
-   both without needing source order to do it. */
+   THERE IS ONE RULE HERE NOW, WHERE THERE WERE TWO. The ordinary path read
+   `*:has(> .pinned-strip) { --pinned-chrome-h: calc(var(--tab-strip-h) +
+   var(--tab-content-gap)) }` and the tight one corrected it back down for the
+   single tickets strip. With every strip tight, that ordinary rule could only
+   ever be overridden, never obeyed: it is deleted rather than left to be
+   re-derived by the next reader. `--tab-content-gap` is no longer spent by a
+   collection strip at all; it survives as the source of `--record-tab-gap`
+   (web/components/records/record-chrome.tsx), which is a RECORD's own
+   floated strip and a different distance.
+
+   THE MARK STAYS ON THE STRIP, and so does this selector's shape. Both are
+   what make the correction survive the strip going STICKY: a strip that pays
+   no trailing gap but whose container still advertised a 20px taller chrome
+   would open a 20px hole between the strip and a PINNED toolbar the moment
+   the page scrolls, even though the two sit flush at rest. The property a
+   pinned toolbar reads as its `top` is the strip's own painted height and
+   nothing else. */
 *:has(> .pinned-strip.pinned-strip-tight) {
   --pinned-chrome-h: var(--tab-strip-h);
 }

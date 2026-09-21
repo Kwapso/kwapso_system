@@ -235,7 +235,17 @@ function appGalleryCard(
     </span>
   )
   return (
-    <Card key={app.id} variant="raised" className="hover:bg-accent motion-hover">
+    /* SOFT PAPER, NOT OFF-BEIGE — rulebook L43 going app wide, 21 Sep 2026.
+       This card used to stand inside a painted collection frame, where
+       `raised` (`--card`, off-beige) read 1.221 against soft paper. The
+       frame is plain now, so its ground is the PAGE, and `--card` IS the
+       page's own colour in light (#FFFEF9): `raised` here would measure
+       1.000 and the card would be held up by its shadow alone. `default`
+       is soft paper, the same 1.103 the search pill and every other
+       object on this ground reads at. The Minimal Kit page named exactly
+       this sweep: "check that nobody passed `raised` explicitly for a
+       tile row that used to sit on a panel". */
+    <Card key={app.id} variant="default" className="hover:bg-accent motion-hover">
       <InAppLink href={href} className="block">
         <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
           {/* THE ICON — `size="band"`, the same size accounts' own gallery

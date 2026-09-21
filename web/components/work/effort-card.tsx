@@ -97,7 +97,7 @@
 // `card.tsx`'s own header describes: "off-beige over soft paper … only reads
 // as raised when it sits inside a `--surface-panel` band"). `StatGrid` has no
 // prop for the raised tone, so each tile is wrapped in the kit's own
-// `<Card variant="raised">` by hand, with `<StatGrid surface="bare">`'s
+// `<Card variant="default">` by hand, with `<StatGrid surface="bare">`'s
 // register (label / value, no card of its own) drawn inside it: the kit's
 // stat markup, the kit's card, never a hand-rolled fill or border.
 
@@ -160,7 +160,6 @@ export function EffortCard({
   canEdit,
   members,
   metrics,
-  surface = "boxed",
   onEmptyChange,
 }: {
   targetTable: "stories" | "help" | "tasks"
@@ -174,11 +173,6 @@ export function EffortCard({
    * that read is still in flight, or OMITTED ENTIRELY by a caller whose
    * record has no such door (a task) — see this file's own header. */
   metrics?: EffortMetrics
-  /** THE TICKETS-MODULE EXPERIMENT (rulebook L43) — forwarded to this card's
-   * own `<EmptyGatedPanel>` shell. `"boxed"` (default) is today's markup;
-   * `"plain"` is the kit's `Card variant="plain"`. Only tickets' own call
-   * site (help-detail.tsx) passes `"plain"`. */
-  surface?: "boxed" | "plain"
   /** BUBBLED UP, the same shape `WorkLogsPanel`'s own `onEmptyChange` already
    * takes for the identical fact on a different record — true once this
    * card has CONFIRMED zero time logged and therefore rendered NOTHING at
@@ -252,7 +246,11 @@ export function EffortCard({
 
   return (
     <>
-      <EmptyGatedPanel title={t("Effort")} count={formatCount(recordCount)} empty={false} surface={surface}>
+      {/* NO `surface` PROP ANY MORE — rulebook L43 went app wide on 21 Sep
+          2026 and EmptyGatedPanel's own default is plain. The forwarding prop
+          this card carried for the tickets-only experiment had exactly one
+          caller, which passed the value that is now the default. */}
+      <EmptyGatedPanel title={t("Effort")} count={formatCount(recordCount)} empty={false}>
         {rows === undefined ? (
           <Skeleton variant="list" lines={3} />
         ) : (
@@ -264,9 +262,24 @@ export function EffortCard({
                 the kit's own stat register (`<StatGrid surface="bare">`, the
                 same label/value markup `pulse.tsx`'s dashboard and
                 `work-logs-panel.tsx`'s Numbers band draw) inside the kit's
-                own `<Card variant="raised">`, a card background `StatGrid`
+                own `<Card variant="default">`, a card background `StatGrid`
                 itself cannot give a tile nested this deep (see this file's
                 own header, the fifth change).
+
+                SOFT PAPER, NOT OFF-BEIGE — rulebook L43 going app wide, 21
+                Sep 2026. These three were `variant="raised"` while the panel
+                around them was a painted card; the panel is plain now, so a
+                tile's ground is the PAGE, and `raised` (`--card`) IS the
+                page's own colour in light (#FFFEF9) — the tiles would have
+                measured 1.000 and been held up by their shadow alone. The
+                Minimal Kit page ruled exactly this, on this exact row: "the
+                tiles take soft paper instead, which is what `Card
+                variant="default"` already paints, and they lift off the page
+                at the same 1.103 the search pill does", plus the sweep it
+                asked for, "check that nobody passed `raised` explicitly for
+                a tile row that used to sit on a panel". Aurora's own word
+                for what a tile is, the same day: "this is a metric, like in
+                kit" — and the kit's own `StatGrid` tile is `default`.
 
                 THREE FIXED TILES, WRITTEN OUT RATHER THAN `.map()`-ED. R65's
                 own census reads any kit `<Card>` carrying React's own `key=`
@@ -280,7 +293,7 @@ export function EffortCard({
                 exemption the census has no slot for. */}
             {metrics && (
               <div className="grid grid-cols-1 gap-[var(--space-3h)] sm:grid-cols-3">
-                <Card variant="raised">
+                <Card variant="default">
                   <CardContent>
                     <StatGrid
                       items={[
@@ -298,7 +311,7 @@ export function EffortCard({
                     />
                   </CardContent>
                 </Card>
-                <Card variant="raised">
+                <Card variant="default">
                   <CardContent>
                     {/* "Effort hours", not "Effort" — the title's own count is
                         the record count now, so the tile answers a different
@@ -316,7 +329,7 @@ export function EffortCard({
                     />
                   </CardContent>
                 </Card>
-                <Card variant="raised">
+                <Card variant="default">
                   <CardContent>
                     <StatGrid
                       items={[
