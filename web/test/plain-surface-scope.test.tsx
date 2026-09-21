@@ -52,13 +52,63 @@
 // by path was moved to the new extension in the same change (R58).
 
 import { join } from "node:path"
-import { cleanup, render } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import { cleanup, render, screen } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { CollectionCard, CollectionEmptyBody } from "@/components/deep-link/screen-bits"
 import { Panel } from "@/components/tickets/tickets-dashboard"
+
+// THE TRIAGE FACET'S OWN EMPTY BRANCH (below, the last describe block) needs
+// its door mocked before `TriageQueue` is imported — the same shape
+// `web/test/triage-list-view-no-buttons.test.tsx` already uses, so this is
+// not a second, invented way to stand the queue up. `waiting: []` and
+// `yours: true` reach `triage-queue.tsx`'s own `view.waiting.length === 0`
+// branch, the one this file's own tickets-collection.tsx comment names as
+// "whatever it renders when the triage queue has zero tickets" — the
+// resting-empty case the PagedFind branch's `CollectionEmptyBody` wrap
+// already covers for Ready and Waiting.
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...actual,
+    content: {
+      ...actual.content,
+      triage: async () => ({
+        onDuty: { userId: "u-1", userName: "Aurora", weekStart: "2026-09-14" },
+        yours: true,
+        waiting: [],
+        total: 0,
+      }),
+      helpAttachments: async () => ({ attachments: [], total: 0 }),
+    },
+    tenancy: {
+      ...actual.tenancy,
+      members: async () => ({ members: [] }),
+      apps: async () => ({ apps: [], total: 0 }),
+    },
+  }
+})
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
+
+vi.mock("@shared/ui/components/sonner/sonner", () => ({
+  toast: { success: () => {}, error: () => {}, info: () => {} },
+  Toaster: () => null,
+}))
+
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver
+
+import { TriageQueue } from "@/components/tickets/triage-queue"
 
 afterEach(cleanup)
 
@@ -293,5 +343,50 @@ describe("tickets-dashboard Panel renders plain (rulebook L43, extended to ticke
     expect(document.querySelector("h3")?.textContent, "the title survives").toBe("Which app")
     expect(document.querySelector('[data-testid="chip"]'), "the chip survives").toBeTruthy()
     expect(document.querySelector('[data-testid="panel-body"]'), "the body survives").toBeTruthy()
+  })
+})
+
+// THE TRIAGE FACET'S OWN EMPTY BRANCH — measured live: Ready and Waiting's
+// resting-empty body sits on soft paper (the PagedFind branch's own
+// `CollectionEmptyBody` wrap, tickets-collection.tsx ~line 1659), but
+// Triage's own resting-empty body (`triage-queue.tsx`'s `view.waiting.length
+// === 0` branch) landed bare on the plain, transparent frame — it is drawn
+// by `TriageQueue` itself rather than by that PagedFind branch, so the
+// existing fix never reached it. This renders `TriageQueue` inside the SAME
+// wrapper `tickets-collection.tsx` actually draws around it
+// (`<CollectionCard surface="plain"><TriageQueue …/></CollectionCard>`,
+// tickets-collection.tsx ~line 1417/1433) and proves the empty body now gets
+// its own paper there too.
+describe("TriageQueue's own empty branch, on the plain Triage frame (rulebook L43)", () => {
+  const PROPS = {
+    teamId: "team-1",
+    canTriage: true,
+    canEdit: true,
+    helpTypeOptions: ["Bug", "Question", "Issue", "Request"],
+    canCreateTicket: false,
+    onCreate: () => {},
+    onOpen: () => {},
+  }
+
+  it('a zero-waiting queue renders "Nothing waiting." inside a data-variant="default" card, nested inside the data-variant="plain" frame', async () => {
+    render(
+      <CollectionCard surface="plain">
+        <TriageQueue {...PROPS} />
+      </CollectionCard>
+    )
+    // `view.yours` is true and `view.waiting` is `[]` in this file's own
+    // `@/lib/api` mock, so this is the genuinely-empty branch, not the
+    // not-your-week one.
+    await screen.findByText("Nothing waiting.")
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
+    expect(emptyBody, "the empty body itself must render").toBeTruthy()
+    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
+    expect(paper, "the empty body must sit inside its own default-variant Card").toBeTruthy()
+    // And that paper card sits INSIDE the plain, transparent outer frame —
+    // never the other way round, which would be the frame itself turning
+    // opaque rather than the empty body getting its own paper.
+    const plainFrame = document.querySelector('[data-slot="card"][data-surface="plain"][data-variant="plain"]')
+    expect(plainFrame, "the outer CollectionCard stays the plain, transparent frame").toBeTruthy()
+    expect(plainFrame!.contains(paper), "the paper card is nested inside the plain frame").toBe(true)
   })
 })

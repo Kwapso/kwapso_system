@@ -129,7 +129,7 @@ import { ticketTitle } from "@shared/web/ticket-chips"
 // is not any more: which order a tab opens in is a per-tab answer now
 // (`helpTabSorts`), and a screen holding both would be two places deciding one
 // thing — with the tab's answer silently losing on whichever prop forgot.
-import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionEmptyBody, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { tenancy } from "@/lib/api/tenancy"
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -762,18 +762,30 @@ export function TriageQueue({
          `EmptyLine` plus a loose `<p>`; the register carries a title and one
          sentence, which is exactly the two things this state has to say. Still
          no action, for the reason above: a button here would be the app
-         inventing a task to hand her. */
-      <CollectionEmptyState
-        title={t("Nothing waiting.")}
-        description={
-          view.onDuty?.userName
-            ? // R54: whoever is on triage is one of ours.
-              t("No new tickets to sort. {name} is on triage this week.", {
-                name: staffNameFromSnapshot(view.onDuty.userName),
-              })
-            : t("No new tickets to sort. Nobody is on triage this week.")
-        }
-      />
+         inventing a task to hand her.
+
+         WRAPPED IN `CollectionEmptyBody` (screen-bits.tsx) — the Triage facet
+         sits on `CollectionCard surface="plain"` (tickets-collection.tsx),
+         same as Ready and Waiting, and the Ready/Waiting empty body already
+         gets its own soft paper there (the PagedFind branch's own
+         `CollectionEmptyBody` wrap). This one landed bare on the plain,
+         transparent frame instead — measured live, the only one of the
+         three that did — because it is drawn by THIS component rather than
+         by the PagedFind branch that already carries the fix. A no-op on a
+         boxed frame, which is already paper. */
+      <CollectionEmptyBody>
+        <CollectionEmptyState
+          title={t("Nothing waiting.")}
+          description={
+            view.onDuty?.userName
+              ? // R54: whoever is on triage is one of ours.
+                t("No new tickets to sort. {name} is on triage this week.", {
+                  name: staffNameFromSnapshot(view.onDuty.userName),
+                })
+              : t("No new tickets to sort. Nobody is on triage this week.")
+          }
+        />
+      </CollectionEmptyBody>
     )
 
   // ── THE CARD IN HAND ────────────────────────────────────────────────────
@@ -1006,12 +1018,23 @@ export function TriageQueue({
            button (there is none here on purpose: "a button here would be the app
            inventing a task"). The sentence is kept rather than defaulted, because
            it names the THREE controls that can empty this list — see the note
-           above on why it stopped saying "your search". */
-        <CollectionEmptyState
-          filtered
-          title={t("Nothing waiting.")}
-          filteredTitle={t("Nothing in the triage queue matches what you asked for.")}
-        />
+           above on why it stopped saying "your search".
+
+           WRAPPED IN `CollectionEmptyBody` TOO, same reason as the resting
+           branch above — this is the SAME plain frame (`CollectionCard
+           surface="plain"`, tickets-collection.tsx), so a search that narrows
+           the queue to nothing must not drop the empty body back onto the
+           transparent frame the resting branch just got taken off. The
+           toolbar (`ToolbarRow`, just above) sits OUTSIDE this wrapper —
+           it is a sibling in this fragment, never nested inside it — so it
+           stays flush with the page exactly as R63/R83 already have it. */
+        <CollectionEmptyBody>
+          <CollectionEmptyState
+            filtered
+            title={t("Nothing waiting.")}
+            filteredTitle={t("Nothing in the triage queue matches what you asked for.")}
+          />
+        </CollectionEmptyBody>
       ) : triageView === "list" ? (
         /* ══ THE LIST — CLIENT RULING, 2026-09-06, ROUND TEN ══════════════════
            Her whole brief, verbatim: "Now let's build the list view: 1. Title.
