@@ -217,6 +217,10 @@ const registerVariants = cva(["flex min-w-0 flex-col"], {
      * `block` — `.kw-register`: the standalone block, panel fill at the box
      * radius, inset 32, left-aligned. For a register that is the whole
      * region rather than a hole inside one.
+     *
+     * `plain` - NO CARD AT ALL, added 22 Sep 2026. See the variant's own
+     * comment below for the ruling; the short version is that the empty
+     * register stopped being a region and went back to being a hole.
      */
     variant: {
       /* Left-aligned, not centred. 27.21: "Type and one button carry it,
@@ -231,6 +235,27 @@ const registerVariants = cva(["flex min-w-0 flex-col"], {
          those margins was adding a second 8 to every one of them. */
       inline: "items-start px-6 py-[var(--space-8)] text-start",
       block: "items-start rounded-[var(--radius)] bg-surface-panel p-[var(--space-7)]",
+      /**
+       * NO CARD AT ALL - 22 SEP 2026. No fill, no radius, no inset of its
+       * own: the register stands directly on whatever ground the panel
+       * already painted, or did not. Aurora, verbatim, on the Accounts /
+       * Inactive screenshot ("Nothing matched. Try fewer words, or clear
+       * the filters." on a soft paper card): "The empty collection now. We
+       * need to get rid of the card background." The app's own
+       * `CollectionEmptyState` stopped papering itself the same day; this
+       * is the kit's `CollectionFrame` composition catching up.
+       *
+       * Reserved for the EMPTY register - and the identical register a
+       * filter reduces a collection to, since this frame carries one
+       * `empty` boolean and no second "filtered" flag - on a
+       * `panel="plain"` frame. See `CollectionFrame`'s own
+       * `emptyRegisterVariant`. LOADING and FAILED are NOT this ruling and
+       * stay on `block`: a spinner or a failure with nothing under it reads
+       * as a page that broke, which is exactly the read the 21 Sep entry
+       * warned about - that warning still holds for those two, and only
+       * for those two.
+       */
+      plain: "items-start text-start",
     },
   },
   defaultVariants: { variant: "inline" },
@@ -707,12 +732,20 @@ export interface CollectionFrameProps
    * IT ALSO DECIDES TWO THINGS THAT USED TO BE HARD CODED, because both
    * were answers to "what has already been painted here":
    *  · `toolbarGround`'s own default - see that prop.
-   *  · which register an empty, loading or failed collection draws. A
-   *    plain frame takes `CollectionRegister variant="block"`, the one
-   *    register that deliberately keeps its paper while everything around
-   *    it goes transparent: a boundary around nothing, with no boundary, is
-   *    just nothing, and three lines of text in the middle of a white field
-   *    reads as a page that failed rather than as a place that is empty.
+   *  · which register an empty, loading or failed collection draws - and,
+   *    AS OF 22 SEP 2026, the three no longer draw alike. Aurora, verbatim,
+   *    on the Accounts / Inactive screenshot: "The empty collection now. We
+   *    need to get rid of the card background." A plain frame's EMPTY
+   *    register (and the identical register a filter reduces a collection
+   *    to - this frame has one `empty` boolean and no second "filtered"
+   *    flag) now takes `CollectionRegister variant="plain"`: no fill, no
+   *    radius, no inset of its own, sitting at the panel's own rhythm.
+   *    LOADING and FAILED are NOT this ruling and are UNCHANGED: both still
+   *    take `variant="block"`, the register that keeps its paper, because a
+   *    spinner or a failure with nothing under it still reads as a page
+   *    that broke rather than as a place that is empty - the 21 Sep
+   *    reasoning, narrowed now to the two states it actually governs. See
+   *    `CollectionFrame`'s own `emptyRegisterVariant` for the split.
    */
   panel?: "plain" | "paper";
   /**
@@ -1039,19 +1072,32 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
        same-specificity classes racing each other. */
     const bodyState = loading ? "loading" : error ? "error" : empty ? "empty" : "default";
 
-    /* THE REGISTER KEEPS ITS PAPER ON A PLAIN FRAME - 21 SEP 2026. `inline`
-       is `.kw-empty`, the lighter register, and it is right INSIDE a painted
-       panel, where "a panel-toned card on a panel-toned band is invisible in
-       light" (see `registerVariants`). With the panel gone that reasoning
-       inverts: the register is standing on the pane, nothing else on the
-       screen is painted, and the one job this object has is to draw a
-       boundary around nothing. Measured live before this line: the register
-       painted rgba(0, 0, 0, 0) at radius 0 with a 48px 24px inset - three
-       lines of text in the middle of a white field, which reads as a page
-       that failed rather than as a place that is empty. `block` is
-       `.kw-register`: soft paper at 24 with the `--space-7` inset, inside
-       the plain frame. */
+    /* THE REGISTER KEPT ITS PAPER ON A PLAIN FRAME FOR EVERY STATE - 21 SEP
+       2026, NARROWED 22 SEP 2026 TO LOADING AND FAILED ONLY. `inline` is
+       `.kw-empty`, the lighter register, right INSIDE a painted panel, where
+       "a panel-toned card on a panel-toned band is invisible in light" (see
+       `registerVariants`). `block` is `.kw-register`: soft paper at 24 with
+       the `--space-7` inset, inside the plain frame - kept for LOADING and
+       FAILED, which still want a boundary: a spinner or a failure with
+       nothing under it reads as a page that broke, not as a place that is
+       empty. That was the 21 Sep reasoning for all three states; it still
+       holds for these two.
+
+       EMPTY IS DIFFERENT NOW. Aurora, verbatim, on the Accounts / Inactive
+       screenshot (22 Sep 2026): "The empty collection now. We need to get
+       rid of the card background." The empty register - and the identical
+       register a filter reduces a collection to, since this frame carries
+       one `empty` boolean and no separate "filtered" flag - takes
+       `variant="plain"` on a plain panel instead: no fill, no radius, no
+       inset of its own, so it sits at the panel's own rhythm - 10px under
+       the toolbar through the panel's own `gap-[var(--space-2h)]` column
+       gap when a toolbar is drawn, or at the frame's own top edge through
+       the panel's own `pt-0` when it is not; neither number is spent again
+       here. `panel="paper"` is untouched either way: the frame itself is
+       the paper there, so every register keeps `inline`, exactly as ruling
+       J2 always drew it. */
     const registerVariant = panelSurface === "plain" ? "block" : "inline";
+    const emptyRegisterVariant = panelSurface === "plain" ? "plain" : "inline";
 
     let body: React.ReactNode = children;
     if (bodyState === "loading") {
@@ -1076,7 +1122,7 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
       body =
         emptyState ??
         (<CollectionRegister
-          variant={registerVariant}
+          variant={emptyRegisterVariant}
           tone="quiet"
           eyebrow={emptyLabel}
           body={emptyBody}

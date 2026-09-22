@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.151",
-  "sha": "f11eb02934e4eaf79dfbab7eb0e02c1154067d43",
+  "tag": "v1.2.152",
+  "sha": "50aa3b84d61881350e63ac1b54b66186a3ab39ae",
   "syncedAt": "2026-09-22"
  },
- "generatedAt": "2026-09-22T06:53:51.151Z",
+ "generatedAt": "2026-09-22T07:22:58.444Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -13,7 +13,7 @@
   "withoutVariants": 77,
   "cvaSites": 54,
   "variantGroups": 82,
-  "variantOptions": 273,
+  "variantOptions": 274,
   "typedEnumProps": 53,
   "typedBooleanProps": 319,
   "compositions": 47,
@@ -2455,6 +2455,11 @@
          "name": "block",
          "classes": "items-start rounded-[var(--radius)] bg-surface-panel p-[var(--space-7)]",
          "note": null
+        },
+        {
+         "name": "plain",
+         "classes": "items-start text-start",
+         "note": "NO CARD AT ALL - 22 SEP 2026. No fill, no radius, no inset of its own: the register stands directly on whatever ground the panel already painted, or did not. Aurora, verbatim, on the Accounts / Inactive screenshot (\"Nothing matched. Try fewer words, or clear the filters.\" on a soft paper card): \"The empty collection now. We need to get rid of the card background.\" The app's own `CollectionEmptyState` stopped papering itself the same day; this is the kit's `CollectionFrame` composition catching up. Reserved for the EMPTY register - and the identical register a filter reduces a collection to, since this frame carries one `empty` boolean and no second \"filtered\" flag - on a `panel=\"plain\"` frame. See `CollectionFrame`'s own `emptyRegisterVariant`. LOADING and FAILED are NOT this ruling and stay on `block`: a spinner or a failure with nothing under it reads as a page that broke, which is exactly the read the 21 Sep entry warned about - that warning still holds for those two, and only for those two."
         }
        ]
       }
@@ -2471,7 +2476,7 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "collectionFrameVariants",
-     "line": 419,
+     "line": 444,
      "base": "flex min-w-0 flex-col rounded-[var(--radius)]",
      "groups": [
       {
@@ -2539,7 +2544,7 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "collectionPanelVariants",
-     "line": 574,
+     "line": 599,
      "base": "relative z-[2] flex min-w-0 flex-col",
      "groups": [
       {
@@ -2644,7 +2649,7 @@
         "plain",
         "paper"
        ],
-       "note": "WHETHER THE ONE PANEL IS A BOX - 21 SEP 2026, THE MINIMAL PASS. `\"plain\"` (THE DEFAULT, the client's \"go an implement this appwide\") paints nothing: the toolbar and the rows stand on the pane, the two paper rebinds invert, and the panel keeps only its own vertical air. `\"paper\"` is ruling J2's soft paper panel, unchanged and reachable for a frame that genuinely stands on off-beige with nothing else between it and the page. See `collectionPanelVariants` for the whole argument. IT ALSO DECIDES TWO THINGS THAT USED TO BE HARD CODED, because both were answers to \"what has already been painted here\": · `toolbarGround`'s own default - see that prop. · which register an empty, loading or failed collection draws. A plain frame takes `CollectionRegister variant=\"block\"`, the one register that deliberately keeps its paper while everything around it goes transparent: a boundary around nothing, with no boundary, is just nothing, and three lines of text in the middle of a white field reads as a page that failed rather than as a place that is empty."
+       "note": "WHETHER THE ONE PANEL IS A BOX - 21 SEP 2026, THE MINIMAL PASS. `\"plain\"` (THE DEFAULT, the client's \"go an implement this appwide\") paints nothing: the toolbar and the rows stand on the pane, the two paper rebinds invert, and the panel keeps only its own vertical air. `\"paper\"` is ruling J2's soft paper panel, unchanged and reachable for a frame that genuinely stands on off-beige with nothing else between it and the page. See `collectionPanelVariants` for the whole argument. IT ALSO DECIDES TWO THINGS THAT USED TO BE HARD CODED, because both were answers to \"what has already been painted here\": · `toolbarGround`'s own default - see that prop. · which register an empty, loading or failed collection draws - and, AS OF 22 SEP 2026, the three no longer draw alike. Aurora, verbatim, on the Accounts / Inactive screenshot: \"The empty collection now. We need to get rid of the card background.\" A plain frame's EMPTY register (and the identical register a filter reduces a collection to - this frame has one `empty` boolean and no second \"filtered\" flag) now takes `CollectionRegister variant=\"plain\"`: no fill, no radius, no inset of its own, sitting at the panel's own rhythm. LOADING and FAILED are NOT this ruling and are UNCHANGED: both still take `variant=\"block\"`, the register that keeps its paper, because a spinner or a failure with nothing under it still reads as a page that broke rather than as a place that is empty - the 21 Sep reasoning, narrowed now to the two states it actually governs. See `CollectionFrame`'s own `emptyRegisterVariant` for the split."
       },
       {
        "name": "toolbarGround",
