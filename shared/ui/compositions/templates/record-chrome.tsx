@@ -114,6 +114,28 @@
        "the portal never shows internal notes, only what was said to the
         client."
 
+     `aboveTitle`, ADDED 22 SEP 2026 — a SECOND, INDEPENDENT SLOT, NOT A
+     REVERSAL OF OVERRIDE 73. The identity row this file composes itself
+     (`recordNumber`/`collectionLabel`/`chips`, folded into `identityRow`
+     below) still draws where override 73 put it, under the title. This
+     addition exists for a caller with its own, later ruling that puts an
+     identity strip ABOVE the title instead (an owner ruling, 2026-09-01,
+     "pills row, then title") — a caller that therefore hands this file
+     NONE of `recordNumber`/`collectionLabel`/`chips` (so this file's own
+     `hasIdentity` reads false and draws nothing) and builds its own chip
+     row instead, to pass through `aboveTitle`. Diagnosed live: with no slot
+     ABOVE the title other than the deleted `eyebrow`, that caller had folded
+     its chip row INSIDE `title` itself, which drew correctly but broke
+     `Title`'s own `items-center` row (21 Sep 2026 ruling, `components/
+     title/title.tsx`) — that row centres `actions` against `Title`'s own
+     box, and a `title` node carrying a chip row above the real heading text
+     made that box taller than the heading alone, so the actions centred 17
+     to 18px above the heading's own optical centre rather than on it.
+     `aboveTitle` is the fix: `RecordDetail` renders it as a plain sibling
+     BEFORE `<Title>`, so `Title`'s own box is the heading (and `eyebrow`,
+     when one is given) alone, always — see that prop's own doc,
+     `components/record-detail/record-detail.tsx`, for the full mechanics.
+
    THE LAW THIS FILE OBEYS
    · IT DRAWS NOTHING. `RecordDetail` already renders the four regions, the
      transparent band, the sticky strip, the opaque panel and the ink footer
@@ -198,6 +220,20 @@ export interface RecordChromeProps
    */
   banner?: React.ReactNode;
 
+  /**
+   * A row ABOVE the title, forwarded straight to `RecordDetail`'s own
+   * `aboveTitle` slot — see that prop's doc for the full mechanics. This
+   * file's OWN identity row (`recordNumber`/`collectionLabel`/`chips`,
+   * immediately below) still draws UNDER `title`, exactly as override 73
+   * left it on 2026-08-26; this is a second, independent slot for a caller
+   * with its own reason to draw a row ABOVE instead — an owner ruling one
+   * app has (2026-09-01: pills, then title), which override 73 was never
+   * about and does not reverse. `RecordChrome` does not compose this row
+   * itself the way it composes `recordNumber`/`collectionLabel`/`chips`
+   * into its own identity row below; it only forwards whatever node the
+   * caller built, the same bare pass-through `hero` and `panel` already are.
+   */
+  aboveTitle?: React.ReactNode;
   /**
    * The record number. Drawn as the charcoal pill ch27.8 names — always
    * `Badge variant="inverse"`, always the FIRST chip. Override 73: this and
@@ -374,6 +410,7 @@ function RecordChrome({
   door = "system",
   density,
   banner,
+  aboveTitle,
   recordNumber,
   collectionLabel,
   chips,
@@ -499,10 +536,15 @@ function RecordChrome({
       {banner}
 
       <RecordDetail
-        /* No `eyebrow` — override 73 leaves nothing above the title. `title`
-           and `actions` land in `Title`'s own row together, which is what
-           puts Edit "aligned with the title" (the client's own words) with
-           no extra markup written here. */
+        /* No `eyebrow` — override 73 leaves nothing above the title INSIDE
+           `Title`'s own row. `title` and `actions` land in `Title`'s own row
+           together, which is what puts Edit "aligned with the title" (the
+           client's own words) with no extra markup written here.
+           `aboveTitle`, forwarded below, is a different region: a plain
+           sibling BEFORE `Title` rather than a passenger inside it, so it
+           adds a row above without touching this alignment at all — see that
+           prop's own doc, above. */
+        aboveTitle={aboveTitle}
         title={title}
         mark={mark}
         /* STILL NO `titleSize`, THROUGH THE 2026-09-22 32PX FIX TOO. The line

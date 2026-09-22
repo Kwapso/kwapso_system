@@ -540,7 +540,9 @@ export function ContactsScreen({
     // badge: it is the one that carries the collection's own total, and it is
     // never empty while the strip is drawn at all.
     <CountedAbove active={formatCount(total) !== ""}>
-      <div className="flex flex-col gap-4">
+      {/* --heading-strip-gap (web/app/globals.css) - see accounts-screen.tsx's
+          identical note; Aurora, 22 Sep 2026. */}
+      <div className="flex flex-col gap-[var(--heading-strip-gap)]">
         <CollectionHeading sectionKey="contacts" total={total} />
         {/* R14's other half, exactly as Accounts: the list pages, so the search
             box and every filter are answered by the DOOR. */}

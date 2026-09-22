@@ -1065,7 +1065,13 @@ export function WaveCollection({
 
   return (
     <CountedAbove active>
-    <div className="flex flex-col gap-6">
+    {/* --heading-strip-gap (web/app/globals.css) - Aurora, 22 Sep 2026: "reduce
+        the spacing above the folder tabs, there's too much." Was a literal
+        `gap-6`; this file's own comment below ("heading stays in the outer …
+        column - a real, single gap: heading to the strip below it") is the
+        proof this IS that seam and nothing else, so the token reaches it
+        cleanly. */}
+    <div className="flex flex-col gap-[var(--heading-strip-gap)]">
       {heading}
 
       {/* THE STRIP AND ITS CARD SHARE ONE GAPLESS COLUMN (R83 —
@@ -1088,8 +1094,10 @@ export function WaveCollection({
           20px trailing pad was paid AND a second, unrelated 24px heading gap
           was spent again on top of it, above the toolbar and nowhere else.
           The inner column below is that second opinion, retracted — `heading`
-          stays in the outer `gap-6` (a real, single gap: heading to the strip
-          below it), and the strip-to-card distance goes back to being the
+          stays in the outer column (a real, single gap: heading to the strip
+          below it - `--heading-strip-gap`, 16px, since Aurora's 22 Sep 2026
+          "too much space" ruling shrank it from this file's own `gap-6`), and
+          the strip-to-card distance goes back to being the
           strip's own number, spent once. */}
       <div className="flex w-full flex-col">
         {/* ACTIVE / ALL — the client's own two tabs, drawn flush against the

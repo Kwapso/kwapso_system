@@ -329,6 +329,38 @@ export interface RecordDetailAuditEntry {
 export interface RecordDetailProps
   extends Omit<React.ComponentPropsWithoutRef<"div">, "title" | "children"> {
   /* ---- Region 1 · the transparent header band ------------------------- */
+  /**
+   * A row above the title — an identity strip of chips, drawn as a plain
+   * SIBLING of `Title`, never inside it.
+   *
+   * ADDED 22 SEP 2026, the same shape `meta` already gives the row BELOW
+   * `Title`: that region has always rendered as its own sibling underneath
+   * (below), so `Title`'s own cross-axis centring of `actions` — the row's
+   * `items-center`, ruling 21 Sep 2026 — only ever measures `Title`'s own
+   * box, eyebrow and heading, nothing appended to it. Nothing symmetric
+   * existed for a caller that needed a row ABOVE the heading instead, so the
+   * one call site that did (an identity-chip strip, moved above the title by
+   * an owner ruling on 2026-09-01) had nowhere to put it except INSIDE
+   * `title` itself — the only region drawn before the heading that this
+   * component exposed. That works for `Title`'s own layout (it draws
+   * whatever `children` holds, in source order, inside the heading element)
+   * and breaks `Title`'s centring specifically: `items-center` on `Title`'s
+   * own row centres `actions` against the FULL height of its heading slot,
+   * and a heading slot now carrying a chip row above the real heading text
+   * is taller than the text alone, so `actions` centres on the composite
+   * rather than on the title's own line — exactly the shape a reader sees as
+   * "the buttons are slightly above the title".
+   *
+   * `aboveTitle` is the fix: a slot this component renders BEFORE `<Title>`,
+   * outside it, so `Title`'s own box is the heading (and eyebrow, when one is
+   * given) alone, always. Spacing is the caller's: unlike `meta` (a single
+   * quiet line with its own fixed treatment), an identity row's own gap to
+   * the title was itself an owner ruling with a specific number ("from chips
+   * to title only 10"), so this slot applies no margin of its own — the
+   * caller supplies whatever space that ruling asked for, the same way
+   * `hero` and `panel` both take a bare node with no assumed spacing.
+   */
+  aboveTitle?: React.ReactNode;
   /** The micro line over the title. `Title` draws it uppercase at micro. */
   eyebrow?: React.ReactNode;
   /** The record's name. */
@@ -769,6 +801,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
   (
     {
       className,
+      aboveTitle,
       eyebrow,
       title,
       meta,
@@ -870,6 +903,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
     }
 
     const hasBand =
+      aboveTitle !== undefined ||
       eyebrow !== undefined ||
       title !== undefined ||
       meta !== undefined ||
@@ -1032,24 +1066,37 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
             className="flex items-start gap-[var(--space-3h)]"
           >
             {mark ? <span className="flex-none">{mark}</span> : null}
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <Title
-                as="h1"
-                size={titleSize}
-                rule={false}
-                eyebrow={eyebrow}
-                actions={actionsVisible ? actions : undefined}
-              >
-                {title}
-              </Title>
-              {meta !== undefined && meta !== null ? (
-                <span
-                  data-slot="record-detail-meta"
-                  className="text-badge tabular-nums text-ink-tertiary"
+            <div className="flex min-w-0 flex-1 flex-col">
+              {/* `aboveTitle` — a plain SIBLING of `Title`, rendered before it
+                  and OUTSIDE the `gap-1` column below, on purpose: that gap is
+                  `Title`-to-`meta`'s own fixed relationship, and `aboveTitle`'s
+                  relationship to the title is the caller's own ruling to keep
+                  (see this prop's own doc above), not a second opinion added
+                  here. `Title` is therefore always this column's own first
+                  flex item whenever `aboveTitle` is absent — the identical DOM
+                  shape every existing caller already renders — so `items-
+                  center` on `Title`'s own row keeps measuring `Title`'s own
+                  box alone, exactly the property this slot exists to protect. */}
+              {aboveTitle !== undefined && aboveTitle !== null ? aboveTitle : null}
+              <div className="flex min-w-0 flex-col gap-1">
+                <Title
+                  as="h1"
+                  size={titleSize}
+                  rule={false}
+                  eyebrow={eyebrow}
+                  actions={actionsVisible ? actions : undefined}
                 >
-                  {meta}
-                </span>
-              ) : null}
+                  {title}
+                </Title>
+                {meta !== undefined && meta !== null ? (
+                  <span
+                    data-slot="record-detail-meta"
+                    className="text-badge tabular-nums text-ink-tertiary"
+                  >
+                    {meta}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}

@@ -209,6 +209,52 @@
 }
 
 /* ============================================================================
+   ONE GAP BETWEEN A SCREEN'S OWN HEAD AND THE FOLDER TAB STRIP UNDER IT.
+   ============================================================================
+   Aurora, 22 Sep 2026, verbatim: "can we reduce the spacing above the folder
+   tabs? there's too much."
+
+   MEASURED: the gap came entirely from a plain `gap-*` utility on each
+   screen's own wrapper column (`<CollectionHeading>` and the strip - or, on
+   `kwapso-screen.tsx`/`settings-screen.tsx`/`module-settings-screen.tsx`,
+   the bare `<Headline>` and the strip - as the wrapper's only two children,
+   so the wrapper's own gap IS this seam and nothing else), and the two
+   sizes in use disagreed screen by screen: `gap-6` (24px, ten screens -
+   `tickets-collection.tsx`, `meetings-screen.tsx`, `apps-screen.tsx`,
+   `sprints-screen.tsx`, `stories-screen.tsx`, `tasks-screen.tsx`,
+   `waves-screen.tsx`, `kwapso-screen.tsx`, `settings-screen.tsx`,
+   `module-settings-screen.tsx`) against `gap-4` (16px, four -
+   `accounts-screen.tsx`, `contacts-screen.tsx`, `inputs-screen.tsx`,
+   `knowledge-screen.tsx`). `renderFolderTabs`'s own strip
+   (`shared/web/screen-engine/tabs-view.tsx`) contributes nothing above
+   itself - R83's second amendment already settled that the strip pays no
+   leading gap of its own - so every pixel measured here was this wrapper's.
+
+   SHE SAID TOO MUCH, so the smaller of the two stands: `--space-4` (16px),
+   not the larger `--space-6`. No reason argued for the bigger number - the
+   ten screens carrying it were never a separate ruling on THIS seam, they
+   were `gap-6` used as the ordinary inter-panel rhythm (`documents/
+   UI-RULEBOOK.md`'s own S1/N7) at a wrapper that happened to hold exactly
+   two children, the heading and the strip, so nothing is lost by moving all
+   fourteen to the smaller figure the other four already prove reads
+   correctly.
+
+   ONE TOKEN, EVERY CALL SITE READS IT, the same shape `--tab-content-gap`/
+   `--toolbar-lead-gap` above already are for the strip's OWN internal
+   spacing - so this cannot drift screen by screen again the way the 16-vs-24
+   split above already shows it did once. A wrapper spends it as
+   `gap-[var(--heading-strip-gap)]`, never a bare `gap-4`/`gap-6`, wherever
+   the wrapper's own two children are a screen's head and a folder-tab-
+   bearing body (`SectionWithCreate`, `PagedFind`, or a bare
+   `renderFolderTabs` call) - `web/test/heading-strip-gap.test.ts` censuses
+   every such wrapper off the disk and fails on a literal `gap-4`/`gap-6` in
+   that exact seam.
+   ========================================================================= */
+:root {
+  --heading-strip-gap: var(--space-4);
+}
+
+/* ============================================================================
    WHAT A PINNED TOOLBAR PINS BELOW (R63).
    ============================================================================
    Client ruling, 2026-09-10: "on scroll down, i also want the toolbar to be on

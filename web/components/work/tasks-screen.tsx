@@ -1268,7 +1268,9 @@ export function TasksScreen({
 
   return (
     <CountedAbove active={openBadge !== ""}>
-    <div className="flex flex-col gap-6">
+    {/* --heading-strip-gap (web/app/globals.css) - Aurora, 22 Sep 2026: "reduce
+        the spacing above the folder tabs, there's too much." */}
+    <div className="flex flex-col gap-[var(--heading-strip-gap)]">
       {/* R16: the count lives in ONE place. The strip below badges all three
           tabs, so the heading stands down through the arbitration context
           rather than saying the same number twice. */}

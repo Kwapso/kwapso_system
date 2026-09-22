@@ -695,7 +695,11 @@ export function SettingsScreen({
   }
 
   return (
-    <div className="flex w-full flex-col gap-6">
+    // --heading-strip-gap (web/app/globals.css) - Aurora, 22 Sep 2026: "reduce
+    // the spacing above the folder tabs, there's too much." Also governs the
+    // title-to-invites gap when the invites panel below renders - the same
+    // wrapper, one number, unchanged by this ruling.
+    <div className="flex w-full flex-col gap-[var(--heading-strip-gap)]">
       {/* MAIN-SCREEN TITLE — the kit's own named "Page title" step (56/500,
           collection-heading.tsx's own note has the full ruling), no eyebrow,
           no chips/pills, no black activity footer: Settings is a MAIN screen

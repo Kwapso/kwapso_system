@@ -91,7 +91,9 @@ export function KwapsoScreen({
   }
 
   return (
-    <div className="flex w-full flex-col gap-6">
+    // --heading-strip-gap (web/app/globals.css) - Aurora, 22 Sep 2026: "reduce
+    // the spacing above the folder tabs, there's too much."
+    <div className="flex w-full flex-col gap-[var(--heading-strip-gap)]">
       {/* THE ACTIONS CENTRE ON THE TITLE'S OWN LINE, NEVER ON THE STACK —
           Aurora's ruling, 21 Sep 2026, verbatim: "EVERYWHERE (not only
           tickets) align the gear settinsvvutton to middle horozotnal of

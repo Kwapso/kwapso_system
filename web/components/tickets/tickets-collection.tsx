@@ -1363,7 +1363,13 @@ export function TicketsCollection({
 
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
-      <div className="flex flex-col gap-6">
+      {/* THE GAP ABOVE THE STRIP IS THE SHARED TOKEN, NOT A LITERAL - Aurora,
+          22 Sep 2026: "can we reduce the spacing above the folder tabs?
+          there's too much." `--heading-strip-gap` (web/app/globals.css) is
+          the one place this seam is decided now; see that token's own
+          comment for the census of every screen that used to spend its own
+          number here. */}
+      <div className="flex flex-col gap-[var(--heading-strip-gap)]">
         {/* THE GEAR — *"on each module, we have a settings gear"* (client,
             2026-09-09), top right of the screen, icon only. It goes in the
             heading's own `action` slot and NOT in the toolbar, because

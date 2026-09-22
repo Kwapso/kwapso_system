@@ -1325,18 +1325,36 @@ export function RecordScreen({
       <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
     </span>
   )
+  // THE TITLE BLOCK NO LONGER CARRIES THE PILLS - RULING ONE, 22 SEP 2026.
+  // Aurora, verbatim: "on detail screens, the title buttons need to be
+  // alignes with the title! currently they are slightly abovem thats
+  // wrong." Measured: the head actions row sat 17-18px above the title
+  // text's own optical centre - true because the kit's `Title` centres its
+  // `actions` cluster against the FULL HEIGHT of whatever `title` resolves
+  // to, and `identityChips` used to ride INSIDE `titleBlock` (a `mb-
+  // [var(--space-2h)]`-margined sibling ABOVE `titleLine`, both inside one
+  // `<span>` handed to the kit as `title`), so the kit's own centring
+  // measured pills-plus-title rather than the title's own line. The kit's
+  // `RecordDetail` (`shared/ui/components/record-detail/record-detail.tsx`)
+  // gained a real slot for this, 22 Sep 2026, kit v1.2.158: `aboveTitle`, a
+  // plain SIBLING of `<Title>` rather than a passenger inside its children -
+  // the identical shape `meta` already is for the row BELOW. `identityChips`
+  // now rides there (below, `aboveTitleNode`, passed to `<RecordChrome
+  // aboveTitle={…}>`), and `titleBlock` - the kit's own `title` prop - is
+  // left holding only what actually sits on the title's own line: the mark,
+  // the heading, and its subtitle immediately under it. `Title`'s own
+  // `items-center` row now measures exactly that, nothing appended above it.
+  const aboveTitleNode =
+    identityChips === undefined ? undefined : (
+      <span className="mb-[var(--space-2h)]">{identityChips}</span>
+    )
   const titleBlock =
-    identityChips === undefined && subtitleLine === null && !showMark ? (
+    subtitleLine === null && !showMark ? (
       titleLine
     ) : (
-      <span className="flex min-w-0 flex-col">
-        {identityChips !== undefined ? (
-          <span className="mb-[var(--space-2h)]">{identityChips}</span>
-        ) : null}
-        <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">
-          {titleLine}
-          {subtitleLine}
-        </span>
+      <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">
+        {titleLine}
+        {subtitleLine}
       </span>
     )
   return (
@@ -1364,10 +1382,18 @@ export function RecordScreen({
            there is nothing left to pass here. */
         /* NO `chips`/`recordNumber`/`collectionLabel` HANDED TO THE KIT ANY
            MORE — see the comment above `identityChips`. The whole pills row
-           rides inside `title` (below) instead, so the kit's own identity row
-           (`hasIdentity` in shared/ui/compositions/templates/record-chrome.tsx)
-           always reads false and draws nothing, leaving exactly one copy of
-           the row on the page. */
+           rides through `aboveTitle` (below) instead, so the kit's own
+           identity row (`hasIdentity` in shared/ui/compositions/templates/
+           record-chrome.tsx) always reads false and draws nothing, leaving
+           exactly one copy of the row on the page. */
+        /* `aboveTitle`, NOT `title` - RULING ONE, 22 SEP 2026. See
+           `aboveTitleNode`'s own comment, just above, for why this moved out
+           of `titleBlock`: a node handed to the kit's `title` prop renders
+           INSIDE `Title`'s own heading slot, which is exactly what broke
+           `items-center`'s centring the first time. `aboveTitle` is a plain
+           sibling BEFORE `<Title>` (kit v1.2.158), so the pills sit above
+           the heading on screen without ever entering its box. */
+        aboveTitle={aboveTitleNode}
         title={titleBlock}
         meta={status}
         actions={actions}
@@ -1897,6 +1923,61 @@ const PANEL_BELOW_TABS =
  * #141310 vs `--kw-unlit-raised` #26241F). The client reported it on a
  * collection screen; this is the detail screen's own copy of the same strip,
  * fixed in the same pass rather than left to be reported a second time. */
+/* THE ESCAPE MUST PAY EXACTLY THE PADDING IT IS ESCAPING FROM - RULING
+ * THREE, 22 SEP 2026. Her screenshot showed a contact record whose title was
+ * visibly cut off along its bottom by the folder tabs strip. Measured and
+ * proven by `elementFromPoint`, at rest with no scrolling: the strip's top
+ * sat 18px above the header band's bottom, and the strip's own trigger
+ * button owned every pixel across the title's last 18px, at `lg` (`--space-7`
+ * minus `record-detail.tsx`'s own 14px `--space-3h` header-to-panel gap -
+ * `PANEL_BELOW_TABS`'s own comment, two constants up, has that arithmetic).
+ *
+ * THE CAUSE: the `-mt-[calc(…)]` escape below (and the root's own `gap`
+ * beside it) used to pay `--space-6`/`--space-7` for "the card's own top
+ * padding it is escaping from" - correct while a record's panel `Card` was
+ * always boxed (`CardContent`'s ordinary `py-6 lg:py-[space-7]`), and wrong
+ * from the moment R67 (21 Sep 2026, "go an implement this appwide") made a
+ * record's panel PLAIN by default: `CardContent`'s own `isPlain && "px-0
+ * pt-0 lg:pt-0"` (`shared/ui/components/card/card.tsx`) zeroes exactly that
+ * padding, and this app's `RecordChrome` (`shared/ui/compositions/
+ * templates/record-chrome.tsx`) has no `surface` prop to opt back into
+ * `"paper"` - so every screen below sits on a plain panel, unconditionally,
+ * and the escape overshot by the padding term on all of them.
+ *
+ * BOTH TERMS ARE FIXED, TOGETHER - they are two halves of one calculation
+ * (this constant's own older comments already say so: "the room TabsContent
+ * needs… is `--space-6`/`--space-7` ALONE"), and fixing one without the
+ * other trades one visible bug for another: the escape and the root's own
+ * `gap` are DERIVED in the doc comments beside each below, straight from the
+ * box model (a flex column, a negative top margin, a painted bottom border,
+ * a sibling's own flex `gap`) rather than tuned by eye, the same discipline
+ * `RECORD_TABS_GEOMETRY`'s own header names for the strip's height.
+ *
+ * WHICH SCREENS THIS REACHES: every `*-detail.tsx` that renders `<TabsView
+ * className={STICKY_TABS}>` with `panelVisible` at its default (`true`, a
+ * real `Card` panel under the strip) - `account-detail.tsx`,
+ * `contact-detail.tsx`, `sprint-detail.tsx`, `wave-detail.tsx`,
+ * `app-detail.tsx`, `meeting-detail.tsx`, `process-detail.tsx`. Her own
+ * screenshot was a contact (an individual account); the same mechanism
+ * reaches a company account (`account-detail.tsx`) identically, and reaches
+ * the other five the same way, even where nobody had screenshotted it yet.
+ * NOT `help-detail.tsx` (a ticket) or `story-detail.tsx`: neither imports
+ * `STICKY_TABS` at all, both compose their tabbed body through
+ * `RecordDetailBody` instead, a plain `<div>` tree with no `Card` for an
+ * escape to overshoot past. `knowledge-detail.tsx` DOES import `STICKY_TABS`
+ * but renders it the identical `RecordDetailBody` way - `<RecordScreen
+ * panelVisible={false} …>` draws the head alone and `<RecordDetailBody>`
+ * draws the strip and its content as its OWN plain siblings - so it is
+ * unreached for the same structural reason, not by coincidence.
+ *
+ * THE CHECK: `web/test/tab-strip-escape-matches-padding.test.ts` reads three
+ * facts straight off disk - `RecordDetail`'s own `surface` default
+ * (`shared/ui/components/record-detail/record-detail.tsx`), `CardContent`'s
+ * `isPlain` branch (`shared/ui/components/card/card.tsx`), and this
+ * constant's own `-mt`/`gap` utilities - and fails if the kit ever changes
+ * either half of "the panel is plain and plain pays no top padding" while
+ * this formula still assumes it, or if this formula ever spends a
+ * `--space-6`/`--space-3`/`--space-7`-shaped padding term again. */
 export const STICKY_TABS =
   "[&>[role=tablist]]:bg-surface-raised [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   /* NO STRIP MAY EVER SCROLL VERTICALLY — client, 17 Sep 2026: "sometimes
@@ -1918,12 +1999,43 @@ export const STICKY_TABS =
   "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
   "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
   "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)] " +
-  "[&>[role=tablist]]:-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "gap-[var(--space-6)] " +
-  "lg:[&>[role=tablist]]:-mx-[var(--space-7)] " +
-  "lg:[&>[role=tablist]]:w-[calc(100%_+_var(--space-7)_+_var(--space-7))] " +
-  "lg:[&>[role=tablist]]:-mt-[calc(var(--space-7)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "lg:gap-[var(--space-7)] " +
+  /* THE ESCAPE PAYS ONLY WHAT IT ACTUALLY ESCAPES FROM - FIXED 22 SEP 2026,
+   * RULING THREE. See the comment immediately above this constant's own
+   * `export` line for the full account: this used to read
+   * `-mt-[calc(var(--space-6)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))]`
+   * (and `--space-7` at `lg`) - a term for `CardContent`'s own top padding
+   * that was correct while the panel `Card` was always boxed and wrong the
+   * moment R67 (21 Sep 2026) made a record's panel PLAIN by default:
+   * `CardContent`'s `isPlain && "px-0 pt-0 lg:pt-0"` (`shared/ui/components/
+   * card/card.tsx`) zeroes exactly the padding this term assumed was still
+   * there, at every breakpoint, and this app's own `RecordChrome`
+   * (`shared/ui/compositions/templates/record-chrome.tsx`) never threads a
+   * `surface` prop through to override it back to `"paper"` - so every
+   * caller of `STICKY_TABS` sits on a plain panel, always, and the term was
+   * overshooting by `--space-6`/`--space-7` on every one of them. DROPPED
+   * rather than conditioned: there is no live state to condition ON here -
+   * `RecordChrome`'s own missing prop makes the panel plain UNCONDITIONALLY
+   * for this whole component, so the honest formula pays the real padding,
+   * which is zero, by naming only what is really being escaped: the strip's
+   * own height and the gap under it. Both breakpoints read the SAME value
+   * now, because neither surviving term was ever responsive - the `lg`
+   * override existed only to track `CardContent`'s OWN `py-6 lg:py-[space-7]`
+   * step, which is gone from this formula along with the rest of the term. */
+  "[&>[role=tablist]]:-mt-[calc(var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
+  /* THE ROOT'S OWN FLEX GAP - THE OTHER HALF OF THE SAME FIX. `TabsContent`
+   * is `[role=tablist]`'s flex sibling on this same `<Tabs>` root, and this
+   * `gap` is what re-adds, for `TabsContent` alone, exactly the distance the
+   * `-mt` escape pulled OUT of normal flow - "the room `TabsContent` needs
+   * to still land at the card's ordinary inset" (this constant's own header
+   * comment, unchanged prose, now correct again): that inset is
+   * `CardContent`'s real top padding, which is zero on the plain panel every
+   * caller here sits on, so the room needed is zero too. `gap-0`, not a
+   * removed utility: the kit's own `<Tabs>` root defaults to `gap-4`
+   * (`tabs.tsx`, the only surviving variant), and leaving no gap utility
+   * here at all would let that default show through and reopen the exact
+   * "content pushed off the card's real top" failure this fix exists to
+   * close, just with a different wrong number. */
+  "gap-0 " +
   /* A DESKTOP SCROLL AFFORDANCE — the kit hides the tab strip's scrollbar
    * unconditionally via `[scrollbar-width:none]` + `[&::-webkit-scrollbar]:hidden`
    * (tabs.tsx), which is correct for touch (short enough to be dragged) but wrong

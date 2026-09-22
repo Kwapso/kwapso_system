@@ -471,7 +471,11 @@ export function AccountsScreen({
 
   return (
     <CountedAbove active={accountsBadge !== ""}>
-      <div className="flex flex-col gap-4">
+      {/* --heading-strip-gap (web/app/globals.css), 16px - was already this
+          screen's own number; Aurora's 22 Sep 2026 "too much space above the
+          folder tabs" ruling made it the app-wide token rather than a literal
+          this screen happened to already agree with. */}
+      <div className="flex flex-col gap-[var(--heading-strip-gap)]">
         <CollectionHeading sectionKey="accounts" total={total} action={<ModuleSettingsGear teamId={teamId} segment="accounts" />} />
         <PagedFind<Account>
           listKey={accountsKey(teamId)}

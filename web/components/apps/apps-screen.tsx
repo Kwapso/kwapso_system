@@ -584,7 +584,9 @@ export function AppsScreen({
     // rather than saying a third number two lines above them. Same shape as the
     // tasks screen's six views, and for the same reason.
     <CountedAbove active={activeBadge !== "" || inactiveBadge !== ""}>
-    <div className="flex flex-col gap-6">
+    {/* --heading-strip-gap (web/app/globals.css) - Aurora, 22 Sep 2026: "reduce
+        the spacing above the folder tabs, there's too much." */}
+    <div className="flex flex-col gap-[var(--heading-strip-gap)]">
       {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the app stages
           (`apps.stage`) and the deliverable kinds (`deliverables.kind`, read on
           an app's own record, so the app is the module that owns them). The

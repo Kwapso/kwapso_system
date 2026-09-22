@@ -342,7 +342,11 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
     // showing the same number twice (the identical shape accounts-screen.tsx
     // uses for its own Active/Inactive/All strip, one collection over).
     <CountedAbove active={allBadge !== ""}>
-      <div className="flex flex-col gap-4">
+      {/* --heading-strip-gap (web/app/globals.css) - see accounts-screen.tsx's
+          identical note; Aurora, 22 Sep 2026. Scoped to THIS branch (the team
+          collection, which carries the kind-tab strip below) - the app-scope
+          branch above draws no tabs and is untouched. */}
+      <div className="flex flex-col gap-[var(--heading-strip-gap)]">
         {/* THE TITLE LINE — R84: the mango Ask button is the one legal home for
             a mango button, so it (and Sync, and the gear last — her own words,
             "the gear should be on the very far right") lives inside

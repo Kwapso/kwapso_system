@@ -297,7 +297,9 @@ export function InputsScreen({
   const facets: FilterFacet[] = [{ field: "accountId", label: t("Account"), control: "select", options: accountOptions }]
 
   return (
-    <div className="flex flex-col gap-4">
+    // --heading-strip-gap (web/app/globals.css) - see accounts-screen.tsx's
+    // identical note; Aurora, 22 Sep 2026.
+    <div className="flex flex-col gap-[var(--heading-strip-gap)]">
       <CollectionHeading sectionKey="inputs" total={total} />
       <PagedFind<Todo>
         listKey={inputsKey(teamId, view)}

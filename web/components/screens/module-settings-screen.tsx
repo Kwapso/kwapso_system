@@ -1114,7 +1114,9 @@ export function ModuleSettingsScreen({
   if (!page || !teamId || sections.length === 0) return <NoAccess />
 
   return (
-    <div className="flex w-full flex-col gap-6">
+    // --heading-strip-gap (web/app/globals.css) - Aurora, 22 Sep 2026: "reduce
+    // the spacing above the folder tabs, there's too much."
+    <div className="flex w-full flex-col gap-[var(--heading-strip-gap)]">
       {/* THE SAME TITLE TREATMENT SETTINGS ITSELF TAKES — a plain page title,
           no eyebrow, no chip, no glyph (the kit's own "Page title" step,
           display-m/56/500; `web/components/records/collection-heading.tsx`

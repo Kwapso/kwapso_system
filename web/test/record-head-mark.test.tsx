@@ -122,7 +122,28 @@ describe("the record head's mark, B1 (client ruling 2026-09-15)", () => {
     expect(row!.className).not.toMatch(/\bflex-col\b/)
   })
 
-  it("still draws the chip row ABOVE the title, unchanged by the mark (R65)", () => {
+  it("still draws the chip row ABOVE the title, unchanged by the mark (R65) - UPDATED 22 SEP 2026, RULING ONE", () => {
+    // THIS TEST USED TO ASSERT `heading.contains(chip)` - the chip row lived
+    // INSIDE the same node the kit renders as `<h1>`, because `record-
+    // chrome.tsx` folded `identityChips` into the `title` prop itself
+    // (`titleBlock`). That was exactly R100's bug (ruling ONE): the kit's
+    // `Title` centres `actions` against the FULL HEIGHT of whatever `title`
+    // resolves to, so a chip row living INSIDE the heading node pulled the
+    // centring up with it. Fixed by giving the kit a real slot for a row
+    // ABOVE the title - `aboveTitle` (kit v1.2.158), a plain SIBLING of
+    // `Title`, never a passenger inside its `children`. The chip row now
+    // lives OUTSIDE the `<h1>` entirely, still before it in document order
+    // (still visually above), and the mark is unmoved - it was never part of
+    // this bug, it rides inside `titleLine` beside the heading text, unlike
+    // the chips.
+    //
+    // THIS TEST GOES GREEN ONLY AFTER THE COORDINATOR SYNCS THE KIT TAG
+    // CARRYING `aboveTitle` (v1.2.158): the vendored `shared/ui` this repo
+    // builds against until that sync has no such prop, so `RecordChrome`
+    // silently drops it and the chip renders nowhere at all - `chip` below
+    // reads `null`, `heading.contains(null)` is `false` (not the asserted
+    // `true`), and this one test fails for exactly that reason, not because
+    // the fix is wrong.
     const { container } = render(
       <RecordScreen
         title="Bergman S.A."
@@ -133,16 +154,18 @@ describe("the record head's mark, B1 (client ruling 2026-09-15)", () => {
     const heading = container.querySelector("h1")!
     const chip = container.querySelector('[data-testid="a-chip"]')!
     const mark = container.querySelector('[data-testid="the-mark"]')!
-    // Both still live inside the same title node the kit renders as <h1> —
-    // that has not changed (see record-chrome.tsx's own "identityChips… rides
-    // inside title" note) — but the chip's own row sits BEFORE the mark+title
-    // row in document order, i.e. visually above it, never merged into it.
-    expect(heading.contains(chip)).toBe(true)
+    expect(chip, "the chip renders at all - only true once the kit tag carries aboveTitle").toBeTruthy()
+    // THE MARK IS UNCHANGED - still inside the heading, beside the title text.
     expect(heading.contains(mark)).toBe(true)
-    const position = chip.compareDocumentPosition(mark)
-    // Node.DOCUMENT_POSITION_FOLLOWING = 4 — the mark comes AFTER the chip
-    // in document order, which is how the pills row stays visually above
-    // the mark+title row in normal flow.
+    // THE CHIP IS NO LONGER INSIDE THE HEADING - it is `aboveTitle`'s own
+    // sibling node now, never a passenger inside `title`.
+    expect(heading.contains(chip)).toBe(false)
+    // …AND IT STILL SITS BEFORE THE HEADING IN DOCUMENT ORDER, i.e. visually
+    // above it, exactly as it read before this fix - only the NESTING
+    // changed, never the visual order.
+    const position = chip.compareDocumentPosition(heading)
+    // Node.DOCUMENT_POSITION_FOLLOWING = 4 - the heading comes AFTER the
+    // chip in document order.
     // eslint-disable-next-line no-bitwise
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })

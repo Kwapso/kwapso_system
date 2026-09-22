@@ -49,6 +49,45 @@
 // never a line number, the same shape `BUTTON_SIZE_EXEMPT`/`ID_CHIP_EXEMPT`
 // already take), empty on the day this law shipped: every row the sweep found
 // was fixed, not exempted.
+//
+// EXTENDED 22 SEP 2026 - RULING ONE, THE SAME CENTRING BUG IN A SHAPE THE
+// CENSUS ABOVE COULD NOT SEE. Aurora, verbatim: "on detail screens, the title
+// buttons need to be alignes with the title! currently they are slightly
+// abovem thats wrong." Measured: the head actions row sat 17-18px above the
+// title text's own optical centre, identically on every detail screen - and
+// the check above passed, because it is LITERALLY TRUE that the row is
+// centred against the heading BOX; the box was the bug. `web/components/
+// records/record-chrome.tsx` used to pack the identity-chip pill row INSIDE
+// the same node it handed the kit's `title` prop (`titleBlock`, above
+// `identityChips` as its own flex-col FIRST child, the real heading second),
+// so `Title`'s own `items-center` row - which the census above exists to
+// require everywhere else - measured a composite of pills-plus-heading
+// rather than the heading's own line. Fixed the kit's own way, not an app
+// hack: `RecordDetail` gained a real `aboveTitle` slot (kit v1.2.158, a
+// plain SIBLING of `<Title>`, the identical shape `meta` already is for a
+// row BELOW), and the pills now ride there instead of inside `title`.
+//
+// THE SECOND CENSUS, so `title` can never again become a dumping ground for
+// content that belongs beside it rather than inside it. A CANDIDATE is any
+// `title={…}` JSX attribute (read off the real syntax tree, not a text
+// window, the same discipline as the census above) on `<RecordChrome`/
+// `<RecordDetail` - the two components whose `title` prop feeds straight
+// into the kit's `Title` composition, so anything but the heading itself
+// inside it reopens exactly this bug. Its own subtree is read for a CHIP
+// MARKER (`<Badge`, `RecordRef`, `identityChips` - the shapes an identity
+// row actually takes) and a HEADING MARKER (`clampRecordHeading(`, `<h1`,
+// `<Title`, `<Headline`). A finding is a chip marker appearing BEFORE the
+// first heading marker in the attribute's own source text - a block sibling
+// ABOVE the title text, packed inside the title node rather than passed
+// through `aboveTitle` beside it. `TITLE_CHIP_ABOVE_EXEMPT` is the reasoned
+// way out, same `{file, contains}` shape, empty the day this shipped.
+//
+// PROVEN BY PUTTING THE CHIPS BACK: the last two cases below restore the
+// PRE-FIX shape of `record-chrome.tsx`'s own `titleBlock` as a synthetic
+// fixture and watch the extended census fail, then prove the current,
+// fixed shape (chips passed through `aboveTitle`, `title` holding only the
+// heading/subtitle) passes clean - the same proof-of-red discipline the
+// last two cases of the FIRST census already use.
 
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -229,5 +268,162 @@ describe("R100, the gear settings button aligns to the middle horizontal of the 
     ].join("\n")
     const sf = ts.createSourceFile("synthetic.tsx", synthetic, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
     expect(candidatesIn(sf, "synthetic.tsx")).toEqual([])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// R100's SECOND CENSUS - a `title={…}` node may carry nothing above its own
+// heading. See this file's header comment, "EXTENDED 22 SEP 2026", for the
+// full account.
+// ─────────────────────────────────────────────────────────────────────────
+
+import { TITLE_CHIP_ABOVE_EXEMPT } from "@shared/rules/registry"
+
+const TITLE_HOST_TAGS = new Set(["RecordChrome", "RecordDetail"])
+const CHIP_MARKER_RE = /<Badge\b|RecordRef|identityChips/
+const HEADING_MARKER_RE = /clampRecordHeading\(|<h1\b|<Title\b|<Headline\b/
+
+interface TitleFinding {
+  rel: string
+  contains: string
+}
+
+/** Every `const <name> = <initializer>` in the file, by name - LAST
+ * declaration wins, a deliberately simple heuristic that is enough for a
+ * single-component census. A `title={…}` attribute almost never holds an
+ * inline JSX literal in this codebase (`record-chrome.tsx`'s own
+ * `titleBlock` is a `const` built earlier in the function and referenced by
+ * NAME at the call site), so resolving the identifier back to what it was
+ * actually BUILT FROM is what makes this census see real code rather than
+ * only a synthetic fixture that happens to inline the JSX. */
+function constDeclarationsIn(sf: ts.SourceFile): Map<string, string> {
+  const decls = new Map<string, string>()
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      decls.set(node.name.text, node.initializer.getText(sf))
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return decls
+}
+
+/** Every `title={…}` JSX attribute on a title-host tag, whose own subtree -
+ * the attribute's initializer expression, or, when that expression is a
+ * bare identifier, the `const` it was built from (see `constDeclarationsIn`)
+ * - carries a chip marker BEFORE the first heading marker: a block sibling
+ * above the title text, packed inside the node the kit centres `actions`
+ * against. */
+function titleChipCandidatesIn(sf: ts.SourceFile, rel: string): TitleFinding[] {
+  const out: TitleFinding[] = []
+  const decls = constDeclarationsIn(sf)
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isJsxElement(node) && TITLE_HOST_TAGS.has(node.openingElement.tagName.getText(sf))) ||
+      (ts.isJsxSelfClosingElement(node) && TITLE_HOST_TAGS.has(node.tagName.getText(sf)))
+    ) {
+      const opening = ts.isJsxElement(node) ? node.openingElement : node
+      for (const attr of opening.attributes.properties) {
+        if (!ts.isJsxAttribute(attr) || attr.name.getText() !== "title") continue
+        if (!attr.initializer || !ts.isJsxExpression(attr.initializer) || !attr.initializer.expression) continue
+        const expr = attr.initializer.expression
+        const text = ts.isIdentifier(expr) ? (decls.get(expr.text) ?? expr.getText(sf)) : expr.getText(sf)
+        const chipAt = text.search(CHIP_MARKER_RE)
+        if (chipAt === -1) continue
+        const headingAt = text.search(HEADING_MARKER_RE)
+        if (headingAt === -1 || chipAt < headingAt) {
+          out.push({ rel, contains: attr.getText(sf).slice(0, 120) })
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return out
+}
+
+function titleChipFindings(): TitleFinding[] {
+  const out: TitleFinding[] = []
+  for (const f of sourceFiles(ROOTS, { extensions: [".tsx"], relativeTo: REPO_ROOT, skipTests: true })) {
+    const sf = ts.createSourceFile(f.path, f.source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    out.push(...titleChipCandidatesIn(sf, f.rel))
+  }
+  return out
+}
+
+function titleChipExcused(rel: string, contains: string) {
+  return TITLE_CHIP_ABOVE_EXEMPT.find((e) => e.file === rel && contains.includes(e.contains))
+}
+
+function titleChipStillOpen(all: TitleFinding[], rel: string, contains: string): boolean {
+  return all.some((f) => f.rel === rel && f.contains.includes(contains))
+}
+
+describe("R100 (amended), a title node carries nothing above its own heading", () => {
+  it(
+    'no title={…} attribute on <RecordChrome>/<RecordDetail> carries a chip marker before its first heading marker, unnamed. ' +
+      'Aurora, verbatim, 22 Sep 2026: "on detail screens, the title buttons need to be alignes with the title! currently they are slightly abovem thats wrong."',
+    () => {
+      const found = titleChipFindings()
+      const unexempt = found.filter((f) => !titleChipExcused(f.rel, f.contains))
+      expect(
+        unexempt,
+        "these title={…} attributes carry a chip marker (<Badge/RecordRef/identityChips) before their first " +
+          "heading marker (clampRecordHeading(/<h1/<Title/<Headline) - pass the chip row through aboveTitle " +
+          "instead (kit v1.2.158), or name the attribute in TITLE_CHIP_ABOVE_EXEMPT with the reason:\n  " +
+          unexempt.map((f) => `${f.rel}  ${f.contains}`).join("\n  ")
+      ).toEqual([])
+    }
+  )
+
+  it("TITLE_CHIP_ABOVE_EXEMPT names only real, still-open findings", () => {
+    const all = titleChipFindings()
+    const stale = TITLE_CHIP_ABOVE_EXEMPT.filter((e) => !titleChipStillOpen(all, e.file, e.contains))
+    expect(
+      stale,
+      "these TITLE_CHIP_ABOVE_EXEMPT entries no longer match a real finding. Fixed, or the source moved on, " +
+        "delete the entry:\n  " + stale.map((e) => `${e.file}  ${e.contains}`).join("\n  ")
+    ).toEqual([])
+  })
+
+  // PROVEN NOT VACUOUS - the last two cases restore the PRE-FIX shape and
+  // watch the census fail, then prove the CURRENT, fixed shape passes clean.
+  it("catches a synthetic titleBlock with the chip row packed back inside title", () => {
+    const synthetic = [
+      "function X() {",
+      "  const titleBlock = (",
+      '    <span className="flex min-w-0 flex-col">',
+      '      <span className="mb-[var(--space-2h)]">{identityChips}</span>',
+      '      <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">',
+      "        {titleLine}",
+      "        {subtitleLine}",
+      "      </span>",
+      "    </span>",
+      "  )",
+      "  return <RecordChrome title={titleBlock} actions={actions} />",
+      "}",
+      "",
+    ].join("\n")
+    const sf = ts.createSourceFile("synthetic.tsx", synthetic, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const found = titleChipCandidatesIn(sf, "synthetic.tsx")
+    expect(found.length).toBe(1)
+  })
+
+  it("does not flag the current, fixed shape - chips via aboveTitle, title holding only the heading", () => {
+    const synthetic = [
+      "function X() {",
+      "  const aboveTitleNode = <span className=\"mb-[var(--space-2h)]\">{identityChips}</span>",
+      "  const titleBlock = (",
+      '    <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">',
+      "      {titleLine}",
+      "      {subtitleLine}",
+      "    </span>",
+      "  )",
+      "  return <RecordChrome aboveTitle={aboveTitleNode} title={titleBlock} actions={actions} />",
+      "}",
+      "",
+    ].join("\n")
+    const sf = ts.createSourceFile("synthetic.tsx", synthetic, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    expect(titleChipCandidatesIn(sf, "synthetic.tsx")).toEqual([])
   })
 })
