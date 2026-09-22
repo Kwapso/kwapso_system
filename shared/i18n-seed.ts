@@ -1575,24 +1575,9 @@ export const SEED: Catalogue = {
      The two sentences these replace were seeded, so the ceiling does not move:
      `TRANSLATION_CEILING` counts strings with NO answer, and each of these has
      three. Rewording seeded copy costs nothing but the rewording. */
-  "Cards are the tickets that matched, as far as they have loaded. Waiting repeats cards from the stages before it. Click a card to open the ticket.": {
-    de: "Die Karten sind die Treffer, so weit sie geladen sind. Wartend wiederholt Karten aus den Phasen davor. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
-    es: "Las tarjetas son los tickets que coinciden, hasta donde se han cargado. En espera repite tarjetas de las fases anteriores. Haz clic en una tarjeta para abrir el ticket.",
-    ca: "Les targetes són els tiquets que coincideixen, fins on s'han carregat. En espera repeteix targetes de les fases anteriors. Fes clic en una targeta per obrir el tiquet.",
-  },
-  "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets, the ones where a client owes us an answer, so the columns don't add up to the total. Click a card to open the ticket.": {
-    de: "Jede der ersten vier Spalten zählt alle offenen Tickets in dieser Phase. Wartend wiederholt dieselben Tickets, die, bei denen ein Kunde uns eine Antwort schuldet, deshalb ergeben die Spalten zusammen nicht die Gesamtzahl. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
-    es: "Cada una de las primeras cuatro columnas cuenta todos los tickets abiertos en esa fase. En espera repite esos mismos tickets, aquellos en los que un cliente nos debe una respuesta, así que las columnas no suman el total. Haz clic en una tarjeta para abrir el ticket.",
-    ca: "Cadascuna de les quatre primeres columnes compta tots els tiquets oberts en aquesta fase. En espera repeteix aquests mateixos tiquets, aquells en què un client ens deu una resposta, així que les columnes no sumen el total. Fes clic en una targeta per obrir el tiquet.",
-  },
   /* THE FIFTH COLUMN'S EMPTY LINE. Not "Nothing at this stage." above, because
      waiting is not a stage: the honest empty sentence here is that no client
      owes us an answer, which is good news rather than an absence of rows. */
-  "Nothing is waiting on a client.": {
-    de: "Es wartet nichts auf einen Kunden.",
-    es: "No hay nada a la espera de un cliente.",
-    ca: "No hi ha res a l'espera d'un client.",
-  },
   "Open the ticket": { de: "Ticket öffnen", es: "Abrir el ticket", ca: "Obre el tiquet" },
   "Ready tickets": { de: "Fertige Tickets", es: "Tickets listos", ca: "Tiquets llestos" },
   "The ticket you are reading": {
@@ -4256,6 +4241,16 @@ export const SEED: Catalogue = {
     de: "Jede Spalte zählt jedes Ticket in dieser Phase: jedes Ticket steht in genau einer. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
     es: "Cada columna cuenta todos los tickets en esa etapa: cada ticket está en exactamente una. Haz clic en una tarjeta para abrir el ticket.",
     ca: "Cada columna compta tots els tiquets en aquesta etapa: cada tiquet és exactament en una. Fes clic en una targeta per obrir el tiquet.",
+  },
+  /* THE OPEN BOARD'S OWN FOOTNOTE, PLAIN AGAIN — the Waiting column that used
+     to need a warning sentence ("Waiting repeats cards from the stages before
+     it") is gone (Aurora, 22 Sep 2026: "remove column waiting from tickets
+     open board"), so this reads the same shape as the sibling entry above,
+     just scoped to Open's own four stages. */
+  "Each column counts every open ticket at that stage. Click a card to open the ticket.": {
+    de: "Jede Spalte zählt jedes offene Ticket in dieser Phase. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada columna cuenta todos los tickets abiertos en esa etapa. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cada columna compta tots els tiquets oberts en aquesta etapa. Fes clic en una targeta per obrir el tiquet.",
   },
 
   /* ── 17 Sep 2026, R44 payday for the round-15 lanes' own uncommitted work: 

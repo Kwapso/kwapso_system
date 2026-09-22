@@ -2394,9 +2394,15 @@ describe("RULES — the laws of the base", () => {
     // isn't "tab" renders a CollectionHeading (derived, never hand-listed).
     for (const s of TEAM_SECTIONS) {
       if (!s.countCacheKey || s.placement === "tab") continue
-      const rendered = componentFiles().some((f) =>
-        read(f).includes(`<CollectionHeading sectionKey="${s.key}"`)
-      )
+      // WHITESPACE TOLERANT SINCE 22 SEP 2026. This used to be a single line
+      // `includes`, which read the FORMATTING rather than the law: the moment
+      // a screen gained a second head action and prettier broke the call over
+      // several lines, a correct screen failed a check about whether the
+      // heading exists at all. The law is that the section renders a
+      // CollectionHeading bound to its own key, so the match now allows any
+      // whitespace between the tag and that prop and nothing else.
+      const heading = new RegExp(`<CollectionHeading\\s+sectionKey="${s.key}"`)
+      const rendered = componentFiles().some((f) => heading.test(read(f)))
       expect(rendered, `sidebar collection "${s.key}" must render a CollectionHeading (R16 ii)`).toBe(true)
     }
 
@@ -5579,6 +5585,7 @@ describe("RULES — the laws of the base", () => {
       "sheet-fact-labels", // R105: web/test/sheet-fact-labels.test.ts, every eyebrow-shaped label (uppercase + text-muted-foreground) inside a literal <SheetContent file, checked against every other label in that same file, plus task-sheet.tsx's own tripwire against the canonical class, or named in SHEET_FACT_LABEL_EXEMPT
       "footer-band-home", // R106: web/test/footer-on-the-edge.test.ts + web/test/task-sheet.test.tsx, ScreenFooterSlot mounted exactly once per record page, the sheet's own stripe footer outside its scroller, record-above-latest-activity on a one-column footer; RECORD_FOOTER_SLOT_EXEMPT names shared/web/screen-engine/screen-renderer.tsx
       "effort-tiles", // R107: web/test/effort-card.test.tsx's existing cases, the three-column gap-4 grid, the tiles' own Card default, the log rows' no-fill plain list, and the one-Separator-between-rows shape
+      "section-title-one-style", // R108: web/test/section-title-one-style.test.ts, a tripwire over TicketSidePanel/EmptyGatedPanel's own canonical title lines, plus a census over web/components + web-portal/components for a literal <h2>/<h3>/<h4> carrying both text-sm and font-medium (the old shape), or named in SECTION_TITLE_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

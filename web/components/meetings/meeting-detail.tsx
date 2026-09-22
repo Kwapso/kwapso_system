@@ -11,6 +11,14 @@
 // for who created the row — they are looking for what was agreed. The agenda sits
 // above the notes because that is the order the two were written in.
 //
+// ONE TITLE STYLE FOR EVERY RECORD SECTION (R108), 22 Sep 2026: Agenda,
+// Notes, What was said, Who was invited and Attached to the entry all used
+// to read `text-muted-foreground text-sm font-medium`, a shape of their own
+// rather than the eyebrow `TicketSidePanel`'s own fix gave the ticket and
+// story pages (`text-micro text-muted-foreground uppercase`,
+// `web/components/tickets/ticket-detail-body.tsx`). Same class list now,
+// every one of the five.
+//
 // NOTHING HERE REACHES OUTSIDE THIS APP ANY MORE. There was an "Add to my
 // calendar" button; the calendar is one-way as of 18 August 2026, so a meeting
 // arranged here stays here and a meeting arranged in Google arrives here on the
@@ -691,7 +699,7 @@ export function MeetingDetailScreen({
                 <TranslateAction translation={translation} />
               </div>
               <section className="flex flex-col gap-2">
-                <h2 className="text-muted-foreground text-sm font-medium">{t("Agenda")}</h2>
+                <h2 className="text-micro text-muted-foreground uppercase">{t("Agenda")}</h2>
                 {item.agenda ? (
                   <RichText html={translation.of(item.agenda)} />
                 ) : (
@@ -717,7 +725,7 @@ export function MeetingDetailScreen({
                     screen resolves ONE meeting (`item` above), never a list. */}
                 <h2
                   id="meeting-notes-heading"
-                  className="text-muted-foreground text-sm font-medium"
+                  className="text-micro text-muted-foreground uppercase"
                 >
                   {t("Notes")}
                 </h2>
@@ -778,7 +786,7 @@ export function MeetingDetailScreen({
               {item.transcriptCapturedAt && (
                 <section className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-muted-foreground text-sm font-medium">{t("What was said")}</h2>
+                    <h2 className="text-micro text-muted-foreground uppercase">{t("What was said")}</h2>
                     <div className="flex flex-wrap items-center gap-2">
                       {/* HOW WE KNOW THIS IS THE RIGHT TRANSCRIPT. The three
                           hunts do not prove the same thing — one is a fact
@@ -963,7 +971,7 @@ function CalendarPanel({
           else is shown as themselves, which is the honest answer for most people
           on most invitations. */}
       <section className="flex flex-col gap-2">
-        <h2 className="text-muted-foreground text-sm font-medium">{t("Who was invited")}</h2>
+        <h2 className="text-micro text-muted-foreground uppercase">{t("Who was invited")}</h2>
         {people.length === 0 ? (
           // The kit's register (27.21) rather than a bare line — owner ruling,
           // 2026-09-07. No act: the invitation is Google's, edited there.
@@ -1029,7 +1037,7 @@ function CalendarPanel({
           can go straight into a page. */}
       {meeting.googleAttachments.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-muted-foreground text-sm font-medium">{t("Attached to the entry")}</h2>
+          <h2 className="text-micro text-muted-foreground uppercase">{t("Attached to the entry")}</h2>
           <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
             {meeting.googleAttachments.map((a) => (
               <a

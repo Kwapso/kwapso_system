@@ -377,7 +377,11 @@ export function ClientOrgPanel({
             as its own trailing margin. Nested so the two numbers stay
             independent instead of one flex-col gap spending both. */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">{t("Departments")}</h3>
+          {/* R108, 22 Sep 2026: the eyebrow every record section title now
+              shares (`text-micro text-muted-foreground uppercase`), never
+              its own `text-sm font-medium`. See `TicketSidePanel`'s own
+              header (`web/components/tickets/ticket-detail-body.tsx`). */}
+          <h3 className="text-micro text-muted-foreground uppercase">{t("Departments")}</h3>
           <ToolbarRow
             empty={departments.length === 0}
             search={
@@ -472,7 +476,8 @@ export function ClientOrgPanel({
         {/* Heading-to-toolbar rhythm is this pair's own — see the identical
             note on the Departments section above. */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">{t("Roles")}</h3>
+          {/* R108: same eyebrow as Departments above. */}
+          <h3 className="text-micro text-muted-foreground uppercase">{t("Roles")}</h3>
           <ToolbarRow
             empty={roles.length === 0}
             search={
@@ -627,7 +632,8 @@ export function ClientOrgPanel({
         {/* Heading-to-toolbar rhythm is this pair's own — see the identical
             note on the Departments section above. */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">{t("Tools")}</h3>
+          {/* R108: same eyebrow as Departments/Roles above. */}
+          <h3 className="text-micro text-muted-foreground uppercase">{t("Tools")}</h3>
           <ToolbarRow
             empty={tools.length === 0}
             search={

@@ -153,6 +153,12 @@ import { ticketTypeIconName } from "@shared/ticket-types"
 import { Icon } from "@shared/web/screen-engine/icon"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { RecordMark } from "@shared/web/record-mark"
+// R104 — a person inside a record section is a bare `PersonCard` chip, never
+// a hand-rolled avatar-plus-name. The board card's own raised-by face (below,
+// `ticketBoardCard`) draws through this, the same component `HelpStakeholders`
+// already draws Raised by / On the loop / Assigned to through.
+import { PersonCard } from "@shared/web/person-card"
+import { nameInitials } from "@/lib/identity"
 // R54 — the "Raised by" column's own trim, the same one `work-panels.tsx`'s
 // identical column already applies to a colleague's stored snapshot.
 import { staffNameFromSnapshot } from "@shared/staff-name"
@@ -1126,29 +1132,17 @@ export function TicketsCollection({
   const facetTotal = useCachedValue<number>(
     totalKey(`help-facet:all:${facet}`, teamId)
   )
-  /* THE OPEN BOARD'S FIFTH COLUMN, AND WHY IT IS A READ RATHER THAN A FILTER.
-     Client, 2026-09-07: "in open, include status ready and waiting". `ready` is
-     a STATUS and joined `OPEN_TAB_STATUSES` (shared/types.ts), so it costs
-     nothing here — the Open tab already asks the door for it and the rows
-     arrive in `scopedQ`. `waiting` is not a status and never becomes one: it is
-     derived at the door from the ticket's own conversation (`waitingClause`,
-     workers/content/src/lib/help.ts) and no row in `scopedQ` carries a flag
-     saying so, so there is nothing in the browser to filter on. The column is
-     fed by the door's own answer to its own question instead.
-     THE SAME CACHE KEY THE WAITING TAB RESTS ON, deliberately: opening the
-     board and then the Waiting tab is one read, the live registry keeps one
-     entry current, and the tab and the column can never disagree about who is
-     waiting. `listFetch.helpFacet` primes this read's exact `total` into
-     `help-facet:all:waiting`, which is what the column's number reads — never
-     `waitingRows.length`, which is page one (R14/R16).
-     CONDITIONAL, so a reader who never opens the board never pays for it:
-     `useCached` with a null key fetches nothing. */
-  const onOpenBoard = facet === OPEN && openView === "board"
-  const waitingQ = useCached<HelpTicket[]>(
-    onOpenBoard ? helpFacetKey(teamId, "all", WAITING) : null,
-    () => listFetch.helpFacet(teamId, "all", WAITING)
-  )
-  const waitingTotal = useCachedValue<number>(totalKey(`help-facet:all:${WAITING}`, teamId))
+  /* THE OPEN BOARD'S FIFTH COLUMN IS GONE, 22 SEP 2026 — Aurora, verbatim:
+     "remove column waiting from tickets open board." It used to live here: a
+     read gated behind `onOpenBoard`, sharing the Waiting TAB's own cache key
+     (`helpFacetKey(teamId, "all", WAITING)`) so opening the board and then the
+     tab cost one fetch rather than two. Nothing else on this screen ever read
+     `onOpenBoard`, `waitingQ` or `waitingTotal`, so all three are deleted with
+     the column rather than left standing unread.
+     THE WAITING TAB ITSELF READS NONE OF THIS. Its own facet, badge and list
+     stand on `facetQ` below, the same generic per-tab read every other tab
+     uses, never on this board's own machinery — removing the board's own copy
+     of the read touches the tab not at all. */
   const scopeTotal = totals.help
   const shownTotal = narrowed ? facetTotal : scopeTotal
 
@@ -1684,8 +1678,7 @@ export function TicketsCollection({
                         teamId={teamId}
                         rows={rows}
                         counts={byStatus}
-                        waitingRows={waitingQ.data}
-                        waitingTotal={waitingTotal}
+                        members={membersQ.data}
                         narrowed={found.active}
                         onOpen={openTicket}
                       />
@@ -1700,6 +1693,7 @@ export function TicketsCollection({
                         teamId={teamId}
                         rows={rows}
                         counts={byStatus}
+                        members={membersQ.data}
                         narrowed={found.active}
                         onOpen={openTicket}
                       />
@@ -2500,14 +2494,68 @@ export function ticketStatusColumnTitles(t: (s: string, vars?: Vars) => string):
  * See `OpenBoard`'s own header for the ruling behind every part of it: the
  * shared chips (`TriageChips`), and the date that moved out of them and under
  * the title as plain text, twice, ending with "Remove the 'Raised On' chip
- * from the QE view" (17 Sep 2026). */
-export function ticketBoardCard(teamId: string, t: (s: string, vars?: Vars) => string, lang: Language) {
-  return (r: HelpTicket) => ({
-    id: r.id,
-    title: ticketTitle(r),
-    badges: <TriageChips teamId={teamId} ticket={r} />,
-    description: t("raised {date}", { date: formatDate(r.createdAt, lang) }),
-  })
+ * from the QE view" (17 Sep 2026).
+ *
+ * THE RAISER'S FACE, UNDER THE DATE — Aurora's ruling, 22 Sep 2026, verbatim:
+ * "on tickts board, show raised by with avatar at the bottom under raised
+ * date." The kit's own `KanbanCard.content` is the slot that draws LAST,
+ * below `description` (kanban.tsx: "`content` stays the LAST drawn thing …
+ * a mark, a bar, a row of avatars is a body"), so the date stays exactly
+ * where it was, in `description`, and the face is `content` under it — no
+ * new slot invented for this. R104 is what says WHICH shape a person draws
+ * as, everywhere a record section in this app shows one: a bare `PersonCard`
+ * chip, never a hand-rolled avatar-plus-name. `size="choice"` is the same
+ * small step `HelpStakeholders`' own Raised by / On the loop / Assigned to
+ * chips already draw at (`help-stakeholders.tsx`), reused rather than a
+ * fourth size invented for one more surface.
+ *
+ * THE FACE AND THE NAME ARE THE SAME PAIR `TicketRowsTable`'s own "Raised"
+ * column already resolves (below), reused rather than rebuilt: the ACTOR
+ * (`raiserId`/`raiserName`/`raiserIsClient`) wins when the ticket has one —
+ * a staff name trimmed through `staffNameFromSnapshot`, faced through
+ * `memberFace` against the team's own members cache, since a person's photo
+ * lives in the global core DB and never the team's own (R47); a client login
+ * raising their own ticket faces the identical way, because that cache holds
+ * every login on the team, not staff alone. The client CONTACT the ticket is
+ * FOR (`raisedByContactName`) is the fallback when nothing raised it through
+ * a login at all, drawn with no picture: `HelpTicket` carries no logo for
+ * that contact (only `TriageWaiting`, the triage queue's own separate read,
+ * does), and this card takes the plain ticket rows both boards already hold
+ * rather than opening a second door for one more field. A ticket with
+ * neither carries no face at all, the same as an empty "Raised" cell on the
+ * list. `members` is a new parameter here for exactly this, the identical
+ * `TeamMember[] | undefined` cache both boards' own host component already
+ * fetches once (`membersQ`, R56: one door, one key) and now hands down. */
+export function ticketBoardCard(
+  teamId: string,
+  t: (s: string, vars?: Vars) => string,
+  lang: Language,
+  members: TeamMember[] | undefined
+) {
+  return (r: HelpTicket) => {
+    const raiserName = r.raiserName
+      ? r.raiserIsClient
+        ? r.raiserName
+        : staffNameFromSnapshot(r.raiserName)
+      : r.raisedByContactName
+    const raiserPicture = r.raiserName ? memberFace(members, r.raiserId) : null
+    return {
+      id: r.id,
+      title: ticketTitle(r),
+      badges: <TriageChips teamId={teamId} ticket={r} />,
+      description: t("raised {date}", { date: formatDate(r.createdAt, lang) }),
+      content: raiserName ? (
+        <PersonCard
+          orientation="horizontal"
+          size="choice"
+          picture={raiserPicture}
+          mark={nameInitials(raiserName)}
+          markName={raiserName}
+          title={<span className="min-w-0 truncate text-sm">{raiserName}</span>}
+        />
+      ) : undefined,
+    }
+  }
 }
 
 /** THE OPEN TAB'S SECOND BODY — client, 2026-09-06: "for the tab open, I want
@@ -2537,10 +2585,12 @@ export function ticketBoardCard(teamId: string, t: (s: string, vars?: Vars) => s
  *       none is, and the flip that owns that column would move it back the next
  *       time anything touched the ticket. A board that undoes your drag an hour
  *       later is a board nobody trusts twice.
- *       AND THE FIFTH COLUMN COULD NOT ACCEPT A DROP AT ALL, which is the
- *       cleanest statement of why this board stays read-only: "waiting" is not
- *       a status, so there is no field a drop into it could write. Nothing
- *       makes a ticket waiting except the client not having replied yet.
+ *       THE FIFTH COLUMN USED TO MAKE THIS EVEN PLAINER, before Aurora removed
+ *       it, 22 Sep 2026: "remove column waiting from tickets open board." It
+ *       was never a status, so a drop into it could not have written anything
+ *       — the cleanest statement of why this board stays read-only. That
+ *       column is gone now, along with the argument; the four real stages
+ *       above make the same case on their own.
  *   2 · THE BOARD IS A PAGE, NOT THE COLLECTION. The list pages (R14), so the
  *       cards are the fifty rows in hand while the column counts below are the
  *       door's exact `COUNT(*)` — honest as a READING (the count says how many
@@ -2552,19 +2602,24 @@ export function ticketBoardCard(teamId: string, t: (s: string, vars?: Vars) => s
  *
  * ── WHAT THE COLUMNS AND THE CARDS CARRY ──────────────────────────────────
  *
- * THE FIRST FOUR COLUMNS ARE `OPEN_TAB_STATUSES`, the same closed vocabulary
- * the Open facet sends to the door — so the board cannot show a stage column
- * the tab does not contain, and a stage added to that list appears here without
- * an edit. That property is what settled 2026-09-07's ruling ("in open, include
+ * THE COLUMNS ARE `OPEN_TAB_STATUSES`, the same closed vocabulary the Open
+ * facet sends to the door — so the board cannot show a stage column the tab
+ * does not contain, and a stage added to that list appears here without an
+ * edit. That property is what settled 2026-09-07's ruling ("in open, include
  * status ready and waiting"): `ready` was added to the ARRAY rather than to
  * this board, so the tab's list, its badge, its Status facet and this board all
  * moved together. A `ready` column over a tab whose list refused to show ready
  * tickets would have been a column counting rows the screen denies, which is
  * R16's founding defect wearing a board's clothes.
  *
- * THE FIFTH IS NOT A STAGE AT ALL — see the column itself, below. It is the
- * waiting PREDICATE, fed by its own door read, and its cards are repeats of
- * cards in the four beside it. Nothing on this screen adds the five together.
+ * THERE WAS A FIFTH COLUMN, "WAITING", UNTIL AURORA REMOVED IT — 22 SEP 2026,
+ * verbatim: "remove column waiting from tickets open board. tehn expand the
+ * other columsntto take full width." It was never a stage: a PREDICATE over a
+ * ticket already sitting in one of the four above, fed by its own door read
+ * (`waitingClause`, workers/content/src/lib/help.ts), and its cards repeated
+ * cards from the four columns beside it. See the removed column's own note,
+ * below, for the read that fed it and why deleting it costs the Waiting TAB
+ * nothing — the tab was never fed by this board's own machinery.
  *
  * THE COUNT UNDER EACH HEAD IS THE DOOR'S, not `cards.length` — but only while
  * the toolbar is RESTING, and that condition is the whole R16 argument.
@@ -2605,8 +2660,7 @@ function OpenBoard({
   teamId,
   rows,
   counts,
-  waitingRows,
-  waitingTotal,
+  members,
   narrowed,
   onOpen,
 }: {
@@ -2614,15 +2668,12 @@ function OpenBoard({
   rows: readonly HelpTicket[]
   /** the door's own grouped tally per status — never `cards.length` */
   counts: Record<string, number> | undefined
-  /** THE FIFTH COLUMN'S OWN PAGE. Not a slice of `rows`: waiting is DERIVED at
-   * the door from the ticket's conversation and no row carries a flag for it,
-   * so this is the door's own answer to its own question, read through the same
-   * facet cache the Waiting TAB rests on. Undefined while it is in flight. */
-  waitingRows: readonly HelpTicket[] | undefined
-  /** …and that read's own exact `total`. Never `waitingRows.length` (R16: the
-   * facet read is page one) and never a term of `counts`, which groups by
-   * status and has no term for a predicate. */
-  waitingTotal: number | undefined
+  /** THE TEAM'S OWN MEMBERS CACHE — a face lookup for a staff raiser, the
+   * identical `TeamMember[] | undefined` `TicketRowsTable` already takes (see
+   * `memberFace`'s own header). Threaded down to `ticketBoardCard` so a
+   * card's own raised-by face (its own header, above) can resolve a staff
+   * picture the same way the list's own "Raised" column does. */
+  members: TeamMember[] | undefined
   /** is the toolbar asking anything? `counts` is the RESTING collection's tally
    * and answers a different question the moment it is. See the header. */
   narrowed: boolean
@@ -2719,23 +2770,27 @@ function OpenBoard({
    * — the identical seam the 2026-09-07 pass first wired and the 2026-09-09
    * one un-wired, so "Triaged" is orange on the Status filter, the ticket's
    * own chip and this column head all at once, never a second table. THE
-   * WAITING COLUMN (the fifth, below) stays dot-less: it is a PREDICATE, not
-   * a stage, and her sentence named the stage — see that column's own note
-   * for the argument, otherwise unchanged by this reversal. */
+   * WAITING COLUMN USED TO STAY DOT-LESS BESIDE THEM — a PREDICATE, not a
+   * stage, and her sentence named the stage — and is gone entirely now, 22
+   * Sep 2026 (see its own removed note, below), so the question does not
+   * arise any more either. */
   // READ OFF THE SHARED SIX rather than a four-entry literal of its own since
   // 17 Sep 2026, the day `AllBoard` below needed the identical titles for the
   // other two stages — one map, `ticketStatusColumnTitles` above, so "Ready"
   // cannot read one word on this board and a different one on that one.
   const COLUMN = ticketStatusColumnTitles(t)
-  /** ONE CARD, BUILT ONCE, FOR BOTH KINDS OF COLUMN.
+  /** ONE CARD, BUILT ONCE, SHARED ACROSS EVERY BOARD IN THIS FILE.
    *
-   * The four stage columns and the Waiting column are fed by two different
-   * reads (see the fifth column's own note below) and used to spell their card
-   * out twice, identically. That was survivable while a card was an id, a title
-   * and a chip line; 2026-09-07 gave it a fourth part, and a fourth part
-   * written twice is the drift this whole screen's chip ruling exists to
-   * prevent, in miniature — the same ticket drawn two ways depending on which
-   * column you happened to find it in, and a waiting ticket is drawn in BOTH.
+   * `OpenBoard`'s four columns and `AllBoard`'s six both draw through the
+   * identical `ticketBoardCard`, so a ticket cannot be drawn one way on one
+   * board and another way on the other. Until 22 Sep 2026 this board's own
+   * Waiting column was a third caller of the same card, over a second read —
+   * that column is gone now (see its own removed note, above), so today it is
+   * the four stage columns here and the six on `AllBoard`, nothing drawing the
+   * same ticket twice on one board any more. That was survivable while a card
+   * was an id, a title and a chip line; 2026-09-07 gave it a fourth part, and
+   * a fourth part written twice is the drift this whole screen's chip ruling
+   * exists to prevent, in miniature.
    *
    * THE DATE MOVES OUT OF THE CHIPS AND UNDER THE TITLE — client, 2026-09-07:
    * *"lets put the date below title as simole tex"*. `TriageChips` used to be
@@ -2766,7 +2821,7 @@ function OpenBoard({
    * LIFTED INTO `ticketBoardCard` ABOVE, 17 Sep 2026, the same day this
    * function's four-entry `COLUMN` moved to the shared six — see that
    * function's own header. */
-  const boardCard = ticketBoardCard(teamId, t, lang)
+  const boardCard = ticketBoardCard(teamId, t, lang, members)
   /* ONE GRAMMAR NOW, THROUGH THE KIT'S OWN THIRD ARGUMENT — the identical fix
      `AppTicketsBoard` (work-panels.tsx) already carried: `onCardSelect={(card)
      => onOpen(card.id)}` reads only the card and never the click, so a
@@ -2825,21 +2880,49 @@ function OpenBoard({
          scroller. Fixed-width columns do not grow and do not shrink.
          SO THE FIX IS THE KIT'S OWN PROP, not a negative margin and not a
          wrapper: `columnWidth` is spent straight into that custom property, so
-         a fluid value makes the five columns SHARE the row. `100%` resolves
+         a fluid value makes the columns SHARE the row. `100%` resolves
          against the flex container's content box — the card's inside — and the
-         four gaps are the kit's own `--space-2h`, subtracted so five columns
-         land exactly on the edge instead of one column past it.
+         gaps between them are the kit's own `--space-2h`, subtracted so the
+         columns land exactly on the edge instead of one column past it.
          `max(18rem, …)` IS THE FLOOR AND IT IS THE KIT'S OWN NUMBER (`.kw-laws`,
          "the kit's own smallest stated column minimum"). Below about 90rem of
          card the columns stop shrinking and the board scrolls, which is what
-         the kit's inline-axis rule already says should happen — a five-column
-         board squeezed to 10rem a column is the "80px each" render CH27.24
+         the kit's inline-axis rule already says should happen — a board
+         squeezed to 10rem a column is the "80px each" render CH27.24
          forbids. Above it they stretch to the edge, which is what she asked
          for. Below 45rem the kit switches to its own single-stage picker and
-         this value is not used at all. */
-      columnWidth="max(18rem, calc((100% - 4 * var(--space-2h)) / 5))"
-      columns={[
-        ...OPEN_TAB_STATUSES.map((stage) => ({
+         this value is not used at all.
+         DOWN TO FOUR COLUMNS, 22 SEP 2026 — Aurora, verbatim: "remove column
+         waiting from tickets open board. tehn expand the other columsntto
+         take full width." The Waiting column is gone (see its own removed
+         note, below), so this is the SAME mechanism, the kit's own
+         `columnWidth` prop, recomputed over four columns instead of five:
+         three gaps between four columns rather than four gaps between five,
+         and the same 18rem floor. Never a wrapper or a negative margin here
+         either — only the arithmetic changed. */
+      columnWidth="max(18rem, calc((100% - 3 * var(--space-2h)) / 4))"
+      /* THE FIFTH COLUMN IS GONE, 22 SEP 2026 — Aurora, verbatim: "remove
+         column waiting from tickets open board." It used to sit here, fed
+         by the door's own answer to `{status: …, waiting: "only"}`
+         (`waitingClause`, workers/content/src/lib/help.ts) rather than a
+         filter over `rows`, because waiting was never a status: a
+         PREDICATE over a ticket already sitting in one of the four stages
+         below, drawn there AND here, on purpose, so the four stage columns
+         never had to lie about a waiting ticket's real stage. Removing this
+         column costs those four nothing — every ticket they draw was
+         always drawn there whether or not it was also waiting, and nothing
+         on the strip ever summed the columns (R16: the Open tab's own badge
+         was always the four stages alone).
+         THE READ THAT FED IT is deleted too: `waitingQ`/`waitingTotal`,
+         gated behind `onOpenBoard`, in this file's own state block above —
+         see that block's own note for the full account, including why the
+         Waiting TAB stands on a completely different read and loses nothing
+         here.
+         NO LONGER A `[...spread]`, because a fifth element used to sit
+         beside this one and forced the array-literal-plus-spread shape;
+         with only one kind of column left, `columns` is this map's own
+         result directly (oxlint's `unicorn/no-useless-spread`). */
+      columns={OPEN_TAB_STATUSES.map((stage) => ({
           id: stage,
           title: COLUMN[stage].title,
           /* THE DOT IS BACK — Aurora's ruling, 21 Sep 2026, verbatim, reviewing
@@ -2863,7 +2946,7 @@ function OpenBoard({
              narrowing the door's own loaded rows in the browser
              (`web/test/paged-search.test.ts`, the law; and
              `web/test/tab-facets.test.tsx`, this screen's own suite). Bucketing
-             page one into five columns is not that: a ticket has exactly one
+             page one into four columns is not that: a ticket has exactly one
              status, every status in `OPEN_TAB_STATUSES` is drawn, so no loaded
              card is dropped — and the moment the toolbar is asking anything,
              every column stops quoting the door's count and falls back to the
@@ -2878,79 +2961,7 @@ function OpenBoard({
              keystroke nobody could see. Lay this call out however reads best. */
           cards: rows.filter((r) => r.status === stage).map(boardCard),
           emptyLabel: t("Nothing at this stage."),
-        })),
-        /* THE FIFTH COLUMN, AND IT IS NOT A `GROUP BY status` BUCKET — client,
-           2026-09-07: "in open, include status ready and waiting / add them
-           after". `ready` IS a status and joined `OPEN_TAB_STATUSES` above, so
-           it needed no clause of its own. `waiting` is not one and never will
-           be: it is a PREDICATE over the ticket's conversation, derived at the
-           door on every read (`waitingClause`, workers/content/src/lib/help.ts
-           — "we spoke last and nobody has answered"), stored nowhere.
-           THREE CONSEQUENCES, EACH DECIDED RATHER THAN INHERITED:
-           1 · THE CARDS COME FROM A SECOND READ. `rows` is the Open page and
-               carries no waiting flag, so filtering it in the browser is not
-               merely wrong-by-paging (R14) — it is impossible. This column is
-               fed by the door's own answer to `{status: …, waiting: "only"}`,
-               the identical read the Waiting TAB rests on, so the tab and the
-               column cannot disagree about who is waiting.
-           2 · A CARD APPEARS TWICE, ON PURPOSE, and this is the decision worth
-               reading twice. A waiting ticket is also `triaged`/`scheduled`/
-               `in_progress`/`ready`, so it is drawn in its stage column AND
-               here. Waiting is not a later stage a ticket MOVES to — it is a
-               property of a ticket that is sitting in one — so "waiting wins"
-               would take a ticket out of the stage it is genuinely in and make
-               the four stage columns lie about the work. The overlap IS the
-               information, which is the same sentence `waitingClause` and the
-               `WAITING` tab constant above already make about the tabs.
-           3 · NOTHING SUMS THE COLUMNS, so the repetition costs no total. The
-               kit adds nothing up (`footnoteMeta`, its only summary, is the
-               caller's and is deliberately not passed). Each column's number is
-               its own exact server `COUNT(*)` of its own question: the four
-               stages are disjoint terms of one `GROUP BY`, and this one is the
-               waiting read's own `total`. The Open TAB's badge stays the sum of
-               the four stages ONLY, so the collection is still counted exactly
-               once on this screen (R16). The footnote says all of this in the
-               reader's own words, because a fifth column beside four is read as
-               a fifth bucket unless something says otherwise.
-           STILL NO DOT ON THIS HEAD, EVEN AFTER THE 21 SEP 2026 REVERSAL
-           ABOVE. Aurora's later ruling ("bring abck the color on t stage in
-           board view", UI-RULEBOOK.md L43) restored `dot` on the four STAGE
-           columns above, in the exact word she used — a stage — and this
-           column is deliberately not one: it is a PREDICATE over a ticket
-           already sitting in one of those four stages, the whole argument this
-           paragraph makes below. Nothing in her 21 Sep review named Waiting,
-           and the reason a colour would have been misleading here on
-           2026-09-09 is unchanged by a ruling about stage colour returning —
-           the FOOTNOTE under the board is still what says this column repeats
-           cards from the four before it, in words, and a reader who needs that
-           sentence is not served by a poppy dot instead of it. If she asks for
-           one here too, it is a new, separate ruling to record, not an
-           extension of this one.
-           WHAT WENT WITH IT. Until 2026-09-09 this line read
-           `dot: waitingDotTone()` — a named seam added on 2026-09-07 so the
-           column would stop borrowing the tone of `awaiting_validation`, a stage
-           the client had just retired. The seam was right for the question it
-           answered and the question is no longer asked, so the function is
-           deleted rather than left exported for nobody
-           (web/test/dead-exports.test.ts). Nothing about WAITING moved: it is
-           still a predicate the door derives on every read (`waitingClause`,
-           workers/content/src/lib/help.ts), it is still the identical read the
-           Waiting TAB rests on, and it is still said in words here and in the
-           footnote — which is where it was always carried.
-           IT IS NOT A FILTER. No card in this column is read by status at all —
-           they come from the door's waiting predicate, below.
-           NO COUNT WHILE THE TOOLBAR IS ASKING, for the reason the four stage
-           columns give: the waiting read is a RESTING one and carries none of
-           the toolbar's narrowing, so a searched board would put an
-           un-narrowed total over the cards that matched. */
-        {
-          id: WAITING,
-          title: t("Waiting"),
-          count: narrowed ? undefined : waitingTotal,
-          cards: (waitingRows ?? []).map(boardCard),
-          emptyLabel: t("Nothing is waiting on a client."),
-        },
-      ]}
+      }))}
       // A CARD OPENS THE TICKET, and that is the board's only act. The kit makes
       // a card a target only when this is passed, so the affordance and the
       // behaviour are one decision. `handleCardSelect`, not a bare
@@ -2962,22 +2973,15 @@ function OpenBoard({
       // component cannot keep on its own". This board keeps no such promise, so
       // it says what is true instead: what the numbers mean, and that a card
       // opens rather than moves.
-      /* THE LINE UNDER THE BOARD, AND THE WAITING COLUMN IS WHY IT CHANGED.
-         Both sentences now say that the last column REPEATS cards from the four
-         before it. That is not politeness: five columns side by side are read
-         as five buckets, and a reader who adds them up gets a number larger
-         than the tab's own badge. Saying it here is the honest fix — the
-         alternative was to pull waiting tickets out of their stage columns,
-         which would make the four stages lie about the work (see the column
-         itself for that decision). */
+      /* THE LINE UNDER THE BOARD, PLAIN AGAIN, 22 SEP 2026. It used to warn a
+         reader that Waiting repeated cards from the four stages beside it, so
+         the columns would not sum to the tab's own badge; with the Waiting
+         column gone that warning has nothing left to say, and the footnote
+         now reads the same shape `AllBoard`'s own footnote already does. */
       footnote={
         narrowed
-          ? t(
-              "Cards are the tickets that matched, as far as they have loaded. Waiting repeats cards from the stages before it. Click a card to open the ticket."
-            )
-          : t(
-              "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets, the ones where a client owes us an answer, so the columns don't add up to the total. Click a card to open the ticket."
-            )
+          ? t("Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.")
+          : t("Each column counts every open ticket at that stage. Click a card to open the ticket.")
       }
       emptyColumnLabel={t("Nothing at this stage.")}
     />
@@ -3009,20 +3013,21 @@ function OpenBoard({
  * honest under a page) and this board answers neither of them any more
  * cheaply than that one does — it holds MORE stages, not fewer decisions.
  *
- * ── SIX COLUMNS, NOT FIVE, AND NO FIFTH "WAITING" COLUMN ───────────────────
+ * ── SIX COLUMNS, AND NO "WAITING" COLUMN ────────────────────────────────────
  *
  * `HELP_STATUSES` (shared/types.ts) is the whole live vocabulary — new,
  * triaged, scheduled, in_progress, ready, resolved — so this board is a
  * PARTITION of the All tab exactly the way `OpenBoard`'s four stage columns
  * partition the Open tab: every ticket has exactly one status, every status
  * gets a column, nothing is dropped and nothing repeats. That is also why
- * there is no sixth "Waiting" column here the way there is a fifth one on
- * Open: Waiting is a PREDICATE over a ticket that is already sitting in one
- * of these six stages (`waitingClause`, workers/content/src/lib/help.ts), and
- * a predicate column only earns its keep once, on the tab that is actually
- * ABOUT triage workload. Adding it here would repeat a card a second time on
- * a board whose whole point is "one ticket, one column" — the client asked
- * for "a board view by status," not a second copy of Open's five-column one.
+ * there is no seventh "Waiting" column here: Waiting is a PREDICATE over a
+ * ticket that is already sitting in one of these six stages (`waitingClause`,
+ * workers/content/src/lib/help.ts), and a predicate column never earned its
+ * keep here — Open's OWN fifth "Waiting" column, the tab actually ABOUT
+ * triage workload, was removed in turn on 22 Sep 2026 (`OpenBoard`'s own
+ * header carries that ruling). Adding one here would repeat a card a second
+ * time on a board whose whole point is "one ticket, one column" — the client
+ * asked for "a board view by status," not a copy of a triage queue.
  *
  * ── COUNTS ARE THE SAME `byStatus` READ THE STRIP ALREADY HOLDS ───────────
  *
@@ -3038,6 +3043,7 @@ function AllBoard({
   teamId,
   rows,
   counts,
+  members,
   narrowed,
   onOpen,
 }: {
@@ -3046,13 +3052,16 @@ function AllBoard({
   /** the door's own grouped tally per status, over the WHOLE collection —
    * never `cards.length`. See the header above for why every stage reads it. */
   counts: Record<string, number> | undefined
+  /** the team's own members cache — see `OpenBoard`'s identical prop, read
+   * the same way, for the same card. */
+  members: TeamMember[] | undefined
   /** is the toolbar asking anything? See `OpenBoard`'s identical prop. */
   narrowed: boolean
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
   const COLUMN = ticketStatusColumnTitles(t)
-  const boardCard = ticketBoardCard(teamId, t, lang)
+  const boardCard = ticketBoardCard(teamId, t, lang, members)
   // ONE GRAMMAR NOW — the identical fix `OpenBoard` carries above, for the
   // identical reason: see that component's own note for the full account.
   const handleCardSelect = (
@@ -3078,9 +3087,9 @@ function AllBoard({
   return (
     <Kanban
       // SIX COLUMNS SHARE THE ROW, the same fluid formula `OpenBoard` uses for
-      // its five — see that component's own note for why this is the kit's
+      // its four — see that component's own note for why this is the kit's
       // `columnWidth` prop and not a wrapper or a negative margin. One gap
-      // fewer term than five columns would need, one column wider a floor.
+      // more term than four columns would need, the same 18rem floor.
       columnWidth="max(18rem, calc((100% - 5 * var(--space-2h)) / 6))"
       columns={HELP_STATUSES.map((stage) => ({
         id: stage,

@@ -628,7 +628,11 @@ export function ProcessDetailScreen({
                     and never computes. */}
                 <div className="flex flex-col gap-3 rounded-[var(--radius)] bg-surface-panel p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{t("Connected processes")}</p>
+                    {/* R108, 22 Sep 2026: the eyebrow every record section
+                        title now shares, never its own `text-sm
+                        font-medium`. See `TicketSidePanel`'s own header
+                        (`web/components/tickets/ticket-detail-body.tsx`). */}
+                    <p className="text-micro text-muted-foreground uppercase">{t("Connected processes")}</p>
                     {canEdit && (
                       // R98 — a card header action is the kit's default height, never `sm`.
                       <Button type="button" variant="secondary" onClick={() => setLinkOpen(true)}>

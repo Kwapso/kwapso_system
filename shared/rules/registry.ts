@@ -931,6 +931,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "effort-tiles",
     status: "enforced",
   },
+  {
+    id: "R108",
+    dimension: "ui",
+    law: "A RECORD SECTION'S OWN TITLE SHARES ONE STYLE, EVERYWHERE: THE SAME SMALL-CAPS EYEBROW THE TASK SHEET'S OWN FACT LABELS ALREADY CARRY, NEVER A SEPARATE 'SECTION TITLE' REGISTER. Her ruling, 22 Sep 2026, over a screenshot of a ticket record: \"look at screenshot. i want that we have 1 single deign for titles. make it like in tasks 'assignd to, details, deadline' so evetything in tickets/stories that are titles (assigned to, pahse and wave, effort, stakeholders, related tickets, related stories...) make the chnage here and everywhee else. what we are changing is the sytle of the title of a section. implement and write the rule.\" A record section's TITLE (Assigned to, Category, Phase and wave, Effort, Stakeholders, Related tickets, Related stories, and every sibling) now draws the identical class list R105 already gave the task sheet's own fact labels, `text-micro text-muted-foreground uppercase`, never the old `text-sm font-medium`. Two shared hosts carry every ticket and story call site at once: `TicketSidePanel` (`web/components/tickets/ticket-detail-body.tsx`, both its `plain` and `boxed` branches) and its twin `EmptyGatedPanel` (`web/components/deep-link/screen-bits.tsx`, R88's own empty-gated shell, same two branches); fixing the two shared components carries the ticket page, the story page (`story-detail.tsx`'s Detail, Acceptance criteria, Build notes, Related tickets, Category, Related stories, Phase and wave, Effort) and every other caller (`help-detail.tsx`'s Stakeholders, `work-logs-panel.tsx`, `effort-card.tsx`, `phase-burndown-panel.tsx`) without touching any of them directly. Three hand-rolled siblings drew a record section title in a shape of their own and are fixed the same way: `web/components/meetings/meeting-detail.tsx` (Agenda, Notes, What was said, Who was invited, Attached to the entry), `web/components/accounts/client-org-panel.tsx` (Departments, Roles, Tools) and `web/components/apps/stakeholders-panel.tsx` (a system's Ours/Theirs groups). The heading stays a real heading element carrying its own `id` wherever it already had one: `TicketSidePanel`/`EmptyGatedPanel`'s `aria-labelledby` wiring on the panel's `role=\"group\"` is untouched, only the STYLE moved, and the count beside the title (the count-beside-title law, R97) drops its old `font-[var(--font-weight-normal)]` override, a no-op now that the title itself carries no `font-medium` to differ from. HER SCREENSHOT ALSO SHOWED THE DUPLICATE THIS CREATES: the Assigned to SECTION was titled \"Assigned to\" and then repeated \"ASSIGNED TO\" a second time as `AssignedToCard`'s own inner eyebrow over the person chip (`web/components/tickets/help-stakeholders.tsx`), a label agreeing with its own heading, once the section title itself became the eyebrow. That inner chip is dropped for the ticket's own assignee now (`chip={assignee.inherited ? … : undefined}`); \"From the app\" survives, because it says something the title does not. Every OTHER section with several facts under one title keeps both its own eyebrow and the section title, on purpose, because the words differ: Stakeholders' own \"Raised by\"/\"On the loop\" (each a different relationship from \"Stakeholders\"), and the merged Phase/Wave facts (\"Phase\"/\"Wave\", each a different fact from \"Phase and wave\"). CHECKED, `web/test/section-title-one-style.test.ts`: a tripwire asserting `TicketSidePanel`'s and `EmptyGatedPanel`'s own title lines carry the canonical string in both branches and never the old shape, plus a census over every file in `web/components` and `web-portal/components` for a literal `<h2`/`<h3`/`<h4` whose own `className` carries both `text-sm` and `font-medium` (the old shape), which must be empty unless the file+expression pair is named in `SECTION_TITLE_EXEMPT`, keyed by `{file, expression}`, rot-checked both ways.",
+    why: "THE CENSUS SCANS FOR THE OLD SHAPE, NOT FOR EVERY HEADING, because \"every h2/h3/h4 in the app\" would catch page titles this ruling never touched (the portal's own screens, `account-activity-panel.tsx`'s \"Account activity\") that happen to share a heading TAG with a record section without sharing its SIZE: those are all `text-lg`/`text-2xl`/`text-3xl`, a different register entirely, so requiring `text-sm` alongside `font-medium` is what narrows the census to exactly the shape a record section title used to draw, the same discipline R105's own `<SheetContent` scope note gives for the identical reason. Four genuine non-record-section headings still match that narrower shape and are named in `SECTION_TITLE_EXEMPT` rather than silently excluded: `web/components/screens/pulse.tsx`'s dashboard tile title, `web-portal/components/collection-heading.tsx`'s and `web-portal/components/deliverables-screen.tsx`'s own collection/grouping headings, and `web/components/process/draft-review.tsx`'s review-dialog group heading. None of them describe one record's own section, so naming them is what keeps the census honest about what it actually found versus what it chose not to chase.",
+    checkId: "section-title-one-style",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -6332,5 +6340,44 @@ export const RECORD_FOOTER_SLOT_EXEMPT: RecordFooterSlotExempt[] = [
   {
     file: "shared/web/screen-engine/screen-renderer.tsx",
     why: "the recipe-driven detail path draws its own footer inline rather than through ScreenFooterSlot, shared with the portal, which has no footer slot; decision pending",
+  },
+]
+
+// ── section-title-one-style (R108) ──────────────────────────────────────────
+
+/** A still-open section-title-one-style finding, keyed by `{file,
+ * expression}`: the file and the offending heading's own class text (never a
+ * line number). A heading in the old `text-sm font-medium` shape earns a line
+ * here only when it genuinely describes something OTHER than a single
+ * record's own section (a dashboard tile, a collection/grouping heading, a
+ * review dialog's own group heading): a real record section title is fixed,
+ * never exempted. Rot-checked both ways by `web/test/
+ * section-title-one-style.test.ts`. */
+export interface SectionTitleExempt {
+  file: string
+  expression: string
+  why: string
+}
+
+export const SECTION_TITLE_EXEMPT: SectionTitleExempt[] = [
+  {
+    file: "web/components/screens/pulse.tsx",
+    expression: "text-muted-foreground mb-2 text-sm font-medium",
+    why: "BandCard's own title, a Pulse dashboard tile heading, not a single record's own section",
+  },
+  {
+    file: "web-portal/components/collection-heading.tsx",
+    expression: "flex min-w-0 flex-1 basis-[12rem] items-center gap-1.5 text-sm font-medium",
+    why: "the portal's own collection heading title (R100 governs this shape), not a record section",
+  },
+  {
+    file: "web-portal/components/deliverables-screen.tsx",
+    expression: "text-muted-foreground text-sm font-medium",
+    why: "groups a collection of deliverables by app on a portal-wide screen, not one record's own section",
+  },
+  {
+    file: "web/components/process/draft-review.tsx",
+    expression: "text-sm font-medium",
+    why: "a draft-review dialog's own group heading (Keeping/Leaving out), not a persisted record's own section",
   },
 ]

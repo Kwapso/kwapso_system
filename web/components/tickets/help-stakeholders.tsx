@@ -201,17 +201,22 @@ function StakeholderTile({
   picture?: string | null
   mark: string
   markName?: string
-  chip: React.ReactNode
+  /** R108, 22 Sep 2026: `undefined` when the section's own title above
+   * already says this word (the ticket's own "Assigned to"), so the row
+   * below draws no empty header line for nothing to sit on. */
+  chip?: React.ReactNode
   title: React.ReactNode
   secondary?: React.ReactNode
   action?: React.ReactNode
 }) {
   return (
     <div data-slot={dataSlot} className="flex flex-col gap-2">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        {chip}
-        {action}
-      </div>
+      {(chip || action) && (
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          {chip}
+          {action}
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         <PersonCard
           orientation="horizontal"
@@ -345,13 +350,19 @@ export function HelpStakeholders({
  * renders as nothing, same as everywhere else) otherwise. Inside it, the
  * face+name tile is `StakeholderTile` (above), the SAME component Raised by
  * draws itself with, not a second copy: face on the left, the small-caps
- * eyebrow over the name on the right. THE EYEBROW WORDS DIFFER FROM RAISED
- * BY'S OWN, on purpose: "Assigned to" when the record carries its own
- * person, "From the app" when it does not and the app's lead is answering
- * instead, with the app's own name kept on the existing second, muted line
- * ("Inherited from <app>", `PersonCard`'s own `secondary` slot) rather than
- * folded into the eyebrow itself, so a translator never has to reorder a
- * name inside a sentence. This card still stands DIRECTLY on the page
+ * eyebrow over the name on the right. THE INNER EYEBROW ONLY SURVIVES WHEN
+ * IT SAYS SOMETHING NEW (R108, 22 Sep 2026). It used to read "Assigned to"
+ * over the tile whenever the record carried its own person, "From the app"
+ * when it did not, but once the panel's own title above IS "Assigned to"
+ * in the same eyebrow register R108 gave it, repeating the identical word a
+ * second time over the tile is a label agreeing with its own heading; her
+ * screenshot showed exactly that duplicate. So the tile's own `chip` is
+ * `undefined` for the ticket's own person now, and only "From the app"
+ * survives, because that word says something the title does not, with the
+ * app's own name kept on the existing second, muted line ("Inherited from
+ * <app>", `PersonCard`'s own `secondary` slot) rather than folded into the
+ * eyebrow itself, so a translator never has to reorder a name inside a
+ * sentence. This card still stands DIRECTLY on the page
  * ground (R67): `TicketSidePanel`'s own `Card` is `variant="default"`,
  * never nested inside `<HelpStakeholders>` or the Stakeholders panel's own
  * `TicketSidePanel`.
@@ -438,10 +449,15 @@ export function AssignedToCard({
           picture={assigneeMember?.photo}
           mark={nameInitials(assignee.name ?? "")}
           markName={assignee.name ?? undefined}
+          // R108, 22 Sep 2026: no chip at all for the ticket's own person.
+          // the panel's own title above already says "Assigned to" in the
+          // identical eyebrow register, so repeating it here would be the
+          // duplicate her screenshot flagged. "From the app" survives
+          // because it says something the title does not.
           chip={
-            <span className="text-micro text-muted-foreground uppercase">
-              {assignee.inherited ? t("From the app") : t("Assigned to")}
-            </span>
+            assignee.inherited ? (
+              <span className="text-micro text-muted-foreground uppercase">{t("From the app")}</span>
+            ) : undefined
           }
           title={<CardTitle className="text-sm">{assignee.name}</CardTitle>}
           secondary={

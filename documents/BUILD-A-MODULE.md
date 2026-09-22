@@ -1353,6 +1353,19 @@ again, which is the only property that matters here.
   `Card` default, and the log rows below carry no fill, separated by exactly
   one kit `Separator` between rows. The census is
   `web/test/effort-card.test.tsx`'s own existing cases.
+- **R108 `section-title-one-style`**: a record section's own title (Assigned
+  to, Category, Phase and wave, Effort, Stakeholders, Related tickets,
+  Related stories and every sibling) carries R105's own canonical class,
+  `text-micro text-muted-foreground uppercase`, never `text-sm font-medium`.
+  Draw it through the shared `TicketSidePanel`/`EmptyGatedPanel` hosts
+  wherever they apply, rather than a hand-rolled heading of your own. Where
+  an inner fact label repeats the section title word for word, delete the
+  inner label and keep the section title, on the same reasoning R105's
+  fact-label eyebrow already earns its place. The census is
+  `web/test/section-title-one-style.test.ts`; a real reason for skipping one
+  goes in `SECTION_TITLE_EXEMPT`, keyed by `{file, expression}`, only when
+  the heading genuinely describes something other than a single record's own
+  section.
 
 **The words** (the ones that catch every new module, every time)
 

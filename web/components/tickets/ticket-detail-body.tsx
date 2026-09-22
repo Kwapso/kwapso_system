@@ -602,7 +602,24 @@ export function TicketDetailBody({
 /** ONE STACKED PANEL, RAISED ON THE RECORD'S OWN SOFT-PAPER GROUND (R67). A
  * plain title row — never a subtitle under it (R70) — with room for a count
  * and a trailing action (a "Show all" link) ON THE TITLE'S OWN LINE, so a
- * translated sentence never has to carry a number or a link inside it. */
+ * translated sentence never has to carry a number or a link inside it.
+ *
+ * ONE TITLE STYLE FOR EVERY RECORD SECTION (R108), 22 Sep 2026. Aurora,
+ * over a screenshot of a ticket record: "i want that we have 1 single deign
+ * for titles. make it like in tasks 'assignd to, details, deadline' so
+ * evetything in tickets/stories that are titles (assigned to, pahse and
+ * wave, effort, stakeholders, related tickets, related stories...) make the
+ * chnage here and everywhee else." This `h3` used to be `text-sm
+ * font-medium`, a different register from the small-caps eyebrow R105 gave
+ * the task sheet's own fact labels (`text-micro text-muted-foreground
+ * uppercase`, `web/components/work/task-sheet.tsx`); it now carries that
+ * exact class list, the ONE title style this law generalises across the
+ * whole app. The heading stays a real `<h3>` with its own `id`, so the
+ * `aria-labelledby` wiring on the panel's `role="group"` below is
+ * unchanged, only the STYLE moved, never the semantics. The count sits on
+ * the same line, no `font-[var(--font-weight-normal)]` override any more:
+ * with `font-medium` gone from the title, title and count already share one
+ * weight, so a second class to say so would be a no-op. */
 export function TicketSidePanel({
   title,
   count,
@@ -634,13 +651,9 @@ export function TicketSidePanel({
       <Card variant="plain" data-surface="plain">
         <CardContent className="flex flex-col gap-3">
           <div className="flex min-w-0 items-center justify-between gap-2">
-            <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+            <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-micro text-muted-foreground uppercase">
               <span className="truncate">{title}</span>
-              {count ? (
-                <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
-                  {count}
-                </span>
-              ) : null}
+              {count ? <span className="shrink-0">{count}</span> : null}
             </h3>
             {action}
           </div>
@@ -655,13 +668,9 @@ export function TicketSidePanel({
     <Card variant="default">
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex min-w-0 items-center justify-between gap-2">
-          <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+          <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-micro text-muted-foreground uppercase">
             <span className="truncate">{title}</span>
-            {count ? (
-              <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
-                {count}
-              </span>
-            ) : null}
+            {count ? <span className="shrink-0">{count}</span> : null}
           </h3>
           {action}
         </div>

@@ -35,11 +35,58 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { TrailLine } from "@shared/ui/components/breadcrumbs/trail-line"
+import { stripComments } from "@shared/rules/source-scan"
 
 afterEach(cleanup)
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
+
+/** Finds the index of the `}` that closes the `{` at `openIndex`, by a plain
+ * depth count over `stripped` — REWRITTEN 22 SEP 2026, source-scan.test.ts's
+ * own law: exactly one comment stripper exists in this repo
+ * (`shared/rules/strip-comments.mjs`), and every law/test reads source
+ * through it rather than hand-rolling a second one. This used to skip a
+ * comment or a quoted string itself — the same `"*​/"`/quote-scanning shape
+ * `source-scan.test.ts`'s "nobody hand-writes the walk either" census exists
+ * to catch, and it caught this file the same day it was written.
+ *
+ * `stripped` MUST be `stripComments(src, { keepLength: true })` — the shared
+ * tokeniser's own comment-aware scan, called with the option that blanks a
+ * comment to spaces rather than removing it, so every index still points at
+ * the same place in `src`. Once comments are gone, all that is left for a
+ * plain `{`/`}` count to trip over is a brace character sitting inside a
+ * STRING or TEMPLATE literal — and `stripComments` deliberately does NOT
+ * blank string content (its own header: R14 reads a SQL `LIMIT` out of a
+ * template literal, so a caller that blanked strings would blind it), so it
+ * exposes no second entry point marking where a string starts or ends,
+ * only the finished text.
+ *
+ * THAT IS A REAL, NARROWER LIMITATION THAN A FULL RE-SCAN WOULD HAVE, STATED
+ * RATHER THAN HIDDEN: a `{` or `}` written inside a string or template
+ * literal INSIDE the bounded block would desync this count. The one call
+ * site below is safe from it — the trail prop's only template literal is
+ * `` `${String(index)}-${step.path}` ``, whose `${…}` holes are genuine,
+ * balanced code braces, not string content, so a plain count over the
+ * comment-stripped text is correct for the block this file actually
+ * inspects. A block whose own STRING held an unmatched brace character
+ * would need the full tokeniser's own internal state, which it does not
+ * publish — the honest trade against declaring a second stripper for one
+ * test, per the census's own rule.
+ *
+ * `openIndex` must point at a `{`. Returns -1 if the text ends before the
+ * brace closes. */
+function matchBraces(stripped: string, openIndex: number): number {
+  let depth = 0
+  for (let i = openIndex; i < stripped.length; i++) {
+    if (stripped[i] === "{") depth++
+    else if (stripped[i] === "}") {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return -1
+}
 
 describe("the kit's own trail slot — screen-shell.tsx, v1.2.119", () => {
   // CLIENT RULING, 18 SEP 2026, VERBATIM: "change to trail line 10px abpove
@@ -153,19 +200,42 @@ describe("app-shell.tsx hands the trail to that slot as a bare node", () => {
   // below instead of the kit's 20/8) →
   //   × the trail prop's own wrapper carries no className of its own
   //     AssertionError: expected the trail prop's block not to match /<div\s[^>]*className=/
+  //
+  // THE BLOCK IS BOUNDED BY ITS OWN BRACES, NOT BY THE NEXT PROP'S NAME —
+  // REWRITTEN 22 SEP 2026. This used to search for the literal `header={`
+  // that happened to follow `trail={` in the JSX, so removing that prop (the
+  // timer moved to `asideLead`, see app-shell.tsx's own comment above that
+  // prop) silently unbounded this block and failed the whole test on a
+  // change this file was never about. `trail` is a `React.ReactNode` prop —
+  // whatever prop comes after it is an implementation detail of the call
+  // site's own ordering, not a fact this file should depend on. The block is
+  // found by stripping comments through the ONE shared tokeniser
+  // (`stripComments`, imported above — source-scan.test.ts's own law: no
+  // second stripper anywhere in this repo) and then counting brace depth
+  // over the result with `matchBraces` — see that function's own header for
+  // exactly what it can and cannot see past — from the `{` right after
+  // `trail=` to the SAME brace closing, which is the actual end of the JSX
+  // expression handed to `trail`, whatever prop follows it.
   it("the trail prop's own wrapper carries no className of its own", () => {
     const src = readFileSync(join(WEB, "components/shell/app-shell.tsx"), "utf8")
     const trailPropStart = src.indexOf("trail={")
     expect(trailPropStart, "app-shell.tsx must hand the kit's ScreenShell a trail prop").toBeGreaterThan(-1)
-    const headerPropStart = src.indexOf("header={", trailPropStart)
-    expect(headerPropStart, "the trail prop must be followed by the header prop, so the block below is bounded").toBeGreaterThan(trailPropStart)
-    const trailPropBlock = src.slice(trailPropStart, headerPropStart)
+    const openBrace = trailPropStart + "trail=".length
+    expect(src[openBrace], "the trail prop must open with a `{...}` JSX expression").toBe("{")
+    // `keepLength: true` — the shared stripper's own option for exactly this:
+    // every comment becomes spaces (plus its own newlines), so `stripped` is
+    // the SAME LENGTH as `src` and `openBrace` (found above, on `src`) still
+    // points at the right `{` in `stripped` too.
+    const stripped = stripComments(src, { keepLength: true })
+    const closeBrace = matchBraces(stripped, openBrace)
+    expect(closeBrace, "the trail prop's own `{...}` expression must close within the file").toBeGreaterThan(openBrace)
+    const trailPropBlock = src.slice(trailPropStart, closeBrace + 1)
     // The node handed to `trail` may open exactly one wrapper div (for the
     // click-capture interception, R37) — it must own no spacing class. A
     // `className` anywhere in this block would mean the app is deciding the
     // trail's own margin/padding again, which is the bug this file exists to
     // catch.
-    expect(trailPropBlock, "the block between trail={ and header={ must not spend a className").not.toMatch(/className=/)
+    expect(trailPropBlock, "the trail prop's own block must not spend a className").not.toMatch(/className=/)
     // And it really is the kit's own TrailLine landing in that prop, not a
     // hand-rolled stand-in.
     expect(trailPropBlock, "the trail prop must hand the kit's own TrailLine to the slot").toContain("<TrailLine")

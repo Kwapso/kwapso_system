@@ -488,7 +488,13 @@ export function AddButton({
  * OWN position in the returned tree never moves, header present or not, so
  * toggling `empty` never remounts whatever the caller nested inside — a
  * child that owns a dialog (an "add" sheet, its own open/closed state) keeps
- * it. */
+ * it.
+ *
+ * ONE TITLE STYLE FOR EVERY RECORD SECTION (R108), 22 Sep 2026: this
+ * panel's own `h3` is `TicketSidePanel`'s own twin (`ticket-detail-body.tsx`)
+ * and carries the identical fix: the small-caps eyebrow, `text-micro
+ * text-muted-foreground uppercase`, rather than `text-sm font-medium`. See
+ * `TicketSidePanel`'s own header for the ruling this generalises. */
 export function EmptyGatedPanel({
   title,
   count,
@@ -528,13 +534,9 @@ export function EmptyGatedPanel({
         <CardContent className="flex flex-col gap-3">
           {!empty && (
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+              <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-micro text-muted-foreground uppercase">
                 <span className="truncate">{title}</span>
-                {count ? (
-                  <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
-                    {count}
-                  </span>
-                ) : null}
+                {count ? <span className="shrink-0">{count}</span> : null}
               </h3>
               {action}
             </div>
@@ -555,13 +557,9 @@ export function EmptyGatedPanel({
       <CardContent className="flex flex-col gap-3 p-4">
         {!empty && (
           <div className="flex min-w-0 items-center justify-between gap-2">
-            <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+            <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-micro text-muted-foreground uppercase">
               <span className="truncate">{title}</span>
-              {count ? (
-                <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
-                  {count}
-                </span>
-              ) : null}
+              {count ? <span className="shrink-0">{count}</span> : null}
             </h3>
             {action}
           </div>

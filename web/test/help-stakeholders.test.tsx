@@ -493,16 +493,21 @@ describe("AssignedToCard", () => {
     })
   })
 
-  // THE TILE'S OWN EYEBROW, "Assigned to" for the record's own person,
-  // "From the app" (the app's own name kept on its existing muted second
-  // line) when inherited. Scoped to the tile itself (`data-slot=
-  // "assignee-tile"`) so the panel's own "Assigned to" title never collides
-  // with the tile's identical eyebrow word in the own-person case.
+  // THE TILE'S OWN EYEBROW (R108, 22 Sep 2026): NO chip at all for the
+  // record's own person any more: the panel's own title above the tile
+  // already reads "Assigned to" in the identical eyebrow register, so
+  // repeating it a second time over the tile is the duplicate her
+  // screenshot flagged, and the duplicate is gone, not the panel's own
+  // title. "From the app" (the app's own name kept on its existing muted
+  // second line) survives when inherited, because it says something the
+  // panel's own title does not. Scoped to the tile itself (`data-slot=
+  // "assignee-tile"`) so the panel's own "Assigned to" title is never
+  // mistaken for a tile eyebrow that no longer exists.
   describe("the tile's own eyebrow, in both states", () => {
-    it("reads 'Assigned to' when the record carries its own person", () => {
+    it("draws no eyebrow at all when the record carries its own person (R108: the panel title already says it)", () => {
       render(<AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />)
       const tile = document.querySelector('[data-slot="assignee-tile"]') as HTMLElement
-      expect(within(tile).getByText("Assigned to")).toBeTruthy()
+      expect(within(tile).queryByText("Assigned to")).toBeNull()
       expect(within(tile).queryByText("From the app")).toBeNull()
     })
 
@@ -527,11 +532,18 @@ describe("AssignedToCard", () => {
   // AND NEITHER CARRIES A RAISED TILE ANY MORE — Aurora's 21 Sep 2026 ruling,
   // "stakeholders raised by design like in the loop (chip like)" / "same with
   // assigned to (chiplike)": both are a face+name chip now, no
-  // `data-variant="raised"` `Card` standing around either one.
-  it("the assigned-to tile shares the Raised by tile's own classes, and neither carries a raised Card any more", () => {
+  // `data-variant="raised"` `Card` standing around either one. The PERSON
+  // ROW itself (the `PersonCard` wrapper) is the LAST child of the tile in
+  // both states now, never the first: Raised by still carries its own
+  // eyebrow row above it (a different word from ANY section title on this
+  // page, so R108 leaves it alone), while Assigned to (R108, 22 Sep 2026)
+  // draws no eyebrow row at all for the ticket's own person, so the person
+  // row is its only child. `lastElementChild` is the shape both states
+  // agree on.
+  it("the assigned-to tile's person row shares the Raised by tile's own classes, and neither carries a raised Card any more", () => {
     render(<HelpStakeholders stakeholders={[MAX]} />)
     const raisedByTile = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
-    const raisedByContent = raisedByTile.firstElementChild as HTMLElement
+    const raisedByContent = raisedByTile.lastElementChild as HTMLElement
     const raisedByClasses = raisedByContent.className
     expect(raisedByTile.getAttribute("data-variant")).toBeNull()
     expect(raisedByTile.querySelector('[data-slot="card"]')).toBeNull()
@@ -540,9 +552,12 @@ describe("AssignedToCard", () => {
 
     render(<AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />)
     const assignedTile = document.querySelector('[data-slot="assignee-tile"]') as HTMLElement
-    const assignedContent = assignedTile.firstElementChild as HTMLElement
+    const assignedContent = assignedTile.lastElementChild as HTMLElement
 
     expect(assignedContent.className).toBe(raisedByClasses)
+    // R108: no eyebrow row at all for the ticket's own person, so the
+    // person row is this tile's ONLY child.
+    expect(assignedTile.children).toHaveLength(1)
     expect(assignedTile.getAttribute("data-variant")).toBeNull()
     expect(assignedTile.querySelector('[data-slot="card"]')).toBeNull()
   })

@@ -763,8 +763,54 @@ export function MeetingsScreen({
           stands down through the arbitration context rather than saying a
           number twice. */}
       {/* THE GEAR (R61) — the transcript capture and the time it writes
-          are listed on this module's own settings page (R70). */}
-      <CollectionHeading sectionKey="meetings" total={total} action={<ModuleSettingsGear teamId={teamId} segment="meetings" />} />
+          are listed on this module's own settings page (R70).
+          THE SYNC BUTTON JOINS IT HERE NOW. Aurora, verbatim, 22 Sep 2026: "on
+          meetngs, the sync button bring it to the top, next to settnigs." It
+          used to sit low on the screen, the foot of a card below the list (see
+          that card's own header further down, kept for the calendar
+          catch-up sentences that still live there). Moved into
+          `CollectionHeading`'s own `action` slot, the same row `knowledge-
+          screen.tsx` already draws Ask/Sync/gear through, so R100 (the gear
+          centres on the title's own line) keeps holding without a bespoke row:
+          the slot's wrapper is already `items-center`, gear last, on the far
+          right. `describe={false}` drops the "what gets brought in" caption,
+          the one line of the button's own text that would not fit beside a
+          title without crowding it, the same choice `knowledge-screen.tsx`
+          made for the identical reason. The status half (syncing / last
+          brought in / what went wrong) is NOT `describe`-gated and still
+          shows beside the button here, exactly as it does on Knowledge's own
+          head today, and that is the shipped reading of "keep the information
+          available", not a new one. The button's own props (`onSynced`,
+          `onCalendarResult`) and the state they write (`ahead`, `caughtUp`,
+          below) are unchanged; only where the button is DRAWN moved. */}
+      <CollectionHeading
+        sectionKey="meetings"
+        total={total}
+        action={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canCreate && (
+              <GoogleSyncButton
+                teamId={teamId}
+                scope="both"
+                describe={false}
+                onCalendarResult={(r) => {
+                  setAhead(r.ahead)
+                  setCaughtUp(r.caughtUp)
+                }}
+                onSynced={() => {
+                  invalidate(meetingsKey(teamId))
+                  invalidate(meetingsKey(teamId, "mine-week"))
+                  // …AND MINE. A calendar sweep is the single biggest source of
+                  // new rows in this person's Mine. Every entry it brings in
+                  // carries the guest list that decides the tab.
+                  invalidate(meetingsKey(teamId, "mine"))
+                }}
+              />
+            )}
+            <ModuleSettingsGear teamId={teamId} segment="meetings" />
+          </div>
+        }
+      />
 
       {/* R14's other half: the meetings list pages, and the meeting somebody digs for is
           the OLD one — so the search box is answered by the door, over the whole
@@ -1167,47 +1213,22 @@ export function MeetingsScreen({
         }}
       </PagedFind>
 
-      {/* BRINGING GOOGLE IN — ONE CONTROL, ONE SENTENCE, ONE FRAME.
-       *
-       * THE OWNER, 26 Aug 2026, looking at this corner of the screen: "it is very
-       * cluttered everywhere. At the bottom near this 'Bring it in' button, there
-       * is too much text. Not well done."
-       *
-       * He was right, and it was not a typography problem. There were TWO buttons
-       * a few pixels apart doing two different things with two different labels
-       * ("Bring in the calendar", "Bring it in"), each with its own status line,
-       * plus a caption, plus a walk-progress sentence — six pieces of text
-       * sprayed across the full width of a 1600px page, none of them framed.
-       *
-       * There is one act here as far as a person is concerned: bring in what
-       * Google knows. The shared control has always been able to do both halves
-       * (`scope="both"`), and the only reason this screen kept its own was that
-       * the calendar sweep's answer carries two facts this screen shows — how far
-       * back the walk has got, and which entries are still beyond the horizon.
-       * `onCalendarResult` hands those over, so the second button is gone.
-       *
-       * The FRAME belongs to the screen and not to the control: on the knowledge
-       * heading band the same control is an inline toolbar item, and a bordered
-       * card there would be wrong. Here it is the foot of a list, so it gets a
-       * card. */}
-      {canCreate && (
+      {/* WHAT THE SYNC BUTTON LEFT BEHIND, when it moved into the head
+       * (Aurora, 22 Sep 2026: "on meetngs, the sync button bring it to the
+       * top, next to settnigs", see `CollectionHeading` above). This used to
+       * be that button's own card, the foot of the list, framed because the
+       * owner had once found six sprayed pieces of text here with no frame
+       * around any of them (26 Aug 2026). The button and its own status line
+       * are gone from this spot now; what is left is the ONE thing that was
+       * never the button's own text: the calendar walk's progress, still
+       * written here by the same `onCalendarResult` callback (now wired from
+       * the head), because it is about the LIST below, not about the control
+       * that started the walk. Gated on there being something to say, not
+       * only on `canCreate`, so a creator who has not pressed Sync yet (or
+       * whose calendar is already caught up with nothing further out) sees no
+       * empty panel. */}
+      {canCreate && (caughtUp === false || ahead.length > 0) && (
         <div className="flex flex-col gap-3 rounded-[var(--radius)] bg-surface-panel p-4">
-          <GoogleSyncButton
-            teamId={teamId}
-            scope="both"
-            onCalendarResult={(r) => {
-              setAhead(r.ahead)
-              setCaughtUp(r.caughtUp)
-            }}
-            onSynced={() => {
-              invalidate(meetingsKey(teamId))
-              invalidate(meetingsKey(teamId, "mine-week"))
-              // …AND MINE. A calendar sweep is the single biggest source of new
-              // rows in this person's Mine — every entry it brings in carries
-              // the guest list that decides the tab.
-              invalidate(meetingsKey(teamId, "mine"))
-            }}
-          />
           {/* HOW FAR BACK IT HAS GOT. Only after a press, and only while there is
               more: a line that always said something would be furniture, and one
               that never said anything would leave somebody believing their whole

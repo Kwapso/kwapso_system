@@ -98,23 +98,28 @@ function badgeName(t: RunningTimer): string {
           : "work"
 }
 
-/** WHAT IS RUNNING RIGHT NOW, as a plain array — this bar's own read, made
- * reusable rather than duplicated.
+/** WHAT IS RUNNING RIGHT NOW, as a plain array — `TimerBar`'s own read,
+ * pulled out as a named step rather than inlined into the component below.
  *
- * `TimerBar` renders nothing when the array is empty, which is most of the
- * time, and that used to be the whole story: a container could hand it a slot
- * and pay nothing for the empty case. It stopped being true when the agency
- * shell's header BAND became the kit's own element (`ScreenShell`, kit
- * v1.2.28): the band carries the shell's header padding whether or not
- * anything is inside it, so "render null" now costs ~90px of empty band above
- * every screen. `AppShell` asks this first and omits the band entirely.
+ * NOT EXPORTED ANY MORE, 22 Sep 2026. It used to be a second seam `AppShell`
+ * called directly, to decide whether to draw the `ScreenShell` header BAND
+ * `TimerBar` sat in at all — that band carried the shell's own header padding
+ * whether or not anything was inside it, so an unconditional band cost ~90px
+ * of empty space on every screen with nobody timing anything, and asking this
+ * hook one level up let the shell skip drawing the band rather than draw it
+ * empty. Both call sites are gone with that band (`app-shell.tsx` now hands
+ * `TimerBar` straight to `ScreenShell`'s `asideLead`, a slot that paints no
+ * fill and costs nothing when its child renders `null`), so the only reader
+ * left is `TimerBar` itself, three lines down, and a name nothing outside
+ * this file uses buys nothing by staying public.
  *
- * IT IS NOT A SECOND REQUEST. `useCached` goes through `loadShared`, which is
- * keyed and de-duplicates in flight, so this hook and the `TimerBar` beneath
- * it share one fetch, one cache entry and one live-sync listener (R15 —
+ * IT IS STILL NOT A SECOND REQUEST — unchanged by the above. `useCached` goes
+ * through `loadShared`, which is keyed and de-duplicates in flight, so a
+ * second `TimerBar` mounted elsewhere (the mobile bar's own copy) shares one
+ * fetch, one cache entry and one live-sync listener with this one (R15 —
  * `runningTimersKey` is in the registry already). `null` for the team is the
  * teamless case and reads nothing at all. */
-export function useRunningTimers(teamId: string | null): RunningTimer[] {
+function useRunningTimers(teamId: string | null): RunningTimer[] {
   // AND IT WAITS FOR THE PAINT. This is shell chrome — a band that says whose
   // timer is running — and it has nothing to do with the screen a person came
   // for. On a cold deep link it was one of the requests in front of the record

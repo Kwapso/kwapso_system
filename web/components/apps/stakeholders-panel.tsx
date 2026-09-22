@@ -96,7 +96,11 @@ function Group({
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-muted-foreground text-sm font-medium">{title}</h2>
+      {/* R108, 22 Sep 2026: the same eyebrow every record section title now
+          shares (`text-micro text-muted-foreground uppercase`), never its
+          own `text-sm font-medium`. See `TicketSidePanel`'s own header
+          (`web/components/tickets/ticket-detail-body.tsx`). */}
+      <h2 className="text-micro text-muted-foreground uppercase">{title}</h2>
       {people.length === 0 ? (
         /* R62 — ONE REGISTER, BOTH ZEROS (client, 2026-09-09). The narrowed
            half was an `EmptyLine`, one grey line beside the full register its

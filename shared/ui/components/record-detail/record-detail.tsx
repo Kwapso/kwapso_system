@@ -657,15 +657,23 @@ function RecordFooterEyebrow({ children }: { children: React.ReactNode }) {
 
 /**
  * THE FOOTER GRID'S ONE COLUMN-COUNT QUERY, SPENT THREE TIMES AND WRITTEN
- * ONCE — 22 SEP 2026. The `CardContent` grid below reads it to pick one
- * track or two; the Record region and the Activity region below it each
- * read it again to pick their own row/column, so the count and the two
- * placements can never name three different widths for what is one
- * question. The number is the grid's own arithmetic, not a guess: two
+ * ONCE — 22 SEP 2026. The `footer-grid` wrapper inside `CardContent` reads
+ * it to pick one track or two; the Record region and the Activity region
+ * below it each read it again to pick their own row/column, so the count
+ * and the two placements can never name three different widths for what is
+ * one question. The number is the grid's own arithmetic, not a guess: two
  * `16.25rem` tracks plus the one `--space-7` gap between them, the exact
  * container width `auto-fit` used to compute this same collapse from
  * implicitly before this ruling (see the grid's own comment for why that
  * became explicit).
+ *
+ * READ AGAINST `CardContent`, NOT AGAINST THE GRID ITSELF — fixed the same
+ * day this query was written. `CardContent` is the query container
+ * (`@container`, below); the grid that actually switches track count is
+ * `CardContent`'s own child, `footer-grid`, one level down, because a
+ * container cannot be queried by a rule on the SAME element that declares
+ * it — see `footer-grid`'s own comment for the full account of the bug that
+ * shipped for a few hours before this split.
  */
 const FOOTER_TWO_COLUMN_QUERY = "@min-[calc(16.25rem*2_+_var(--space-7))]";
 
@@ -1285,45 +1293,36 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                    beside it. */
                 "px-[var(--pane-inset-x,var(--space-5))] py-[var(--space-4h)]",
                 "lg:px-[var(--pane-inset-x,var(--space-7))] lg:py-6",
-                /* 27.8's grid, verbatim except for the unit: `repeat(auto-fit,
-                   minmax(260px, 1fr))`. auto-fit is what makes "one column at
-                   380" a property of the box rather than a breakpoint someone
-                   has to remember — at 380 the card's content box is ~340 and
-                   a second 16.25rem track cannot land.
-
-                   REPLACED WITH AN EXPLICIT CONTAINER QUERY, 22 SEP 2026 —
-                   CLIENT RULING: "whenever the footer displays only one
-                   column instead of two, put the record on top and the
-                   latest activity on the bottom." `auto-fit` alone answers
-                   "how many columns" but leaves both columns in DOM order
-                   however many it draws, which is right for the two-column
-                   case (CH27.8's Activity-left/Record-right) and wrong for
-                   the one-column case (this ruling's Record-top/Activity-
-                   bottom) — one grid, two different orders, and `order` alone
-                   cannot hold both without knowing which of the two is
-                   showing. So the COUNT is now the same arithmetic `auto-fit`
-                   already did — two `16.25rem` tracks plus the one gap
-                   between them, `@min-[calc(16.25rem*2_+_var(--space-7))]` —
-                   spelled out as a container query rather than left implicit,
-                   so the two columns below (`ORDER`/`PLACEMENT`, on each
-                   region) can gate their own row/column on the EXACT same
-                   number instead of guessing at auto-fit's own threshold.
-                   `@container` is this element's own — CardContent both
-                   establishes the query container and is queried by its own
-                   two children, the same shape `toolbar-row.tsx`'s root
-                   already uses ("the kit's first" container query; this is
-                   its second). A CONTAINER query, not a viewport one, for the
-                   identical reason toolbar-row.tsx gives: a `stripe` register
-                   can stand in a sheet narrower than the viewport, and the
-                   column count has to answer to the box it is actually in. */
-                "@container grid grid-cols-1",
-                footerHasTwoColumns
-                  ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`
-                  : undefined,
-                "items-start",
-                /* 32 BETWEEN the columns, 14 between them once they stack.
-                   The chapter's two specimens, in one declaration. */
-                "gap-x-[var(--space-7)] gap-y-[var(--space-3h)]",
+                /* THE QUERY CONTAINER, AND ONLY THE QUERY CONTAINER — FIXED
+                   22 SEP 2026, the same day `FOOTER_TWO_COLUMN_QUERY` was
+                   written. This class used to sit right beside
+                   `grid grid-cols-1` and the `${FOOTER_TWO_COLUMN_QUERY}:`
+                   variant, ALL THREE ON THIS SAME ELEMENT — and a container
+                   cannot be queried by a rule on the element that declares
+                   it. The container-query spec resolves an element's query
+                   container by walking up from its PARENT, never itself, so
+                   with the variant and `@container` on one node there was no
+                   valid ancestor container to resolve it against (grep the
+                   kit: the only other `@container` is `toolbar-row.tsx`'s
+                   root, which keeps its own query on DESCENDANTS for exactly
+                   this reason) and the two-column class never matched, at any
+                   width. `grid-cols-1` was the only rule left standing, so a
+                   full-width ticket's footer — easily wide enough for two
+                   16.25rem tracks — stacked to one column anyway: the live
+                   bug this comment is here to keep from coming back.
+                   `@container` stays here because `CardContent`'s content
+                   box (padding already subtracted, both above) IS the box
+                   `FOOTER_TWO_COLUMN_QUERY`'s arithmetic is written against;
+                   the grid that the query actually switches now lives one
+                   level down, on `CardContent`'s own child `footer-grid`,
+                   which carries no padding or margin of its own and so
+                   changes none of that arithmetic. `footer-grid` is a
+                   DESCENDANT of `CardContent`, so the query resolves cleanly,
+                   and `footer-activity`/`footer-record` — `footer-grid`'s own
+                   children — still find `CardContent` as their nearest
+                   ancestor container exactly as before, since a plain wrapper
+                   with no `container-type` of its own does not shadow it. */
+                "@container",
               )}
               /* THE ONE REBINDING, and the reason `ActivityFeed`, `Input` and
                  `Avatar` can be composed onto a charcoal ground without any
@@ -1398,6 +1397,55 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                 } as React.CSSProperties
               }
             >
+              {/* THE GRID ITSELF, ONE LEVEL BELOW THE QUERY CONTAINER — see
+                 `CardContent`'s own `@container` comment above and
+                 `FOOTER_TWO_COLUMN_QUERY`'s for the full account. This node
+                 carries no padding and no margin, so it introduces no width
+                 of its own: its content box is `CardContent`'s content box,
+                 unchanged, which is what keeps the query's arithmetic
+                 (`calc(16.25rem*2 + var(--space-7))`) correct without
+                 retuning it for the extra level of nesting.
+
+                 27.8's grid, verbatim except for the unit: `repeat(auto-fit,
+                 minmax(260px, 1fr))`. auto-fit is what made "one column at
+                 380" a property of the box rather than a breakpoint someone
+                 has to remember — at 380 the card's content box is ~340 and
+                 a second 16.25rem track cannot land.
+
+                 REPLACED WITH AN EXPLICIT CONTAINER QUERY, 22 SEP 2026 —
+                 CLIENT RULING: "whenever the footer displays only one
+                 column instead of two, put the record on top and the
+                 latest activity on the bottom." `auto-fit` alone answers
+                 "how many columns" but leaves both columns in DOM order
+                 however many it draws, which is right for the two-column
+                 case (CH27.8's Activity-left/Record-right) and wrong for
+                 the one-column case (this ruling's Record-top/Activity-
+                 bottom) — one grid, two different orders, and `order` alone
+                 cannot hold both without knowing which of the two is
+                 showing. So the COUNT is now the same arithmetic `auto-fit`
+                 already did — two `16.25rem` tracks plus the one gap
+                 between them, `@min-[calc(16.25rem*2_+_var(--space-7))]` —
+                 spelled out as a container query rather than left implicit,
+                 so the two columns below (`ORDER`/`PLACEMENT`, on each
+                 region) can gate their own row/column on the EXACT same
+                 number instead of guessing at auto-fit's own threshold. A
+                 CONTAINER query, not a viewport one, for the identical
+                 reason toolbar-row.tsx gives: a `stripe` register can stand
+                 in a sheet narrower than the viewport, and the column count
+                 has to answer to the box it is actually in. */}
+              <div
+                data-slot="record-detail-footer-grid"
+                className={cn(
+                  "grid grid-cols-1",
+                  footerHasTwoColumns
+                    ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`
+                    : undefined,
+                  "items-start",
+                  /* 32 BETWEEN the columns, 14 between them once they stack.
+                     The chapter's two specimens, in one declaration. */
+                  "gap-x-[var(--space-7)] gap-y-[var(--space-3h)]",
+                )}
+              >
               {/* ---- Left · Latest activity ---------------------------- */}
               {showActivityColumn ? (
                 <div
@@ -1695,6 +1743,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                   </div>
                 </div>
               ) : null}
+              </div>
             </CardContent>
           </Card>
         ) : null}

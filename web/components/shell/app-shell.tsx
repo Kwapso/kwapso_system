@@ -110,7 +110,7 @@ import { CreateTeamDialog } from "@/components/team/create-team-dialog"
 import { TEAM_CREATION_CLOSED, TEAM_SCREENS_HIDDEN } from "@shared/product"
 import { ProfileMenu } from "@/components/shell/profile-menu"
 import { TeamSwitcher } from "@/components/shell/team-switcher"
-import { TimerBar, useRunningTimers } from "@/components/shell/timer-bar"
+import { TimerBar } from "@/components/shell/timer-bar"
 import {
   Sheet,
   SheetContent,
@@ -581,12 +581,6 @@ export function AppShell({
   // paint, only for somebody who holds both rights the door asks for — see the
   // hook, which is where all the reasoning about why this is not a cron lives.
   useGoogleCatchUp(teamId, can)
-  // IS ANYTHING BEING TIMED. The same cached read `TimerBar` makes for itself,
-  // asked one level up so the shell can decide whether to draw the header BAND
-  // the timer would sit in at all — see the `header` prop below for why an
-  // always-drawn band is not free. One key, one request: both callers go
-  // through `loadShared`.
-  const runningTimers = useRunningTimers(teamId)
   // IS THE ASSISTANT SHOWING. The same module store the panel itself reads
   // (web/lib/agent-open.ts) — read here because the shell's third column is
   // CONTROLLED by it: the kit holds the aside's state uncontrolled unless it is
@@ -1816,6 +1810,47 @@ export function AppShell({
            deleted rather than merely unwired: nothing here passes any of
            the three, so the aside goes back to the kit's own single fixed
            width, exactly as it was before this ruling existed. */
+        /* THE TIMER, OUT OF THE CARD AND BESIDE THE ASSISTANT OPENER —
+           Aurora, 22 Sep 2026: "the timer, i want it on the same line as the
+           open assistant, to its left... kind of 'out of the main content
+           card'." This USED TO be the `header` prop above (deleted with this
+           change): a row inside `ScreenShell`'s own header band, i.e. inside
+           the card, drawn only `md:flex` and gated on `runningTimers.length`
+           because an always-drawn band carries the shell's header padding
+           whether or not anything sits in it (~90px of empty band on every
+           screen with nobody timing anything).
+
+           `asideLead` IS THE KIT'S OWN ANSWER TO THIS EXACT SENTENCE. Its own
+           doc comment in `screen-shell.tsx` quotes an EARLIER instance of the
+           same ruling, verbatim, from 2026-09-07: "I want the timer out of
+           the main body. I want it exactly at the same level on the left of
+           the assistant button opener, and of course, if I open the
+           assistant, they should also move." The slot already does all three:
+           it is chrome on the GROUND, not a row in the card; it shares the
+           shut `EdgeHandle`'s own two tokens (`--shell-gutter`,
+           `--control-height-button`) so "same level" is a derivation; and it
+           is anchored to the assistant dock's own leading edge, so it travels
+           with the column on the same transition the dock's width already
+           runs — no second animation written here. No app-side slot existed
+           beside `EdgeHandle` before this prop; had the kit not already
+           shipped it, THAT is the slot this ruling would have needed added.
+
+           NO LENGTH GATE ANY MORE, AND THAT IS NOT AN OVERSIGHT. `AsideLead`
+           paints no fill, no radius and no ink of its own (screen-shell.tsx,
+           "A PLACEMENT AND NOTHING ELSE") — it is an invisible box even when
+           `TimerBar` renders `null` inside it, unlike the deleted header band,
+           which spent real padding whether or not anything was inside. So
+           this is `teamId` alone, exactly the same gate the mobile copy above
+           uses, and `TimerBar`'s own "render nothing while nothing is
+           running" is what makes both copies cost nothing at rest — unchanged
+           in that file.
+
+           STILL `max-md:hidden`, FROM THE SLOT ITSELF — the mobile bar above
+           keeps drawing its own copy in the fixed top bar, which is already
+           outside the card and already immediately left of the mobile
+           assistant trigger; nothing about that pairing moves. Only the wide
+           screens' copy changes home, from the header band to this slot. */
+        asideLead={teamId ? <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} /> : undefined}
         breadcrumb={
           /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,
              stated at the kit's own `breadcrumb` prop: no buttons, no pills,
@@ -2032,35 +2067,6 @@ export function AppShell({
                 forwardLabel={t("Forward")}
                 label={t("Trail")}
               />
-            </div>
-          )
-        }
-        header={
-          /* THE HEADER BAND HOLDS THE RUNNING TIMER, AND ONLY WHEN ONE IS
-           * RUNNING. The breadcrumbs used to share this row; they are on the
-           * ground now (above), and the timer cannot follow them there —
-           * "navigation text only" is the client's rule for that strip and a
-           * clock with a Stop button on it is a control. So it stays in the
-           * band, inside the card, which is where the kit says a screen's
-           * controls go.
-           *
-           * IT IS CONDITIONAL BECAUSE THE BAND COSTS REAL SPACE. `TimerBar`
-           * renders nothing when nothing is running, which is most of the
-           * time — but the band it sits in is the SHELL's element and carries
-           * the shell's own header padding whether or not anything is inside
-           * it, so an unconditional `header` would put ~90px of empty band
-           * above every screen in the app. `useRunningTimers` is the same
-           * cached read `TimerBar` itself makes (one key, one in-flight
-           * request, `loadShared`), asked one level up so the row can be
-           * decided rather than drawn empty.
-           *
-           * BUILD-1 §5 — "a running timer appears in the header of EVERY
-           * screen" — is unaffected: the timer is still in the shell, on
-           * every screen, and still shows nothing when nobody is timing
-           * anything. The mobile bar keeps its own copy above. */
-          !teamId || runningTimers.length === 0 ? undefined : (
-            <div className="hidden justify-end md:flex">
-              <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />
             </div>
           )
         }

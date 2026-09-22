@@ -474,6 +474,36 @@ import {
 } from "../../foundations/icons";
 
 /* ----------------------------------------------------------------------------
+   THE ACTIVE ROW'S INDICATOR — MEASURED, NOT CSS ONLY. THE VERTICAL ANALOGUE
+   OF `TabsList` (`components/tabs/tabs.tsx`, around its own "THE INDICATOR,
+   AND WHY IT IS MEASURED" section).
+
+   HER RULING, 22 SEP 2026, VERBATIM: "do you know how when changing tabs
+   (line tabs) there's a slight animating where the active tab travels? i
+   want the same idea on the sidebar nav."
+
+   Tabs travel on the INLINE axis and every trigger has its own width, so
+   `TabsList` measures `offsetLeft`/`offsetWidth` off the active trigger. This
+   rail travels on the BLOCK axis instead, and its two row shapes (`ROW_
+   EXPANDED`, `ROW_COLLAPSED`) do not vary row to row the way a tab's width
+   does — expanded rows stretch to the column's own width (flex's default
+   cross-axis stretch, see `ROW_EXPANDED`'s own comment) and collapsed rows
+   are all the same fixed square. So only the axis that actually varies per
+   row is measured here: `offsetTop` and `offsetHeight`. The inline axis is
+   CSS/token driven at the indicator's own render site below, not read off
+   the DOM — `inset-inline` for the expanded full-bleed case, `--control-
+   height-button` + `margin-inline: auto` for the collapsed centred square.
+
+   THE HELPER AND THE CONTEXT ARE REDECLARED, NOT IMPORTED. `tabs.tsx` has no
+   shared module either file reaches for, and a six-line helper is not worth
+   inventing one for. */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
+
+/** True once the rail's own nav has a measured indicator painting the mark. */
+const RailIndicatorContext = React.createContext(false);
+
+/* ----------------------------------------------------------------------------
    THE ACTIVE ROW — mango, ruled, and now spine-aware.
 
    Client ruling D1 = A: the row is the chapter's mango. Register row 53 is
@@ -495,7 +525,14 @@ import {
    no shadow underneath." The row was drawing `--btn-primary-pressed` on
    `:active` on top of the translate `ROW_PRESSABLE` already applies. One of
    the two had to go and the chapter says which.
-   -------------------------------------------------------------------------- */
+
+   SPLIT IN TWO, 22 SEP 2026, THE SAME WAY `tabs.tsx` SPLITS `TRIGGER_
+   SELECTED` FROM `TRIGGER_SELECTED_WITH_INDICATOR`. Before the first
+   measurement lands (server render, the frame before hydration) the active
+   row draws its OWN fill, exactly as before. Once the nav's indicator is
+   live, the row stops painting the fill and the hover wash — both move to
+   the travelling element below — and keeps only the ink and the weight, so
+   the two marks are never both on screen at once. */
 const ACTIVE_TREATMENT = [
   "bg-[var(--spine-active-fill)] text-[var(--spine-active-ink)]",
   /* D5 = C. The lit row is MEDIUM against a quiet row's body weight, which is
@@ -503,6 +540,14 @@ const ACTIVE_TREATMENT = [
      entry carries no weight at all. */
   "font-[var(--font-weight-medium)]",
   "hover:bg-[var(--spine-active-hover)]",
+].join(" ");
+
+/** What the ACTIVE row draws once the measured indicator is painting the
+ *  mark: ink and weight only, no fill of its own and no hover wash, so a
+ *  travelling indicator is never doubled up with a static one underneath it. */
+const ACTIVE_TREATMENT_WITH_INDICATOR = [
+  "text-[var(--spine-active-ink)]",
+  "font-[var(--font-weight-medium)]",
 ].join(" ");
 
 /* ----------------------------------------------------------------------------
@@ -1092,6 +1137,12 @@ interface RowProps {
 function RailRow({ item, active, collapsed, reserveIcon, onSelect }: RowProps) {
   const blocked = item.disabled === true;
 
+  /* Whether the nav's own measured indicator is live — see the context's own
+     comment above `ACTIVE_TREATMENT`. `false` outside a `Rail` (the default
+     `React.createContext(false)` value), which draws the pre-measurement fill
+     exactly as a stray `RailRow` always has. */
+  const indicatorLive = React.useContext(RailIndicatorContext);
+
   /* THE THREE SKINS ARE EXCLUSIVE AND RESOLVED HERE, IN JS — PAG-2's own
      recommendation. Two of them carry a `hover:` rule and the third carries
      none, so no two rules with equal specificity are ever in the class list
@@ -1100,7 +1151,13 @@ function RailRow({ item, active, collapsed, reserveIcon, onSelect }: RowProps) {
     ROW_SHAPE,
     collapsed ? ROW_COLLAPSED : ROW_EXPANDED,
     blocked ? ROW_BLOCKED : ROW_PRESSABLE,
-    blocked ? undefined : active ? ACTIVE_TREATMENT : ROW_IDLE,
+    blocked
+      ? undefined
+      : active
+        ? indicatorLive
+          ? ACTIVE_TREATMENT_WITH_INDICATOR
+          : ACTIVE_TREATMENT
+        : ROW_IDLE,
   );
 
   const body = collapsed ? (
@@ -1320,6 +1377,93 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
       setClosed((prev) => (open ? prev.filter((k) => k !== id) : [...prev, id]));
       onGroupToggle?.(id, open);
     };
+
+    /* THE INDICATOR'S OWN MEASUREMENT — see the block comment above
+       `ACTIVE_TREATMENT` for what this does and does not read off the DOM. */
+    const navRef = React.useRef<HTMLElement | null>(null);
+
+    /** `null` until measured. Block axis only: top offset + height. Named
+     *  `indicatorMark` rather than `mark`, which is already this component's
+     *  own brand-artwork prop a few lines up. */
+    const [indicatorMark, setIndicatorMark] = React.useState<
+      { top: number; height: number } | null
+    >(null);
+
+    useIsomorphicLayoutEffect(() => {
+      const nav = navRef.current;
+      if (!nav) {
+        setIndicatorMark(null);
+        return;
+      }
+
+      const measure = () => {
+        const active = nav.querySelector<HTMLElement>(
+          '[data-slot="rail-item"][data-active]',
+        );
+        if (!active) {
+          setIndicatorMark(null);
+          return;
+        }
+
+        /* `offsetTop`/`offsetHeight` are read against `nav` once it carries
+           `position: relative` (below): every unpositioned wrapper between a
+           row and the nav — each `rail-group` div — is invisible to this
+           measurement, the same way `offsetLeft` skips nothing between a
+           tab trigger and its list in `tabs.tsx`. */
+        const top = active.offsetTop;
+        const height = active.offsetHeight;
+
+        setIndicatorMark((prev) =>
+          prev && prev.top === top && prev.height === height ? prev : { top, height },
+        );
+      };
+
+      measure();
+
+      /* THE MUTATION OBSERVER — the active attribute, and childList. A
+         selection change writes `data-active` on the SAME row nodes (this
+         file sets the attribute itself, not Radix), which the attribute
+         filter catches. A group opening or closing above the active row
+         unmounts/remounts every `RailRow` in it (`{open || isCollapsed ?
+         group.items.map(...) : null}`, below) rather than resizing them,
+         which `childList` catches — and is also why `closed` sits in this
+         effect's own dependency list: React re-runs the effect on that
+         state change and re-queries the (new) live rows for the resize
+         observer below, rather than the old, now-detached ones. */
+      const mutations = new MutationObserver(measure);
+      mutations.observe(nav, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-active", "disabled"],
+        childList: true,
+      });
+
+      /* THE RESIZE OBSERVER — the nav itself, and every row inside it. The
+         nav's own resize is what a collapsed <-> expanded transition fires
+         (the column narrows to the icon width and back); every row keeps its
+         DOM identity across that transition (`key={item.id}`, unchanged by
+         `isCollapsed`), so it is a resize of the SAME nodes, not a mutation,
+         and only the resize observer sees it. */
+      const resizes = new ResizeObserver(measure);
+      resizes.observe(nav);
+      for (const row of Array.from(
+        nav.querySelectorAll<HTMLElement>('[data-slot="rail-item"]'),
+      )) {
+        resizes.observe(row);
+      }
+
+      return () => {
+        mutations.disconnect();
+        resizes.disconnect();
+      };
+    }, [groups, isCollapsed, closed, current]);
+
+    /** Whether the nav's indicator has a real measurement to paint. Provided
+     *  to every `RailRow` below so the active one stops drawing its own fill
+     *  the instant the travelling mark can draw it instead — never both, and
+     *  never neither (before the first measurement the row's own fill is
+     *  still live, see `ACTIVE_TREATMENT`). */
+    const indicatorLive = indicatorMark !== null;
 
     return (
       <div
@@ -1588,17 +1732,57 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             invented; wheel/touch/keyboard scrolling are a paint change away,
             untouched. */}
         <nav
+          ref={navRef}
           data-slot="rail-nav"
           aria-label={label}
           className={cn(
-            "flex min-h-0 min-w-0 flex-1 flex-col gap-[var(--space-5)] overflow-y-auto",
+            /* `relative` — added for the measured indicator below, and it
+               costs nothing here: the negative-margin/padding pair two lines
+               down still cancels exactly (see that comment), so this is the
+               same visual box it always was, now with a containing block for
+               one absolutely positioned child. */
+            "relative flex min-h-0 min-w-0 flex-1 flex-col gap-[var(--space-5)] overflow-y-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             "-m-[calc(var(--focus-offset)_+_var(--focus-width))]",
             "p-[calc(var(--focus-offset)_+_var(--focus-width))]",
             isCollapsed && "items-center gap-[var(--space-3)]",
           )}
         >
-          {groups.map((group, groupIndex) => {
+          {/* THE INDICATOR — first in the DOM so the rows paint over it, same
+              order as `TabsList`'s own. Undrawn until the first measurement
+              lands (no `indicatorMark`), so there is no slide-in from nowhere
+              on first paint: the active row's own fill (`ACTIVE_TREATMENT`)
+              carries the mark until this exists, and `RailIndicatorContext`
+              flips the row off the same commit this appears in. */}
+          {indicatorMark ? (
+            <span
+              aria-hidden="true"
+              data-slot="rail-indicator"
+              className={cn(
+                "motion-rail-indicator pointer-events-none absolute rounded-pill",
+                "bg-[var(--spine-active-fill)]",
+              )}
+              style={{
+                top: 0,
+                insetInlineStart: 0,
+                insetInlineEnd: 0,
+                height: `${indicatorMark.height}px`,
+                transform: `translateY(${indicatorMark.top}px)`,
+                /* THE INLINE AXIS, TOKEN DRIVEN, NOT MEASURED — see the block
+                   comment above `ACTIVE_TREATMENT`. Expanded, `insetInlineStart`
+                   / `insetInlineEnd` above already span the row's own full
+                   width; collapsed, this narrows it to the same fixed square
+                   every `ROW_COLLAPSED` row is and centres it the same way
+                   `items-center` centres the real rows, `margin-inline: auto`
+                   against the two insets already set. */
+                ...(isCollapsed
+                  ? { width: "var(--control-height-button)", marginInline: "auto" }
+                  : {}),
+              }}
+            />
+          ) : null}
+          <RailIndicatorContext.Provider value={indicatorLive}>
+            {groups.map((group, groupIndex) => {
             const open = !closed.includes(group.id);
             return (
               <div
@@ -1685,6 +1869,7 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
               </div>
             );
           })}
+          </RailIndicatorContext.Provider>
         </nav>
 
         {/* THE COLLAPSE TOGGLE — opt-in, and never mango. Chapter 15 draws the

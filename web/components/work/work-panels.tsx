@@ -1368,7 +1368,8 @@ export function AppTicketsPanel({
    * `PagedPanelBody` caller in this file) and an unrecognised value, which is
    * the same defensive default `AppTicketsTab`'s own switch takes below. */
   const renderBody = (rows: HelpTicket[]) => {
-    if (view?.value === "board") return <AppTicketsBoard teamId={teamId} host={host} rows={rows} onOpen={openTicket} />
+    if (view?.value === "board")
+      return <AppTicketsBoard teamId={teamId} host={host} rows={rows} members={membersQ.data} onOpen={openTicket} />
     if (view?.value === "queue") {
       /* THE QUEUE — client, 17 Sep 2026: "I also want the queue view for
          triaging. Empty. Show there's nothing to triage." A far smaller ask
@@ -1492,16 +1493,23 @@ function AppTicketsBoard({
   teamId,
   host,
   rows,
+  members,
   onOpen,
 }: {
   teamId: string
   host: PanelHost
   rows: readonly HelpTicket[]
+  /** the team's own members cache — `ticketBoardCard` (tickets-collection.tsx)
+   * reads it to face a staff raiser under a card's date, R104's own shape,
+   * added 22 Sep 2026. This board's caller already holds it (`membersQ`,
+   * `AppTicketsPanel`, above) for the identical resolved-by face the list
+   * body draws, so it is handed down rather than fetched a second time. */
+  members: TeamMember[] | undefined
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
   const COLUMN = ticketStatusColumnTitles(t)
-  const baseCard = ticketBoardCard(teamId, t, lang)
+  const baseCard = ticketBoardCard(teamId, t, lang, members)
   // ONE GRAMMAR NOW, THROUGH THE KIT'S OWN THIRD ARGUMENT (Kanban v1.2.113,
   // `onCardSelect(card, column, event)`) — the title `<span>` this file used
   // to wrap every card in is gone. It existed only because `onCardSelect`

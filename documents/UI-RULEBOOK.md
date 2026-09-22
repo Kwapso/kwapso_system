@@ -2729,6 +2729,36 @@ and the log rows below carry no fill, separated by the kit `Separator`.
 cases (the three-column `gap-4` grid, the tiles' own Card default, the log rows' no-fill plain
 list, the one-Separator-between-rows shape) are registered as this law's check.
 
+**The rule (R108 `section-title-one-style`).** Her ruling, 22 Sep 2026, over a screenshot of a
+ticket record: *"look at screenshot. i want that we have 1 single deign for titles. make it like
+in tasks 'assignd to, details, deadline' so evetything in tickets/stories that are titles
+(assigned to, pahse and wave, effort, stakeholders, related tickets, related stories...) make the
+chnage here and everywhee else. what we are changing is the sytle of the title of a section.
+implement and write the rule."* A record section's TITLE (Assigned to, Category, Phase and wave,
+Effort, Stakeholders, Related tickets, Related stories and every sibling) now adopts the one style
+the task sheet already uses for its fact labels, R105's own canonical class,
+`text-micro text-muted-foreground uppercase`, never `text-sm font-medium`. Two shared hosts carry
+every ticket and story call site at once, `TicketSidePanel` (`web/components/tickets/
+ticket-detail-body.tsx`) and its twin `EmptyGatedPanel` (`web/components/deep-link/
+screen-bits.tsx`); three hand-rolled siblings drew a title in a shape of their own and were fixed
+the same way, `meeting-detail.tsx`, `client-org-panel.tsx` and `stakeholders-panel.tsx`. The
+heading stays a real heading element with its own `id`, so the existing labelled-by wiring keeps
+working, only the STYLE moved. Her screenshot also showed the consequence: the Assigned to SECTION
+was titled "Assigned to" and then repeated "ASSIGNED TO" a second time as an inner eyebrow above
+the person chip, once the section title itself is the eyebrow, that inner label duplicates its own
+heading. Where an inner fact label repeats its section title word for word, the inner label is
+deleted and the section title kept, `AssignedToCard` (`help-stakeholders.tsx`) drops its own inner
+chip for the ticket's own assignee; "From the app" survives, because it says something the title
+does not. Where the inner label says something different (a section with several facts, each with
+its own label, Stakeholders' own "Raised by"/"On the loop", the merged Phase/Wave facts), both
+stay.
+
+**Law.** [R108](../RULES.md) (`section-title-one-style`). A tripwire over `TicketSidePanel`'s and
+`EmptyGatedPanel`'s own title lines, plus a source census, `web/test/section-title-one-style.test.ts`,
+over every file in `web/components` and `web-portal/components` for a literal `<h2`/`<h3`/`<h4`
+carrying both `text-sm` and `font-medium` (the old shape), or named in `SECTION_TITLE_EXEMPT`,
+keyed by `{file, expression}`, rot-checked both ways.
+
 **Three earlier rulings, not yet law, now amended in with their own numbers.** All three were
 already built and already read into this book before today; none of them mint a new R-number,
 they graduate under the numbers they already carry. The toolbar's 10px rhythm on every module is
@@ -10417,6 +10447,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R102 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R103 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 | R104 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R105 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 | R106 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R107 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
+| R108 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | | |
 
 ### The seven files that carry most of it
 

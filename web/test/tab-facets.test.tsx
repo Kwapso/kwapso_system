@@ -586,8 +586,18 @@ describe("the Open tab's board", () => {
        MAPPED off that array rather than written out, so the board, the tab's
        query, its badge and its Status facet are one fact. A future stage joins
        all five surfaces or none. */
+    /* THE MATCHER, NOT THE LAW, MOVED, 22 Sep 2026. Until Aurora's ruling
+       ("remove column waiting from tickets open board") this array held a
+       second, hand-written column after the map, so `columns` had to be an
+       array LITERAL wrapping a spread: `[...OPEN_TAB_STATUSES.map(...), {…}]`.
+       With the Waiting column gone there is nothing left to wrap the map in —
+       `columns` is the `.map(...)` call itself now, and wrapping it in a
+       redundant `[...spread]` fails its own lint (`unicorn/no-useless-spread`,
+       caught live building this change). The law this locks is unchanged: the
+       columns still have to be MAPPED off `OPEN_TAB_STATUSES`, never written
+       out by hand. */
     expect(
-      /columns=\{\[\s*\.\.\.OPEN_TAB_STATUSES\.map\(/.test(board),
+      /columns=\{OPEN_TAB_STATUSES\.map\(/.test(board),
       "the board's stage columns are no longer mapped off OPEN_TAB_STATUSES — a hand-written column can show a stage the Open tab's own list refuses"
     ).toBe(true)
     for (const stage of OPEN_TAB_STATUSES)
@@ -597,56 +607,59 @@ describe("the Open tab's board", () => {
       ).toContain(stage)
   })
 
-  it("adds Waiting as a fifth column, AFTER the stages, fed by its own door read", () => {
-    /* WAITING IS NOT A `GROUP BY status` BUCKET. There is no waiting column in
-       the database and no flag on a loaded row (`waitingClause`,
-       workers/content/src/lib/help.ts), so the cards cannot be a slice of the
-       Open page and the count cannot be a term of `byStatus`. Both come from
-       the door's own answer to the Waiting question — the SAME cache key the
-       Waiting tab rests on, so the tab and the column can never disagree. */
-    const stages = board.indexOf("...OPEN_TAB_STATUSES.map(")
-    const waiting = board.indexOf("id: WAITING")
-    expect(waiting, "the board has no Waiting column — the client asked for five").toBeGreaterThan(-1)
+  it("carries exactly the four stage columns and no Waiting column", () => {
+    /* THIS TEST USED TO ASSERT THE OPPOSITE, AND THAT IS ON PURPOSE, READ
+       TWICE (the same shape the dot test above already carries once on this
+       file). It used to lock a FIFTH column, Waiting, drawn after the four
+       stages, fed by its own door read off the Waiting tab's own cache key.
+       Aurora removed it, 22 Sep 2026, verbatim: "remove column waiting from
+       tickets open board. tehn expand the other columsntto take full width."
+       So the law this test now locks is the flip side of the one it used to:
+       the board's `columns` is nothing but the four-stage map — no second
+       column literal joins it, no `WAITING` token survives anywhere in the
+       board's own source, and the read that used to feed it
+       (`waitingQ`/`waitingTotal`, gated behind `onOpenBoard`) is gone with
+       it rather than left standing unread. */
     expect(
-      waiting > stages,
-      'the Waiting column is drawn before the stages — the client said "add them after"'
-    ).toBe(true)
-    expect(
-      /count:\s*narrowed \? undefined : waitingTotal/.test(board),
-      "the Waiting column's number is not the door's own total for the waiting question — `.length` there would be page one under a badge counting all of them (R14/R16)"
-    ).toBe(true)
-    expect(
-      /helpFacetKey\(teamId, "all", WAITING\)/.test(code),
-      "the board's waiting cards no longer come from the Waiting tab's own cache key — the column and the tab can now disagree about who is waiting"
-    ).toBe(true)
-    // THE WAITING COLUMN CARRIES NO `dot`, EVEN AFTER THE 21 SEP 2026 REVERSAL
-    // ABOVE — its own literal, `{ id: WAITING, title: t("Waiting"), … }`, has
-    // no `dot:` key between here and the closing `]}` of the board's columns
-    // array. Her ruling named "the stage" and Waiting is deliberately not
-    // one (a PREDICATE over a ticket already sitting in one of the four
-    // stages) — see `OpenBoard`'s own header, the Waiting column's paragraph,
-    // for the argument this locks.
-    const waitingLiteral = board.slice(waiting, board.indexOf("]}", waiting))
-    expect(
-      /\bdot\s*:/.test(waitingLiteral),
-      "the Waiting column is now passing the kit a `dot` — her 21 Sep 2026 ruling named the STAGE, and Waiting is a predicate over a ticket already in one, not a stage of its own; see OpenBoard's own header before adding one here"
+      board.includes("id: WAITING"),
+      "the board still carries a Waiting column literal — she asked for it removed"
     ).toBe(false)
+    expect(
+      /\bWAITING\b/.test(board),
+      "the board's own source still names WAITING somewhere — the column and everything that fed it should be gone, not just the column head"
+    ).toBe(false)
+    expect(
+      board.includes("waitingTotal") || board.includes("waitingRows") || board.includes("waitingQ"),
+      "the board still reads a waiting-specific value — that read existed only to feed the column this ruling removed"
+    ).toBe(false)
+    // THE MAP IS THE WHOLE `columns` VALUE, not one term ORed or spread
+    // against a second one — the same close-reading the width test below
+    // does for `columnWidth`, applied to the columns array's own shape: the
+    // `.map(...)` call closes with `}))` immediately before the prop's own
+    // closing `}`, so nothing else was appended after it.
+    expect(
+      /columns=\{OPEN_TAB_STATUSES\.map\(\(stage\) => \(\{[\s\S]*?\}\)\)\}/.test(board),
+      "the board's columns prop is no longer exactly one OPEN_TAB_STATUSES.map(...) call — something else is joining it"
+    ).toBe(true)
   })
 
-  it("repeats cards rather than moving them, and says so where the reader is", () => {
-    /* A waiting ticket is ALSO triaged / scheduled / in progress / ready, so it
-       is drawn twice: once in the stage it is genuinely in, once here. The
-       alternative ("waiting wins") would take it out of its stage column and
-       make the four stage columns lie about the work.
-       THAT COSTS NO TOTAL, and this is the half that has to be checked rather
-       than reasoned about: nothing adds the columns up. The kit's only summary
-       is `footnoteMeta` and it is deliberately not passed, and the Open TAB's
-       badge sums the STAGES only — so the collection is still counted exactly
-       once on this screen. The footnote carries the sentence a reader needs,
-       because five columns beside each other read as five buckets. */
+  it("tells the reader what the counts mean, in the footnote where the reader is", () => {
+    /* THIS USED TO GUARD A REPEATING COLUMN, AND THAT COLUMN IS GONE, 22 Sep
+       2026 (Aurora: "remove column waiting from tickets open board" — see the
+       column's own removed `it` above). A waiting ticket used to be drawn
+       twice — once in its real stage, once in the fifth column — and the
+       footnote carried the sentence that told a reader why the columns did
+       not sum to the tab's own badge. With no fifth column there is nothing
+       left to repeat, so that sentence is gone with it.
+       WHAT SURVIVES IS THE REASON A FOOTNOTE EXISTS ON THIS BOARD AT ALL:
+       the kit's only summary is `footnoteMeta` and it is deliberately still
+       not passed, and the Open TAB's badge still sums the STAGES only (R16),
+       so the board still has to tell the reader in words what the number
+       over each column means, and it still does — just a plainer sentence
+       now that there is only one kind of column to explain. */
     expect(
       board.includes("footnoteMeta"),
-      "the board passes the kit's own summary line — with a repeating column that number would double-count"
+      "the board passes the kit's own summary line — this board's own footnote is the one place that explains the counts, not a second kit summary"
     ).toBe(false)
     expect(
       code.includes("formatCount(OPEN_TAB_STATUSES.reduce("),
@@ -654,13 +667,18 @@ describe("the Open tab's board", () => {
     ).toBe(true)
     expect(
       /badge: formatCount\(OPEN_TAB_STATUSES\.reduce[\s\S]{0,120}waiting/i.test(code),
-      "the Open tab's badge has taken a waiting term — waiting overlaps the stages, so adding it counts tickets twice"
+      "the Open tab's badge has taken a waiting term — there is no Waiting column left for it to be counting"
     ).toBe(false)
-    for (const half of ["Waiting repeats cards from the stages before it", "Waiting repeats those same tickets"])
+    for (const half of [
+      "Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.",
+      "Each column counts every open ticket at that stage. Click a card to open the ticket.",
+    ])
+      expect(board.includes(half), `the board's own footnote no longer says: "${half}"`).toBe(true)
+    for (const stale of ["Waiting repeats cards from the stages before it", "Waiting repeats those same tickets"])
       expect(
-        code.includes(half),
-        `the board's footnote no longer tells the reader that the last column repeats the ones before it: "${half}"`
-      ).toBe(true)
+        code.includes(stale),
+        `the board's footnote still carries a sentence about the column that was removed: "${stale}"`
+      ).toBe(false)
   })
 
   it("stays READ-ONLY — the kit makes that a property of the API, not a promise", () => {
@@ -689,11 +707,33 @@ describe("the Open tab's board", () => {
        stated minimum. NOT a negative margin and NOT a width of this screen's
        own: either would be a second page measure, which is exactly what R29
        exists to stop, and the first would also be a lie about where the card
-       ends. */
+       ends.
+       THE ARITHMETIC MOVED, 22 Sep 2026, THE SAME DAY THE FIFTH COLUMN DID —
+       Aurora: "remove column waiting from tickets open board. tehn expand the
+       other columsntto take full width." Four columns need three gaps between
+       them, not the four a fifth column used to need, so a FROZEN STRING here
+       (`… - 4 * … ) / 5`) is exactly what silently passed the wrong arithmetic
+       the day the column count changed under it. This reads the two numbers
+       back OUT of the source instead and checks them as a RELATIONSHIP against
+       `OPEN_TAB_STATUSES.length` — the same array the columns themselves are
+       mapped off (the `it` above) — so the next column count change fails
+       here rather than passing on a stale digit nobody re-read. */
+    const columnWidth = /columnWidth="max\(18rem, calc\(\(100% - (\d+) \* var\(--space-2h\)\) \/ (\d+)\)\)"/.exec(
+      board
+    )
     expect(
-      /columnWidth="max\(18rem, calc\(\(100% - 4 \* var\(--space-2h\)\) \/ 5\)\)"/.test(code),
-      "the board's columns no longer share the row's width — five fixed columns overflow a laptop and leave a wide display two-thirds empty"
-    ).toBe(true)
+      columnWidth,
+      "the board's columnWidth is no longer the kit's own fluid calc() over the --space-2h gap token — columns no longer share the row's width"
+    ).not.toBeNull()
+    const [, gapCount, columnCount] = columnWidth as unknown as [string, string, string]
+    expect(
+      Number(columnCount),
+      "columnWidth's own divisor no longer matches the number of stage columns OPEN_TAB_STATUSES actually draws — the arithmetic and the columns have drifted apart"
+    ).toBe(OPEN_TAB_STATUSES.length)
+    expect(
+      Number(gapCount),
+      "columnWidth's own gap count is not one fewer than the column count — N columns sitting in a row need N-1 gaps between them, not N"
+    ).toBe(OPEN_TAB_STATUSES.length - 1)
     expect(
       /-m[xlrs]?-/.test(board),
       "the board pulls itself out of its card with a negative margin — nothing on this path sets a width to escape (R29)"

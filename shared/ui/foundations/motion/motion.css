@@ -822,6 +822,27 @@
   animation: motion-rise-in-tight var(--duration-entrance) var(--ease-entrance) both;
 }
 
+/* THE RAIL'S OWN VERTICAL ANALOGUE, 22 SEP 2026 - her ruling, verbatim: "do
+   you know how when changing tabs (line tabs) there's a slight animating
+   where the active tab travels? i want the same idea on the sidebar nav."
+   compositions/templates/rail.tsx measures its active row the same way
+   TabsList measures its active trigger (see that file's own block comment
+   above ACTIVE_TREATMENT), and writes the result back as a top offset and a
+   height rather than a left offset and a width - the rail travels on the
+   BLOCK axis, tabs on the inline one. Same two tokens as the rule above,
+   for the same reason: --ease-move because the mark is tracked continuously
+   rather than entering once, --duration-entrance because this file names no
+   third duration for "a mark travelling between two on-screen positions"
+   and .motion-tab-indicator already sets that precedent. Only transform and
+   height transition - the inline axis (left/right, or the collapsed square's
+   width) is CSS/token driven at rail.tsx's own render site, never measured,
+   so it never needs to animate through this rule. */
+.motion-rail-indicator {
+  transition:
+    transform var(--duration-entrance) var(--ease-move),
+    height    var(--duration-entrance) var(--ease-move);
+}
+
 
 /* ============================================================================
    9 · ACCORDION AND COLLAPSIBLE EXPAND

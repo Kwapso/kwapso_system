@@ -1885,16 +1885,43 @@ if (
       "can disagree about which of them is showing.",
   );
 }
-if (!/"@container grid grid-cols-1",/.test(recordDetailSrc)) {
+/* THE QUERY CONTAINER AND THE QUERIED GRID MUST BE TWO DIFFERENT ELEMENTS —
+   FIXED 22 SEP 2026, SAME DAY THIS CHECK ORIGINALLY SHIPPED. The first
+   version of this check pinned "@container grid grid-cols-1" as ONE string
+   on ONE element, which is exactly the bug: a container cannot be queried
+   by a rule on the element that declares it, so with both classes on
+   CardContent the two-column template never matched at any width and a
+   full-width ticket's footer stacked to one column regardless of how wide
+   its pane was. Fixed by construction, not by tuning the query: "@container"
+   stays alone on CardContent (its content box is still what the query's
+   arithmetic is written against), and the grid that the query actually
+   switches moved one level down onto CardContent's own child,
+   data-slot="record-detail-footer-grid" - a descendant, so the query
+   resolves, and a plain wrapper with no width or padding of its own, so the
+   arithmetic did not have to be retuned for the extra nesting. */
+if (!/"@container",\n\s*\)\}\n\s*\/\* THE ONE REBINDING/.test(recordDetailSrc)) {
   airFindings.push(
-    `${recordDetailRel}'s ink footer grid does not establish its own container query with "@container grid ` +
-      "grid-cols-1\" - a stripe standing in a sheet narrower than the viewport needs the grid answering to its " +
-      "own box, not the window (the same convention toolbar-row.tsx's root already uses).",
+    `${recordDetailRel}'s CardContent does not close its className with "@container" standing alone, right ` +
+      'before the "THE ONE REBINDING" style block - "@container" must never sit combined with "grid grid-cols-1" ' +
+      "on that same element again: a container cannot be queried by a rule on the element that declares it, " +
+      "which is the exact self-query bug this line exists to catch before it ships a second time.",
+  );
+}
+if (
+  !/data-slot="record-detail-footer-grid"[\s\S]{0,60}className=\{cn\(\s*\n\s*"grid grid-cols-1",/.test(
+    recordDetailSrc,
+  )
+) {
+  airFindings.push(
+    `${recordDetailRel} does not draw a data-slot="record-detail-footer-grid" element carrying "grid grid-cols-1" ` +
+      "as its base template - the grid that the column-count query switches must be a DESCENDANT of the " +
+      '"@container" element (CardContent), never that same element, or the query has no ancestor container to ' +
+      "resolve against and can never match, in a sheet or in a full-width pane alike.",
   );
 }
 if (
   !recordDetailSrc.includes(
-    'footerHasTwoColumns\n                  ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`\n                  : undefined,',
+    'footerHasTwoColumns\n                    ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`\n                    : undefined,',
   )
 ) {
   airFindings.push(
