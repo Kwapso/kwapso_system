@@ -59,6 +59,7 @@ import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
    so the separator import went with it. */
 import { RecordSections } from "@shared/ui/components/record-detail/record-detail"
 import { useIsAtLeastLg } from "@/components/records/record-detail-body"
+import { ScreenFooterSlot } from "@/components/shell/footer-slot"
 
 /** Stable DOM anchors for the four panels a ticket's page draws, so a link
  * built before the tab strip existed — `?tab=stories`, the rail, anywhere
@@ -95,9 +96,7 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * Last edited by), the kit's own CH27.8 ink footer — never the composer.
  * Round 23's whole construction pinned the WRONG element and is reversed:
  *
- *  1. THE BAND is this component's own LAST child, `flex-none`, full
- *     content width, pinned at the screen's true bottom edge, always
- *     visible — built by `RecordFooterBand` (`@/components/records/
+ *  1. THE BAND is built by `RecordFooterBand` (`@/components/records/
  *     record-chrome`, its own header has the full account of why a SECOND
  *     call to the kit's `RecordDetail`, not a moved prop, is what answers a
  *     DOM-order question `RecordScreen`'s own single call could not).
@@ -105,6 +104,18 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  *     `audit`/`activity`/`onAddNote` data it already fed `RecordScreen`
  *     (now `footerVisible={false}` there, so the SAME footer never draws
  *     twice).
+ *
+ *     IT STOPPED BEING THIS COMPONENT'S OWN LAST CHILD ON 22 SEP 2026, kit
+ *     v1.2.155. It was `flex-none mt-auto w-full`, in a wrapper carrying
+ *     this page's own marker, reaching the bottom of a box that itself
+ *     stopped `DENSITY_BODY`'s reserved `padding-bottom` short of the pane:
+ *     measured by paint, 24px of paper under the band at every desktop
+ *     width and 115px at 760 tall. This component hands `footer` to
+ *     `<ScreenFooterSlot>` now, which portals it into the node the kit
+ *     renders inside the one scroller and OUTSIDE the body's padded stack,
+ *     as the `mt-auto` last child of a `min-h-full` column. Everything
+ *     below about the band being reached like a normal footer still holds;
+ *     what changed is which box it is the last child OF.
  *  2. THE COMPOSER IS BACK INSIDE THE CONVERSATION CARD'S OWN FOOTER —
  *     "rewind here" — `TicketConversationPanel` (below) is UN-retired,
  *     exactly its round-22 shape (`git show d1167183`): `Card` →
@@ -557,31 +568,33 @@ export function TicketDetailBody({
           </div>
         )}
       </div>
-      {/* THE BAND — LATEST ACTIVITY + RECORD, the kit's own ink footer,
-          this component's `flex-none` LAST child, full content width.
-          ROUND 28 (R89/R91): NORMAL FLOW, `mt-auto`, never `sticky`/
-          `fixed`. The root's own `flex-1` (above) already fills the
-          leftover space after the head when the page is short, so
-          `margin-top: auto` on this, its last flex child, is the ordinary
-          "footer at the bottom of a short page" trick — it consumes
-          whatever leftover space the root was handed, pushing the band
-          down to the root's own bottom edge (the window's bottom, for a
-          short page). When content is instead taller than that leftover
-          space, the root has already grown to fit it (see the region
-          comment above), so the band simply sits right after the region,
-          at the true end of a page the browser now scrolls as ONE region —
-          no sticky offset, no negative padding compensation, because
-          nothing needs to reach past a pane's own reserved bottom padding
-          any more (`app-shell.tsx`'s `has-[[data-slot=ticket-detail-body]]`
-          growth rule is retired the same round: this page now ends on the
-          pane's own ordinary bottom padding, exactly like every other
-          record screen). */}
-      <div
-        data-slot="ticket-footer-band"
-        className="flex-none mt-auto w-full"
-      >
-        {footer}
-      </div>
+      {/* THE BAND, THROUGH THE SHELL'S OWN FOOTER SLOT, 22 Sep 2026, kit
+          v1.2.155. It is NOT this component's last child any more, and it
+          is not inside this component's box at all: `ScreenFooterSlot`
+          portals it into `ScreenShell`'s own `footer` node, which the kit
+          renders inside the one scroller and OUTSIDE the body's padded
+          stack, as the `mt-auto` last child of a `min-h-full` column.
+
+          WHY THE MARKER AND THE `mt-auto` WRAPPER WENT WITH IT. Both were
+          this page's own half of round 28's construction: a flex-none,
+          margin-top-auto, full-width div carrying this page's own ticket
+          footer band marker, the band's last-child position in THIS flex
+          column, reaching the bottom of a box that itself stopped
+          `DENSITY_BODY`'s own reserved `padding-bottom` short of the pane.
+          Measured by paint on staging, that was 24px of paper under the
+          band at every desktop width and 115px at 760 tall. There is
+          nothing left here for a marker to name: the band's position is the
+          kit's now, the wrapper that carries `mt-auto` is
+          `screen-shell-footer`, and the column it spends that slack in is
+          `screen-shell-column`.
+
+          THE ROOT'S OWN `flex-1` AND `gap-6` STAY. `flex-1` is still what
+          makes this component fill the leftover space after the head on a
+          short ticket and grow past it on a long one (round 28's whole
+          argument, above); `gap-6` is still S1's panel gap, now between
+          the two things this column actually holds. The 24 above the band
+          is the shell's own stack padding, which is the same number. */}
+      <ScreenFooterSlot>{footer}</ScreenFooterSlot>
     </div>
   )
 }

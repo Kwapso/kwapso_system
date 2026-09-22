@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.154",
-  "sha": "779c4129b4153a13288d1f8bc0ad65f55517d7fe",
+  "tag": "v1.2.155",
+  "sha": "ef3621186d64fbcdbfa12b5046b3f84217e213a0",
   "syncedAt": "2026-09-22"
  },
- "generatedAt": "2026-09-22T08:25:05.567Z",
+ "generatedAt": "2026-09-22T09:15:35.111Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -6074,7 +6074,7 @@
         "band",
         "stripe"
        ],
-       "note": "THE FOOTER'S OUTER REGISTER — ADDED 22 SEP 2026, CLIENT RULING ON THE FOOTER BAND. Verbatim: \"The latest activity always has to be at the very bottom, and also make it a stripe, not a container.\" Two shapes for the one card, chosen by the call site rather than guessed from where it happens to render: \"band\" (the default, UNCHANGED) — CH27.8's card exactly as it already ships: it reads `--pane-inset-x` off the pane it is standing in and pulls itself out to the pane's own edges (`-mx-[var(--pane-inset-x, 0px)]`), and its corners follow `--radius-pane-edge`. This is the register a RECORD PAGE wants, drawn straight in a `ScreenShell`'s body. \"stripe\" — a card drawn inside a SHEET or another narrow host that publishes no `--pane-inset-x` at all and has no pane edges to reach for. It pulls no margin (there is nothing to escape) and draws no radius (`rounded-none`, not `--radius-pane-edge`'s own fallback to `--radius`) — edge to edge of whatever box it is given, flush with that host's own last child. THE HOST DECIDES THE FLUSH BOTTOM, not this prop: a host whose own column ends after this card, with nothing below it and no bottom padding of its own, is what \"flush with the host's bottom\" means, the same way `CARD_FLUSH` in `screen-shell.tsx` is the shell's own column deciding it, not the card. BOTH REGISTERS SHARE THE SAME TWO-COLUMN GRID AND THE SAME ONE-COLUMN ORDER RULE, below — the register only changes the OUTER box; see the grid's own comment, at the `CardContent`, for \"Record on top, Latest activity at the bottom\" whenever either register draws one column rather than two."
+       "note": "THE FOOTER'S OUTER REGISTER — ADDED 22 SEP 2026, CLIENT RULING ON THE FOOTER BAND. Verbatim: \"The latest activity always has to be at the very bottom, and also make it a stripe, not a container.\" Two shapes for the one card, chosen by the call site rather than guessed from where it happens to render: \"band\" (the default). CH27.8's card, reaching the pane's own edges. It reads `--pane-escape-x` off its host and pulls itself out by that measure (`-mx-[var(--pane-escape-x,var(--pane-inset-x,0px))]`), and its corners follow `--radius-pane-edge`. This is the register a RECORD PAGE wants. THE TWO HOSTS IT HAS, 22 SEP 2026: rendered through `ScreenShell`'s own FOOTER SLOT (the band's home since v1.2.155) the escape computes to 0, because that slot already sits outside the body's padded stack and spans the pane; rendered inside `children`, in the padded stack, it inherits the pane's own gutter and pulls out by it, exactly as it has since 21 Sep 2026. Either way the padding below pays `--pane-inset-x` back inside, so the band's first word lands under the h1. \"stripe\" — a card drawn inside a SHEET or another narrow host that publishes no `--pane-inset-x` at all and has no pane edges to reach for. It pulls no margin (there is nothing to escape) and draws no radius (`rounded-none`, not `--radius-pane-edge`'s own fallback to `--radius`) — edge to edge of whatever box it is given, flush with that host's own last child. THE HOST DECIDES THE FLUSH BOTTOM, not this prop: a host whose own column ends after this card, with nothing below it and no bottom padding of its own, is what \"flush with the host's bottom\" means, the same way `CARD_FLUSH` in `screen-shell.tsx` is the shell's own column deciding it, not the card. BOTH REGISTERS SHARE THE SAME TWO-COLUMN GRID AND THE SAME ONE-COLUMN ORDER RULE, below — the register only changes the OUTER box; see the grid's own comment, at the `CardContent`, for \"Record on top, Latest activity at the bottom\" whenever either register draws one column rather than two."
       }
      ]
     },

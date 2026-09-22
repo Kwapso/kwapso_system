@@ -63,7 +63,7 @@ describe("knowledge-detail's footer band sits flush, through the SAME constructi
     expect(src, "RecordDetailBody must actually be called").toContain("<RecordDetailBody")
   })
 
-  it("imports RecordFooterBand and hands it to RecordDetailBody's own footer prop, not RecordScreen's combined footer", () => {
+  it("imports RecordFooterBand and builds the band itself, never RecordScreen's combined footer", () => {
     const src = source()
     expect(src).toMatch(/import \{[^}]*\bRecordFooterBand\b[^}]*\}\s*from\s*"@\/components\/records\/record-chrome"/)
     expect(src, "RecordFooterBand must actually be called").toContain("<RecordFooterBand")
@@ -84,7 +84,7 @@ describe("knowledge-detail's footer band sits flush, through the SAME constructi
     expect(callTail, "activity must no longer be handed to RecordScreen directly").not.toMatch(/^\s*activity=\{activity\}/m)
   })
 
-  it("<RecordDetailBody> is called with dataSlot, main and footer — never a second data-slot wrapper of this file's own", () => {
+  it("<RecordDetailBody> is called with dataSlot and main, and the band goes to the shell's footer slot instead", () => {
     const src = source()
     const callIdx = src.indexOf("<RecordDetailBody")
     expect(callIdx, "RecordDetailBody must be called").toBeGreaterThan(-1)
@@ -93,7 +93,12 @@ describe("knowledge-detail's footer band sits flush, through the SAME constructi
     const call = src.slice(callIdx, closeIdx)
     expect(call, "the call must name its own dataSlot").toMatch(/dataSlot="knowledge-detail-body"/)
     expect(call, "the call must pass main").toContain("main={")
-    expect(call, "the call must pass footer").toContain("footer={")
+    // NO `footer`, 22 Sep 2026, kit v1.2.155. RecordDetailBody draws no
+    // band any more and declares no footer prop: this page renders
+    // <ScreenFooterSlot> as a SIBLING of this call, and the kit puts that
+    // node outside the shell body's padded stack, which is the only place
+    // the band reaches the pane's own bottom edge.
+    expect(call, "the call must NOT pass footer, the band goes through the shell's own footer slot").not.toContain("footer={")
     // NO `side` — a knowledge source has no side column, one tabbed body
     // only (record-detail-body.tsx's own doc comment on the prop).
     expect(call, "the call must NOT pass side — one tabbed body, no side column").not.toMatch(/\bside=\{/)
@@ -117,10 +122,26 @@ describe("knowledge-detail's footer band sits flush, through the SAME constructi
     // round 29 (22 Sep 2026 — the negative-margin growth applies only at
     // the default footerDataSlot marker), so both its branches are checked
     // instead of one literal className= attribute.
+    // record-detail-body.tsx is the one file that still says the ROOT's own
+    // class string. Its footer wrapper, and the negative bottom margin that
+    // wrapper carried at the default marker, are DELETED, 22 Sep 2026, kit
+    // v1.2.155: the band is the kit's `screen-shell-footer` slot's now, one
+    // level outside the padded stack, where there is no padding under it to
+    // escape and therefore no number to keep in step.
     const body = bodySource()
     expect(body).toContain('className="flex min-w-0 flex-1 flex-col gap-6"')
-    expect(body).toContain('"flex-none mt-auto w-full mb-[calc(var(--space-5)*-1)] lg:mb-[calc(var(--space-6)*-1)]"')
-    expect(body).toContain('"flex-none mt-auto w-full"')
+    expect(body).not.toContain('"flex-none mt-auto w-full"')
+    expect(body).not.toContain("reachesPaneFloor")
+  })
+
+  it("this page renders ScreenFooterSlot itself, once, with the band inside it", () => {
+    const src = source()
+    expect(src).toMatch(/import \{[^}]*\bScreenFooterSlot\b[^}]*\}\s*from\s*"@\/components\/shell\/footer-slot"/)
+    const slotAt = src.indexOf("<ScreenFooterSlot>")
+    expect(slotAt, "the page must fill the shell's own footer slot").toBeGreaterThan(-1)
+    const slotBody = src.slice(slotAt, src.indexOf("</ScreenFooterSlot>", slotAt))
+    expect(slotBody, "the slot must hold the band").toContain("<RecordFooterBand")
+    expect(src.indexOf("<ScreenFooterSlot>", slotAt + 1), "exactly one slot fill on this page").toBe(-1)
   })
 
   it("RecordDetailBody's own `side` prop is genuinely optional, and absent it renders `main` alone (no lg grid, no empty second track)", () => {
@@ -176,17 +197,19 @@ describe("knowledge-detail's construction is the SAME one story-detail.tsx uses,
     }
   })
 
-  it("both <RecordDetailBody> calls carry the identical REQUIRED tokens — main and footer, footer wrapping RecordFooterBand", () => {
+  it("both <RecordDetailBody> calls carry the identical REQUIRED token, main, and neither carries a footer any more", () => {
     const knowledgeCall = extractJsxCall(source(), "<RecordDetailBody")
     const storyCall = extractJsxCall(storySource(), "<RecordDetailBody")
     for (const call of [knowledgeCall, storyCall]) {
       expect(call, "main is the required left/only column").toMatch(/\bmain=\{/)
-      expect(call, "footer is required and must exist").toMatch(/\bfooter=\{/)
-      // Scoped to the footer prop's own value, not merely "somewhere in the
-      // call" — a `<RecordFooterBand>` elsewhere in `main` would false-pass
-      // a bare `.toContain`.
-      const footerValue = call.slice(call.indexOf("footer={"))
-      expect(footerValue).toMatch(/footer=\{\s*<RecordFooterBand/)
+      expect(call, "the footer prop is gone, the band goes through the shell's own slot").not.toMatch(/\bfooter=\{/)
+    }
+    // AND BOTH PAGES STILL DRAW ONE, from the same component, in the same
+    // place: their own <ScreenFooterSlot>, a sibling of the call above.
+    for (const src of [source(), storySource()]) {
+      const slotAt = src.indexOf("<ScreenFooterSlot>")
+      expect(slotAt, "each page must fill the shell's footer slot itself").toBeGreaterThan(-1)
+      expect(src.slice(slotAt, src.indexOf("</ScreenFooterSlot>", slotAt))).toContain("<RecordFooterBand")
     }
   })
 

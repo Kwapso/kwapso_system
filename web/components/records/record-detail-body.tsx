@@ -19,12 +19,19 @@
 //
 // SO THIS COMPONENT'S OWN SHAPE IS PROVED BY CONSTRUCTION, AGAINST THAT SAME
 // FILE, RATHER THAN BY A SHARED CALL: read `TicketDetailBody`'s return JSX
-// side by side with `RecordDetailBody`'s own below — root flex column
-// (`gap-6`, no `min-h-0`), one normal-flow region switching between the `lg`
-// grid and the below-`lg` stack, the footer band `mt-auto` last — and they
-// agree line for line, on purpose, because both answer the identical R89
-// argument. A future change to one is a change this file's own comment asks
-// to be made to the other in the same commit.
+// side by side with `RecordDetailBody`'s own below, root flex column
+// (`gap-6`, no `min-h-0`) and one normal-flow region switching between the
+// `lg` grid and the below-`lg` stack, and they agree line for line, on
+// purpose, because both answer the identical R89 argument. A future change
+// to one is a change this file's own comment asks to be made to the other in
+// the same commit.
+//
+// NEITHER OF THEM DRAWS THE BAND ANY MORE, 22 Sep 2026, kit v1.2.155. Both
+// used to end with it, `mt-auto`, as their own last child; it goes through
+// `ScreenShell`'s own footer slot now (`@/components/shell/footer-slot`),
+// outside the shell body's padded stack, which is the only place it can sit
+// on the pane's own bottom edge with no paper under it. See the note above
+// this component's own props for the negative margin that deletion retires.
 //
 // WHAT GENERALISES AND WHAT DOES NOT. The ticket's own conversation card
 // SCROLLS internally and must contribute ZERO intrinsic height to the grid's
@@ -40,10 +47,11 @@
 // reached by ordinary content height instead of an absolute-positioned
 // escape hatch.
 //
-// `dataSlot`/`footerDataSlot` default to a NEUTRAL pair of names — never the
-// literal `"ticket-detail-body"`/`"ticket-footer-band"` strings, which stay
-// owned by `ticket-detail-body.tsx`'s own inlined JSX and nowhere else, so
-// two different DOM subtrees can never carry the same marker.
+// `dataSlot` defaults to a NEUTRAL name, never the literal
+// `"ticket-detail-body"` string, which stays owned by
+// `ticket-detail-body.tsx`'s own inlined JSX and nowhere else, so two
+// different DOM subtrees can never carry the same marker. Its
+// `footerDataSlot` companion is gone with the footer itself.
 //
 // `side` IS OPTIONAL, FOR A SINGLE-COLUMN RECORD — added for
 // knowledge-detail.tsx (the finding, 21 Sep 2026: a knowledge source has one
@@ -84,9 +92,7 @@ export function useIsAtLeastLg(): boolean {
 export function RecordDetailBody({
   main,
   side,
-  footer,
   dataSlot = "record-detail-body",
-  footerDataSlot = "record-footer-band",
 }: {
   /** THE LEFT COLUMN AT `lg`, FIRST BELOW IT — a finished node, already
    * carrying whatever responsive class its own content needs (a scrolling
@@ -105,64 +111,40 @@ export function RecordDetailBody({
    * proved one). Absent, `main` renders alone at every width — no `lg`
    * grid, no empty second track. */
   side?: React.ReactNode
-  /** THE BLACK BAND — `RecordFooterBand` (`@/components/records/
-   * record-chrome`), this component's own `flex-none` LAST child, `mt-auto`
-   * so it reaches the root's own bottom edge on a short page and sits right
-   * after the region on a tall one (round 28, R89/R91 — see this file's own
-   * header).
+  /** THE BLACK BAND, AND WHERE IT WENT, 22 Sep 2026, kit v1.2.155.
    *
-   * "THE ROOT'S OWN BOTTOM EDGE" IS `app-shell.tsx`'S DOING, NOT THIS FILE'S
-   * — 22 Sep 2026 finding. `mt-auto` correctly pushes the band to the
-   * bottom of this file's own root, but that root's OWN height — resolved
-   * through the ordinary `flex-1`/`h-full` chain above it — stops exactly
-   * `DENSITY_BODY`'s reserved `padding-bottom` (screen-shell.tsx) short of
-   * the pane's true bottom edge whenever the record's content is too short
-   * to overflow it on its own. A real ticket (T0001) never shows this,
-   * because its conversation thread + three side panels are tall enough to
-   * overflow that ceiling by themselves.
+   * THIS COMPONENT NO LONGER DRAWS THE BAND AT ALL. It used to take a
+   * `footer` node and render it as its own `flex-none mt-auto w-full` last
+   * child, carrying a `footerDataSlot` marker and, on the default marker, a
+   * fixed NEGATIVE bottom margin (`mb-[calc(var(--space-5)*-1)]
+   * lg:mb-[calc(var(--space-6)*-1)]`) to reach past
+   * `[data-slot="screen-shell-body"]`'s own reserved `padding-bottom`. That
+   * margin is DELETED, and so is the marker, and so is the prop.
    *
-   * THE FIRST FIX (22 Sep 2026, same day, since retired) GREW
-   * `app-shell.tsx`'s content div INSTEAD — `has-[[data-slot=record-footer-
-   * band]]:h-[calc(100%+…)]`, reaching the container PAST
-   * `screen-shell-body`'s own reserved padding. Measured flush live at
-   * `scrollTop=0` (876 → 900) — and STILL 876 after scrolling the pane to
-   * its own `scrollHeight`, which is how a person actually reaches the
-   * bottom. Live DOM proof: growing the container's own `height` past its
-   * parent's content-box edge makes it register as genuine scrollable
-   * overflow, and a scrolling ancestor with `padding-bottom` reserves that
-   * same padding a SECOND time after any overflow — Chromium's own
-   * documented behaviour, not a bug in this construction's arithmetic
-   * (`el.scrollHeight` measured `clientHeight + padding-bottom`, on TOP of
-   * a box that had already grown into that padding once). Scrolling to the
-   * pane's own end therefore dragged the already-flush band back UP by
-   * exactly the grown amount — the live bug Aurora reported, reproduced
-   * exactly by `el.scrollTop = el.scrollHeight`.
+   * WHY THE MARGIN HAD TO GO EVEN THOUGH IT REACHED THE PIXEL. It was a
+   * number derived from a padding this file does not own, on a box the kit
+   * can change under it: v1.2.153 moved `DENSITY_BODY` off the scroller onto
+   * `screen-shell-stack` and the same figure went on being right by
+   * coincidence. It is also the third escape in a row from the same fact,
+   * after a grown page container and a `:has()` growth rule, and every one of
+   * them was an attempt to get OUT of a padded box rather than to stop being
+   * inside it.
    *
-   * THE REAL FIX DOES NOT GROW ANY BOX'S OWN `height`. A fixed, negative
-   * `margin-bottom` on THIS div (below, `mb-[calc(var(--space-5)*-1)]
-   * lg:mb-[calc(var(--space-6)*-1)]`) reaches the identical pixel — proved
-   * live, `el.scrollHeight === el.clientHeight` afterwards (ZERO phantom
-   * scroll room, so there is nothing left for a person to overscroll into)
-   * — because a negative margin does not enlarge this div's own measured
-   * box past its ancestor's content edge the way an explicit `height` does;
-   * it only shifts where the box PAINTS, which the scrolling ancestor's own
-   * overflow/padding accounting never sees. Proved harmless on genuinely
-   * tall content too (a real story, B0002, which overflows the ceiling on
-   * its own): identical `scrollHeight`/flush position with and without the
-   * margin, since `mt-auto` already resolves to 0 there and the fixed
-   * offset rides along for free. Scoped to THIS file's own `footerDataSlot`
-   * default exactly as the retired rule was — a caller naming a different
-   * `footerDataSlot` opts out, unchanged. */
-  footer: React.ReactNode
+   * WHAT REPLACES IT. `ScreenShell`'s own footer SLOT, which the kit renders
+   * inside the one scroller and OUTSIDE the padded stack, as the `mt-auto`
+   * last child of a `min-h-full` column. A caller reaches it with
+   * `<ScreenFooterSlot>` (`@/components/shell/footer-slot`) from wherever it
+   * is, so there is nothing for this component to thread. `story-detail.tsx`
+   * and `knowledge-detail.tsx` both do exactly that, as siblings of their own
+   * `<RecordDetailBody>` call.
+   *
+   * WHAT THIS COMPONENT STILL IS. The shared `lg` grid / below-`lg` stack
+   * over `main` and an optional `side`, `gap-6` between them, one column,
+   * `flex-1` so it fills the leftover space after the head. That is the half
+   * of R89's shape that was never about the band. */
   dataSlot?: string
-  footerDataSlot?: string
 }) {
   const isAtLeastLg = useIsAtLeastLg()
-  // THE NEGATIVE-MARGIN GROWTH APPLIES ONLY AT THE DEFAULT MARKER — a
-  // caller naming its own `footerDataSlot` (opting out of the shared shape)
-  // gets no reach-past-the-pane's-padding behaviour either, same contract
-  // the retired `app-shell.tsx` `:has()` rule carried.
-  const reachesPaneFloor = footerDataSlot === "record-footer-band"
   return (
     <div data-slot={dataSlot} className="flex min-w-0 flex-1 flex-col gap-6">
       <div className="min-w-0">
@@ -179,16 +161,6 @@ export function RecordDetailBody({
             {main}
           </div>
         )}
-      </div>
-      <div
-        data-slot={footerDataSlot}
-        className={
-          reachesPaneFloor
-            ? "flex-none mt-auto w-full mb-[calc(var(--space-5)*-1)] lg:mb-[calc(var(--space-6)*-1)]"
-            : "flex-none mt-auto w-full"
-        }
-      >
-        {footer}
       </div>
     </div>
   )

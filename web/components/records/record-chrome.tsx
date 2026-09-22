@@ -54,6 +54,7 @@ import { cn } from "@shared/ui/lib/utils"
 
 import { ActivityRail, hasActivityDoor, type RailActivity } from "@/components/records/activity-rail"
 import { InAppLink } from "@/components/shell/in-app-link"
+import { ScreenFooterSlot } from "@/components/shell/footer-slot"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordRef } from "@shared/web/record-ref"
 import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "@shared/web/record-heading"
@@ -640,8 +641,20 @@ export function RecordChipLink({ href, children }: { href: string; children: Rea
  * anything for. */
 const FOOTER_TO_BOTTOM =
   "flex-1 min-h-0 " +
-  "[&_[data-slot=record-detail]]:flex-1 [&_[data-slot=record-detail]]:min-h-0 " +
-  "[&_[data-record-region=footer]]:mt-auto"
+  "[&_[data-slot=record-detail]]:flex-1 [&_[data-slot=record-detail]]:min-h-0"
+
+/* THE THIRD LINE IS GONE, 22 Sep 2026, kit v1.2.155, and the name above is
+   kept, because every caller and every test reads it and the two classes that
+   remain still do the job the paragraph above describes for everything ABOVE
+   the band. It used to read
+   `[&_[data-record-region=footer]]:mt-auto`, reaching into `RecordDetail`'s
+   own ink-footer card to push it to this column's bottom edge. There is no
+   footer inside `RecordChrome` any more to reach: `RecordScreen` passes
+   `footerVisible={false}` to the kit unconditionally and fills
+   `ScreenShell`'s own footer slot instead, where the kit's own
+   `screen-shell-footer` wrapper carries the `mt-auto` (and a `min-h-full`
+   column for it to spend) one level OUTSIDE the body's padded stack. A
+   selector left here would match nothing and read as a live rule. */
 
 /** THE HEAD-ONLY CASE — R89 RE-PROOF, 18 Sep 2026. `FOOTER_TO_BOTTOM` above
  * is right for every caller that hands `RecordScreen` its own `children` as
@@ -1140,7 +1153,11 @@ export function RecordScreen({
   /** The retry offered by the error register. */
   errorAction?: React.ReactNode
 }) {
-  const { t, lang } = useLanguage()
+  // NO `useLanguage()` HERE ANY MORE, 22 Sep 2026, kit v1.2.155. Its `t` and
+  // `lang` were spent on the footer's own data (`recordAuditEntries`,
+  // `activityLabel`), and that whole prop set moved to `RecordFooterBand`,
+  // which reads the same hook itself. Nothing else in this component says a
+  // word to a person.
   // NOTHING WATCHES THIS TITLE ANY MORE. It used to carry a `titleRef` for the
   // condensed stand-in bar's `useIsVisible` trigger (condensed-title.tsx,
   // deleted 2026-09-03 — this file's header has the client's ruling), so the
@@ -1357,109 +1374,65 @@ export function RecordScreen({
         hero={headerExtra}
         panel={children}
         panelVisible={panelVisible}
-        /* THE FIX — the kit's own ink footer, fed from this app's real data
-           instead of held off (`footerVisible={false}`, this file's old line)
-           while a hand-rolled grey box drew a different one below the panel.
-           `footerVisible` is left to `RecordDetail`'s own default (true): the
-           card draws only when `audit`/`activity` actually put something in one
-           of its two columns. */
-        footerVisible={footerVisible}
-        audit={audit ? recordAuditEntries(audit, t, lang) : undefined}
-        activity={activity ? footerActivityItems(activity.items) : undefined}
-        /* THE DOOR TO THE FULL HISTORY, ON THE EYEBROW'S OWN LINE — wired ONCE
-           here for all thirteen bespoke details rather than thirteen times.
-           The client, 2026-09-06, verbatim: "On the right column, on Latest
-           Activity, I would like some view or expand or whatever, and this
-           would open a slide-in with all the activity." 2026-09-07: "implemet
-           'A · in the eyebrow row' across the app." The rail itself — the link,
-           the count and the `EdgePanel` behind them — is
-           `web/components/records/activity-rail.tsx`.
+        /* THE BAND IS NOT DRAWN HERE ANY MORE, 22 Sep 2026, kit v1.2.155.
+           `footerVisible={false}` is now UNCONDITIONAL on this call, whatever
+           this component's own `footerVisible` prop says, because region 4 of
+           this `RecordDetail` sits INSIDE the shell body's padded stack and
+           that is the one place the band may no longer be. Aurora, 21 Sep
+           2026: "The latest activity always has to be at the very bottom."
+           The band goes through `ScreenShell`'s own footer SLOT instead ,
+           outside the padded stack, `mt-auto` on a `min-h-full` column, so
+           it lands on the pane's own bottom edge with no paper under it ,
+           and this component fills that slot itself, below, with the very
+           same `<RecordFooterBand>` the ticket, story and knowledge pages
+           already build. This component's `footerVisible` prop keeps its
+           meaning exactly ("the reader may see the band at all"); it now
+           decides whether the SLOT is filled rather than whether region 4
+           draws.
 
-           ── THE KIT OWNS THIS ROW NOW, v1.2.69, VENDORED 2026-09-08 ────────
-
-           `RecordDetail` grew `activityAction` in v1.2.67 for exactly this
-           door, but this file does not reach `RecordDetail` — it goes through
-           `RecordChrome`, the kit's own composition template, which forwarded
-           ~24 props and not that one. So until v1.2.69 the rail was SMUGGLED
-           through `activityLabel`, which is the EYEBROW: a label slot carrying
-           a control, so the eyebrow's own type step and ink applied to it and
-           the two could never be styled apart. v1.2.69 forwards the real prop
-           and this is the deletion its CHANGELOG asks for.
-
-           WHAT WENT WITH IT. A local `activityEyebrowRow` helper hand-copied
-           the kit's own eyebrow row — `flex min-w-0 items-baseline
-           justify-between gap-[var(--space-3)]`, the `--footer-eyebrow-line`
-           declaration, `flex-none whitespace-nowrap` on the action — PLUS
-           three resets the nesting forced, `normal-case`, `tracking-normal`
-           and the footer ink, because `RecordFooterEyebrow` is `text-micro
-           font-[var(--font-weight-medium)] uppercase text-ink-tertiary` and
-           every one of those inherits into a child. All of it is gone, and
-           none of it is still needed: the kit's own branch (record-detail.tsx,
-           `data-slot="record-detail-activity-row"`) draws the action as a
-           SIBLING of the eyebrow rather than a child — nothing to reset — and
-           declares `--footer-eyebrow-line` itself, `calc(var(--text-micro) *
-           var(--text-micro--line-height))`, the same expression the stand-in
-           carried.
-
-           MEASURED after the swap, in a browser against staging rows (a ticket
-           record, 1280×900): the eyebrow's box, the action's box and the ROW's
-           box are all 14.296875px — three numbers, one value, so the door adds
-           nothing to the height the lone eyebrow already had. THE IDENTITY IS
-           THE CLAIM, NOT THE NUMBER. The kit's own note quotes 13.406px for
-           this expression "at the shipped 15px root"; the agency door does not
-           render at 15px — `shared/web/scale-section.tsx` sets an inline
-           `style.fontSize` on <html> (16px here) and an inline style beats
-           `:root[data-scale=…]`, which `shared/scale.ts` documents as
-           deliberate. 0.6875rem × 1.3 × 16 = 14.3. Re-measured at every
-           `data-scale` step and the three boxes stay equal.
-
-           `activityLabel` IS STILL PASSED, AND STILL TRANSLATED. It is no
-           longer carrying the control, but `RecordDetail`'s own default for it
-           is the hardcoded English "Latest activity", and the translation walk
-           never opens `shared/ui/` (R28, `VENDORED_UI`) — left off, a German
-           reader is told "Latest activity" in English over three German
-           sentences. These are now the same two lines the recipe path has used
-           all along (`shared/web/screen-engine/screen-renderer.tsx`).
-
-           `undefined` — NOT `null`, AND NOT AN ELEMENT THAT WILL RENDER
-           NOTHING. `activityAction` is one of the three terms in the kit's
-           `showActivityColumn`, and that term tests the PROP (`!== undefined`),
-           which a React element satisfies even when its component returns null.
-           So the host has to ask BEFORE it builds the node, and it asks
-           `hasActivityDoor` — the same single expression `ActivityRail` itself
-           decides on (R16's `formatCount`: "" for a zero and for a total still
-           in flight), exported rather than copied. Caught by measuring: passing
-           the element unconditionally put a 14.296875px column carrying a bare
-           "LATEST ACTIVITY" and nothing under it onto a knowledge record with
-           no history and no note composer — a record that drew no column at all
-           the day before. The old smuggle could not do this, because
-           `activityLabel` is not a term in that gate.
-
-           NOT GATED ON `state` — a record whose PANEL is still loading has
-           already loaded its footer's own facts or it would not be drawing a
-           footer, and `ActivityRail` waits for the exact total either way. */
-        activityLabel={t("Latest activity")}
-        activityAction={
-          !hasActivityDoor(activity) ? undefined : (
-            <ActivityRail
-              activity={activity}
-              /* The SAME handler the footer's own composer is given, gated by
-                 the SAME `can(module, "create")` at the same call site — never
-                 recomputed here, so the two fields cannot end up disagreeing
-                 about who may write. */
-              onAddNote={onAddNote}
-              notePlaceholder={notePlaceholder}
-              head={activityHead}
-            />
-          )
-        }
-        onAddNote={onAddNote}
-        notePlaceholder={notePlaceholder}
+           THE FOOTER'S OWN DATA GOES WITH IT. `audit`, `activity`,
+           `activityLabel`, `activityAction`, `onAddNote` and
+           `notePlaceholder` were all region 4's props; `RecordFooterBand`
+           (below in this file) shapes and passes every one of them through
+           its own `<RecordDetail>` call, which is where they are now. The
+           long note that used to stand here about the activity door, the
+           kit's v1.2.69 `activityAction` prop and `hasActivityDoor`'s gate
+           moved with them, to that component's own call. */
+        footerVisible={false}
         state={state}
         copy={copy}
         emptyAction={emptyAction}
         errorAction={errorAction}
       />
+      {/* THE BAND, THROUGH THE SHELL'S OWN FOOTER SLOT, 22 Sep 2026, kit
+          v1.2.155. One line here covers every record screen that hands this
+          component its own children: the band leaves the padded stack and
+          lands on the pane's own bottom edge, full width, with the stack's
+          own trailing air above it and nothing under it.
+
+          `footerVisible` STILL MEANS WHAT IT ALWAYS MEANT. A caller that
+          turns it off (help-detail.tsx, story-detail.tsx,
+          knowledge-detail.tsx, all three build their own band, because
+          their bodies are SIBLINGS of this component rather than its
+          children) fills the slot itself; this renders nothing for them and
+          the slot holds exactly one band either way.
+
+          A SCREEN WITH NO HISTORY AND NO RECORD COLUMN STILL DRAWS NOTHING.
+          `RecordFooterBand`'s own `RecordDetail` call is gated the same way
+          region 4 always was, the card draws only when `audit`/`activity`
+          actually put something in one of its two columns, so a record
+          with neither puts an empty wrapper in the slot and no band. */}
+      <ScreenFooterSlot>
+        {footerVisible ? (
+          <RecordFooterBand
+            audit={audit}
+            activity={activity}
+            activityHead={activityHead}
+            onAddNote={onAddNote}
+            notePlaceholder={notePlaceholder}
+          />
+        ) : null}
+      </ScreenFooterSlot>
     </div>
   )
 }

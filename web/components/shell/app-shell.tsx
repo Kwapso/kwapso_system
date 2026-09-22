@@ -121,6 +121,7 @@ import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
+import { FooterSlotProvider } from "@/components/shell/footer-slot"
 import { AgentDockSlot, AgentDockTabsSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
 // THE TRAIL LINE (client ruling, 17 Sep 2026) — the active workspace tab's
@@ -1435,6 +1436,13 @@ export function AppShell({
   // its own — no separate `md:` literal needed any more.
   const shellRootRef = React.useRef<HTMLDivElement>(null)
   const tabBarRef = React.useRef<HTMLElement>(null)
+  // THE FOOTER SLOT'S HOST, 22 Sep 2026, kit v1.2.155. A `useState` callback
+  // ref and not a `useRef`: the pages that fill this slot render DOWN the
+  // tree from here, so they need a re-render on the frame the host element
+  // first exists, and a ref mutation does not cause one. See
+  // `web/components/shell/footer-slot.tsx` for why this is a portal host
+  // rather than a node held in state.
+  const [footerHost, setFooterHost] = React.useState<HTMLDivElement | null>(null)
   React.useEffect(() => {
     const shell = shellRootRef.current
     const bar = tabBarRef.current
@@ -1625,6 +1633,21 @@ export function AppShell({
            deleted on 2026-09-03; the strip inherited both the bleed and the
            measurement, which is why this paragraph still holds.)
 
+           `pb-24 md:pb-0` CAME BACK TO THIS LINE ON 22 Sep 2026, FROM THE
+           CONTENT DIV BELOW, and the paragraph at the top of this comment is
+           true again: the padding comes out of the `h-dvh` window rather than
+           adding to it, so the ground still paints the full viewport and what
+           the padding insets is the CARD. Which is the point. The phone's
+           `fixed` tab bar overlays whatever is under it, and while this
+           clearance was paid INSIDE the scroller (on the content div, as
+           `pb-24 md:pb-0`) it was 96px of paper between a record's own footer
+           band and the pane's bottom edge, measured on staging at 760 tall:
+           the story page's band flush at desktop and 96px short there. Paying
+           it out here ends the pane 96px above the window's foot instead, so
+           the band lands flush on the pane's OWN bottom edge and the bar sits
+           below the card rather than on top of it. Aurora's ruling reads "at
+           the very bottom" of the main content, not "under the navigation".
+
            IT IS AN OVERRIDE HERE AND NOT A KIT EDIT for the reason the five
            rail overrides above give: `shared/ui/` is vendored and pinned and a
            hand-edit fails web/test/vendored-kit.test.ts. Owed upstream — "a
@@ -1642,7 +1665,29 @@ export function AppShell({
            content` always carries `CARD_FLUSH` (`rounded-b-none`). See
            `web/test/shell-bottom-edge.test.ts`, which now censuses the kit's
            source for exactly this instead of this file's className. */
-        className="pt-[var(--shell-top)] [&_[data-slot=screen-shell-body]]:pt-0"
+        className="pt-[var(--shell-top)] pb-24 md:pb-0 [&_[data-slot=screen-shell-body]]:pt-0"
+        /* ── THE FOOTER SLOT, AND WHY IT IS DECLARED UNCONDITIONALLY ───────
+         * 22 Sep 2026, kit v1.2.155. Aurora: "The latest activity always has
+         * to be at the very bottom". The kit renders this node inside the one
+         * scroller and OUTSIDE the body's padded stack, as the `mt-auto` last
+         * child of a `min-h-full` column, which is what puts a short record's
+         * band on the pane's own bottom edge with no paper under it.
+         *
+         * IT IS AN EMPTY HOST ON EVERY SCREEN THAT HAS NO BAND, and that
+         * costs nothing: a zero-height div at the foot of the column, no
+         * padding, no fill. The alternative, deciding here whether the
+         * routed screen is a record, would mean this file knowing what the
+         * router put on screen, which is exactly the knowledge it does not
+         * have. `web/components/records/record-chrome.tsx`'s own
+         * `RecordScreen`, and the three pages that build their band
+         * themselves, fill it through `ScreenFooterSlot`.
+         *
+         * `narrowFooter` IS NOT OPTIONAL HERE. The kit's own default drops a
+         * footer below `sm` (27.39's narrow render, for a footer full of
+         * controls); the record band is not controls, it is the record's own
+         * foot, and it has drawn on a phone since the day it shipped. */
+        narrowFooter
+        footer={<div ref={setFooterHost} className="min-w-0" />}
         spine={spine}
         rail={railContent}
         railLabel={t("Sections")}
@@ -2306,11 +2351,11 @@ export function AppShell({
          * header carries the rest of this argument. */}
         <div
           className={cn(
-            "mx-auto flex w-full max-w-none min-w-0 h-full flex-col pb-24 md:pb-0",
+            "mx-auto flex w-full max-w-none min-w-0 h-full flex-col",
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >
-          {children}
+          <FooterSlotProvider host={footerHost}>{children}</FooterSlotProvider>
         </div>
       </ScreenShell>
 

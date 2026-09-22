@@ -604,12 +604,18 @@ export interface RecordDetailProps
    * one card, chosen by the call site rather than guessed from where it
    * happens to render:
    *
-   *   "band" (the default, UNCHANGED) — CH27.8's card exactly as it already
-   *   ships: it reads `--pane-inset-x` off the pane it is standing in and
-   *   pulls itself out to the pane's own edges (`-mx-[var(--pane-inset-x,
-   *   0px)]`), and its corners follow `--radius-pane-edge`. This is the
-   *   register a RECORD PAGE wants, drawn straight in a `ScreenShell`'s
-   *   body.
+   *   "band" (the default). CH27.8's card, reaching the pane's own edges.
+   *   It reads `--pane-escape-x` off its host and pulls itself out by that
+   *   measure (`-mx-[var(--pane-escape-x,var(--pane-inset-x,0px))]`), and
+   *   its corners follow `--radius-pane-edge`. This is the register a
+   *   RECORD PAGE wants. THE TWO HOSTS IT HAS, 22 SEP 2026: rendered
+   *   through `ScreenShell`'s own FOOTER SLOT (the band's home since
+   *   v1.2.155) the escape computes to 0, because that slot already sits
+   *   outside the body's padded stack and spans the pane; rendered inside
+   *   `children`, in the padded stack, it inherits the pane's own gutter
+   *   and pulls out by it, exactly as it has since 21 Sep 2026. Either way
+   *   the padding below pays `--pane-inset-x` back inside, so the band's
+   *   first word lands under the h1.
    *
    *   "stripe" — a card drawn inside a SHEET or another narrow host that
    *   publishes no `--pane-inset-x` at all and has no pane edges to reach
@@ -1239,8 +1245,26 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  instead of relying on an absent custom property to fall
                  back to it, so a reader can see the rule without having to
                  know what `--pane-inset-x` resolves to. */
+              /* THE ESCAPE READS `--pane-escape-x` NOW, 22 SEP 2026, AND
+                 THAT IS HOW THE BAND LOSES IT IN THE SHELL'S FOOTER SLOT
+                 WITHOUT A THIRD REGISTER OR A CALL-SITE FLAG. The slot
+                 (`screen-shell.tsx`'s `footerNode`) renders this card
+                 OUTSIDE the padded stack, already spanning the pane, and
+                 rebinds `--pane-escape-x` to `0px` on its own wrapper, so
+                 this margin computes to nothing there, while the padding
+                 below goes on reading `--pane-inset-x` and the band's first
+                 word still lands under the h1. A caller that renders the
+                 band inside a padded body WITHOUT the slot (a demo cell, a
+                 dialog, a screen not yet moved over) inherits the pane's own
+                 `--pane-escape-x` and pulls out exactly as it has since
+                 21 Sep. Both fallbacks stay `0px`, which is what keeps a
+                 record drawn outside a pane altogether where it always
+                 drew. */
               footerRegister === "band"
-                ? ["-mx-[var(--pane-inset-x,0px)]", "rounded-[var(--radius-pane-edge)]"]
+                ? [
+                    "-mx-[var(--pane-escape-x,var(--pane-inset-x,0px))]",
+                    "rounded-[var(--radius-pane-edge)]",
+                  ]
                 : "rounded-none",
             )}
           >

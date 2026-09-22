@@ -1771,6 +1771,20 @@ if (!/"\[--pane-inset-x:var\(--space-6\)\]",/.test(src)) {
       "the same number DENSITY_BODY spends as padding, or the ink band cannot break out of it and pay it back.",
   );
 }
+/* 6b · AND THE SAME NUMBER UNDER THE SECOND NAME, 22 SEP 2026. The pane's
+   gutter answers two questions that stopped having one answer when the
+   footer slot became the band's home: what a part owes its own text
+   (`--pane-inset-x`, always 24) and how far that part is from the pane's
+   edges (`--pane-escape-x`, 24 inside the padded stack and 0 in the footer
+   slot, which already spans the pane). The pane declares the default; the
+   slot's own wrapper rebinds it. */
+if (!/"\[--pane-escape-x:var\(--space-6\)\]",/.test(src)) {
+  airFindings.push(
+    `${rel}'s BODY does not publish [--pane-escape-x:var(--space-6)] - the band's negative margin reads that ` +
+      "property, and without the declaration a band inside the padded stack falls back to --pane-inset-x and " +
+      "then to 0, which draws it inset 24px on both sides again.",
+  );
+}
 if (!/"\[--radius-pane-edge:0px\]",/.test(src)) {
   airFindings.push(
     `${rel}'s BODY does not publish [--radius-pane-edge:0px] - the pane's own bottom corners are square against ` +
@@ -1782,11 +1796,13 @@ if (!/"\[--radius-pane-edge:0px\]",/.test(src)) {
    the inner padding are one property read twice; either alone is a bug - the
    first would put the band's text hard against the window, the second would
    change nothing at all. */
-if (!/"-mx-\[var\(--pane-inset-x,0px\)\]",/.test(recordDetailSrc)) {
+if (!/"-mx-\[var\(--pane-escape-x,var\(--pane-inset-x,0px\)\)\]",/.test(recordDetailSrc)) {
   airFindings.push(
-    `${recordDetailRel}'s ink footer does not pull itself out by -mx-[var(--pane-inset-x,0px)] - the client asked ` +
-      'for "the full row side to side (within the main content)", and the 0px fallback is what keeps a record ' +
-      "drawn outside a pane (a dialog, a demo cell) exactly where it always drew.",
+    `${recordDetailRel}'s ink footer does not pull itself out by -mx-[var(--pane-escape-x,var(--pane-inset-x,` +
+      '0px))] - the client asked for "the full row side to side (within the main content)"; the --pane-inset-x ' +
+      "fallback is what keeps a band inside the padded stack drawing as it did before the footer slot existed, " +
+      "and the 0px fallback under it is what keeps a record drawn outside a pane (a dialog, a demo cell) " +
+      "exactly where it always drew.",
   );
 }
 if (
@@ -1818,12 +1834,12 @@ if (!/"rounded-\[var\(--radius-pane-edge\)\]"/.test(recordDetailSrc)) {
    host that asked for none - so this pins the whole ternary, not each half
    separately, the same shape 7's own two lines are pinned together for. */
 if (
-  !/footerRegister === "band"\s*\n\s*\?\s*\[\s*"-mx-\[var\(--pane-inset-x,0px\)\]",\s*"rounded-\[var\(--radius-pane-edge\)\]",?\s*\]\s*\n\s*:\s*"rounded-none",/.test(
+  !/footerRegister === "band"\s*\n\s*\?\s*\[\s*"-mx-\[var\(--pane-escape-x,var\(--pane-inset-x,0px\)\)\]",\s*"rounded-\[var\(--radius-pane-edge\)\]",?\s*\]\s*\n\s*:\s*"rounded-none",/.test(
     recordDetailSrc,
   )
 ) {
   airFindings.push(
-    `${recordDetailRel}'s ink footer does not gate -mx-[var(--pane-inset-x,0px)] and rounded-[var(--radius-` +
+    `${recordDetailRel}'s ink footer does not gate -mx-[var(--pane-escape-x,…)] and rounded-[var(--radius-` +
       'pane-edge)] together on footerRegister === "band", falling back to a flat rounded-none for "stripe" - a ' +
       "stripe register has no pane to escape and draws no radius at all, not --radius-pane-edge's own fallback " +
       "to --radius.",
@@ -2138,6 +2154,115 @@ console.log(
     "className={BODY} alone, BODY's own literal carries no padding utility, and DENSITY_BODY moved one level " +
     "in onto screen-shell-stack rather than being dropped - the scroller's clip box is the pane's border box " +
     "unconditionally, not by the coincidence of a zero border-width.",
+);
+
+/* ============================================================================
+   THE 22 SEP 2026 FOOTER-SLOT CHECK - THE BAND'S HOME, PINNED AS STRUCTURE.
+
+   AURORA, VERBATIM, 21 SEP 2026: "also, make footer not inside a container,
+   but the full row side to side (withing the main content)", and over the
+   sixth screenshot: "The latest activity always has to be at the very
+   bottom".
+
+   WHY A CHECK AND NOT A COMMENT. The three fixes this replaces were all
+   arithmetic somebody could delete without anything going red: a page
+   container grown past the pane's padding, a negative bottom margin on an
+   app's own wrapper, and v1.2.153's move of DENSITY_BODY onto the stack,
+   which was right for the band's sides and put paper under its bottom. The
+   shape that survives them is four facts about this file, and each one of
+   them is load-bearing on its own:
+
+     1. The footer renders INSIDE screen-shell-body (R91: one scroller, and
+        "you reach it like a normal footer, this is a law").
+     2. It renders OUTSIDE screen-shell-stack, so DENSITY_BODY's own py never
+        sits under it.
+     3. The column the two share is min-h-full, so a short record's column is
+        still the pane's full height.
+     4. The footer wrapper is mt-auto and carries NO padding, so the band
+        lands on that column's own bottom edge with nothing under it.
+
+   Drop any one and the paper strip comes back - 24px under the band on a
+   ticket, 62-198px on a knowledge source, 96px on a story at 760. */
+const footerSlotFindings = [];
+
+const columnSlotMatch = /data-slot="screen-shell-column"[\s\S]{0,300}?\n\s*>/.exec(src);
+if (!columnSlotMatch) {
+  footerSlotFindings.push(
+    `${rel} has no screen-shell-column render site - the scroller's own content column is what makes the ` +
+      "footer slot reach the pane's bottom edge; without it the stack is the scroller's only child again and " +
+      "the band goes back to sitting on top of DENSITY_BODY's own bottom padding.",
+  );
+} else if (!/"flex min-h-full min-w-0 flex-col"/.test(columnSlotMatch[0])) {
+  footerSlotFindings.push(
+    `${rel}'s screen-shell-column does not read "flex min-h-full min-w-0 flex-col" - min-h-full is the whole ` +
+      "trick (it resolves because screen-shell-body is a flex item with a real used height), and without it a " +
+      "short record's column is its own content height and mt-auto has no slack to spend.",
+  );
+}
+
+/* THE ORDER, READ OFF THE SOURCE RATHER THAN ASSUMED: the stack's closing
+   tag has to come BEFORE {footerNode}, and {footerNode} before the column's
+   own closing tag. A footerNode back inside the stack is exactly v1.2.153's
+   own defect. */
+const columnAt = src.indexOf('data-slot="screen-shell-column"');
+const stackAt = src.indexOf('data-slot="screen-shell-stack"');
+const footerNodeAt = src.indexOf("{footerNode}");
+const stackChildrenAt = src.indexOf("{children}", stackAt);
+if (columnAt === -1 || stackAt === -1 || footerNodeAt === -1 || stackChildrenAt === -1) {
+  footerSlotFindings.push(
+    `${rel} is missing one of screen-shell-column / screen-shell-stack / {footerNode} / the stack's {children} ` +
+      "- the ordering check below is written against today's exact shape and needs updating alongside it.",
+  );
+} else {
+  if (!(columnAt < stackAt && stackAt < stackChildrenAt && stackChildrenAt < footerNodeAt)) {
+    footerSlotFindings.push(
+      `${rel} does not render {footerNode} after the stack's own {children}, inside screen-shell-column - the ` +
+        "footer must be the column's LAST child and the stack's SIBLING, never the stack's child.",
+    );
+  }
+  const stackToFooter = src.slice(stackChildrenAt, footerNodeAt);
+  if (!/<\/div>/.test(stackToFooter)) {
+    footerSlotFindings.push(
+      `${rel} renders {footerNode} with no closing tag between it and the stack's own {children} - it is still ` +
+        "inside screen-shell-stack, which is where DENSITY_BODY's own padding wraps it on all four sides.",
+    );
+  }
+}
+
+const footerSlotMatch = /data-slot="screen-shell-footer"[\s\S]{0,400}?\n\s*>/.exec(src);
+if (!footerSlotMatch) {
+  footerSlotFindings.push(`${rel} has no screen-shell-footer render site at all.`);
+} else {
+  const footerSlot = footerSlotMatch[0];
+  if (!/"mt-auto min-w-0 \[--pane-escape-x:0px\]",/.test(footerSlot)) {
+    footerSlotFindings.push(
+      `${rel}'s screen-shell-footer does not read "mt-auto min-w-0 [--pane-escape-x:0px]" - mt-auto is what ` +
+        "puts a short record's band on the pane's own floor, and the 0px rebinding is what stops the band " +
+        "pulling a 24px negative margin it no longer owes now that this wrapper already spans the pane.",
+    );
+  }
+  if (/\bpx-|\bpy-|\bp-\[|\bpt-|\bpb-|\bps-|\bpe-|\bp-\d/.test(footerSlot)) {
+    footerSlotFindings.push(
+      `${rel}'s screen-shell-footer carries a padding utility - there must be none on any side: padding here ` +
+        'is paper around the band, and "no white on the sides" and "at the very bottom" are the same ruling ' +
+        "read on two axes.",
+    );
+  }
+}
+
+if (footerSlotFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell footer-slot check (22 Sep 2026, the band's home):\n" +
+      footerSlotFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell footer-slot check: the footer node renders inside the one scroller and outside the padded " +
+    "stack, as screen-shell-column's last child; the column is min-h-full, the footer wrapper is mt-auto with " +
+    "no padding on any side and rebinds --pane-escape-x to 0px - a short record's band lands on the pane's own " +
+    "bottom edge and a long one's lands after its content.",
 );
 
 /* ============================================================================

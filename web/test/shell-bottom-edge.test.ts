@@ -137,10 +137,42 @@ describe("app-shell.tsx carries NO bottom-edge override of its own — the kit o
 
   const classNameBlock = () => APP_SHELL_SRC.slice(classNamePropAt, spinePropAt)
 
-  it("still flushes the top edge — untouched by this round's cleanup", () => {
+  it("still flushes the top edge, and pays the phone bar's clearance out here rather than inside the scroller", () => {
     expect(classNameBlock(), "the pre-existing top-edge override must survive untouched").toContain(
-      'className="pt-[var(--shell-top)] [&_[data-slot=screen-shell-body]]:pt-0"'
+      'className="pt-[var(--shell-top)] pb-24 md:pb-0 [&_[data-slot=screen-shell-body]]:pt-0"'
     )
+  })
+
+  it("the phone tab bar's 96px clearance is paid on the PAGE, never inside the pane", () => {
+    // 22 Sep 2026, kit v1.2.155. This clearance used to sit on the content
+    // div INSIDE the scroller (`pb-24 md:pb-0` there), where it was 96px of
+    // paper between a record's own footer band and the pane's bottom edge:
+    // measured on staging at 760 tall, the story page's band was flush at
+    // desktop and exactly 96px short there. Paid on the PAGE level instead
+    // (`h-dvh`, border-box, so the padding comes out of the window rather
+    // than adding to it) it ends the CARD above the fixed bar, and the band
+    // lands flush on the pane's own bottom edge at every width.
+    expect(classNameBlock(), "the page level must carry the clearance").toContain("pb-24 md:pb-0")
+    const contentDivAt = APP_SHELL_SRC.indexOf('"mx-auto flex w-full max-w-none min-w-0 h-full flex-col')
+    expect(contentDivAt, "app-shell.tsx must still draw its one page-width content div").toBeGreaterThan(-1)
+    const contentDiv = APP_SHELL_SRC.slice(contentDivAt, APP_SHELL_SRC.indexOf("\n", contentDivAt))
+    expect(contentDiv, "the content div inside the scroller must carry no bottom padding of its own").not.toContain("pb-24")
+  })
+
+  it("the kit's own footer slot is declared, with a host and narrowFooter", () => {
+    // The band's home since kit v1.2.155: the kit renders this node inside
+    // the one scroller and OUTSIDE the body's padded stack, as the `mt-auto`
+    // last child of a `min-h-full` column. `narrowFooter` is required ,
+    // the kit's own default hides a footer below `sm`, and the record band
+    // has drawn on a phone since the day it shipped.
+    const callEnd = APP_SHELL_SRC.indexOf("header={", screenShellAt)
+    const call = APP_SHELL_SRC.slice(screenShellAt, callEnd)
+    expect(call, "the ScreenShell call must declare the footer slot").toContain("footer={<div ref={setFooterHost}")
+    expect(call, "the footer must survive the narrow width").toMatch(/^\s*narrowFooter$/m)
+    expect(
+      APP_SHELL_SRC,
+      "the host must be provided to the tree through FooterSlotProvider, so a page at any depth can portal into it"
+    ).toContain("<FooterSlotProvider host={footerHost}>")
   })
 
   it("is a plain string again, not a cn(...) call — the six-class override is gone, not just emptied", () => {

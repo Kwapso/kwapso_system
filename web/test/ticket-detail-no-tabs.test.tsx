@@ -31,6 +31,7 @@
 // `help-form-dialog-loop-field.test.tsx` proves the picker's NEW home, in
 // the edit sheet.
 
+import * as React from "react"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -354,6 +355,7 @@ window.matchMedia = ((query: string) => ({
   dispatchEvent: () => false,
 })) as unknown as typeof window.matchMedia
 
+import { FooterSlotProvider } from "@/components/shell/footer-slot"
 import { HelpDetailScreen } from "@/components/tickets/help-detail"
 import { TICKET_PANEL_ANCHOR } from "@/components/tickets/ticket-detail-body"
 
@@ -370,9 +372,38 @@ beforeEach(() => {
   api.timers = []
 })
 
+/* THE SHELL'S FOOTER SLOT, STOOD IN FOR, 22 Sep 2026, kit v1.2.155.
+ *
+ * The dark band is not the page's own last child any more: the page renders
+ * it through `<ScreenFooterSlot>`, which portals it into the host
+ * `app-shell.tsx` hands `ScreenShell`'s own `footer` slot. The kit then draws
+ * that host inside the one scroller and OUTSIDE the body's padded stack, as
+ * the `mt-auto` last child of a `min-h-full` column, which is the whole
+ * point: a short record's band lands on the pane's own bottom edge with no
+ * paper under it.
+ *
+ * `AppShell` is not mounted in these tests, so the host is stood in for here
+ * AND PLACED LAST inside the same container, exactly where the kit places it
+ * relative to the body. That keeps any reading-order assertion a real
+ * statement about the rendered page rather than an artefact of where the
+ * stand-in happens to sit. */
+function WithFooterSlot({ children }: { children: React.ReactNode }) {
+  const [host, setHost] = React.useState<HTMLDivElement | null>(null)
+  return (
+    <>
+      <FooterSlotProvider host={host}>{children}</FooterSlotProvider>
+      <div data-slot="screen-shell-footer" ref={setHost} />
+    </>
+  )
+}
+
 const openTicket = (status: HelpStatus = "triaged") => {
   api.ticket = { ...BASE_TICKET, status } as HelpTicket
-  return render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
+  return render(
+    <WithFooterSlot>
+      <HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />
+    </WithFooterSlot>
+  )
 }
 
 describe("the ticket detail draws no tabs", () => {
@@ -920,30 +951,42 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     expect(conversationCard.contains(composerFooter)).toBe(true)
   })
 
-  it("the band (Latest activity + Record) is the ticket body's own pinned last child, outside the grid and its scroll region entirely", async () => {
+  it("the band (Latest activity + Record) renders through the shell's footer slot, never inside the ticket body", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const band = document.querySelector('[data-slot="ticket-footer-band"]') as HTMLElement
-    expect(band, "the ticket body must render its own pinned band").toBeTruthy()
-    const ticketBodyRoot = band.parentElement as HTMLElement
-    expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
-    expect(ticketBodyRoot.lastElementChild).toBe(band)
-    // ROUND 26 — the panel gap above the band (R89), by token.
+
+    // THE SLOT IS WHERE IT LANDS, 22 Sep 2026, kit v1.2.155. Until then the
+    // band was the ticket body's own `flex-none mt-auto w-full` last child,
+    // carrying this page's own marker, reaching the bottom of a box that
+    // itself stopped `DENSITY_BODY`'s reserved `padding-bottom` short of the
+    // pane: 24px of paper under it at every desktop width, 115px at 760.
+    // The band is portalled into `ScreenShell`'s own footer node now, which
+    // the kit draws OUTSIDE the body's padded stack.
+    const footerCards = document.querySelectorAll('[data-record-region="footer"]')
+    expect(footerCards.length, "exactly one ink footer on the page, RecordScreen's own copy stays switched off").toBe(1)
+    const band = footerCards[0] as HTMLElement
+
+    const slot = document.querySelector('[data-slot="screen-shell-footer"]') as HTMLElement
+    expect(slot, "the shell's own footer slot must be the band's host").toBeTruthy()
+    expect(slot.contains(band), "the band must render inside the shell's footer slot").toBe(true)
+
+    const ticketBodyRoot = document.querySelector('[data-slot="ticket-detail-body"]') as HTMLElement
+    expect(ticketBodyRoot, "the ticket body must still render").toBeTruthy()
+    expect(
+      ticketBodyRoot.contains(band),
+      "the band must NOT be inside the ticket body any more, that box is inside the shell's padded stack, which is what put paper under it"
+    ).toBe(false)
+
+    // THE PAGE'S OWN MARKER IS GONE WITH THE WRAPPER IT NAMED. Nothing is
+    // left here to mark: the wrapper that carries `mt-auto` is the kit's
+    // `screen-shell-footer`, and the column it spends that slack in is
+    // `screen-shell-column`.
+    expect(document.querySelector('[data-slot="ticket-footer-band"]')).toBeNull()
+
+    // ROUND 26'S PANEL GAP SURVIVES, on the body's own root, between the two
+    // things that column actually holds now.
     expect(ticketBodyRoot.className).toContain("gap-6")
-    // ROUND 28 — sticky is GONE. The band is normal flow now; `mt-auto` is
-    // the ordinary "footer at the bottom of a short page" flex trick,
-    // consuming whatever leftover space the root's own flex-1 was handed.
-    expect(band.className).not.toContain("sticky")
-    expect(band.className).not.toContain("bottom-[calc(-1*var(--space-5))]")
-    expect(band.className).not.toContain("lg:bottom-[calc(-1*var(--space-6))]")
-    expect(band.className).not.toContain("bottom-0")
-    expect(band.className).toContain("mt-auto")
-    expect(band.className).toContain("flex-none")
-    expect(band.className).toContain("w-full")
-    // THE REAL FOOTER CARD (kit's own ink footer, CH27.8) lives inside it —
-    // and nowhere else on the page (RecordScreen's own copy is switched off).
-    expect(band.querySelectorAll('[data-record-region="footer"]').length).toBe(1)
-    expect(document.querySelectorAll('[data-record-region="footer"]').length).toBe(1)
+    expect(ticketBodyRoot.className).toContain("flex-1")
   })
 })
 

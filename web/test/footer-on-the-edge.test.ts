@@ -334,13 +334,31 @@ describe("R89 — footer-on-the-edge", () => {
     ).toBe(false)
   })
 
-  it("record-chrome.tsx's RecordScreen carries a footerVisible passthrough, forwarded to the kit's RecordChrome", () => {
+  it("record-chrome.tsx's RecordScreen keeps footerVisible, and spends it on the shell's footer SLOT rather than on the kit's own region 4", () => {
     const propAt = chrome.indexOf("footerVisible?: boolean")
-    expect(propAt, "RecordScreen's own prop type must declare footerVisible").toBeGreaterThan(-1)
+    expect(propAt, "RecordScreen's own prop type must still declare footerVisible").toBeGreaterThan(-1)
     const defaultAt = chrome.indexOf("footerVisible = true,")
-    expect(defaultAt, "footerVisible must default to true — every existing caller keeps its own footer unless it opts out").toBeGreaterThan(-1)
-    const forwardAt = chrome.indexOf("footerVisible={footerVisible}")
-    expect(forwardAt, "RecordScreen must forward footerVisible straight to the kit's own RecordChrome/RecordDetail").toBeGreaterThan(-1)
+    expect(defaultAt, "footerVisible must still default to true, every existing caller keeps its own band unless it opts out").toBeGreaterThan(-1)
+    // 22 Sep 2026, kit v1.2.155. Region 4 of the kit's own RecordDetail sits
+    // INSIDE the shell body's padded stack, which is the one place the band
+    // may no longer be, so this call switches it off UNCONDITIONALLY, never
+    // a passthrough of this component's own prop.
+    expect(
+      chrome.includes("footerVisible={footerVisible}"),
+      "RecordScreen must NOT forward footerVisible into the kit any more, region 4 draws inside the padded stack, which is what put paper under the band"
+    ).toBe(false)
+    expect(
+      chrome.includes("footerVisible={false}"),
+      "RecordScreen's own RecordChrome call must pass footerVisible={false} unconditionally"
+    ).toBe(true)
+    // AND THE PROP IS SPENT, not merely accepted: the band goes into the
+    // shell's own footer slot, gated on this component's own footerVisible.
+    const slotAt = chrome.indexOf("<ScreenFooterSlot>")
+    expect(slotAt, "RecordScreen must fill ScreenShell's own footer slot").toBeGreaterThan(-1)
+    const slotEnd = chrome.indexOf("</ScreenFooterSlot>", slotAt)
+    const slotBody = chrome.slice(slotAt, slotEnd)
+    expect(slotBody.includes("footerVisible ?"), "the slot's own contents must be gated on RecordScreen's footerVisible").toBe(true)
+    expect(slotBody.includes("<RecordFooterBand"), "the slot must hold the same RecordFooterBand every other record page builds").toBe(true)
   })
 
   it("help-detail.tsx switches RecordScreen's own footer off and builds the real one from RecordFooterBand instead", () => {
@@ -369,7 +387,7 @@ describe("R89 — footer-on-the-edge", () => {
     ).toBe(true)
   })
 
-  it("TicketDetailBody's own root is a flex column whose exactly two children are the scrolling region and the pinned band", () => {
+  it("TicketDetailBody's own root is a flex column, and the band leaves it for the shell's footer slot", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     expect(fnAt).toBeGreaterThan(-1)
     const at = body.indexOf('data-slot="ticket-detail-body"', fnAt)
@@ -391,44 +409,36 @@ describe("R89 — footer-on-the-edge", () => {
     ).toBe(false)
     expect(
       rootTag.includes("gap-6"),
-      "the root must carry gap-6 — round 26's panel gap between the scrolling region and the band, the same token every other pair of stacked panels uses"
+      "the root must carry gap-6, round 26's panel gap, the same token every other pair of stacked panels uses"
     ).toBe(true)
 
-    // THE BAND — this component's own last child now, marked
-    // data-slot="ticket-footer-band", never a bare <CardFooter> (round 23's
-    // shape, retired).
-    const bandAt = body.indexOf('data-slot="ticket-footer-band"', at)
-    expect(bandAt, "the root's own pinned band must exist, marked data-slot=\"ticket-footer-band\"").toBeGreaterThan(-1)
-    const bandTagStart = body.lastIndexOf("<div", bandAt)
-    const bandTag = body.slice(bandTagStart, body.indexOf(">", bandAt))
-    // ROUND 28 — sticky is GONE. The band is an ordinary flow child now;
-    // `mt-auto` is what pushes it to the root's own bottom edge when
-    // content is short (the root's own leftover space, per above), and it
-    // simply follows the region in normal flow when content is tall.
-    expect(bandTag.includes("sticky"), "sticky must NOT appear on the band any more (round 28) — the band is normal flow, mt-auto").toBe(false)
+    // 22 SEP 2026, kit v1.2.155, THE BAND IS NOT A CHILD OF THIS ROOT ANY
+    // MORE. It goes through `<ScreenFooterSlot>`, which portals it into the
+    // node the kit renders OUTSIDE the body's padded stack, as the `mt-auto`
+    // last child of a `min-h-full` column. Until then this page carried its
+    // own `flex-none mt-auto w-full` wrapper and its own marker, reaching the
+    // bottom of a box that itself stopped `DENSITY_BODY`'s own reserved
+    // `padding-bottom` short of the pane: 24px of paper under the band at
+    // every desktop width, 115px at 760 tall, measured by paint.
     expect(
-      bandTag.includes("bottom-[calc(-1*var(--space-5))]") || bandTag.includes("lg:bottom-[calc(-1*var(--space-6))]"),
-      "the round-23 negative, padding-compensated bottom offset must be GONE — nothing needs to reach past the pane's own padding any more"
+      body.includes('data-slot="ticket-footer-band"'),
+      "this page's own footer-band marker must be GONE, there is no wrapper of its own left here to name"
     ).toBe(false)
-    expect(bandTag.includes("bottom-0"), "bottom-0 must not appear either — the band is not positioned at all").toBe(false)
-    expect(bandTag.includes("mt-auto"), "the band must carry mt-auto — the ordinary flex 'footer at the bottom of a short page' trick, round 28").toBe(true)
-    expect(bandTag.includes("flex-none"), "the band must be flex-none — never a share of the scroll region's budget").toBe(
-      true
-    )
-    expect(bandTag.includes("w-full"), "the band must be w-full — full content width").toBe(true)
+    expect(
+      body.includes('className="flex-none mt-auto w-full"'),
+      "this page must carry no mt-auto footer wrapper of its own, the wrapper that carries mt-auto is the kit's screen-shell-footer now"
+    ).toBe(false)
+    const slotAt = body.indexOf("<ScreenFooterSlot>{footer}</ScreenFooterSlot>", fnAt)
+    expect(slotAt, "the band must be handed to ScreenShell's own footer slot").toBeGreaterThan(-1)
 
-    // Nothing may render after the band inside the root — D21's own "last
+    // Nothing may render after the slot inside the root, D21's own "last
     // child" rule, restated positionally for the root itself.
     const fnEnd = body.indexOf("\n}\n", fnAt)
-    const afterBand = body
-      .slice(body.indexOf("</div>", bandAt) , fnEnd)
-    // The band's own closing </div> is immediately followed by the root's
-    // own closing </div>) — nothing else in between but whitespace.
-    const betweenBandCloseAndRootClose = afterBand.slice("</div>".length)
-    const nextRealTagAt = betweenBandCloseAndRootClose.search(/\S/)
+    const afterSlot = body.slice(slotAt + "<ScreenFooterSlot>{footer}</ScreenFooterSlot>".length, fnEnd)
+    const nextRealTagAt = afterSlot.search(/\S/)
     expect(
-      betweenBandCloseAndRootClose.slice(nextRealTagAt, nextRealTagAt + 6),
-      "the band's own closing tag must be followed immediately by the root's own closing tag — nothing renders after the band"
+      afterSlot.slice(nextRealTagAt, nextRealTagAt + 6),
+      "the slot must be followed immediately by the root's own closing tag, nothing renders after the band"
     ).toBe("</div>")
   })
 
@@ -584,7 +594,7 @@ describe("R89 — footer-on-the-edge", () => {
     expect(constBody.includes('fill={isAtLeastLg ? "absolute" : "block"}'), "TicketConversationPanel must be called with fill branching on isAtLeastLg").toBe(true)
   })
 
-  it("ROUND 28 — the region wrapping both per-width branches is a plain, content-sized block (NO flex-1/min-h-0/overflow-y-auto), and is the root's other child besides the band", () => {
+  it("ROUND 28, the region wrapping both per-width branches is a plain, content-sized block (NO flex-1/min-h-0/overflow-y-auto), and is the root's other child besides the footer slot", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     const returnAt = body.indexOf("return (", fnAt)
     const rootAt = body.indexOf('data-slot="ticket-detail-body"', returnAt)
@@ -603,8 +613,13 @@ describe("R89 — footer-on-the-edge", () => {
 
     const fnEnd = body.indexOf("\n}\n", fnAt)
     const rootBody = body.slice(rootTagEnd, fnEnd)
-    const bandCount = (rootBody.match(/data-slot="ticket-footer-band"/g) || []).length
-    expect(bandCount, "exactly one band in the root").toBe(1)
+    // THE ROOT'S OTHER CHILD IS THE SLOT, NOT A BAND, 22 Sep 2026, kit
+    // v1.2.155. The band left this box entirely (see this suite's own
+    // "TicketDetailBody's own root is a flex column" case), so what the
+    // region is a sibling of is `<ScreenFooterSlot>`, which renders a portal
+    // and adds no box of its own here at all.
+    const slotCount = (rootBody.match(/<ScreenFooterSlot>/g) || []).length
+    expect(slotCount, "exactly one footer slot in the root").toBe(1)
 
     // NEITHER `TicketDetailBody`'s own root NOR its region wrapper carries
     // overflow-y-auto any more — the ONE remaining scroller (the thread's
@@ -623,41 +638,42 @@ describe("R89 — footer-on-the-edge", () => {
   })
 })
 
-// R89, GENERALISED TO RecordDetailBody — 22 Sep 2026 finding, round 29
-// correction same day. Measured live on staging: a thin proof story and a
-// short knowledge source (both drawn through story-detail.tsx /
-// knowledge-detail.tsx calling the shared
-// `RecordDetailBody`) already reach the pane's edges left/right — the kit's
-// own `-mx-[var(--pane-inset-x,0px)]` escape on the footer Card (v1.2.149)
-// covers that, unconditionally, for any caller — but land 24px SHORT at the
-// bottom (876px against a 900px pane at 1440×900), because `mt-auto` only
-// reaches `RecordDetailBody`'s own root, and that root's height is capped by
-// the ordinary `h-full` chain at exactly `DENSITY_BODY`'s reserved
-// `padding-bottom` (screen-shell.tsx) short of the pane's true edge, UNLESS
-// the record's own content is tall enough to overflow that ceiling on its
-// own (T0001 always is; a thin story or a short knowledge source is not).
+// R89, ROUND 30, 22 Sep 2026, THE BAND LEAVES EVERY BODY FOR THE SHELL'S
+// OWN FOOTER SLOT, AND THE THREE ESCAPES ARE DELETED.
 //
-// ROUND 29 MOVED THE FIX HERE, off app-shell.tsx entirely. The first
-// attempt grew app-shell.tsx's own page container past screen-shell-body's
-// content-box edge — flush at `scrollTop=0`, but 24px short again the
-// instant the pane was scrolled to its own end (live proof:
-// `el.scrollHeight` counted `DENSITY_BODY`'s padding-bottom a SECOND time,
-// because a descendant's own `height` reaching past its scrolling
-// ancestor's content edge is real, detected overflow, and Chromium
-// reserves the trailing padding again once it sees any). This file's own
-// footer wrapper (`data-slot="record-footer-band"`) instead carries a
-// fixed, NEGATIVE `margin-bottom` — it reaches the identical pixel without
-// enlarging any box's measured `height`, so the ancestor's overflow
-// accounting never registers it (proved live: `scrollHeight ===
-// clientHeight` afterwards, zero phantom scroll room). Still keyed to
-// `record-footer-band` — `RecordDetailBody`'s own `footerDataSlot`
-// default — so it reaches every caller of the shared shape without
-// touching the ticket page's own, separately-marked band.
-describe("R89 — RecordDetailBody's own footer band matches TicketDetailBody's construction, and carries its own negative-margin growth (round 29)", () => {
+// THE MEASUREMENT THAT ENDED THE ARGUMENT. By paint on staging, with the
+// band's SIDES already flush on every page and state (v1.2.151/v1.2.153):
+// the ticket T0001 carried a 24px paper strip under the band at every
+// desktop width and 115px at 760 tall; a knowledge source carried between
+// 62 and 198px; a story was flush at desktop and 96px short at 760. Three
+// pages, three different numbers, one cause, the band was rendering INSIDE
+// the shell body's padded, scrolling stack, and every fix so far had been
+// an attempt to escape that box rather than to leave it.
+//
+// THE THREE ESCAPES, ALL RETIRED. (1) A page-container growth rule, retired
+// the day it shipped: growing a box past a scrolling ancestor's content edge
+// IS overflow, and Chromium then reserves that ancestor's padding-bottom a
+// second time, so scrolling to the pane's end dragged the band back up by
+// exactly the amount it had been grown. (2) A fixed NEGATIVE `margin-bottom`
+// on `RecordDetailBody`'s own footer wrapper, keyed to its default marker: it
+// reached the pixel, and it was a number derived from a padding this app does
+// not own, on a box the kit moved under it once already (v1.2.153). (3) The
+// ticket page's own `flex-none mt-auto w-full` wrapper and marker, which
+// reached the bottom of a box that itself stopped short of the pane.
+//
+// WHAT REPLACES THEM IS STRUCTURE. `ScreenShell`'s own footer SLOT (kit
+// v1.2.155) renders inside the one scroller and OUTSIDE the padded stack, as
+// the `mt-auto` last child of a `min-h-full` column: a short record's band
+// lands on the pane's own bottom edge, a long record's after its content, and
+// nothing measures anything. `app-shell.tsx` mounts the host and provides it
+// through `FooterSlotProvider`; a page reaches it with `<ScreenFooterSlot>`
+// from any depth, because it is a portal rather than a prop.
+describe("R89 round 30, every record body hands its band to the shell's footer slot, and the escapes are deleted", () => {
   const recordBody = read("web/components/records/record-detail-body.tsx")
   const ticketBody = read("web/components/tickets/ticket-detail-body.tsx")
   const knowledgeDetail = read("web/components/knowledge/knowledge-detail.tsx")
   const storyDetail = read("web/components/work/story-detail.tsx")
+  const helpDetail = read("web/components/tickets/help-detail.tsx")
 
   it("RecordDetailBody's root carries the IDENTICAL classes TicketDetailBody's own root does", () => {
     expect(
@@ -670,59 +686,84 @@ describe("R89 — RecordDetailBody's own footer band matches TicketDetailBody's 
     ).toBe(true)
   })
 
-  it("TicketDetailBody's own band keeps the plain, unconditional flex-none/mt-auto/w-full string — it never reaches for the negative-margin growth, because its own content already overflows on its own (round 28)", () => {
+  it("neither body draws the band any more, both hand it to ScreenShell's own footer slot", () => {
+    // 22 Sep 2026, kit v1.2.155. Both files used to end with the band as
+    // their own `flex-none mt-auto w-full` last child; `RecordDetailBody`
+    // additionally carried a fixed NEGATIVE bottom margin, gated on its
+    // default marker, to reach past the pane's own reserved padding. All of
+    // it is deleted: the slot the kit renders outside the padded stack has
+    // nothing to escape from, so there is no number here to keep in step
+    // with a padding this app does not own.
     expect(
       ticketBody.includes('className="flex-none mt-auto w-full"'),
-      "TicketDetailBody's own band must still carry the plain, ungrown class string"
-    ).toBe(true)
-  })
-
-  it("RecordDetailBody's own footer wrapper carries a fixed, NEGATIVE margin-bottom at the default marker — round 29's fix, replacing app-shell.tsx's retired height-growth rule", () => {
-    // The growth is CONDITIONAL in source (a ternary keyed to whether
-    // footerDataSlot is still the default), so the census reads for the
-    // GROWN branch's own class string rather than a single literal
-    // className= attribute — that shape stopped existing the moment the
-    // growth became conditional.
-    expect(
-      recordBody.includes("mb-[calc(var(--space-5)*-1)]"),
-      "the below-lg negative margin must exist, matching DENSITY_BODY's own reserved padding-bottom at that breakpoint"
-    ).toBe(true)
-    expect(
-      recordBody.includes("lg:mb-[calc(var(--space-6)*-1)]"),
-      "the lg negative margin must exist too, matching DENSITY_BODY's own comfortable-density reserved padding-bottom"
-    ).toBe(true)
-    // The UNGROWN branch (a caller naming its own footerDataSlot opts out)
-    // must still exist, carrying no margin at all — the same contract the
-    // retired app-shell.tsx rule offered.
+      "TicketDetailBody must carry no footer wrapper of its own"
+    ).toBe(false)
     expect(
       recordBody.includes('"flex-none mt-auto w-full"'),
-      "the opted-out branch must still exist, with no negative margin, for a caller naming its own footerDataSlot"
-    ).toBe(true)
-    // NEVER GROWN UNCONDITIONALLY — the negative margin must be gated on
-    // reaching the default marker, never a bare, always-on class string
-    // (which would also reach a future caller's own, deliberately
-    // different footerDataSlot).
+      "RecordDetailBody must carry no footer wrapper of its own"
+    ).toBe(false)
     expect(
-      recordBody.includes('reachesPaneFloor'),
-      "the growth must be gated by a named condition, never applied unconditionally to every caller"
-    ).toBe(true)
+      recordBody.includes("reachesPaneFloor"),
+      "the negative-margin escape must be gone, gate and all, the slot has no padding under it to reach past"
+    ).toBe(false)
+    expect(
+      /className=\{[\s\S]{0,200}mb-\[calc\(var\(--space/.test(recordBody),
+      "no negative bottom margin may survive in a className, a number derived from a padding the kit can move under it"
+    ).toBe(false)
+    expect(ticketBody.includes("<ScreenFooterSlot>"), "TicketDetailBody must hand the band to the shell's footer slot").toBe(true)
   })
 
-  it("footerDataSlot defaults to record-footer-band — the exact marker record-detail-body.tsx's own growth reads", () => {
-    expect(recordBody).toMatch(/footerDataSlot\s*=\s*"record-footer-band"/)
+  it("RecordDetailBody declares no footer prop at all, a caller reaches the slot itself, from wherever it is", () => {
+    expect(
+      /\bfooter:\s*React\.ReactNode/.test(recordBody),
+      "the footer prop must be gone: there is nothing for this component to thread, because ScreenFooterSlot portals from any depth"
+    ).toBe(false)
+    expect(
+      /footerDataSlot\s*=/.test(recordBody),
+      "footerDataSlot must be gone with the wrapper it named"
+    ).toBe(false)
   })
 
-  it("TicketDetailBody's own band keeps its OWN, separate marker — never record-footer-band — so the negative-margin growth cannot double up on a page that already reaches flush through natural overflow", () => {
-    expect(ticketBody).toContain('data-slot="ticket-footer-band"')
-    expect(ticketBody).not.toContain('data-slot="record-footer-band"')
+  it("the ticket, story and knowledge pages each fill the slot exactly once, with RecordFooterBand", () => {
+    for (const [name, src] of [
+      ["help-detail.tsx", helpDetail],
+      ["story-detail.tsx", storyDetail],
+      ["knowledge-detail.tsx", knowledgeDetail],
+    ] as const) {
+      expect(src.includes("<RecordFooterBand"), `${name} must still build the band from RecordFooterBand`).toBe(true)
+    }
+    // help-detail.tsx hands its band to `TicketDetailBody`'s own `footer`
+    // prop, and THAT component renders the slot, one hop, because the
+    // ticket's body is the thing that owns where its own regions sit. The
+    // story and knowledge pages have no such body of their own and render
+    // the slot directly, as a sibling of their `<RecordDetailBody>` call.
+    expect(ticketBody.includes("<ScreenFooterSlot>"), "ticket-detail-body.tsx renders the slot for the ticket page").toBe(true)
+    for (const [name, src] of [
+      ["story-detail.tsx", storyDetail],
+      ["knowledge-detail.tsx", knowledgeDetail],
+    ] as const) {
+      const slotAt = src.indexOf("<ScreenFooterSlot>")
+      expect(slotAt, `${name} must render ScreenFooterSlot itself`).toBeGreaterThan(-1)
+      const slotBody = src.slice(slotAt, src.indexOf("</ScreenFooterSlot>", slotAt))
+      expect(slotBody.includes("<RecordFooterBand"), `${name}'s slot must hold the band`).toBe(true)
+      expect(src.indexOf("<ScreenFooterSlot>", slotAt + 1), `${name} must fill the slot exactly once`).toBe(-1)
+    }
   })
 
-  it("neither knowledge-detail.tsx nor story-detail.tsx overrides RecordDetailBody's own footerDataSlot away from the shared default", () => {
-    // Overriding it would silently opt a screen OUT of the negative-margin
-    // growth (which reads the literal data-slot value), so the census is
-    // positional: no `footerDataSlot=` prop on either call at all, never
-    // an assertion about what value it would carry if one existed.
+  it("neither knowledge-detail.tsx nor story-detail.tsx hands RecordDetailBody a footer of its own", () => {
+    // The prop is gone from the component (above); this is the census on the
+    // other side of the call, so a screen cannot quietly reintroduce a band
+    // inside the padded stack by handing one down.
     expect(knowledgeDetail).not.toMatch(/\bfooterDataSlot=/)
     expect(storyDetail).not.toMatch(/\bfooterDataSlot=/)
+    for (const [name, src] of [
+      ["knowledge-detail.tsx", knowledgeDetail],
+      ["story-detail.tsx", storyDetail],
+    ] as const) {
+      const callAt = src.indexOf("<RecordDetailBody")
+      expect(callAt, `${name} must still call RecordDetailBody`).toBeGreaterThan(-1)
+      const call = src.slice(callAt, src.indexOf("/>", callAt))
+      expect(call.includes("footer="), `${name}'s RecordDetailBody call must pass no footer`).toBe(false)
+    }
   })
 })

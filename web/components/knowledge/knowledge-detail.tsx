@@ -35,6 +35,7 @@ import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { RecordFooterBand, RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
 import { RecordDetailBody } from "@/components/records/record-detail-body"
+import { ScreenFooterSlot } from "@/components/shell/footer-slot"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
@@ -583,20 +584,24 @@ export function KnowledgeDetailScreen({
       }
       // NO `side` — a knowledge source has no side column, one tabbed body
       // only (`RecordDetailBody`'s own doc comment above `side`).
-      //
-      // THE BAND — the SAME data the old single combined call handed
-      // `<RecordScreen>` (see this function's own header note above), built
-      // here instead so `RecordDetailBody`'s own `mt-auto` reaches the true
-      // bottom of the page. No `audit`: a knowledge source has no
-      // creator/editor (unchanged; see the comment this replaced for why).
-      footer={
+    />
+
+      {/* THE BAND, THROUGH THE SHELL'S OWN FOOTER SLOT, 22 Sep 2026, kit
+          v1.2.155. The SAME data the old single combined call handed
+          `<RecordScreen>` (see this function's own header note above), built
+          here and portalled into the slot the kit renders outside the shell
+          body's padded stack. It was `<RecordDetailBody>`'s own `footer`
+          prop, whose `mt-auto` reached only that component's own bottom
+          edge, which is where this page measured between 62 and 198px of
+          paper under the band. No `audit`: a knowledge source has no
+          creator/editor (unchanged; see the comment this replaced for why). */}
+      <ScreenFooterSlot>
         <RecordFooterBand
           activity={activity}
           onAddNote={can("knowledge", "create") ? activity.addNote : undefined}
           notePlaceholder={t("Add a note")}
         />
-      }
-    />
+      </ScreenFooterSlot>
 
       <KnowledgeFormDialog
         open={editingOpen}

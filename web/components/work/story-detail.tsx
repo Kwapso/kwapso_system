@@ -68,6 +68,7 @@ import {
   type RecordAction,
 } from "@/components/records/record-chrome"
 import { RecordDetailBody } from "@/components/records/record-detail-body"
+import { ScreenFooterSlot } from "@/components/shell/footer-slot"
 import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 import { EmptyGatedPanel } from "@/components/deep-link/screen-bits"
 import { EditPenButton } from "@shared/web/edit-pen-button"
@@ -648,23 +649,28 @@ export function StoryDetailScreen({
       panelVisible={false}
       footerVisible={false}
     />
-      <RecordDetailBody
-        main={mainColumn}
-        side={sideColumn}
-        footer={
-          <RecordFooterBand
-            audit={{
-              createdByName: story.createdByName,
-              createdAt: story.createdAt,
-              editedByName: story.editedByName,
-              updatedAt: story.updatedAt,
-            }}
-            activity={activity}
-            onAddNote={can("work", "create") ? activity.addNote : undefined}
-            notePlaceholder={t("Add a note")}
-          />
-        }
-      />
+      <RecordDetailBody main={mainColumn} side={sideColumn} />
+
+      {/* THE BAND, THROUGH THE SHELL'S OWN FOOTER SLOT, 22 Sep 2026, kit
+          v1.2.155. It was `<RecordDetailBody>`'s own `footer` prop, drawn as
+          that component's `mt-auto` last child with a negative bottom margin
+          to reach past the pane's reserved padding; both are deleted. The
+          kit's own footer slot renders this outside the shell body's padded
+          stack, on the pane's own bottom edge, so a short story lands flush
+          at desktop AND at 760, where this page measured 96px short before. */}
+      <ScreenFooterSlot>
+        <RecordFooterBand
+          audit={{
+            createdByName: story.createdByName,
+            createdAt: story.createdAt,
+            editedByName: story.editedByName,
+            updatedAt: story.updatedAt,
+          }}
+          activity={activity}
+          onAddNote={can("work", "create") ? activity.addNote : undefined}
+          notePlaceholder={t("Add a note")}
+        />
+      </ScreenFooterSlot>
 
       <StoryFormDialog
         teamId={teamId}

@@ -24,6 +24,7 @@
 // (web/components/work/effort-card.tsx) — and there is no add door left on
 // the card at all, on either page.
 
+import * as React from "react"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -291,6 +292,7 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver
 
+import { FooterSlotProvider } from "@/components/shell/footer-slot"
 import { StoryDetailScreen } from "@/components/work/story-detail"
 import { clearCache } from "@shared/web/store"
 
@@ -324,8 +326,37 @@ const RUNNING_ON_STORY: RunningTimer = {
   runaway: false,
 }
 
+/* THE SHELL'S FOOTER SLOT, STOOD IN FOR, 22 Sep 2026, kit v1.2.155.
+ *
+ * The dark band is not the page's own last child any more: the page renders
+ * it through `<ScreenFooterSlot>`, which portals it into the host
+ * `app-shell.tsx` hands `ScreenShell`'s own `footer` slot. The kit then draws
+ * that host inside the one scroller and OUTSIDE the body's padded stack, as
+ * the `mt-auto` last child of a `min-h-full` column, which is the whole
+ * point: a short record's band lands on the pane's own bottom edge with no
+ * paper under it.
+ *
+ * `AppShell` is not mounted in these tests, so the host is stood in for here
+ * AND PLACED LAST inside the same container, exactly where the kit places it
+ * relative to the body. That keeps any reading-order assertion a real
+ * statement about the rendered page rather than an artefact of where the
+ * stand-in happens to sit. */
+function WithFooterSlot({ children }: { children: React.ReactNode }) {
+  const [host, setHost] = React.useState<HTMLDivElement | null>(null)
+  return (
+    <>
+      <FooterSlotProvider host={host}>{children}</FooterSlotProvider>
+      <div data-slot="screen-shell-footer" ref={setHost} />
+    </>
+  )
+}
+
 const openStory = () =>
-  render(<StoryDetailScreen teamId="team-1" storyId="story-1" basePath="/stories" />)
+  render(
+    <WithFooterSlot>
+      <StoryDetailScreen teamId="team-1" storyId="story-1" basePath="/stories" />
+    </WithFooterSlot>
+  )
 
 describe("the story detail page — panel order", () => {
   it("draws the left column Detail, Acceptance criteria, Build notes, and the right column Assigned to, Related tickets, Related stories, Phase and wave, Effort (with its metrics inside), band last", async () => {

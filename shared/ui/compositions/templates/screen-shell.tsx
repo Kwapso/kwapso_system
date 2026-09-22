@@ -2185,6 +2185,19 @@ const BODY = cn(
      every reader falls back to what it drew before - see `RecordDetail`'s
      band for the fallbacks. */
   "[--pane-inset-x:var(--space-6)]",
+  /* ── AND THE SAME NUMBER AGAIN UNDER A SECOND NAME, 22 SEP 2026, BECAUSE
+     THE TWO READERS STOPPED AGREEING. `--pane-inset-x` answers "what does a
+     part inside this pane owe its own text so it lands under the h1"; this
+     one answers "how far is a part from the pane's edges, that it would have
+     to pull itself back out by". They were one property while the band only
+     ever drew inside the padded stack. Since the footer SLOT (see
+     `footerNode` in the render) the band can also be drawn already AT the
+     pane's edges, where the second answer is 0 and the first is still 24:
+     so the slot's own wrapper rebinds `--pane-escape-x` to `0px` and the
+     band's negative margin reads THIS property while its padding goes on
+     reading `--pane-inset-x`. One number, two questions, and the rebinding
+     is owned by the one element that knows which case it is. */
+  "[--pane-escape-x:var(--space-6)]",
   "[--radius-pane-edge:0px]",
 );
 
@@ -4345,13 +4358,72 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
        none; `footerVisible={false}` is the reader who may not see the one
        this page has, and it draws NOTHING rather than something greyed
        (ch24.6). It drops narrow with the other controls unless the screen
-       says otherwise — 27.39's own narrow render. */
+       says otherwise — 27.39's own narrow render.
+
+       ═══ THIS SLOT IS THE RECORD FOOTER BAND'S HOME NOW, 22 SEP 2026 ══════
+       AURORA, VERBATIM, 21 SEP 2026: "also, make footer not inside a
+       container, but the full row side to side (withing the main content)",
+       and, over the fourth screenshot: "In the fourth screenshot, on the
+       footer, there should be no white on the sides. Make the black go side
+       to side." And, over the sixth: "The latest activity always has to be
+       at the very bottom".
+
+       THREE ESCAPES CAME BEFORE THIS AND ALL THREE WERE ESCAPES. A page
+       container that grew past the pane's own padding (retired the day it
+       shipped: growing a box past a scrolling ancestor's content edge IS
+       overflow, and Chromium then reserves that ancestor's padding-bottom a
+       SECOND time, so scrolling to the pane's end dragged the band back up
+       by exactly the amount it had been grown). A negative bottom margin on
+       the app's own footer wrapper (reaches the pixel, and is a number
+       nobody can derive from anything). And v1.2.153's own move of
+       `DENSITY_BODY` off the scroller onto `screen-shell-stack`, which was
+       right for the band's SIDES and put paper back under its BOTTOM,
+       because the stack's `pb` then sat under every band in the app.
+
+       WHAT REPLACES THEM IS THIS SLOT, AND IT IS STRUCTURE RATHER THAN
+       ARITHMETIC. Three facts, and the band needs nothing of its own:
+
+         1. THE FOOTER RENDERS INSIDE THE ONE SCROLLER (`screen-shell-body`),
+            so R91 still holds (one scroller per screen) and the band is
+            reached by scrolling to the end of the content, "like a normal
+            footer. this is a law" (Aurora, 19 Sep 2026), never pinned.
+         2. IT RENDERS OUTSIDE `screen-shell-stack`, so `DENSITY_BODY`'s own
+            inset never wraps it: no side padding to escape and, the part
+            three attempts kept missing, NO BOTTOM PADDING UNDER IT. The
+            stack's own trailing `py` becomes the air ABOVE the band, which
+            is the 24 (`--space-6` at `lg`) the 21 Sep page already ruled.
+         3. THE COLUMN THE TWO SIT IN IS `min-h-full` AND THE FOOTER IS
+            `mt-auto`, which is the ordinary sticky-footer flex trick and
+            the only arithmetic left: a SHORT record's band lands on the
+            pane's own bottom edge, a TALL record's band lands after its
+            content and scrolls into view there. Nothing measures anything.
+
+       SO THE BAND HAS NOTHING TO ESCAPE FROM HERE, AND THIS WRAPPER SAYS SO
+       OUT LOUD: `[--pane-escape-x:0px]`. `RecordDetail`'s band reads that
+       property for its own negative margin (`record-detail.tsx`, the `band`
+       register) and `--pane-inset-x` for the padding it pays back inside
+       itself. Two properties, because the two answers differ exactly here:
+       a band drawn in the slot is ALREADY at the pane's edges and must pull
+       nothing, while its text still owes the pane's 24 so it lands under the
+       h1. A band a caller still renders inside `children` (a demo cell, a
+       screen that has not moved to the slot) reads the pane's own gutter for
+       both, exactly as it has since 21 Sep, because this wrapper is not in
+       its ancestry to say otherwise.
+
+       NO PADDING HERE, EVER. This wrapper carries `min-w-0` (a sizing
+       floor, not paint), the narrow rule, `mt-auto` and the one property.
+       A padding utility on this element would put paper back on whichever
+       side it names, which is the whole defect. `check-screen-shell.mjs`
+       pins that. */
     const footerNode =
       !footerVisible || footer === undefined ? null : (
         <div
           data-slot="screen-shell-footer"
           data-level="footer"
-          className={cn("min-w-0", narrowFooter ? undefined : "hidden sm:block")}
+          className={cn(
+            "mt-auto min-w-0 [--pane-escape-x:0px]",
+            narrowFooter ? undefined : "hidden sm:block",
+          )}
         >
           {footer}
         </div>
@@ -5189,17 +5261,52 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 carries `DENSITY_BODY`'s own `pt`, so it is the thing a
                 `trail && !band` screen must zero it on. */}
             <div data-slot="screen-shell-body" data-level="body" className={BODY}>
+              {/* ── THE COLUMN, THE SCROLLER'S OWN CONTENT COLUMN, AND THE
+                  ONE THING THAT MAKES THE FOOTER SLOT REACH THE PANE'S
+                  BOTTOM. ADDED 22 SEP 2026 WITH THE FOOTER SLOT'S MOVE; see
+                  `footerNode` above for Aurora's own words and for the three
+                  escapes this replaces.
+
+                  `min-h-full` IS THE WHOLE TRICK AND IT RESOLVES, rather
+                  than being a floor nothing can measure: `screen-shell-body`
+                  above is a flex ITEM (`flex-1 min-h-0`) of a card that is
+                  itself inside `h-dvh`, so its used height is a real number
+                  so a percentage min-height on this, its own child, has
+                  something definite to be a percentage OF. That is the same
+                  chain the app's own content div has banked on since
+                  2026-08-31; it is stated here now so the kit owns it.
+
+                  THE STACK GROWS AND THE FOOTER DOES NOT. `grow` on the
+                  stack hands it every pixel this column has over its own
+                  content, which is what gives a screen nested inside
+                  `children` a REAL height to divide (`h-full`/`flex-1
+                  min-h-0` chains, the ticket page's conversation cell) now
+                  that the stack sits between them and the pane; before the
+                  stack existed those chains read the pane directly.
+                  `mt-auto` on the footer is the same answer said the other
+                  way round, and it is not redundant: it is what holds the
+                  band on the floor for any caller whose own content does
+                  not claim the slack.
+
+                  NOTHING ELSE MOVES. With no `footer` declared this column
+                  is a flex parent with one child that already fills it, which is the
+                  same paint a screen got before this element existed. */}
               <div
-                data-slot="screen-shell-stack"
-                className={cn(
-                  "flex min-w-0 flex-col",
-                  DENSITY_BODY[density],
-                  DENSITY_STACK[density],
-                  trail && !band ? "pt-0 lg:pt-0" : undefined,
-                )}
+                data-slot="screen-shell-column"
+                className="flex min-h-full min-w-0 flex-col"
               >
-                {strip}
-                {children}
+                <div
+                  data-slot="screen-shell-stack"
+                  className={cn(
+                    "flex min-w-0 grow flex-col",
+                    DENSITY_BODY[density],
+                    DENSITY_STACK[density],
+                    trail && !band ? "pt-0 lg:pt-0" : undefined,
+                  )}
+                >
+                  {strip}
+                  {children}
+                </div>
                 {footerNode}
               </div>
             </div>

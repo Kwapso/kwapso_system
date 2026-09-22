@@ -1835,6 +1835,15 @@ export function HelpDetailScreen({
         // own header and `RecordFooterBand`'s (record-chrome.tsx) for the
         // full account of why a second call to the kit's composition, not
         // a moved prop, is what answers this DOM-order question.
+        //
+        // WHERE IT LANDS CHANGED ON 22 SEP 2026, kit v1.2.155, and this
+        // call did not. `TicketDetailBody` hands this node to
+        // `<ScreenFooterSlot>` rather than drawing it as its own last
+        // child, so the band renders outside the shell body's padded stack,
+        // on the pane's own bottom edge. One hop, because the ticket's body
+        // is the component that owns where its own regions sit; the story
+        // and knowledge pages, which have no such body, fill the slot
+        // directly.
         footer={
           <RecordFooterBand
             audit={{
