@@ -8184,6 +8184,25 @@ ALTER TABLE stories DROP COLUMN contributes_to_goal;
 ALTER TABLE work_logs DROP COLUMN billable;
 `,
   },
+  {
+    // AN ACCOUNT GETS A WEBSITE. One optional field, the owner's own scope —
+    // no LinkedIn, no VAT, no legal name, no region, no lead source, no Drive
+    // folder, all explicitly ruled out. It behaves exactly like `industry`
+    // beside it (0024): a plain nullable TEXT column, validated at the door
+    // with `optionalText` and stored as given — no URL validator invented for
+    // it, because Glide holds "hogo.cc", "www.kwapso.com" and full https URLs
+    // alike, and all of them have to survive.
+    //
+    // NUMBERED 0116, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0115 is the highest version on both the
+    // local tree and `origin/main` as of 22 Sep 2026, so 0116 is the next
+    // free number.
+    version: "0116_an_account_gets_a_website",
+    sql: `
+ALTER TABLE accounts ADD COLUMN website TEXT;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

@@ -202,6 +202,7 @@ export const TARGETS: Record<string, TargetDef> = {
       { key: "city", label: "City", required: false },
       { key: "country", label: "Country", required: false },
       { key: "industry", label: "Industry", required: false },
+      { key: "website", label: "Website", required: false },
       { key: "status", label: "Status", required: false },
     ],
     endpoint: { binding: "TENANCY", path: "/api/tenancy/accounts" },
@@ -225,6 +226,7 @@ export const TARGETS: Record<string, TargetDef> = {
       city: "Madrid",
       country: "Spain",
       industry: "Hospitality",
+      website: "https://bergman.example",
       status: "active_client",
     },
     buildBody: (r) => ({
@@ -238,6 +240,7 @@ export const TARGETS: Record<string, TargetDef> = {
       city: r.city || undefined,
       country: r.country || undefined,
       industry: r.industry || undefined,
+      website: r.website || undefined,
       status: r.status || undefined,
     }),
   },

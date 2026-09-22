@@ -46,6 +46,7 @@ const account: Account = {
   city: null,
   country: null,
   industry: null,
+  website: null,
   about: null,
   // No picture on purpose: this is the 83-in-134 case `accountOption`'s own
   // header measures, where the face is the letter fallback rather than a

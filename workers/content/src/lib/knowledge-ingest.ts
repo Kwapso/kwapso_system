@@ -547,7 +547,11 @@ export const INGEST_KINDS: IngestKind[] = [
     // through `clampTitle` when it is over TITLE_MAX_CHARS. Byte-identical
     // for every account whose name already fits; a bump so the rare
     // over-length legacy name still indexed gets its title re-clamped.
-    textVersion: 6,
+    //
+    // v7: team migration 0116, 22 Sep 2026 — the account's own website joins
+    // the contact line beside email and phone. An account with none set
+    // reads exactly as before; one that has it now says so.
+    textVersion: 7,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -567,6 +571,7 @@ export const INGEST_KINDS: IngestKind[] = [
         city: string | null
         country: string | null
         industry: string | null
+        website: string | null
         about: string | null
         parent_name: string | null
         deactivated_at: string | null
@@ -591,7 +596,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // only for the rows this slice RETURNS. A tick's rollup cost is bounded
         // by 25 accounts, not by how many accounts the team has.
         `SELECT a.id, a.name, a.account_type, a.code, a.status, a.email, a.phone, a.address,
-                a.street, a.postal_code, a.city, a.country, a.industry, a.about,
+                a.street, a.postal_code, a.city, a.country, a.industry, a.website, a.about,
                 a.deactivated_at, a.created_at,
                 (SELECT p.name FROM accounts p WHERE p.id = a.parent_account_id) AS parent_name,
                 COALESCE(a.updated_at, a.created_at) AS sort_at,
@@ -698,7 +703,7 @@ export const INGEST_KINDS: IngestKind[] = [
             `Status: ${r.status}.`,
             r.industry ? `Their industry: ${r.industry}.` : "",
             r.about ? `About them: ${r.about}` : "",
-            [r.email, r.phone, where].filter(Boolean).join(" · "),
+            [r.email, r.phone, r.website, where].filter(Boolean).join(" · "),
             r.contacts ? `The people we deal with there:\n${r.contacts}` : "",
             r.apps ? `The systems we have built for them:\n${r.apps}` : "",
             r.sprints ? `The blocks of work sold to them:\n${r.sprints}` : "",

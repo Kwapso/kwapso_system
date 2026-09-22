@@ -44,6 +44,7 @@ type AccountRow = {
   city: string | null
   country: string | null
   industry: string | null
+  website: string | null
   about: string | null
   logo_url: string | null
   cover_url: string | null
@@ -156,7 +157,7 @@ const LINKED_COMPANY = (field: string) => `CASE WHEN account_type = 'individual'
  * the same block (who made it, who touched it last), and the list's keyset pages
  * on created_at, so it is selected once here rather than twice at the call site. */
 const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone,
-  street, postal_code, city, country, industry, about, logo_url, cover_url, code,
+  street, postal_code, city, country, industry, website, about, logo_url, cover_url, code,
   currency, locale, timezone, commercials_visible, alt_names, name_narrows_alone,
   account_manager_user_id,
   deactivated_at,
@@ -271,6 +272,7 @@ function toAccount(r: AccountRow, scope: AccountScope, sight?: ContactSight): Ac
     city: r.city,
     country: r.country,
     industry: r.industry,
+    website: r.website,
     about: r.about,
     logoUrl: r.logo_url,
     coverUrl: r.cover_url,
@@ -873,6 +875,7 @@ export async function createAccount(
     city?: string
     country?: string
     industry?: string
+    website?: string
     about?: string
     logoUrl?: string
     coverUrl?: string
@@ -910,6 +913,7 @@ export async function createAccount(
     city: input.city ?? null,
     country: input.country ?? null,
     industry: input.industry ?? null,
+    website: input.website ?? null,
     about: input.about ?? null,
     logo_url: input.logoUrl ?? null,
     cover_url: input.coverUrl ?? null,
@@ -1016,6 +1020,7 @@ export async function updateAccount(
     city?: Patch
     country?: Patch
     industry?: Patch
+    website?: Patch
     about?: Patch
     logoUrl?: Patch
     coverUrl?: Patch
@@ -1058,6 +1063,7 @@ export async function updateAccount(
     city: keep(input.city, before.city),
     country: keep(input.country, before.country),
     industry: keep(input.industry, before.industry),
+    website: keep(input.website, before.website),
     about: keep(input.about, before.about),
     logoUrl: keep(input.logoUrl, before.logo_url),
     coverUrl: keep(input.coverUrl, before.cover_url),
@@ -1073,7 +1079,7 @@ export async function updateAccount(
       cfg,
       guard.databaseId,
       `UPDATE accounts SET name = ?, email = ?, phone = ?, street = ?, postal_code = ?, city = ?,
-         country = ?, industry = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
+         country = ?, industry = ?, website = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
          locale = ?, timezone = ?, account_manager_user_id = ?, commercials_visible = ?, alt_names = ?, name_narrows_alone = ?,
          ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
@@ -1086,6 +1092,7 @@ export async function updateAccount(
         next.city,
         next.country,
         next.industry,
+        next.website,
         next.about,
         next.logoUrl,
         next.coverUrl,

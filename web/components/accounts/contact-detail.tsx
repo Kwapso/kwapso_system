@@ -212,6 +212,9 @@ export function ContactDetailScreen({
       postalCode: values.postalCode.trim() || null,
       city: values.city.trim() || null,
       country: values.country.trim() || null,
+      // No `website`, same reason `industry` is absent here too: a person's
+      // site is their employer's, not their own record's field, and the form
+      // does not offer the control for an individual to begin with.
       about: values.about.trim() || null,
       logoUrl: values.logoUrl || null,
       coverUrl: values.coverUrl || null,
@@ -678,6 +681,7 @@ export function ContactDetailScreen({
           city: account.city ?? "",
           country: account.country ?? "",
           industry: account.industry ?? "",
+          website: account.website ?? "",
           accountManagerId: account.accountManagerId ?? "",
           about: account.about ?? "",
           logoUrl: account.logoUrl ?? "",

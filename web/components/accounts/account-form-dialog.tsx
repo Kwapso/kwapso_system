@@ -120,6 +120,7 @@ const postalField = { ...defaultFieldConfig, label: "Postal code", required: fal
 const cityField = { ...defaultFieldConfig, label: "City", required: false }
 const countryField = { ...defaultFieldConfig, label: "Country", required: false }
 const industryField = { ...defaultFieldConfig, label: "Industry", required: false }
+const websiteField = { ...defaultFieldConfig, label: "Website", required: false }
 // 0091, client ruling 14 Sep 2026: "who the account responsible or account
 // manager is, like someone from staff." Not required AT THE DOOR — an API/MCP
 // caller, and a pre-16-Sep-2026 row, may still carry no manager at all — but
@@ -195,6 +196,9 @@ export type AccountFormValues = {
   city: string
   country: string
   industry: string
+  /** their own site, typed free, never validated as a URL here or at the door
+   * — "hogo.cc" and "www.kwapso.com" are real values on real accounts. */
+  website: string
   /** 0091 — a `team_members` user id, or "" for nobody assigned yet. Picked
    * from `members`, the same assignee picker the rest of the app uses (R35). */
   accountManagerId: string
@@ -225,6 +229,7 @@ const EMPTY: AccountFormValues = {
   city: "",
   country: "",
   industry: "",
+  website: "",
   accountManagerId: "",
   about: "",
   logoUrl: "",
@@ -497,6 +502,23 @@ export function AccountFormDialog({
           (v) => set({ industry: v }),
           t("Not said")
         )}
+
+      {/* Same scope as Industry, same reason: a person's site is their
+          employer's, not their own record's field. Typed free, like every
+          other text field on this form — never validated as a URL here or
+          at the door, because a real account's value can be a bare domain
+          or a full link, and both have to survive. */}
+      {isCompany && (
+        <Field config={websiteField} htmlFor="account-website" className={fieldSpacing}>
+          <Input
+            id="account-website"
+            value={values.website}
+            onChange={(e) => set({ website: e.target.value })}
+            placeholder="https://bergman.example"
+            disabled={busy}
+          />
+        </Field>
+      )}
 
       {picker(
         "account-language",

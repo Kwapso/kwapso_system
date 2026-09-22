@@ -75,6 +75,7 @@ function accountFields(body: Record<string, unknown>) {
     city: optionalText(body.city, "City", TEXT_LIMITS.short),
     country: optionalText(body.country, "Country", TEXT_LIMITS.short),
     industry: optionalText(body.industry, "Industry", TEXT_LIMITS.short),
+    website: optionalText(body.website, "Website", TEXT_LIMITS.short),
     about: optionalText(body.about, "About", TEXT_LIMITS.long),
     // THE TWO PICTURES ARE NOT PROSE, and the cap has to know it: a picked file
     // arrives here as a data URL and the prose cap refused every one of them
@@ -315,13 +316,13 @@ export async function getAccountsExport(request: Request, env: Env): Promise<Res
   const csv = toCsv(
     [
       "name", "accountType", "code", "email", "phone", "street", "postalCode", "city",
-      "country", "industry", "about",
+      "country", "industry", "website", "about",
       "parent_account_id", "currency", "locale", "timezone", "commercials_visible",
       "active", "created_at", "created_by", "updated_at", "updated_by",
     ],
     rows.map((r) => [
       r.name, r.accountType, r.code, r.email, r.phone, r.street, r.postalCode, r.city,
-      r.country, r.industry, r.about,
+      r.country, r.industry, r.website, r.about,
       r.parentAccountId, r.currency, r.locale, r.timezone, r.commercialsVisible,
       r.active, r.createdAt, r.createdByName, r.updatedAt, r.editedByName,
     ])

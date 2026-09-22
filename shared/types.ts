@@ -1336,6 +1336,9 @@ export type Account = {
   country: string | null
   /** what this company does, from the Industry dropdown group */
   industry: string | null
+  /** their own site, typed free — "hogo.cc", "www.kwapso.com" and a full
+   * https URL all survive as given, no scheme required and none added */
+  website: string | null
   /** a paragraph about them, authored as rich text (HTML) */
   about: string | null
   /** their mark, and the wide image their record leads with */

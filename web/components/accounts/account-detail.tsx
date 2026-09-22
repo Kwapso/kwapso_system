@@ -312,6 +312,7 @@ export function AccountDetailScreen({
       city: values.city.trim() || null,
       country: values.country.trim() || null,
       industry: values.industry.trim() || null,
+      website: values.website.trim() || null,
       // 0091 — always sent (edit mode always shows this field), so a save
       // here can never leave a stale manager, the same reasoning altNames
       // below already carries.
@@ -491,6 +492,7 @@ export function AccountDetailScreen({
     { label: t("Parent account"), value: parent ? parent.name : t("Sits on its own") },
     { label: t("Reference"), value: account.code || "" },
     { label: t("Industry"), value: account.industry || "" },
+    { label: t("Website"), value: account.website || "" },
     { label: t("Email"), value: account.email || "" },
     { label: t("Phone"), value: account.phone || "" },
     { label: t("Address"), value: where || "" },
@@ -942,6 +944,7 @@ export function AccountDetailScreen({
           city: account.city ?? "",
           country: account.country ?? "",
           industry: account.industry ?? "",
+          website: account.website ?? "",
           accountManagerId: account.accountManagerId ?? "",
           about: account.about ?? "",
           logoUrl: account.logoUrl ?? "",

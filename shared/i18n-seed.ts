@@ -4623,4 +4623,10 @@ export const SEED: Catalogue = {
    * applied to the two new settings-choices-panel.tsx column headers. */
   "Added by": { de: "Hinzugefügt von", es: "Añadido por", ca: "Afegit per" },
   "Added on": { de: "Hinzugefügt am", es: "Añadido el", ca: "Afegit el" },
+
+  /* THE ACCOUNT'S OWN WEBSITE FIELD (team migration 0116) — a plain optional
+   * text field beside `industry`, seeded here rather than left to the
+   * generator so TRANSLATION_CEILING stays at 0/0/0 (R44 — the pin falls
+   * and never rises). */
+  "Website": { de: "Website", es: "Sitio web", ca: "Lloc web" },
 }

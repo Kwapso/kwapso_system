@@ -1052,7 +1052,9 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // through `clampTitle` when it is over TITLE_MAX_CHARS. Byte-identical for
   // every account whose name already fits; the bump walks the cursor back
   // over the rare over-length legacy name still indexed whole.
-  account: { version: 6, digest: "e9115f440d83bfba" },
+  // v7: team migration 0116, 22 Sep 2026 — the account's own website joins
+  // the contact line beside email and phone.
+  account: { version: 7, digest: "caf0b0d3cff10d17" },
   // v2: same 21 Sep 2026 amendment as account: the title now clamps.
   contact: { version: 2, digest: "56cf3ceab4e1746f" },
   // v2 (BUILD-5 §H, 18 Sep 2026): same change as account — `generatedOnly`

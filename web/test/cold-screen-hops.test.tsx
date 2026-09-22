@@ -215,6 +215,7 @@ const account: Account = {
   city: null,
   country: null,
   industry: null,
+  website: null,
   about: null,
   logoUrl: null,
   coverUrl: null,

@@ -365,6 +365,7 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   city: null,
   country: null,
   industry: null,
+  website: null,
   about: null,
   logoUrl: null,
   coverUrl: null,

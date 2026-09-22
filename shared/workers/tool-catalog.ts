@@ -108,6 +108,7 @@ const accountFields = (i: Record<string, unknown>): Record<string, unknown> => (
   city: sent(i, "city"),
   country: sent(i, "country"),
   industry: sent(i, "industry"),
+  website: sent(i, "website"),
   about: sent(i, "about"),
   logoUrl: sent(i, "logoUrl"),
   coverUrl: sent(i, "coverUrl"),
@@ -148,7 +149,7 @@ const appPeopleBody = (i: Record<string, unknown>): Record<string, unknown> => (
  * proves them equal by RUNNING buildBody; this is what keeps them equal. */
 const ACCOUNT_FIELD_SCHEMA = {
   code: S, email: S, phone: S, street: S, postalCode: S, city: S, country: S,
-  industry: S, about: S, logoUrl: S, coverUrl: S, currency: S, locale: S,
+  industry: S, website: S, about: S, logoUrl: S, coverUrl: S, currency: S, locale: S,
   timezone: S, accountManagerUserId: S,
 }
 

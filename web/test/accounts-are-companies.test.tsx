@@ -87,6 +87,7 @@ const PERSON: AccountFormValues = {
   city: "",
   country: "",
   industry: "",
+  website: "",
   accountManagerId: "",
   about: "",
   logoUrl: "",
