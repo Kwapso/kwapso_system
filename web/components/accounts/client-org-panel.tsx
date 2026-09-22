@@ -411,13 +411,16 @@ export function ClientOrgPanel({
         {departments.length === 0 ? (
           // No import target — a department is a fact about the client's own
           // org chart, added one at a time as it comes up.
-          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-            <CollectionEmptyState
-              title={t("No departments yet.")}
-              description={t("Add the parts of their company, so a role can say where it sits.")}
-              onCreate={canCreate ? () => setAddingDept(true) : undefined}
-            />
-          </div>
+          // NO CARD ANY MORE, 22 SEP 2026 — her ruling over the A0013
+          // Stakeholders tab, generalised: "the empty collection now. We need
+          // to get rid of the card background." The register carries its own
+          // `--space-6` inset (collection-frame.tsx), so the wrapping
+          // `bg-surface-panel` div is dropped rather than repainted.
+          <CollectionEmptyState
+            title={t("No departments yet.")}
+            description={t("Add the parts of their company, so a role can say where it sits.")}
+            onCreate={canCreate ? () => setAddingDept(true) : undefined}
+          />
         ) : shownDepartments.length === 0 ? (
           /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client, 2026-09-09:
              "the empty because of filters hosul look the same as empty
@@ -425,14 +428,13 @@ export function ClientOrgPanel({
              the full register at rest and a bare grey line when a search
              narrowed them to nothing; they are one body now, and `filtered`
              withdraws the create action rather than the call site remembering
-             to. */
-          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-            <CollectionEmptyState
-              filtered
-              title={t("No departments yet.")}
-              onCreate={canCreate ? () => setAddingDept(true) : undefined}
-            />
-          </div>
+             to. NO CARD ANY MORE, 22 SEP 2026 — same ruling as the resting
+             branch above. */
+          <CollectionEmptyState
+            filtered
+            title={t("No departments yet.")}
+            onCreate={canCreate ? () => setAddingDept(true) : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {shownDepartments.map((d) => (
@@ -503,24 +505,21 @@ export function ClientOrgPanel({
           // No import target — a role's cost is set by hand, deliberately
           // (the file's own header: overwriting it from a sheet is exactly
           // what would break an older map's saving).
-          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-            <CollectionEmptyState
-              title={t("No roles yet.")}
-              description={t(
-                "A role carries what an hour of it costs them, which is what turns a process map's minutes into money."
-              )}
-              onCreate={canCreate ? () => setAddingRole(true) : undefined}
-            />
-          </div>
+          // NO CARD ANY MORE, 22 SEP 2026 — see the Departments section above.
+          <CollectionEmptyState
+            title={t("No roles yet.")}
+            description={t(
+              "A role carries what an hour of it costs them, which is what turns a process map's minutes into money."
+            )}
+            onCreate={canCreate ? () => setAddingRole(true) : undefined}
+          />
         ) : shownRoles.length === 0 ? (
-          /* R62 — as on Departments above. */
-          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-            <CollectionEmptyState
-              filtered
-              title={t("No roles yet.")}
-              onCreate={canCreate ? () => setAddingRole(true) : undefined}
-            />
-          </div>
+          /* R62 — as on Departments above. NO CARD ANY MORE, 22 SEP 2026. */
+          <CollectionEmptyState
+            filtered
+            title={t("No roles yet.")}
+            onCreate={canCreate ? () => setAddingRole(true) : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {shownRoles.map((r) => (
@@ -660,22 +659,19 @@ export function ClientOrgPanel({
         {tools.length === 0 ? (
           // No import target — a tool's price is set from its own dated form
           // (the file's own header explains why), never bulk-loaded.
-          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-            <CollectionEmptyState
-              title={t("No tools yet.")}
-              description={t("Add what they run on, so a step that replaces one can subtract what it costs.")}
-              onCreate={canCreate ? () => setAddingTool(true) : undefined}
-            />
-          </div>
+          // NO CARD ANY MORE, 22 SEP 2026 — see the Departments section above.
+          <CollectionEmptyState
+            title={t("No tools yet.")}
+            description={t("Add what they run on, so a step that replaces one can subtract what it costs.")}
+            onCreate={canCreate ? () => setAddingTool(true) : undefined}
+          />
         ) : shownTools.length === 0 ? (
-          /* R62 — as on Departments above. */
-          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-            <CollectionEmptyState
-              filtered
-              title={t("No tools yet.")}
-              onCreate={canCreate ? () => setAddingTool(true) : undefined}
-            />
-          </div>
+          /* R62 — as on Departments above. NO CARD ANY MORE, 22 SEP 2026. */
+          <CollectionEmptyState
+            filtered
+            title={t("No tools yet.")}
+            onCreate={canCreate ? () => setAddingTool(true) : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {shownTools.map((x) => (

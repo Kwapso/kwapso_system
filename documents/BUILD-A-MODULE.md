@@ -1320,6 +1320,39 @@ again, which is the only property that matters here.
 - **R102 `id-column-noun`** — the record reference column is as narrow as its
   chip, w-px, and its header is the record's own noun, never ID. The census is
   `web/test/id-column-noun.test.ts`.
+- **R103 `empty-register-on-the-page`**: an empty or filtered-empty register
+  (R62's two zeros) draws no card and no paper fill: text on the page ground,
+  24px of air above it, its single door (R88) beside it, never a `Card`
+  default, a literal `bg-surface-panel`/`bg-card` box, or a `<EmptyGatedPanel
+  surface="boxed">` branch. The census is
+  `web/test/empty-register-on-the-page.test.ts`; a real reason for skipping
+  one goes in `EMPTY_REGISTER_EXEMPT`, keyed by `{file, expression}`, never
+  for a file another lane is still fixing.
+- **R104 `people-as-chips`**: a person or a group of people inside a record
+  section (Raised by, Assigned to, On the loop, stakeholders, a group's
+  members) renders as bare `PersonCard` chips under an eyebrow label, never
+  inside a tile or a `Card`. A per-record gallery grid (Settings members, a
+  contacts grid) is a different shape and stays exempt by its whole file, in
+  `PEOPLE_AS_CHIPS_EXEMPT`, with the reason "a per-record card in a grid". The
+  census is `web/test/people-as-chips.test.ts`.
+- **R105 `sheet-fact-labels`**: inside a sheet, every fact label (Assigned
+  to, Details, Deadline and their siblings) shares the eyebrow register,
+  `text-micro text-muted-foreground uppercase`, above its own content, and
+  the sheet's own sections carry no background. The census is
+  `web/test/sheet-fact-labels.test.ts`; a real reason for skipping one goes
+  in `SHEET_FACT_LABEL_EXEMPT`, keyed by `{file, expression}`.
+- **R106 `footer-band-home`**: a record page fills the shell's footer slot
+  (`ScreenFooterSlot`, `web/components/shell/footer-slot.tsx`) exactly once
+  and never draws the ink band inline; a sheet draws it as a stripe
+  (`RecordFooterBand stripe`), the sheet body's own last child outside its
+  scroller; a one-column footer stacks Record above Latest activity. The
+  checks are `web/test/footer-on-the-edge.test.ts` and
+  `web/test/task-sheet.test.tsx`.
+- **R107 `effort-tiles`**: the Effort section's metric tiles span it in a
+  three-column, `gap-4` grid on the title's own edge, each tile keeps the kit
+  `Card` default, and the log rows below carry no fill, separated by exactly
+  one kit `Separator` between rows. The census is
+  `web/test/effort-card.test.tsx`'s own existing cases.
 
 **The words** (the ones that catch every new module, every time)
 

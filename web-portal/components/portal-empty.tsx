@@ -10,34 +10,35 @@
  * exists to be filled, so it names the one act. An EMPTY RESULT holds rows that
  * a search has narrowed to none — nothing is wrong, and offering "Ask us
  * something" there invites a second ticket about a question already on the
- * list. Same body, same box, same words-then-button rhythm; the button is the
- * only difference, and it is subtracted HERE rather than at each call site, for
- * the reason R50's `empty` prop is required rather than optional.
+ * list. Same body, same words-then-button rhythm; the button is the only
+ * difference, and it is subtracted HERE rather than at each call site, for the
+ * reason R50's `empty` prop is required rather than optional.
  *
- * WHY THE PORTAL HAS ITS OWN REGISTER AND DOES NOT IMPORT THE AGENCY'S.
- * The agency door's `CollectionEmptyState` (shared/web/screen-engine/
- * collection-frame.tsx) is LEFT-ALIGNED and un-boxed: it sits inside a
- * collection panel that is already the box. The portal has no collection panel
- * — its sections sit straight on the page ground — so every one of these five
- * states was written as a centred `bg-surface-panel` card, which is also the
- * client's standing rule that nothing sits on a bare background. Importing the
- * agency register here would have swapped a considered portal treatment for a
- * measure that only reads correctly inside a panel. So: the same LAW, the
- * portal's own drawing, one component instead of five copies.
- *
- * NO CSS BORDER. `bg-surface-panel` is a fill, and that is deliberate: every
- * one of these five boxes was `border border-dashed` until 2026-09-01 — a bare
- * `border-*` in Tailwind v4 carries no colour and falls back to `currentColor`,
- * which drew near-white ink in dark mode. Separation here is a fill, never a
- * stroke (BUILD-A-SCREEN.md §6.1).
+ * NO CARD ANY MORE, 22 SEP 2026. Her ruling over the A0013 Stakeholders tab,
+ * generalised to both front doors: "the empty collection now. We need to get
+ * rid of the card background." This SUPERSEDES the reasoning that used to sit
+ * here (kept below for the record): a centred `bg-surface-panel` card,
+ * reasoned as "the portal has no collection panel, so the box is its own"
+ * against the 2026-09-09 "nothing sits on a bare background" rule. That
+ * reasoning is overruled outright — an empty register is one of the FIVE
+ * things `PAPER_ON_PURPOSE` names a grouping card may still be (R67:
+ * conversation card, tile, well, not-a-section — never an empty state), and
+ * this was the sixth thing pretending to be one. THE REGISTER NOW STANDS ON
+ * THE PAGE GROUND, unpapered, left-aligned rather than centred, carrying the
+ * same `--space-6` (24px) top inset the agency door's `CollectionEmptyState`
+ * carries above its own text (`shared/web/screen-engine/collection-frame.tsx`)
+ * — the two registers draw the same LAW again, in the portal's own layout,
+ * never a second card.
  *
  * NO ILLUSTRATION, EVER — 27.21's own words: "no empty-box drawing, no mascot,
- * no dashed placeholder rectangle. Type and one button carry it." */
+ * no dashed placeholder rectangle. Type and one button carry it." That line
+ * survives unchanged; only the box around the type is gone. */
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Plus } from "@shared/ui/foundations/icons"
+import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { useT } from "@shared/web/language"
 
 export function PortalEmpty({
@@ -71,23 +72,31 @@ export function PortalEmpty({
   // R62 — THE BUTTON IS THE ONLY DIFFERENCE, and it is subtracted here so a
   // call site cannot forget to. Everything below is drawn the same either way.
   const act = filtered ? undefined : action
+  // NO PAPER, ANYWHERE, PERIOD — 22 SEP 2026, her ruling over the A0013
+  // Stakeholders tab, generalised to the portal. `items-start`/`text-left`
+  // replace the old centred, boxed read; `pt-[var(--space-6)]` is the same
+  // top inset `CollectionEmptyState`'s own `bodyClassName` carries (the
+  // card's own former inset token, not the larger page pad) so the two
+  // registers read as one law rather than two hand-tuned numbers.
   return (
     <div
       data-slot="portal-empty"
-      className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center"
+      className="flex min-w-0 flex-col items-start gap-3 pt-[var(--space-6)] pb-[var(--space-6)] text-left"
     >
-      <p>{filtered ? (filteredTitle ?? t("Nothing matched that.")) : title}</p>
+      <Headline as="h3" size="h3">
+        {filtered ? (filteredTitle ?? t("Nothing matched that.")) : title}
+      </Headline>
       {(filtered ? (filteredDescription ?? t("Try fewer words, or clear the search to see everything.")) : description) ? (
-        <p className="text-sm">
+        <Text as="p" size="sm" tone="secondary" measure>
           {filtered
             ? (filteredDescription ?? t("Try fewer words, or clear the search to see everything."))
             : description}
-        </p>
+        </Text>
       ) : null}
       {act ? (
         // R84 — an empty state's "add the first" is not inside a title
         // component, so black now.
-        <Button variant="inverse" className="mt-3 gap-1" onClick={act.onClick}>
+        <Button variant="inverse" className="gap-1" onClick={act.onClick}>
           <Plus className="size-3.5" />
           {act.label}
         </Button>

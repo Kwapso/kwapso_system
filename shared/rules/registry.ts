@@ -891,6 +891,46 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "id-column-noun",
     status: "enforced",
   },
+  {
+    id: "R103",
+    dimension: "ui",
+    law: "AN EMPTY OR FILTERED-EMPTY REGISTER DRAWS NO CARD AND NO PAPER FILL: TEXT ON THE PAGE, 24PX OF AIR ABOVE IT, ITS SINGLE DOOR (R88) BESIDE IT. Read at L43, from her round of answers on the minimal fixes, 22 Sep 2026, item 2, over the empty-collection screenshot: \"ok, but need a bit more spacing over it (like it was with the card).\" R62's two-zero register (`CollectionEmptyState` on the agency door, `PortalEmpty` on the portal) already draws both zeros, a resting collection and a search narrowed to nothing, as words on the page ground, no illustration, no dashed box (27.21). This law is the negative space of that one: NEITHER zero may sit inside a painted `<Card>` (the kit's own `default` variant, `shared/ui/components/card/card.tsx`, which paints `bg-surface-panel` unless the call site says `variant=\"plain\"`), inside any element carrying a literal `bg-surface-panel`/`bg-card` fill class, or inside an `<EmptyGatedPanel>` branch a call site painted on purpose (`surface=\"boxed\"`, the shell's own default is `\"plain\"`, R88's own construction, so painting it is always a deliberate override). The 24px top inset both registers already carry (`--space-6`, `CollectionEmptyState`'s own `bodyClassName`, `PortalEmpty`'s matching `pt-[var(--space-6)]`) is the ONE air this law asks for, never a second box drawn around it to make room. CHECKED, `web/test/empty-register-on-the-page.test.ts`, a census over `web/components`, `web-portal/components` and `shared/web/screen-engine`: every `<CollectionEmptyState>`/`<PortalEmpty>` mount, its full ancestor chain read for a non-plain `<Card>` or a literal fill class, and every `<EmptyGatedPanel surface=\"boxed\">` read directly, or the finding named in `EMPTY_REGISTER_EXEMPT`, keyed by `{file, expression}`, rot-checked both ways. A PARALLEL LANE OWNS THE LAST OFFENDERS: `web/components/apps/stakeholders-panel.tsx` and `web-portal/components/portal-empty.tsx` were the two worst historical cases (a `bg-surface-panel` box wrapping the register on each), fixed independently of this law's own landing; this census reports whatever it still finds there rather than parking an exemption against a file another lane is mid-editing, which would rot the moment that lane's own fix lands.",
+    why: "AN EXEMPTION AGAINST A FILE ANOTHER LANE IS ACTIVELY REWRITING IS A ROT WAITING TO HAPPEN, NOT A REASONED LINE. Every other `_EXEMPT` table in this registry names a finding this lane itself decided was outside the law's reach; a finding in a file somebody else is mid-fixing is not that: it is a status update that goes stale the moment their commit lands, and `registry-backed-exemptions`' own rot-check (R73) would then be asserting a lie against a file this lane never re-read. So this law's own account is explicit about the one class of finding it will NOT name here: report it, in the lane's own written account, and let the owning lane's fix (or this census re-run after it lands) be what actually clears it.",
+    checkId: "empty-register-on-the-page",
+    status: "enforced",
+  },
+  {
+    id: "R104",
+    dimension: "ui",
+    law: "A PERSON OR A GROUP OF PEOPLE INSIDE A RECORD SECTION RENDERS AS PersonCard CHIPS UNDER AN EYEBROW LABEL, NEVER IN A TILE OR A CARD. Read at L43, her round of validated rulings on the round-48/round-50 batch, 22 Sep 2026, following the 21 Sep 2026 correction over the live tickets pages: \"stakeholders raised by design like in the loop (chip like)\" and \"same with assigned to (chiplike).\" Raised by, Assigned to, On the loop and a system's stakeholders all draw the identical shape now (`StakeholderTile`, `web/components/tickets/help-stakeholders.tsx`; the task sheet's merged Assigned to part, `web/components/work/task-sheet.tsx`): a plain grey uppercase eyebrow line naming the relationship (\"Raised by\", \"Assigned to\", \"On the loop\"), then `PersonCard orientation=\"horizontal\" size=\"choice\"`, the loop's own face size, directly on the page, no card standing around it. This is the RECORD-SECTION reading of a person, never the GALLERY reading: a collection of PEOPLE AS RECORDS (Settings members, a contacts grid) draws each one as its own square tile inside its own per-record `<Card>`, which is a different law (R65, chip-above-title) governing a different shape: one card per row of a collection, not a card wrapping a fact about ONE record. CHECKED, `web/test/people-as-chips.test.ts`, a census over `web/components/tickets`, `web/components/work`, `web/components/apps` and `web/components/accounts` (which is where this app's contacts live; there is no separate `contacts/` folder): every `<PersonCard>` mount whose ancestor chain reaches a `<Card>` of any variant is a finding, unless its whole FILE is named in `PEOPLE_AS_CHIPS_EXEMPT` with the reason \"a per-record card in a grid\": `web/components/accounts/contacts-screen.tsx`'s own contacts gallery is exempt on exactly that reading, one `<Card>` per contact row, the collection's own G3/K16 shape, not a fact about a single record.",
+    why: "THE EXEMPTION IS FILE-WIDE, NOT PER-EXPRESSION, BECAUSE THE TWO READINGS DO NOT COEXIST INSIDE ONE FILE ON PURPOSE. A gallery screen's whole reason to exist is drawing one `<Card>` per person; naming each individual `<PersonCard>` mount in the exemption table one at a time would be restating the same fact as many times as the gallery has rows, and a reviewer reading the table would learn nothing a single `{file, why}` line does not already say. A record-section file (help-stakeholders.tsx, task-sheet.tsx) is never exempt this way: if either one ever legitimately needs a boxed PersonCard again, that is a new ruling to write down, not a line to add here.",
+    checkId: "people-as-chips",
+    status: "enforced",
+  },
+  {
+    id: "R105",
+    dimension: "ui",
+    law: "INSIDE A SHEET, EVERY FACT LABEL SHARES THE EYEBROW REGISTER, text-micro, uppercase, muted, PLACED ABOVE ITS OWN CONTENT, AND THE SHEET'S OWN SECTIONS CARRY NO BACKGROUND. Her answer, 22 Sep 2026, item 6, reading the merged task-sheet section back: \"there are 3 stiles of titles here adn that does not make sense: unify!! assigend to, details and deadline the three look different! i Definitely think it makes sense thys grey color, the rest you decide. also the assigned to person make it a chip, like in stories and put the title above.\" `task-sheet.tsx`'s own merged Assigned to/Details/Deadline section (D19's own 22 Sep amendment) is the shape this law generalises: one shared class list, `text-micro text-muted-foreground uppercase`, on EVERY fact label (Details' old bold `<h3>` and Deadline's old `OverviewList` dt/dd pair are both retired for it), sitting as a sibling ABOVE its own content (the description, the date, the assignee's own `PersonCard orientation=\"horizontal\" size=\"choice\"` chip) rather than beside or inside it, and the section itself paints no fill: no `bg-*` utility anywhere in the sheet's own source. CHECKED, `web/test/sheet-fact-labels.test.ts`, a census over every file in `web/components` that draws a literal `<SheetContent` (a real Sheet, not merely a panel that resembles one): every element whose own `className` carries both `uppercase` and `text-muted-foreground` (the established eyebrow shape) must carry the IDENTICAL class list as every other one in that same file, or the file is named in `SHEET_FACT_LABEL_EXEMPT`, keyed by `{file, expression}`. `task-sheet.tsx`'s own three labels (Assigned to, Details, Deadline) are asserted against the canonical string directly, a tripwire so the census cannot pass by matching nothing; `web/test/task-sheet.test.tsx`'s own existing case (\"Assigned to, Details and Deadline share one eyebrow label style...\") is registered as this law's second check, over a real render rather than source text alone.",
+    why: "THE CENSUS IS SCOPED TO A LITERAL `<SheetContent` MOUNT, NOT EVERY FILE THAT MENTIONS THE WORD \"sheet\", because a panel that merely slides in (a card, a side rail) is not the surface this ruling is about, and widening the scope to anything eyebrow-shaped anywhere in the app would drag in labels this law never touched (a collection's own field labels, D10's `DescriptionList`) under a rule written specifically about a sheet's own fact rows. Within-file consistency, rather than one hard-coded class string for every sheet in the app, is deliberate too: `agent-panel.tsx`'s own \"Reading from\" eyebrow already carries the identical token set in a different order (`text-muted-foreground text-micro uppercase`) and is a different KIND of label (a scope selector, not a record's own fact); this law does not ask every sheet to agree with `task-sheet.tsx`'s own order, only that a sheet does not disagree with itself.",
+    checkId: "sheet-fact-labels",
+    status: "enforced",
+  },
+  {
+    id: "R106",
+    dimension: "ui",
+    law: "EVERY RECORD PAGE FILLS THE SHELL'S FOOTER SLOT EXACTLY ONCE, AND NO BODY RENDERS THE BAND INLINE; A SHEET RENDERS IT AS A STRIPE, THE SHEET BODY'S LAST CHILD OUTSIDE THE SCROLLER; ONE COLUMN STACKS RECORD ABOVE LATEST ACTIVITY. The standing law behind D21/L31 (`footer-on-the-edge`), restated as its own entry because R89's own text is the ticket page's own nine-round history and this is the GENERAL shape every record page and every sheet is now built to, kit v1.2.155: `ScreenFooterSlot` (`web/components/shell/footer-slot.tsx`) is a React portal into `ScreenShell`'s own footer slot, outside the body's padded stack, flush with the pane's own bottom edge, `mt-auto` inside a `min-h-full` column so a short record's band lands on the floor and a long record's lands after its content. A record page calls it exactly once (`record-chrome.tsx`, `ticket-detail-body.tsx`, `knowledge-detail.tsx`, `story-detail.tsx` all do), and never draws the band a second time inline. A SHEET has no slot of its own to portal into: `task-sheet.tsx` instead draws `RecordFooterBand` with its `stripe` prop (Aurora, 22 Sep 2026: \"the footer... has to be at the very bottom, and also make it a stripe, not a container\"), the sheet body's own last child, outside its scrolling region, never a container around it. On a one-column footer the record's own facts stack above Latest activity, the kit's own fixed order (D22/round-22 ruling: \"in any kind of screen that requires that the footer displays only one column instead of two, put the record on top and the latest activity on the bottom\"). CHECKED: `web/test/footer-on-the-edge.test.ts` (the shell's own flex-col page container, the one-scrolling-region proof, the composer's own last-child shape) and `web/test/task-sheet.test.tsx` (the sheet's own stripe-footer, outside-the-scroller, record-above-latest-activity assertions) are both registered as this law's checks. `RECORD_FOOTER_SLOT_EXEMPT` (`shared/rules/registry.ts`) names the one path this law does not yet reach: `shared/web/screen-engine/screen-renderer.tsx`, the recipe-driven detail path, which draws its own footer inline rather than through `ScreenFooterSlot`, reasoned \"shared with the portal, which has no footer slot; decision pending\".",
+    why: "THE RECIPE-DRIVEN PATH IS NAMED RATHER THAN SILENTLY LEFT OUT OF THE CENSUS, because the two detail paths (`RecordScreen`'s hand-composed screens and `renderDetail`'s recipe-driven ones, D11's own split) are meant to converge on one construction wherever they can, and a census that only ever looked at `web/` would never notice the recipe engine had not: `shared/web/screen-engine/` is ALSO imported by `web-portal/`, which has no `ScreenFooterSlot` host at all (the portal's own shell never mounted one), so wiring the slot into the shared engine is a decision that touches the portal too and is deliberately left open rather than forced through under this law's own deadline.",
+    checkId: "footer-band-home",
+    status: "enforced",
+  },
+  {
+    id: "R107",
+    dimension: "ui",
+    law: "THE EFFORT SECTION'S METRIC TILES SPAN THE SECTION IN A THREE-COLUMN GRID WITH THE KIT'S 16PX GAP, THEIR LEFT EDGE ON THE TITLE'S EDGE, EACH TILE A CARD DEFAULT WITH THE KIT'S CONTENT INSET, AND THE LOG ROWS BELOW CARRY NO FILL, SEPARATED BY THE KIT SEPARATOR. Her item 5, the round of answers on the minimal fixes, 22 Sep 2026, read as the kit lane's own item over the Effort card's own alignment and margin: \"look screenshot. its not correct, the contact is touching the border\", resolved on `EffortCard` (`web/components/work/effort-card.tsx`): the three stat tiles (cycle time, flow efficiency, total logged) sit in a `sm:grid-cols-3 gap-[var(--space-4)]` grid spanning the section's own full width, flush with the section title's own left edge; each tile keeps the kit's own `Card` (unvaried, `variant=\"default\"`, R67's own named exception for a tile, `PAPER_ON_PURPOSE`) with its ordinary content inset, so the tiles alone keep their paper while everything below them (the work-log rows) does not; the rows are a plain list, no fill, no rounded/divide-y border utility, separated by exactly one kit `<Separator>` between adjacent rows, never above the first, never below the last, and a single row draws no separator at all. CHECKED: `web/test/effort-card.test.tsx`'s own existing cases, \"spans the section's full width, three columns, gap-4 (16px, the mock's own figure)\", \"draws the three tiles' own paper (Card default), only the log rows below lose their fill\", \"draws the log rows with no fill and no rounded/divide-y border utility, a plain list\", and \"separates rows with exactly one kit Separator between them, never above the first or below the last\" (plus its single-row sibling case), are registered as this law's check.",
+    why: "THE TILES KEEP THEIR CARD ON PURPOSE, EVEN THOUGH R103/R67 TAKE THE BOX OFF EVERY OTHER GROUPING SECTION. A metric tile is one of `PAPER_ON_PURPOSE`'s five named exceptions (a number standing for itself, not a section grouping other content), the identical reasoning R97 (`counts-beside-titles`) already gives for why a COUNT never gets its own card while a TILE of real metrics still can. Writing this as its own law rather than folding it into R97 or R67 is what lets the rulebook's own rule index point a reader at the Effort section specifically, the way R100 to R102 each earned their own entry for one screenshot's worth of correction rather than being buried inside a broader rule already carrying a different subject.",
+    checkId: "effort-tiles",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -6224,3 +6264,73 @@ export interface IdColumnNounExempt {
 }
 
 export const ID_COLUMN_NOUN_EXEMPT: IdColumnNounExempt[] = []
+
+// ── empty-register-on-the-page (R103) ───────────────────────────────────────
+
+/** A still-open empty-register-on-the-page finding, keyed by `{file,
+ * expression}`: the file and the census's own offending-shape description
+ * (never a line number). Rot-checked both ways by `web/test/
+ * empty-register-on-the-page.test.ts`. Deliberately NOT the way out for a
+ * file a parallel lane is mid-fixing (`web/components/apps/
+ * stakeholders-panel.tsx`, `web-portal/components/portal-empty.tsx`), see
+ * this law's own `why` for the reasoning; a finding there is reported by the
+ * census, never parked here. */
+export interface EmptyRegisterExempt {
+  file: string
+  expression: string
+  why: string
+}
+
+export const EMPTY_REGISTER_EXEMPT: EmptyRegisterExempt[] = []
+
+// ── people-as-chips (R104) ──────────────────────────────────────────────────
+
+/** A whole FILE exempt from people-as-chips, never a single `<PersonCard>`
+ * mount: a gallery/grid screen draws one `<Card>` per person-as-record, the
+ * opposite reading from a record section's own fact about one person.
+ * Rot-checked both ways by `web/test/people-as-chips.test.ts`. */
+export interface PeopleAsChipsExempt {
+  file: string
+  why: string
+}
+
+export const PEOPLE_AS_CHIPS_EXEMPT: PeopleAsChipsExempt[] = [
+  {
+    file: "web/components/accounts/contacts-screen.tsx",
+    why: "a per-record card in a grid: one <Card variant=\"default\"> per contact row in the contacts gallery, G3/K16's own collection shape, not a fact about a single record",
+  },
+]
+
+// ── sheet-fact-labels (R105) ────────────────────────────────────────────────
+
+/** A still-open sheet-fact-labels finding, keyed by `{file, expression}`:
+ * the sheet file and the offending label's own class text (never a line
+ * number). Rot-checked both ways by `web/test/sheet-fact-labels.test.ts`.
+ * Empty on the day this law shipped: every Sheet the census reaches today
+ * (`task-sheet.tsx`, `agent-panel.tsx`) already carries one class list per
+ * file. */
+export interface SheetFactLabelExempt {
+  file: string
+  expression: string
+  why: string
+}
+
+export const SHEET_FACT_LABEL_EXEMPT: SheetFactLabelExempt[] = []
+
+// ── footer-band-home (R106) ─────────────────────────────────────────────────
+
+/** A path this law does not yet reach, with the reason why, never a still-
+ * open finding a census produced. Rot-checked only in the sense that the
+ * path must still exist and still be true; there is no automated finder for
+ * "draws a footer inline" to rot-check it against. */
+export interface RecordFooterSlotExempt {
+  file: string
+  why: string
+}
+
+export const RECORD_FOOTER_SLOT_EXEMPT: RecordFooterSlotExempt[] = [
+  {
+    file: "shared/web/screen-engine/screen-renderer.tsx",
+    why: "the recipe-driven detail path draws its own footer inline rather than through ScreenFooterSlot, shared with the portal, which has no footer slot; decision pending",
+  },
+]

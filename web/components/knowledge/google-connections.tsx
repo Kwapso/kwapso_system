@@ -218,19 +218,15 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         * `rounded-[var(--radius)] bg-surface-panel` box, stacked with a gap —
         * legal under R67 (both stand on paper, neither on the page ground) but
         * two decisions where the section is one thing: "your Google
-        * connections". They now share a single outer panel, the invitation on
-        * top and the rows underneath it, split by the same inset hairline a
-        * service row uses against its neighbour (kit §2.7 — a rule between
-        * rows is a hairline, not a second card).
+        * connections". They shared a single outer panel for a week, the
+        * invitation on top and the rows underneath it, split by the same inset
+        * hairline a service row uses against its neighbour.
         *
-        * ONE BOX, WHATEVER THIS SECTION IS SAYING (R67) — the same change its
-        * neighbour on this tab took on 2026-09-11 (web/components/team/
-        * access-tokens.tsx has the client's ruling and the measured tones).
-        * The connected services stood on soft paper and the error, the
-        * skeleton and the "not set up here" line stood on the page, so the
-        * section changed SHAPE as well as content between states; that is
-        * unchanged here, it is just one panel now instead of a matching pair. */}
-      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
+        * AMENDED 22 Sep 2026 (R103): an empty or filtered-empty register draws
+        * no card and no paper fill, so the invitation moved back out of this
+        * panel and stands on the page ground above it. The panel now holds
+        * only the connected/error/skeleton/not-ready body for the services,
+        * still the one box that changes shape rather than a matching pair. */}
       {/* THE EYEBROW AND THE SENTENCE ARE GONE, AND THE INVITATION IS A CARD —
         * client ruling, 2026-09-11, over a screenshot of this tab: "i said
         * nothing on white backgorund. … for google replicate the no tokens yet,
@@ -240,13 +236,12 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         * "REPLICATE THE NO TOKENS YET" IS AN INSTRUCTION ABOUT A COMPONENT, not
         * about a look, so this draws the neighbour's own register rather than a
         * second thing shaped like it: `CollectionEmptyState`, the one body the
-        * app's zeros are drawn with (R62), on the same soft paper as the rows
-        * beneath it now that the two are one panel. Two cards that mean the
-        * same thing must not be two components. The only thing this call site
-        * asks for that a collection does not is the WORD on the button — you
-        * do not "add the first" Google connection, you approve one — which is
-        * a prop on that component now (`createLabel`), defaulted so no other
-        * caller moves.
+        * app's zeros are drawn with (R62), on the page ground rather than any
+        * panel's own paper (R103). Two cards that mean the same thing must not
+        * be two components. The only thing this call site asks for that a
+        * collection does not is the WORD on the button — you do not "add the
+        * first" Google connection, you approve one — which is a prop on that
+        * component now (`createLabel`), defaulted so no other caller moves.
         *
         * WHAT THE SENTENCE UNDERNEATH HAD TO KEEP, because both halves are
         * load-bearing and neither survives on the page ground:
@@ -268,28 +263,27 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         * title, and the old always-drawn row could get away with saying it
         * because it was a toolbar rather than a claim. Somebody reconnecting
         * one service has the button on that service's own row; somebody who
-        * has disconnected one gets this card back — now as the panel's own top
-        * section rather than a second panel above it. */}
+        * has disconnected one gets this register back, on the page above the
+        * panel of rows. */}
       {q.data?.ready && GOOGLE_SERVICES.some((service) => !liveFor(service)) && (
-        <div className="px-4 pt-4 shadow-[var(--hairline-under)]">
-          <CollectionEmptyState
-            title={t("Connect to Google")}
-            description={t(
-              // "YOUR OWN GOOGLE ACCOUNT", never "your own account": `account`
-              // is a glossary term in this product — the client company we do
-              // the work for — and R34 is the law that the screens speak the
-              // glossary. The old sentence said "your own Google account" for
-              // the same reason; the word Google is doing work, not repeating.
-              "Drive, Gmail, Calendar and Chat in one approval, on your own Google account. {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.",
-              BRAND
-            )}
-            createLabel={t("Connect everything")}
-            onCreate={() => {
-              window.location.href = "/api/content/google/start?service=all"
-            }}
-          />
-        </div>
+        <CollectionEmptyState
+          title={t("Connect to Google")}
+          description={t(
+            // "YOUR OWN GOOGLE ACCOUNT", never "your own account": `account`
+            // is a glossary term in this product — the client company we do
+            // the work for — and R34 is the law that the screens speak the
+            // glossary. The old sentence said "your own Google account" for
+            // the same reason; the word Google is doing work, not repeating.
+            "Drive, Gmail, Calendar and Chat in one approval, on your own Google account. {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.",
+            BRAND
+          )}
+          createLabel={t("Connect everything")}
+          onCreate={() => {
+            window.location.href = "/api/content/google/start?service=all"
+          }}
+        />
       )}
+      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
       {q.error ? (
         <div className="p-4">
           <ShapeStateBody

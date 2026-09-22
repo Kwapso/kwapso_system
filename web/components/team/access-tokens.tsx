@@ -155,15 +155,15 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
        * amendment 4, and `web/test/sections-stand-on-paper.test.ts` carries it.
        *
        * DELETED RATHER THAN BOXED, which is her own instruction and is the right
-       * one here: the contained register below already titles the section ("No
-       * tokens yet.") and already carries the one first-add, so the eyebrow and
-       * the sentence were a SECOND title for one thing, floating on the page.
+       * one here: the register below already titles the section ("No tokens
+       * yet.") and already carries the one first-add, so the eyebrow and the
+       * sentence were a SECOND title for one thing, floating on the page.
        * A section titled twice is not fixed by giving the spare title a box.
        *
        * WHAT THIS COSTS, stated rather than discovered later: nothing on screen
        * now says what a token IS before you make one. If she wants that sentence
-       * back it belongs in the register's own `description`, INSIDE the panel,
-       * which is the shape the Google card beside it now uses. */}
+       * back it belongs in the register's own `description`, on the page ground
+       * (R103), the same shape the Google card beside it uses. */}
       {/* ONE BOX, WHATEVER THE SECTION IS SAYING — client ruling, 2026-09-10:
        * "once again, nothing shoudl sit on the white, everything contained!"
        * (and, on the Team tab the day before, "nothing on top of white
@@ -175,7 +175,19 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
        * page's `--background`, measured at 1.103 light / 1.079 dark
        * (web/components/team/team-panel.tsx has the numbers and the reasoning).
        * The inset is on the STATES rather than on the box, because a row
-       * already carries its own `p-3` and a box inset would double it. R67. */}
+       * already carries its own `p-3` and a box inset would double it. R67.
+       *
+       * AMENDED 22 Sep 2026 (R103): an empty or filtered-empty register draws
+       * no card and no paper fill, so the zero body moved back out to the page
+       * ground above this panel. Only the error and the skeleton still draw
+       * inside it; the panel itself only renders at all when one of those two,
+       * or the rows, has something to show. */}
+      {tokensQ.data !== undefined && !tokensQ.error && tokens.length === 0 ? (
+        // The kit's register (27.21) with the one act, on the page ground
+        // rather than inside the panel's own paper (R103) — owner ruling
+        // 2026-09-07, amended 22 Sep 2026.
+        <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
+      ) : (
       <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
         {/* THE CREATE BUTTON CAME INSIDE THE BOX WITH THE HEADING'S REMOVAL —
          * 2026-09-11. It used to ride the header row opposite the eyebrow, and
@@ -219,12 +231,6 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
         ) : tokensQ.data === undefined ? (
           <div className="p-4">
             <Skeleton variant="list" lines={2} />
-          </div>
-        ) : tokens.length === 0 ? (
-          // The kit's register (27.21) with the one act, rather than a bare
-          // line under a button in the header — owner ruling, 2026-09-07.
-          <div className="px-4">
-            <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
           </div>
         ) : (
           tokens.map((token) => (
@@ -316,6 +322,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           ))
         )}
       </div>
+      )}
 
       {/* Create — FormShell (Law R4), IN A SLIDE-IN (Law R59).
        *

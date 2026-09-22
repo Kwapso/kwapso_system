@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-102 laws, 100 resolved to at least one check file, 2 unresolved.
+107 laws, 103 resolved to at least one check file, 4 unresolved.
 
 ## Architecture (28)
 
@@ -39,7 +39,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 | R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/task-sheet.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
 
-## UI (65)
+## UI (70)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -108,6 +108,11 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R100 | enforced | `head-actions-centred` | `web/test/head-actions-centred.test.ts` |
 | R101 | enforced | `toolbar-search-edge` | `web/test/toolbar-search-edge.test.tsx` |
 | R102 | enforced | `id-column-noun` | `web/test/id-column-noun.test.ts` |
+| R103 | enforced | `empty-register-on-the-page` | `web/test/empty-register-on-the-page.test.ts` |
+| R104 | enforced | `people-as-chips` | `web/test/people-as-chips.test.ts` |
+| R105 | enforced | `sheet-fact-labels` | `web/test/sheet-fact-labels.test.ts` |
+| R106 | enforced | `footer-band-home` | *unresolved — see below* |
+| R107 | enforced | `effort-tiles` | *unresolved — see below* |
 
 ## Workflow (2)
 
@@ -134,6 +139,8 @@ None of the three patterns this generator looks for matched anywhere under the c
 
 - R69 (`guarded-sighting-writes`, enforced)
 - R76 (`protected-is-active`, enforced)
+- R106 (`footer-band-home`, enforced)
+- R107 (`effort-tiles`, enforced)
 
 ---
 

@@ -102,10 +102,13 @@ function Group({
            half was an `EmptyLine`, one grey line beside the full register its
            own sibling branch drew. No act on either: who is on a system is set
            on the system's own form, so this panel has no add button for
-           `filtered` to subtract — what it fixes here is the LOOK. */
-        <div className="rounded-[var(--radius)] bg-surface-panel px-4">
-          <CollectionEmptyState filtered={narrowed} title={empty} filteredTitle={empty} />
-        </div>
+           `filtered` to subtract — what it fixes here is the LOOK.
+           NO CARD ANY MORE, 22 SEP 2026 — her ruling over the A0013 Stakeholders
+           tab: "the empty collection now. We need to get rid of the card
+           background." `CollectionEmptyState` carries its own `--space-6` inset
+           (collection-frame.tsx), so the wrapping `bg-surface-panel` div is
+           dropped rather than repainted. */
+        <CollectionEmptyState filtered={narrowed} title={empty} filteredTitle={empty} />
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (

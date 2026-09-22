@@ -2650,6 +2650,92 @@ above."*
    Assigned to, Details and Deadline, and the assignee renders as the story page's own loop chip
    (`PersonCard orientation="horizontal" size="choice"`), its eyebrow above it.
 
+**Five more laws, read off the same round.** Items 2 and 6 above, and the 21/22 Sep rulings
+already read into this section (the no-containers empty-collection reading, the "stakeholders...
+chip like" correction, the footer-band mechanics, the Effort card's own alignment), each earn
+their own R-number, the same way R100 to R102 did above: a census over the disk, an exemption
+table keyed by `{file, expression}` (or, where the exemption is a whole file rather than one
+finding, by `{file}` alone), never a line number.
+
+**The rule (R103 `empty-register-on-the-page`).** Her item 2 above, read alongside R62's own
+two-zero register and the no-containers ruling this section already carries: an empty or
+filtered-empty register (`CollectionEmptyState` on the agency door, `PortalEmpty` on the portal)
+draws no card and no paper fill. Text sits on the page ground, the same `--space-6` (24px) top
+inset both registers already carry, with its one door in (R88) beside it, never a second box
+painted around it. Neither register may sit inside a painted `<Card>` (the kit's own `default`
+variant, unless the call site says `variant="plain"`), inside any element carrying a literal
+`bg-surface-panel`/`bg-card` fill, or inside an `<EmptyGatedPanel surface="boxed">` branch: the
+shell's own default is `"plain"` (R88's own construction), so painting it is always a deliberate
+override.
+
+**Law.** [R103](../RULES.md) (`empty-register-on-the-page`), a source census,
+`web/test/empty-register-on-the-page.test.ts`, over `web/components`, `web-portal/components` and
+`shared/web/screen-engine`: every `<CollectionEmptyState>`/`<PortalEmpty>` mount, its ancestor
+chain read for a non-plain Card or a literal fill class, and every `<EmptyGatedPanel
+surface="boxed">` read directly, or the finding named in `EMPTY_REGISTER_EXEMPT`, keyed by `{file,
+expression}`, rot-checked both ways. A parallel lane owns the last offenders under
+`web/components`/`web-portal/components`; this census reports what it still finds there rather
+than exempting a file that lane is mid-editing.
+
+**The rule (R104 `people-as-chips`).** The 21 Sep 2026 correction over the live tickets pages,
+read together with item 6 above: *"stakeholders raised by design like in the loop (chip like)"*
+and *"same with assigned to (chiplike)."* A person or a group of people inside a record section
+(Raised by, Assigned to, On the loop, stakeholders, a group's members) renders as `PersonCard`
+chips under a plain eyebrow label, never inside a tile or a card: the shape
+`help-stakeholders.tsx` and `task-sheet.tsx` already draw. This is the RECORD-SECTION reading of a
+person; a GALLERY of people-as-records (Settings members, a contacts grid) still draws its own
+per-record `<Card>` (R65), a different shape entirely.
+
+**Law.** [R104](../RULES.md) (`people-as-chips`), a source census, `web/test/people-as-chips.test.ts`,
+over `web/components/tickets`, `work`, `apps` and `accounts`: every `<PersonCard>` whose ancestor
+chain reaches a `<Card>` of any variant is a finding, unless its whole file is named in
+`PEOPLE_AS_CHIPS_EXEMPT` with the reason "a per-record card in a grid":
+`accounts/contacts-screen.tsx`'s own gallery is exempt on exactly that reading.
+
+**The rule (R105 `sheet-fact-labels`).** Her item 6 above, read in full: every fact label inside a
+sheet (Assigned to, Details, Deadline and their siblings) shares the eyebrow register,
+`text-micro`, uppercase, muted, placed above its own content, and the sheet's own sections carry
+no background. `task-sheet.tsx`'s merged section is the shape: one class list,
+`text-micro text-muted-foreground uppercase`, on every label, Details' old bold `<h3>` and
+Deadline's old `OverviewList` dt/dd pair both retired for it.
+
+**Law.** [R105](../RULES.md) (`sheet-fact-labels`), a source census, `web/test/sheet-fact-labels.test.ts`,
+over every file under `web/components` that draws a literal `<SheetContent`: every eyebrow-shaped
+label (`uppercase` + `text-muted-foreground`) must share the identical class list with every other
+one in that same file (`task-sheet.tsx`'s own three asserted against the canonical string
+directly, a tripwire against the census matching nothing), or named in `SHEET_FACT_LABEL_EXEMPT`,
+keyed by `{file, expression}`.
+
+**The rule (R106 `footer-band-home`).** The general shape behind D21/L31, kit v1.2.155: every
+record page fills the shell's footer slot (`ScreenFooterSlot`, `web/components/shell/
+footer-slot.tsx`) exactly once, and no body renders the ink band inline; a sheet renders the band
+as a stripe (`RecordFooterBand stripe`), the sheet body's own last child outside the scroller.
+Aurora, 22 Sep 2026: *"the footer ... has to be at the very bottom, and also make it a stripe, not
+a container."* One column stacks Record above Latest activity, the kit's own fixed order from the
+round-22 ruling this section already carries.
+
+**Law.** [R106](../RULES.md) (`footer-band-home`). `web/test/footer-on-the-edge.test.ts` and
+`web/test/task-sheet.test.tsx` are registered as this law's checks. `RECORD_FOOTER_SLOT_EXEMPT`
+names `shared/web/screen-engine/screen-renderer.tsx`, the recipe-driven detail path, shared with
+the portal, which has no footer slot. Decision pending.
+
+**The rule (R107 `effort-tiles`).** Her item 5 above, read as the kit lane's own item over the
+Effort card: *"look screenshot. its not correct, the contact is touching the border."* The
+Effort section's metric tiles span the section in a three-column grid with the kit's 16px gap,
+their left edge on the title's edge, each tile a Card default with the kit's own content inset,
+and the log rows below carry no fill, separated by the kit `Separator`.
+
+**Law.** [R107](../RULES.md) (`effort-tiles`). `web/test/effort-card.test.tsx`'s own existing
+cases (the three-column `gap-4` grid, the tiles' own Card default, the log rows' no-fill plain
+list, the one-Separator-between-rows shape) are registered as this law's check.
+
+**Three earlier rulings, not yet law, now amended in with their own numbers.** All three were
+already built and already read into this book before today; none of them mint a new R-number,
+they graduate under the numbers they already carry. The toolbar's 10px rhythm on every module is
+[R83](../RULES.md) (`toolbar-lead-gap`, amended 21 Sep 2026, above in this section). The id column's
+narrow width and record-noun header is [R102](../RULES.md) (`id-column-noun`, above). The
+toolbar's search-field edge is [R101](../RULES.md) (`toolbar-search-edge`, above).
+
 ---
 
 ## 4. Collections
@@ -10328,7 +10414,9 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R96 | [L39](#l39-the-id-chip-is-black) | R97 | [L40](#l40-a-count-never-gets-its-own-card) |
 | R98 | [L41](#l41-every-button-is-the-kits-own-height) | R99 | [L42](#l42-no-record-closes-while-its-own-clock-is-still-running) |
 | R100 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R101 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
-| R102 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | | |
+| R102 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R103 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
+| R104 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R105 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
+| R106 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R107 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 
 ### The seven files that carry most of it
 
