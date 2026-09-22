@@ -42,6 +42,34 @@
 // app. And there is no "Add a source" / "Upload a file" action here: the
 // client's own words named a gallery, a toolbar and an Ask button — not a
 // fourth thing to author from a tab that was never asked to grow one.
+//
+// A THIRD SCOPE, THE SAME COMPONENT AGAIN (22 Sep 2026). Aurora's ruling on
+// the ACCOUNT record's own Knowledge tab, verbatim: "on accounst/knoweledge,
+// 1. tehres too much blank space begfore teh content 2. replicate how it
+// looks in main knowelegde, search, button to ask, preview the content,
+// filters by type.. etc." — then, over both hosts: "same for knowelegde
+// inside apps." Before this, the account record's Knowledge tab was not a
+// thinner GALLERY at all, it mounted `<AskTheAssistant>` alone (account-
+// detail.tsx) — no toolbar, no cards, no filters — which is the "too much
+// blank space" she measured: the panel painted a small ask box and then
+// bare page ground the rest of the way down to the record's own footer band,
+// because nothing else was ever drawn there. "account" scope closes that gap
+// the identical way "app" did: the same gallery, the same `<PagedFind>` tree,
+// narrowed to this account's own compartment (`compartment: account:<id>`,
+// the exact string the team scope's own "Filed under" facet already builds
+// and the door's `sourcesWhere` already matches) rather than to an `appId`.
+//
+// ASK MOVES INTO THE TOOLBAR (the same 22 Sep ruling): "in knoweledge when
+// isnide app or acount, make ask a button in the toolbar." Both record hosts
+// used to float Ask in a standalone row ABOVE `<PagedFind>`, on purpose
+// (R50 — the row stands the whole toolbar down on a collection with zero
+// rows, and Ask is exactly what a person reaches for then). That reasoning
+// still holds for the ONE case it was written for — a truly empty, unsearched
+// record — so the standalone row survives for exactly that state; the moment
+// there IS a toolbar (any source at all, kind or type narrowed or not), Ask
+// now rides inside it, in `<PagedFind>`'s own `actions` slot (R53's own
+// right-hand slot), never mango (R84 — this tab has no title component of its
+// own to be the one legal home for that).
 
 import * as React from "react"
 
@@ -84,6 +112,16 @@ type Translate = (english: string) => string
  * (client, 17 Sep 2026) to the same class of cell theirs is — a mark, a
  * title, one chip, one line. Passed to `CardGrid`'s `fluid` mode below. */
 const KNOWLEDGE_CARD_MIN = "12rem"
+
+/** ONE ACCOUNT'S OWN COMPARTMENT — the exact string the door's own
+ * `accountCompartment()` builds (workers/content/src/lib/knowledge.ts) and
+ * the team scope's "Filed under" facet already spells inline, a few dozen
+ * lines below (`value: \`account:${a.id}\``). Named here rather than left a
+ * third inline template literal, now that the account scope's own resting
+ * read and its `<PagedFind>` narrowing both need the identical string. */
+function accountCompartment(accountId: string): string {
+  return `account:${accountId}`
+}
 
 /** WHICH SLICE OF THE BASE THIS INSTANCE DRAWS — the team's whole collection
  * (K2, the general Knowledge screen, fed by `collection-content.tsx`'s own
@@ -132,29 +170,64 @@ export type KnowledgeGalleryScope =
       appName: string
       onIntent: (intent: ScreenIntent) => void
     }
+  | {
+      kind: "account"
+      teamId: string
+      accountId: string
+      /** the account's own name — folded into the empty state and into the
+       * Ask button's conversation label, the identical convention the "app"
+       * scope above already uses. */
+      accountName: string
+      onIntent: (intent: ScreenIntent) => void
+    }
 
 export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScope; t: Translate; can: Can }) {
   const teamId = scope.teamId
   const isApp = scope.kind === "app"
+  const isAccount = scope.kind === "account"
+  // EITHER RECORD HOST — the two scopes that hang this gallery off one
+  // record's own tab rather than off the team's whole Knowledge screen. Every
+  // place below that used to ask "is this the app scope" and mean "is this a
+  // nested record tab" now asks this instead; the few spots that are truly
+  // app-only (the "app" `AgentTabScope`'s own id-narrowed Ask, below) still
+  // branch on `isApp` by itself.
+  const isRecordHost = isApp || isAccount
 
-  // THE APP TAB'S OWN READ. A nested record tab has no `collection-content.tsx`
+  // THE RECORD TAB'S OWN READ. A nested record tab has no `collection-content.tsx`
   // orchestrator feeding it a pre-fetched `knowledgeQ` the way the team screen
-  // is fed (below) — so this asks the door itself, filtered to the app
-  // (`SourceFilters.appId`, workers/content/src/lib/knowledge.ts), over the
-  // SAME `sliceKey` seam `work-panels.tsx` gives every other app-record
-  // collection (sprints, stories, tickets…), which is what makes this list
-  // live (R15, `live-resources.ts`'s `knowledge` entry now carries
-  // `"knowledge-app-of:"` in its own `slicePrefix`) and countable (R16) the
-  // same way its five tab siblings already are. `null` on the team branch —
+  // is fed (below) — so this asks the door itself, over the SAME `sliceKey`
+  // seam `work-panels.tsx` gives every other record-hosted collection
+  // (sprints, stories, tickets…), which is what makes this list live (R15,
+  // `live-resources.ts`'s `knowledge` entry carries both `"knowledge-app-of:"`
+  // and `"knowledge-account-of:"` in its own `slicePrefix`) and countable
+  // (R16) the same way its siblings already are. `null` on the team branch —
   // never fetched, never cached under a key nobody reads.
-  const appKey = isApp ? sliceKey("knowledge-app", scope.appId) : null
-  const appKnowledgeQ = useCached<KnowledgeSource[]>(appKey, () =>
-    contentApi.knowledge({ appId: isApp ? scope.appId : "" }).then((r) => {
-      primeCache(totalKey("knowledge-app", isApp ? scope.appId : ""), r.total)
-      return r.sources
-    })
+  //
+  // TWO FILTERS, NEVER ONE MERGED SHAPE — an app narrows by `SourceFilters.appId`
+  // (a source's own `app_id` column or its `apps` array), an account narrows by
+  // `SourceFilters.compartment` (`account:<id>`, the exact string the team
+  // scope's "Filed under" facet already builds below and the door's
+  // `sourcesWhere` already matches) — two different columns, so the branch
+  // stays explicit rather than one filter object pretending to be the other's.
+  const recordKey = isApp
+    ? sliceKey("knowledge-app", scope.appId)
+    : isAccount
+      ? sliceKey("knowledge-account", scope.accountId)
+      : null
+  const recordKnowledgeQ = useCached<KnowledgeSource[]>(recordKey, () =>
+    contentApi
+      .knowledge(
+        isApp ? { appId: scope.appId } : { compartment: accountCompartment(isAccount ? scope.accountId : "") }
+      )
+      .then((r) => {
+        if (isApp) primeCache(totalKey("knowledge-app", scope.appId), r.total)
+        else if (isAccount) primeCache(totalKey("knowledge-account", scope.accountId), r.total)
+        return r.sources
+      })
   )
-  const appTotal = useCachedValue<number | null>(isApp ? totalKey("knowledge-app", scope.appId) : null)
+  const recordTotal = useCachedValue<number | null>(
+    isApp ? totalKey("knowledge-app", scope.appId) : isAccount ? totalKey("knowledge-account", scope.accountId) : null
+  )
 
   // THE TAB STRIP'S OWN BADGES (R16 — one count per tab from the door, never
   // a client-side count of a page). `countSourceKinds`
@@ -226,7 +299,7 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
       })
   }, [scopeTab, teamId, can])
 
-  const knowledgeQ = isApp ? appKnowledgeQ : scope.knowledgeQ
+  const knowledgeQ = scope.kind === "team" ? scope.knowledgeQ : recordKnowledgeQ
   if (knowledgeQ.error) return <LoadError what="the knowledge base" />
   if (knowledgeQ.data === undefined) return <Skeleton variant="list" lines={4} />
   // THE ACCOUNT a source is filed under — the list says "Bergman S.A.", never
@@ -270,7 +343,7 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
       badge: formatCount(byKind[k]),
       badgeVariant: "" as const,
     }))
-  const total = isApp ? (appTotal ?? undefined) : scope.total
+  const total = scope.kind === "team" ? scope.total : (recordTotal ?? undefined)
   const allBadge = formatCount(total)
   const knowledgeTabs = [
     { value: "all", label: t("All"), icon: "asterisk", badge: allBadge, badgeVariant: "" as const },
@@ -301,7 +374,11 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
   const knowledgeDefaultSort =
     scope.kind === "team" && activeTab === "glossary" ? "title" : COLLECTION_SORTS.knowledge.defaultSort
 
-  const listKey = isApp ? sliceKey("knowledge-app", scope.appId) : knowledgeKey(teamId)
+  const listKey = isApp
+    ? sliceKey("knowledge-app", scope.appId)
+    : isAccount
+      ? sliceKey("knowledge-account", scope.accountId)
+      : knowledgeKey(teamId)
 
   function openAskConversation() {
     const id = openNewAgentTab()
@@ -311,27 +388,48 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
     // what the FIRST-MESSAGE PREFIX needs (`recordLabel`/`scopeId`); the tab
     // reads "New" until `agent-panel.tsx`'s `handleSend` titles it off the
     // question actually asked.
+    //
+    // "app" CARRIES A STRUCTURED ID (`scopeId`) — the one record kind the
+    // retrieval door can narrow BY exactly (`ask_knowledge`'s own `appId`).
+    // "account" HAS NO SUCH DOOR PARAMETER, so it rides the same "record"
+    // scope the generic in-panel picker already uses for every other kind of
+    // record — a name folded into the first message's own prose ("About the
+    // account {name}: …"), the identical mechanism `ask-the-assistant.tsx`
+    // already used on this exact tab before this change, and the one
+    // `agent-panel.tsx`'s own comment on `handleSend` names as how an
+    // ordinary record-scoped question already resolves an account's
+    // compartment today. Adding a second structured, id-narrowed scope for
+    // accounts (mirroring "app") is real, further work — it would need a new
+    // `accountId` parameter on the retrieval door and the tool schema wired
+    // through R19/R22/R27 — and is out of this change's own scope, which is
+    // the record-hosted GALLERY, not the retrieval door.
     if (isApp) pickAgentTabScope(id, "app", scope.appName, scope.appId)
+    else if (isAccount) pickAgentTabScope(id, "record", scope.accountName)
     else pickAgentTabScope(id, "knowledge")
     setAgentOpen(true)
   }
 
-  if (scope.kind === "app")
+  if (isRecordHost)
     return (
       <div className="flex flex-col gap-4">
-        {/* THE ASK BUTTON, ALWAYS OFFERED — outside `<PagedFind>`'s own
-            toolbar on purpose: R50 stands that whole toolbar down on an empty,
-            unsearched collection, and asking is exactly the thing a person
-            reaches for when the gallery has nothing in it yet. Never mango
-            (R84) — this is a tab's own body, not the app record's title
-            component, so the button reads `variant="inverse"`, the same as
-            every other nested panel's own action. */}
-        <div className="flex justify-end">
-          <Button variant="inverse" className="gap-1" onClick={openAskConversation}>
-            <Sparkle className="size-4" aria-hidden />
-            {t("Ask")}
-          </Button>
-        </div>
+        {/* THE ASK BUTTON'S OUTER FALLBACK — the one case R50 leaves it no
+            home inside `<PagedFind>`: a truly empty, unsearched record (that
+            row stands its WHOLE toolbar down at zero rows, actions slot
+            included, and asking is exactly what a person reaches for then).
+            The moment there IS a toolbar (any source at all), this wrapper
+            draws nothing and Ask lives in the toolbar's own `actions` slot
+            below instead — her ruling, 22 Sep 2026: "make ask a button in
+            the toolbar." Never mango (R84) — this tab has no title
+            component of its own to be the one legal home for that, so the
+            button reads `variant="inverse"` in both homes. */}
+        {loadedSources.length === 0 && (
+          <div className="flex justify-end">
+            <Button variant="inverse" className="gap-1" onClick={openAskConversation}>
+              <Sparkle className="size-4" aria-hidden />
+              {t("Ask")}
+            </Button>
+          </div>
+        )}
         {renderGallery()}
       </div>
     )
@@ -400,12 +498,21 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
         sorts={translatedSorts("knowledge", t)}
         defaultSort={knowledgeDefaultSort}
         restingEmpty={loadedSources.length === 0}
-        listKey={isApp ? sliceKey("knowledge-app", scope.appId) : knowledgeKey(teamId)}
-        fixed={isApp ? { appId: scope.appId } : activeTab === "all" ? undefined : { kind: activeTab }}
+        listKey={listKey}
+        fixed={
+          isApp
+            ? { appId: scope.appId }
+            : isAccount
+              ? { compartment: accountCompartment(scope.accountId) }
+              : activeTab === "all"
+                ? undefined
+                : { kind: activeTab }
+        }
         fetchPage={(query, cursor) =>
           contentApi.knowledge({ ...query, cursor }).then((r) => {
             if (scope.kind === "team") primeCache(knowledgeByKindKey(teamId), r.byKind)
-            else primeCache(totalKey("knowledge-app", scope.appId), r.total)
+            else if (isApp) primeCache(totalKey("knowledge-app", scope.appId), r.total)
+            else if (isAccount) primeCache(totalKey("knowledge-account", scope.accountId), r.total)
             return { rows: r.sources, nextCursor: r.nextCursor, total: r.total }
           })
         }
@@ -453,7 +560,19 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
             : undefined
         }
         actions={() =>
-          !canCreateKnowledge ? null : scope.kind === "team" && activeTab === "glossary" ? (
+          // ASK, INSIDE THE TOOLBAR NOW (22 Sep 2026 ruling, this file's own
+          // header says the rest) — the whole reason `isRecordHost` exists:
+          // this slot only ever draws once the standalone fallback above has
+          // already stood down (`loadedSources.length > 0`), so Ask is never
+          // offered twice. `variant="inverse"`, same reasoning as the
+          // fallback's own button — R84's one legal mango home is a screen's
+          // own title component, and this tab draws no title of its own.
+          isRecordHost ? (
+            <Button variant="inverse" className="gap-1" onClick={openAskConversation}>
+              <Sparkle className="size-4" aria-hidden />
+              {t("Ask")}
+            </Button>
+          ) : !canCreateKnowledge ? null : scope.kind === "team" && activeTab === "glossary" ? (
             <AddButton
               label={t("Add a word")}
               onClick={() => scope.go(scope.sectionPath, { tab: "glossary", panel: "add", module: "knowledge-glossary" })}
@@ -564,16 +683,22 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
                   title={
                     isApp
                       ? t("Nothing filed under this app yet.")
-                      : t("Nothing in the knowledge base yet.")
+                      : isAccount
+                        ? t("Nothing filed under this account yet.")
+                        : t("Nothing in the knowledge base yet.")
                   }
                   description={
                     isApp
                       ? t(
                           "Everything the assistant knows about this app will show up here: its tickets, process maps and meetings, and anything filed against it by hand."
                         )
-                      : t(
-                          "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
-                        )
+                      : isAccount
+                        ? t(
+                            "Everything the assistant knows about this account will show up here: its tickets, meetings and sprints, and anything filed against it by hand."
+                          )
+                        : t(
+                            "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
+                          )
                   }
                   filtered={found.active}
                   onCreate={

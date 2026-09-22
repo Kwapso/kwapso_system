@@ -87,7 +87,7 @@ function inTheDatabase(where: string): string[] {
 const UNTYPED_IS_COMPANIES_ONLY = "account_type = 'entity'"
 
 describe("an accounts filter narrows the rows AND the count", () => {
-  it("unfiltered, it is the companies only — archived rows included", async () => {
+  it("unfiltered, it is the companies only — inactive rows included (never an archived one, see below)", async () => {
     const all = await findAccounts({})
     expect(all).toEqual(inTheDatabase(UNTYPED_IS_COMPANIES_ONLY))
     expect(all, "deactivate-never-delete: a put-away account is still listable").toContain("A_GONE_CO")
@@ -102,11 +102,16 @@ describe("an accounts filter narrows the rows AND the count", () => {
     expect(companies).not.toContain("A_LIVE_ONE")
   })
 
-  it("archived: either pile on its own — companies only, same as the unfiltered read", async () => {
-    expect(await findAccounts({ archived: "yes" })).toEqual(
+  // RENAMED FROM `archived` TO `inactive` (0117, 22 Sep 2026) — her ruling
+  // split one word into two states, and the wire word this suite's fixture
+  // (`deactivated_at`) answers to moved with it: `archived` now means her
+  // real, stronger `archived_at` state, proved in its own describe block
+  // below, against the SAME fixture with two more rows added for it.
+  it("inactive: either pile on its own — companies only, same as the unfiltered read", async () => {
+    expect(await findAccounts({ inactive: "yes" })).toEqual(
       inTheDatabase(`deactivated_at IS NOT NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
     )
-    expect(await findAccounts({ archived: "no" })).toEqual(
+    expect(await findAccounts({ inactive: "no" })).toEqual(
       inTheDatabase(`deactivated_at IS NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
     )
   })
@@ -114,7 +119,7 @@ describe("an accounts filter narrows the rows AND the count", () => {
   it("they compose — a search AND two filters is still one question", async () => {
     // "Confia" matches a company and a person; the type narrows it to the person,
     // and both of them are live.
-    expect(await findAccounts({ q: "Confia", type: "individual", archived: "no" })).toEqual(["A_LIVE_ONE"])
+    expect(await findAccounts({ q: "Confia", type: "individual", inactive: "no" })).toEqual(["A_LIVE_ONE"])
   })
 
   it("a filter that matches nothing says nothing — not everything", async () => {
@@ -123,15 +128,61 @@ describe("an accounts filter narrows the rows AND the count", () => {
 
   it("the EXPORT narrows by the same sentence — one filter, two doors", async () => {
     // The list and the CSV are built from one `accountsWhere`, so "export what
-    // I'm looking at" cannot mean something else. Proved on `archived`, as
+    // I'm looking at" cannot mean something else. Proved on `inactive`, as
     // search-literal.test.ts proves it for `q`. It used to be proved on `status`,
     // which 0042 retired — the sentence this test makes is about the SEAM, so it
     // holds on whichever filter is asked through it. UNTYPED, so the type
     // partition applies here too — the export is companies only, exactly like
     // the list above it.
-    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { archived: "yes" })
+    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { inactive: "yes" })
     expect(rows.map((r) => r.id).sort()).toEqual(
       inTheDatabase(`deactivated_at IS NOT NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
+    )
+  })
+})
+
+// HER ARCHIVED (0117, 22 Sep 2026) — a second, stronger, INDEPENDENT state.
+// Two more rows join the fixture: one archived company (also inactive, to
+// prove archiving does not require or imply deactivating first) and one
+// archived person, so the same two questions `UNTYPED_IS_COMPANIES_ONLY`
+// answers for the pile above can be asked of this one too.
+describe("an archived account is excluded by default, and is its own pile on its own filter", () => {
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, status, deactivated_at, archived_at, created_at, creator_id) VALUES
+         ('A_ARCHIVED_CO',  'entity',     'Retired Freight Ltd', 'R1', 'past_client', '2026-03-01', '2026-03-02', '2026-01-05', '${IDS.staffUser}'),
+         ('A_ARCHIVED_ONE', 'individual', 'Old Contact',         'R2', 'past_client', NULL,         '2026-03-03', '2026-01-06', '${IDS.staffUser}');`
+    )
+  })
+
+  it("the default (no `archived` sent at all) excludes it — every OTHER filter still applies around it", async () => {
+    const all = await findAccounts({})
+    expect(all).not.toContain("A_ARCHIVED_CO")
+    expect(all).toEqual(inTheDatabase(`${UNTYPED_IS_COMPANIES_ONLY} AND archived_at IS NULL`))
+    // Explicit `inactive: "yes"` (her OTHER state) still excludes the archived
+    // row too — the two questions are independent, and archived wins.
+    const inactiveOnly = await findAccounts({ inactive: "yes" })
+    expect(inactiveOnly).not.toContain("A_ARCHIVED_CO")
+    expect(inactiveOnly).toContain("A_GONE_CO")
+  })
+
+  it("`archived: \"yes\"` is the one way in, and it ignores the type/inactive defaults around it except type itself", async () => {
+    const archived = await findAccounts({ archived: "yes" })
+    expect(archived).toEqual(inTheDatabase(`archived_at IS NOT NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`))
+    expect(archived).toEqual(["A_ARCHIVED_CO"])
+    // The person pile, asked explicitly — `type` still narrows within the
+    // archived pile, exactly as it does within the live one.
+    expect(await findAccounts({ archived: "yes", type: "individual" })).toEqual(["A_ARCHIVED_ONE"])
+  })
+
+  it("the EXPORT excludes it by the same default, and includes it only when asked", async () => {
+    const { rows: defaultRows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, {})
+    expect(defaultRows.map((r) => r.id)).not.toContain("A_ARCHIVED_CO")
+    const { rows: archivedRows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, {
+      archived: "yes",
+    })
+    expect(archivedRows.map((r) => r.id).sort()).toEqual(
+      inTheDatabase(`archived_at IS NOT NULL AND ${UNTYPED_IS_COMPANIES_ONLY}`)
     )
   })
 })

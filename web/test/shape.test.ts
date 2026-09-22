@@ -378,6 +378,9 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   nameNarrowsAlone: "unreviewed",
   accountManagerId: null,
   active: true,
+  // 0117 — her stronger, independent state; default false (never archived)
+  // like every fixture that predates it, overridable through `over`.
+  archived: false,
   ...over,
 })
 

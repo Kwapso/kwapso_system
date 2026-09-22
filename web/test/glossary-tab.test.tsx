@@ -268,7 +268,19 @@ describe("the Glossary tab is wired into the Knowledge screen (source-read proof
     // identical seam every other kind tab already narrows by (`fixed={{
     // kind: activeTab }}` a few lines above this screen's own glossary
     // branch), so a search on this tab only ever searches glossary words.
-    expect(src).toMatch(/fixed=\{isApp \? \{ appId: scope\.appId \} : activeTab === "all" \? undefined : \{ kind: activeTab \}\}/)
+    // MATCHED BY ITS PARTS, NOT AS ONE FROZEN LINE, 22 Sep 2026. This was one
+    // regex over the whole ternary spelled on a single line. The expression
+    // grew a third arm the day the account scope landed, and prettier put it
+    // across nine lines, so a check about WHICH FILTER THE GLOSSARY TAB SENDS
+    // went red over the shape of an unrelated branch. What this law actually
+    // owns is the last arm: a kind tab narrows the door by its own kind, and
+    // the All tab narrows by nothing. The host arms above it belong to their
+    // own tests. Each part is asserted on its own so a fourth arm cannot break
+    // this one either.
+    const fixedProp = src.slice(src.indexOf("fixed={"), src.indexOf("fetchPage="))
+    expect(fixedProp, "the glossary tab must narrow the door by its own kind").toMatch(
+      /activeTab === "all"[\s\S]*\?\s*undefined[\s\S]*:\s*\{ kind: activeTab \}/
+    )
   })
 
   it("load-more is the same LoadMore every other tab pages with", () => {

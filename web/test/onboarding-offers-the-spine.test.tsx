@@ -4,16 +4,25 @@
 // can change it during the onboarding or anytime at settings". Two halves, and
 // this suite locks the half a screen can get wrong in silence.
 //
+// MANGO RETIRED, 22 SEP 2026 — "reduce backgorund options to only balck or
+// paper (rmoeve mango)". `DEFAULT_SPINE` moved to `paper` the same day
+// (shared/spine.ts's own header has the full reasoning); this suite now
+// asserts the CURRENT fallback rather than the 2026-09-02 one, and adds a
+// case for a row still holding the retired `mango` value, the same shape it
+// already held for the retired `quiet` value below.
+//
 // WHAT IS ACTUALLY AT RISK HERE, and why it is a suite rather than a glance:
 //
-// 1. THE DEFAULT ITSELF. `DEFAULT_SPINE` was paper until this ruling, on a
-//    written argument that a person who never opened Settings should keep the
-//    rail they always had. The argument was overruled, not forgotten
-//    (shared/spine.ts keeps it), and a value that was reversed once by a person
-//    is the kind that gets reversed back by a merge.
+// 1. THE DEFAULT ITSELF. `DEFAULT_SPINE` was paper before the 2026-09-02
+//    ruling, on a written argument that a person who never opened Settings
+//    should keep the rail they always had; that ruling overruled it in favour
+//    of mango, and the 22 Sep 2026 mango retirement moved the fallback back to
+//    paper as a MECHANICAL consequence (mango is not a `Spine` any more), not
+//    a re-litigation of the argument (shared/spine.ts keeps both in full). A
+//    value that has moved twice is the kind that gets moved back by a merge.
 //
 // 2. TAKING THE DEFAULT MUST WRITE NOTHING. `users.spine` NULL means "never
-//    chosen" and is kept distinct from a deliberate mango, exactly as `scale`
+//    chosen" and is kept distinct from a deliberate choice, exactly as `scale`
 //    and `language` are. A screen that posted the value it happened to be
 //    showing would destroy that distinction for every person who ever onboards
 //    — and it would do it invisibly, because the rail would look identical.
@@ -119,13 +128,13 @@ beforeEach(() => {
   setSpine.mockResolvedValue({})
 })
 
-describe("the ruling's first half — mango is what an unset spine means", () => {
-  it("is the fallback, so a person who never chooses lands on the brand rail", () => {
-    expect(DEFAULT_SPINE).toBe("mango")
-    expect(toSpine(null)).toBe("mango")
-    expect(toSpine(undefined)).toBe("mango")
+describe("the ruling's first half — paper is what an unset spine means, since 22 Sep 2026", () => {
+  it("is the fallback, so a person who never chooses lands on paper", () => {
+    expect(DEFAULT_SPINE).toBe("paper")
+    expect(toSpine(null)).toBe("paper")
+    expect(toSpine(undefined)).toBe("paper")
     // …and an unrecognised value still costs a rail, never a screen.
-    expect(toSpine("not-a-spine")).toBe("mango")
+    expect(toSpine("not-a-spine")).toBe("paper")
   })
 
   it("costs a retired 'quiet' row its rail, never its screen", () => {
@@ -133,19 +142,26 @@ describe("the ruling's first half — mango is what an unset spine means", () =>
     // 2026-09-03) and is not a spine any more — no migration resurrects it,
     // it falls through to the ordinary catch-all like any other unrecognised
     // value (shared/spine.ts). A row still holding it is not a broken row.
-    expect(toSpine("quiet")).toBe("mango")
+    expect(toSpine("quiet")).toBe("paper")
+  })
+
+  it("costs a retired 'mango' row its rail too, never its screen", () => {
+    // `mango` was the fallback itself for three weeks (2026-09-02 to 22 Sep
+    // 2026) and is not a spine any more — the identical discipline as
+    // `quiet` above, no special-case migration, just the ordinary catch-all
+    // (shared/spine.ts's own header names this exact case).
+    expect(toSpine("mango")).toBe("paper")
   })
 })
 
 describe("the ruling's second half — the choice is on the onboarding screen", () => {
-  it("draws all three, with the default already set", async () => {
+  it("draws both, with the default already set", async () => {
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
 
-    expect(spineCards()).toHaveLength(3)
+    expect(spineCards()).toHaveLength(2)
     expect(checkedOf("Ink")).toBe("false")
-    expect(checkedOf("Paper")).toBe("false")
-    expect(checkedOf("Mango")).toBe("true")
+    expect(checkedOf("Paper")).toBe("true")
   })
 
   it("opens on the spine this person already has, not on the default", async () => {
@@ -156,12 +172,20 @@ describe("the ruling's second half — the choice is on the onboarding screen", 
     expect(checkedOf("Ink")).toBe("true")
   })
 
-  it("opens on mango when the stored value is the retired 'quiet'", async () => {
+  it("opens on paper when the stored value is the retired 'quiet'", async () => {
     me.mockResolvedValue({ user: { ...fresh, spine: "quiet" } })
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
 
-    expect(checkedOf("Mango")).toBe("true")
+    expect(checkedOf("Paper")).toBe("true")
+  })
+
+  it("opens on paper when the stored value is the retired 'mango'", async () => {
+    me.mockResolvedValue({ user: { ...fresh, spine: "mango" } })
+    render(<OnboardingPage />)
+    await screen.findByLabelText(/first name/i)
+
+    expect(checkedOf("Paper")).toBe("true")
   })
 })
 
@@ -178,7 +202,7 @@ describe("what the submit posts", () => {
   it("writes nothing when they press the card that is already set", async () => {
     render(<OnboardingPage />)
     await screen.findByLabelText(/first name/i)
-    fireEvent.click(card("Mango"))
+    fireEvent.click(card("Paper"))
     await fillAndSubmit()
 
     await waitFor(() => expect(updateProfile).toHaveBeenCalledTimes(1))

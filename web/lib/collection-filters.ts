@@ -85,17 +85,25 @@ const YES_NO: FacetOption[] = [
 ]
 
 /** ACCOUNTS' OWN "Status" — the SAME door parameter as `YES_NO` above
- * (`archived`, `AccountFilters.archived`), worded the way a reader asks the
+ * (`inactive`, `AccountFilters.inactive`), worded the way a reader asks the
  * question rather than the way the column is named. Client ruling, 14 Sep
  * 2026: "filter by account manager, country, status" — and the account's
- * only real status word IS the archive flag (0042: a separate `status` column
- * was removed for saying the same thing twice, `workers/tenancy/src/lib/
- * accounts.ts`'s own header carries the finding). A dedicated pair rather
+ * only real status word IS the deactivate flag (0042: a separate `status`
+ * column was removed for saying the same thing twice, `workers/tenancy/src/
+ * lib/accounts.ts`'s own header carries the finding). A dedicated pair rather
  * than `YES_NO` because "No"/"Yes" answers a question this control never
- * asks out loud — the label is "Status", not "Archived?". */
+ * asks out loud — the label is "Status", not "Inactive?".
+ *
+ * RENAMED FROM `archived` TO `inactive` (0117, 22 Sep 2026) — the same day a
+ * real, stronger `archived` state joined `AccountFilters`. This facet answers
+ * her INACTIVE (unchanged meaning: its own tab, excluded from pickers, still
+ * opens in full at a held URL); her ARCHIVED is a separate, stronger state
+ * that this facet does not and should not expose — it has its own tab
+ * instead (`accounts-screen.tsx`), matching how Inactive is offered, not a
+ * filter dropdown a caller could otherwise widen past. */
 const ACCOUNT_STATUS: FacetOption[] = [
   { value: "no", label: "Active" },
-  { value: "yes", label: "Archived" },
+  { value: "yes", label: "Inactive" },
 ]
 
 /** THE PAGED COLLECTIONS' door filters, keyed by the collection's name in
@@ -122,7 +130,7 @@ const ACCOUNT_STATUS: FacetOption[] = [
  * vocabulary the account form offers. */
 export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   accounts: [
-    { field: "archived", label: "Status", options: ACCOUNT_STATUS },
+    { field: "inactive", label: "Status", options: ACCOUNT_STATUS },
     // WHO IS RESPONSIBLE — a ROW facet: the door matches a `team_members` user
     // id (`AccountFilters.manager`), so this file declares no options and the
     // screen fills them in from `assignableMembers`, the same staff picker the

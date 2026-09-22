@@ -161,6 +161,7 @@ import { purposesKey } from "@/lib/live-resources"
 import { content as contentApi, tenancy } from "@/lib/api"
 import type { MeetingPurpose, SelectableValue } from "@shared/types"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { selectableFieldWords } from "@shared/selectable-where"
 
 /** What every block on a module's settings page has, whatever it draws. */
 type ModuleSettingsSectionBase = {
@@ -282,12 +283,15 @@ export type ModuleSettingsSection =
        * `types`/`create`/`colour` are facts about a `selectable_data` group
        * and mean nothing beside a table that is not one), so this needed a
        * sibling rather than a `types: []` that would have shipped a
-       * `SettingsChoicesPanel` scope with nothing to narrow. STILL DRAWS ON
-       * THE "Choices" TAB, same as a vocabulary section does — the union
-       * member is about the DATA source, not the tab it appears on. No
-       * fields of its own: today there is exactly one meeting-types section
-       * and it is `MeetingTypesPanel`'s own concern
-       * (`web/components/team/internal-screens.tsx`) to fetch and shape. */
+       * `SettingsChoicesPanel` scope with nothing to narrow. DRAWS ITS OWN
+       * TYPE TAB, same as a vocabulary section's own type does (22 Sep 2026
+       * — `typeTabValue`'s own header, above `ModuleSettingsScreen`, has the
+       * ruling that retired the single shared "Choices" tab this comment
+       * used to name) — the union member is about the DATA source, not
+       * which tab it lands on. No fields of its own: today there is exactly
+       * one meeting-types section and it is `MeetingTypesPanel`'s own
+       * concern (`web/components/team/internal-screens.tsx`) to fetch and
+       * shape. */
       kind: "meetingTypes"
     })
   | (ModuleSettingsSectionBase & {
@@ -935,6 +939,60 @@ export function moduleSettingsIndex(
   })).filter((row) => row.sections.length > 0)
 }
 
+/** ONE TAB PER DECLARED CHOICE TYPE — REPLACES THE COMBINED "Choices" TAB
+ * THIS SCREEN USED TO DRAW. Aurora, 22 Sep 2026, verbatim: "on the
+ * settttings for each module, i think t owuld make more sense to have one
+ * tab for each choice type: fe: for tickets, instead of chocies do type
+ * (with type emoji) and so on everywhere. the choices tab with column for
+ * type shoudl only be on main settings (where theya re altogether) on each
+ * module should be the tab for each type." The combined table with its own
+ * type COLUMN survives exactly where she asked — the MAIN Settings screen
+ * (`settings-screen.tsx`'s own "choices" tab, unchanged) — because that is
+ * the one place several modules' vocabularies sit side by side and the
+ * column is the only thing telling their rows apart. A module's own page
+ * never has that problem (its own tab strip already says which type), so
+ * the column is redundant there and the whole combined tab is replaced by
+ * one tab per type instead.
+ *
+ * DERIVED OFF THE SECTIONS THIS READER MAY ALREADY SEE, never a hand-written
+ * list per module: `ModuleSettingsScreen` below walks `vocabularySections`'
+ * own `types` (plus `meetingTypesSection`'s one implicit type) into
+ * `choiceTypeTabs`, so a module that gains a type in `MODULE_SETTINGS` gains
+ * a tab without a second edit here.
+ *
+ * `typeTabValue` IS THE TAB'S IDENTITY, keyed off the TYPE'S OWN NAME rather
+ * than the generic field it fills — "Ticket type" and "Story type" both
+ * read as "Type" (`choiceTypeLabel` below), but they are two different
+ * modules' own vocabularies and need two different tab values. No two
+ * declared types share a name anywhere in this app (`shared/selectable-
+ * homes.ts`'s own keys are the proof), so the slug is unique by
+ * construction — never two tabs racing for one Radix `value` on one page. */
+function typeTabValue(type: string): string {
+  return type
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+/** THE TAB'S OWN WORD — the FIELD a type's values fill in on a record
+ * (`selectableFieldWords`, `shared/selectable-where.ts`), the identical
+ * derivation the general Choices table's own "Where" column already reads
+ * off `shared/selectable-homes.ts`, never typed a second time here. "Type"
+ * for a Ticket/Story/Phase type, "Department"/"Industry"/"Country" for
+ * those, "Stage"/"Kind" for Apps' two, "Category" for Brand's — her own
+ * worked example, word for word ("for tickets, instead of chocies do
+ * type"). Falls back to the type's own name for a group this app has never
+ * told `shared/selectable-homes.ts` where it lives — a render can never
+ * throw over a stray or historical group (the same refusal `shape.tsx`'s
+ * own `choiceFieldWord` already takes for the identical reason). */
+function choiceTypeLabel(type: string): string {
+  try {
+    return selectableFieldWords(type)?.[0] ?? type
+  } catch {
+    return type
+  }
+}
+
 export function ModuleSettingsScreen({
   active,
   segment,
@@ -1029,13 +1087,22 @@ export function ModuleSettingsScreen({
   //     so a module-scoped count reusing that same register is the
   //     established pattern, not a new one. The one case that register
   //     cannot cover is what THIS badge is for: a number BEFORE the panel
-  //     below it has mounted at all. `choiceValueCount` below is `undefined`
+  //     below it has mounted at all. `typeValueCount` below is `undefined`
   //     — `formatCount(undefined)` renders "", the same silence the general
   //     tab ships — whenever the source it would count from is still
   //     loading OR came back at the cap: a wrong number is worse than no
   //     number (the same refusal R23 makes for an uncited answer and R42
   //     makes for an unreadable file), and the day that cap is actually
   //     reachable this badge goes quiet rather than lying about it.
+  //
+  //     SPLIT ONE TYPE FURTHER, 22 Sep 2026. The combined "choices" tab this
+  //     badge used to sit on is gone (this file's own `typeTabValue` header,
+  //     above `ModuleSettingsScreen`); the arithmetic is unchanged, only
+  //     read PER TYPE now (`typeValueCount(type)`, below) rather than
+  //     summed across every type on the page — the same "counts the rows
+  //     the panel below it lists" rule the 15 Sep 2026 ruling above already
+  //     established, followed one tab further now that there is one panel
+  //     per type instead of one panel per page.
   const automationsCount = AUTOMATIONS.filter((a) => a.segment === segment).length
   const selectableQ = useCached<SelectableValue[]>(
     vocabularySections.length > 0 && teamId ? `selectable:${teamId}` : null,
@@ -1045,22 +1112,32 @@ export function ModuleSettingsScreen({
     meetingTypesSection && teamId ? purposesKey(teamId) : null,
     () => contentApi.meetingPurposes().then((r) => r.purposes)
   )
-  const choiceGroups = new Set(vocabularySections.flatMap((s) => s.types))
-  const selectableValueCount =
-    vocabularySections.length === 0
-      ? 0
-      : selectableQ.data === undefined || selectableQ.data.length >= LIST_HARD_CAP
-        ? undefined
-        : selectableQ.data.filter((v) => choiceGroups.has(v.type)).length
-  const meetingTypeValueCount = !meetingTypesSection
-    ? 0
-    : purposesQ.data === undefined || purposesQ.data.length >= LIST_HARD_CAP
+  // ── ONE TAB PER TYPE — see `typeTabValue`/`choiceTypeLabel`'s own header,
+  // above `ModuleSettingsScreen`. Built off `vocabularySections` (already
+  // filtered to what THIS reader may see) plus `meetingTypesSection`'s one
+  // implicit type, in that order — the same order `MODULE_SETTINGS` already
+  // declares its sections in, never re-sorted.
+  const choiceTypeTabs: { value: string; type: string; label: string }[] = vocabularySections.flatMap((s) =>
+    s.types.map((type) => ({ value: typeTabValue(type), type, label: choiceTypeLabel(type) }))
+  )
+  // MEETING TYPE — not a `selectable_data` group (this file's own
+  // `ModuleSettingsSection` header, "the third kind"), so it carries no real
+  // `type` string for `SettingsChoicesPanel` to scope on; `""` is a sentinel
+  // `renderPanel` below reads to draw `MeetingTypesPanel` instead. Its own
+  // word is "Type" too — the same field, a different table.
+  if (meetingTypesSection) choiceTypeTabs.push({ value: "meeting-type", type: "", label: t("Type") })
+
+  // ONE COUNT PER TYPE, R16 — a badge counts what its OWN tab lists, never a
+  // combined total that used to sit on one shared "Choices" tab. Same
+  // ceiling logic as before (`LIST_HARD_CAP`): a loaded list at the cap
+  // could be undercounting, so the badge goes quiet (`formatCount(undefined)`
+  // renders "") rather than lying.
+  function typeValueCount(type: string): number | undefined {
+    if (type === "") return purposesQ.data === undefined || purposesQ.data.length >= LIST_HARD_CAP ? undefined : purposesQ.data.length
+    return selectableQ.data === undefined || selectableQ.data.length >= LIST_HARD_CAP
       ? undefined
-      : purposesQ.data.length
-  const choiceValueCount =
-    selectableValueCount === undefined || meetingTypeValueCount === undefined
-      ? undefined
-      : selectableValueCount + meetingTypeValueCount
+      : selectableQ.data.filter((v) => v.type === type).length
+  }
 
   const tabs: TabItem[] = []
   if (automationsSection)
@@ -1071,19 +1148,17 @@ export function ModuleSettingsScreen({
       badge: formatCount(automationsCount),
       badgeVariant: "" as const,
     })
-  if (vocabularySections.length > 0 || meetingTypesSection)
+  // THE GLOSSARY'S OWN WORD, ONE TAB PER TYPE — Aurora, 22 Sep 2026,
+  // verbatim: "instead of chocies do type (with type emoji) and so on
+  // everywhere." Replaces the single combined "Choices" tab this screen used
+  // to draw here (see `typeTabValue`'s own header for the ruling in full and
+  // why the combined shape survives only on the MAIN Settings screen).
+  for (const ct of choiceTypeTabs)
     tabs.push({
-      // THE GLOSSARY'S OWN WORD (`shared/glossary.ts`, `dropdownValues.term`),
-      // never "Choice components" — the client asked for "whatever the
-      // standard term in the industry is", and CLAUDE.md's voice rule
-      // (warm, plain, no jargon, the glossary's own words) already answers
-      // that question in the other direction: "picklist" / "option set" /
-      // "reference data" are exactly the jargon that rule refuses, and this
-      // app already has a plain word for the same concept, used nowhere else.
-      value: "choices",
-      label: t("Choices"),
+      value: ct.value,
+      label: t(ct.label),
       icon: "",
-      badge: formatCount(choiceValueCount),
+      badge: formatCount(typeValueCount(ct.type)),
       badgeVariant: "" as const,
     })
   // PHASE DAYS — its own tab, seven fixed numbers rather than a vocabulary a
@@ -1101,9 +1176,20 @@ export function ModuleSettingsScreen({
   // Remembered per address (`/settings/<segment>`), like every other tab
   // strip in the app — a visit to Ticket settings and a visit to Account
   // settings do not share one memory slot.
+  //
+  // REVIVED AGAINST THE CURRENT TAB SET, not accepted blindly — `useRemembered`'s
+  // own contract for exactly this case ("a tab that no longer exists on this
+  // record" — shared/web/remembered.tsx). The combined "choices" tab this
+  // screen used to draw is gone (replaced by the per-type tabs above), so a
+  // saved memory still holding that word — from five minutes ago or five
+  // weeks — must land somewhere real rather than a blank panel with no tab
+  // selected. Checked against `tabs` itself rather than hand-listing the
+  // retired value, so ANY tab that stops existing (a type renamed, a section
+  // regated) revives the same honest way.
   const [tab, setTab] = useRemembered<string>(
     "tab",
-    automationsSection ? "automations" : phaseDaysSection ? "phaseDays" : "choices"
+    automationsSection ? "automations" : phaseDaysSection ? "phaseDays" : (choiceTypeTabs[0]?.value ?? "automations"),
+    (remembered) => (typeof remembered === "string" && tabs.some((t) => t.value === remembered) ? remembered : undefined)
   )
 
   // AN ADDRESS NOBODY HAS A PAGE FOR, and one a reader may not see, land in the
@@ -1167,84 +1253,67 @@ export function ModuleSettingsScreen({
                 scope={{ kind: "module", segment, title: t(page.title) }}
               />
             ) : null
-          if (panel.value === "choices")
-            // ── ONE EDITOR, TWO SCOPES — 15 SEP 2026 ─────────────────────
-            // This used to mount `SelectableScreen` (this file's own header,
-            // "never a second editor") — true the day it was written, and
-            // it stopped being true the day `SettingsChoicesPanel` shipped
-            // as the general Choices tab's OWN editor, one day before this
-            // change: two components drawing one concept is the exact drift
-            // that sentence exists to refuse. `SettingsChoicesPanel`'s
-            // `scope` prop (settings-choices-panel.tsx's own header, "the
-            // one module-settings allowed edit here") is what makes this
-            // file's editor and that one the SAME editor again — narrowed to
-            // THIS page's segment, which already covers every vocabulary
-            // section it owns (there is at most one per page today; see
-            // `MODULE_SETTINGS`'s own header), so this is one mounting
-            // rather than a `.map` over sections the way `SelectableScreen`
-            // needed.
-            //
-            // AND A SECOND, DIFFERENT COMPONENT BESIDE IT ON THE SAME TAB —
-            // `meetingTypesSection`, this file's own third `kind`. The tab
-            // is "Choices" because that is what the reader is looking for,
-            // not because one table backs everything under it; the Meetings
-            // page is the one place today that draws both halves at once
-            // (though it in fact only ever has one, `meetingTypesSection`),
-            // stacked the same way two vocabulary sections used to stack
-            // before Task B narrowed that to one `SettingsChoicesPanel` call.
-            return (
-              <div className="flex flex-col gap-8">
-                {vocabularySections.length > 0 && (
-                  <SettingsChoicesPanel
-                    teamId={teamId}
-                    can={can}
-                    scope={{
-                      segment,
-                      // ── THE IMPORT DOOR, THIS PAGE'S OWN — 11 SEP 2026 ──
-                      // Unchanged in substance from the `SelectableScreen`
-                      // mounting this replaces: *"each module's settings
-                      // page gets its own import and export for its own
-                      // groups… nothing sits outside Settings"* (client
-                      // ruling). The groups are every vocabulary section's
-                      // own `types` (usually one section, occasionally two —
-                      // Accounts owns Industry and Country in ONE section
-                      // already, so this is the same union `section.types`
-                      // alone used to be).
-                      onImport: () =>
-                        openInNewTab(
-                          `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(
-                            vocabularySections.flatMap((s) => s.types).join(",")
-                          )}`,
-                          // NO PER-GROUP WORD TO GIVE IT — see
-                          // `IMPORT_TARGET_LABEL`'s own note: the scope here
-                          // lives in `?groups=`, which the tab store never
-                          // sees (its identity is the bare pathname), so a
-                          // richer label here would only be clobbered back
-                          // to "Import" the moment `deep-link-screen.tsx`'s
-                          // own crumb effect runs. Passing the same word it
-                          // will settle on keeps this a single paint rather
-                          // than a flash.
-                          t("Import")
-                        ),
-                    }}
-                  />
-                )}
-                {/* MEETING TYPES — its own adapter, not `selectable_data`
-                    (this file's `kind: "meetingTypes"` header). `?groups=`
-                    is `selectable_data`'s own import door's argument and
-                    means nothing to `meeting_purposes`'s import target
-                    (`workers/data-ops/src/lib/targets.ts`, keyed by table),
-                    so this passes the bare wizard address rather than
-                    reusing the vocabulary sections' URL. */}
-                {meetingTypesSection && (
-                  <MeetingTypesPanel
-                    teamId={teamId}
-                    can={can}
-                    onImport={() => openInNewTab(`/t/${teamId}/import/meeting_purposes`, t("Import"))}
-                  />
-                )}
-              </div>
-            )
+          // ── ONE EDITOR, NARROWED ONE TYPE FURTHER — 22 SEP 2026 ─────────
+          // Used to be one shared "choices" panel value stacking every
+          // vocabulary section (`vocabularySections.length` was at most one
+          // per page, but Accounts/Apps each fold two TYPES into that one
+          // section) plus `meetingTypesSection` beside it. Now every TYPE
+          // gets its own tab value (`choiceTypeTabs`, above), so this reads
+          // which one `panel.value` names and mounts exactly that type's own
+          // narrowed `SettingsChoicesPanel` — still the SAME editor
+          // (`scope` prop, settings-choices-panel.tsx's own header, "the one
+          // module-settings allowed edit here"), narrowed one step further
+          // than before (`scope.type`, that file's own header has the new
+          // paragraph). `meetingTypesSection`'s one type is the sentinel
+          // `""` (never a real `selectable_data` group, this file's own
+          // `ModuleSettingsSection` header) and draws `MeetingTypesPanel`
+          // instead, exactly as it always has, just on its own tab now
+          // rather than stacked under a shared one.
+          {
+            const typeTab = choiceTypeTabs.find((ct) => ct.value === panel.value)
+            if (typeTab && typeTab.type === "" && meetingTypesSection)
+              // MEETING TYPES — its own adapter, not `selectable_data` (this
+              // file's `kind: "meetingTypes"` header). `?groups=` is
+              // `selectable_data`'s own import door's argument and means
+              // nothing to `meeting_purposes`'s import target
+              // (`workers/data-ops/src/lib/targets.ts`, keyed by table), so
+              // this passes the bare wizard address rather than a groups one.
+              return (
+                <MeetingTypesPanel
+                  key={meetingTypesSection.key}
+                  teamId={teamId}
+                  can={can}
+                  onImport={() => openInNewTab(`/t/${teamId}/import/meeting_purposes`, t("Import"))}
+                />
+              )
+            if (typeTab && typeTab.type !== "")
+              return (
+                <SettingsChoicesPanel
+                  key={typeTab.value}
+                  teamId={teamId}
+                  can={can}
+                  scope={{
+                    segment,
+                    // THE TYPE THIS TAB, AND ONLY THIS TAB, DRAWS — see
+                    // settings-choices-panel.tsx's own header for what
+                    // narrowing this far turns off (the Where column, the
+                    // module/where facets, the dialog's own group step).
+                    type: typeTab.type,
+                    // ── THE IMPORT DOOR, THIS TYPE'S OWN — 11 SEP 2026,
+                    // narrowed from the whole page's `?groups=` (every type
+                    // on the page, joined) to just this one type, 22 Sep
+                    // 2026: a page with two types (Accounts, Apps) used to
+                    // hand the wizard both at once from either tab; now each
+                    // tab is its own type, so each imports its own type.
+                    onImport: () =>
+                      openInNewTab(
+                        `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(typeTab.type)}`,
+                        t("Import")
+                      ),
+                  }}
+                />
+              )
+          }
           // PHASE DAYS — the team's own defaults, the same seven-row panel a
           // wave's own Settings sheet draws (wave-phase-days-panel.tsx),
           // never a second editor for one fact. `TeamPhaseDayDefaultsPanel`

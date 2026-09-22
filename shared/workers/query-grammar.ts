@@ -366,6 +366,21 @@ const ACCOUNT: QueryField = {
   note: "the client this belongs to",
 }
 const APP: QueryField = { name: "appId", column: "app_id", type: "id", ref: "apps" }
+/** ACCOUNTS' OWN SECOND, STRONGER STATE (0117, Aurora's ruling 22 Sep 2026: "we
+ * have sttaus active, inactive and archived … archived are not visible
+ * anywhere"). `deactivatedAt`/`DEACTIVATED` above is her INACTIVE — unchanged,
+ * not put away here, so this generic door keeps answering about an inactive
+ * account exactly as it always has. This is the new column, and it IS the
+ * module's `putAway` field below: the one thing that must be invisible to
+ * every ordinary read, this one included, unless a caller asks for it by
+ * name — the same escape hatch `tickets`' own `archivedAt` above already
+ * gives a caller who wants the put-away ones on purpose. */
+const ACCOUNT_ARCHIVED: QueryField = {
+  name: "archivedAt",
+  column: "archived_at",
+  type: "date",
+  note: "set when the account was archived — a second, stronger state than deactivatedAt (inactive); isNull means it is not archived",
+}
 
 /* -------------------------------- the modules -------------------------------- */
 
@@ -775,6 +790,19 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
         "The address book is somebody's personal data; seeing who we work with is a separate " +
         "grant from seeing that we work with them.",
     },
+    // 0117 — ARCHIVED, not `deactivatedAt`/INACTIVE. `accountsWhere`
+    // (workers/tenancy/src/lib/accounts.ts) applies `archived_at IS NULL`
+    // unconditionally to every ordinary account read; this generic door
+    // carries the identical default through the SAME mechanism every other
+    // put-away module here uses, so "list accounts" from the assistant
+    // cannot surface a record every other surface has made invisible.
+    putAway: {
+      field: "archivedAt",
+      reason:
+        "the accounts door's own everyday reads are `archived_at IS NULL` — deleted-in-spirit, " +
+        "never in fact: the row, its people and its history all survive, and asking for " +
+        "archivedAt by name still finds it",
+    },
     fields: [
       ID,
       { name: "name", column: "name", type: "text" },
@@ -807,6 +835,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       CREATED,
       UPDATED,
       DEACTIVATED,
+      ACCOUNT_ARCHIVED,
     ],
   },
   apps: {

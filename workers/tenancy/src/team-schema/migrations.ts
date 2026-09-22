@@ -8203,6 +8203,63 @@ ALTER TABLE work_logs DROP COLUMN billable;
 ALTER TABLE accounts ADD COLUMN website TEXT;
 `,
   },
+  {
+    // ARCHIVED, ACCOUNTS' SECOND AND STRONGER STATE. Aurora's ruling, 22 Sep
+    // 2026, verbatim: "inactive is different than archived! Archived menas
+    // 'delated' (only that we cnnot delete). inactive meanse something els,
+    // its a status for accounts." And earlier the same day, the behaviour:
+    // "we have sttaus active, inactive and archived (archived is different
+    // than inactive, archived are not visible anywhere. however inactive
+    // have their own tab - but do not show in choice components but i can
+    // still see them and acces everything underneath, archived however are
+    // completley invisible."
+    //
+    // WHAT WAS ALREADY TRUE, verified before writing this: `deactivated_at`
+    // (0007) already behaves exactly like her INACTIVE — its own tab on the
+    // Accounts screen with its own exact count, every picker already asks
+    // for it (`AccountFilters`, renamed `inactive` at the door in this same
+    // round now that `archived` means something stronger — see
+    // workers/tenancy/src/routes/accounts.ts and lib/accounts.ts), and the
+    // detail read never filtered on it, so a held URL still opens the record
+    // and everything under it. That column and that behaviour are UNCHANGED
+    // by this migration — only the WORDS around it move (the button, the
+    // activity line, the glossary), in the same round, not in the schema.
+    //
+    // WHAT DID NOT EXIST: a state that hides a record from every surface a
+    // reader can reach. This migration adds it, as a SECOND nullable
+    // timestamp beside the first, shaped exactly like `deactivated_at`'s own
+    // four columns (0007's `deactivated_at`/`deactivator_id`/
+    // `deactivator_email`/`deactivator_name`) rather than a boolean or a
+    // reused `status` column — 0042 killed `status` for being a free-text
+    // second answer to a question one flag already answered, and reusing it
+    // here would be the identical mistake wearing a new name.
+    //
+    // TWO INDEPENDENT NULLABLE TIMESTAMPS, NOT ONE THREE-VALUE COLUMN,
+    // because they are independent facts, not one lifecycle: an account can
+    // be deactivated (its own tab, everything under it still opens) and
+    // later archived ON TOP of that, and un-archiving it has to hand back
+    // exactly the active/inactive state it carried before it was archived,
+    // never a guess reconstructed from one merged column. Every read this
+    // round applies `archived_at IS NULL` FIRST, ahead of and independent of
+    // `deactivated_at` — so an archived row never surfaces in the Active
+    // tab, the Inactive tab, or the unconditional All tab, only in its own
+    // Archived tab: the identical shape Inactive already holds relative to
+    // Active, one level stronger, and "matching how the existing one is
+    // offered" is Aurora's own instruction for the door this state gets.
+    //
+    // NUMBERED 0117, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0116 is the highest version on both the
+    // local tree and `origin/main` as of 22 Sep 2026, so 0117 is the next
+    // free number.
+    version: "0117_an_account_can_be_archived",
+    sql: `
+ALTER TABLE accounts ADD COLUMN archived_at TEXT;
+ALTER TABLE accounts ADD COLUMN archiver_id TEXT;
+ALTER TABLE accounts ADD COLUMN archiver_email TEXT;
+ALTER TABLE accounts ADD COLUMN archiver_name TEXT;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

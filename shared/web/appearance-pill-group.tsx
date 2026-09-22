@@ -57,6 +57,7 @@ import * as React from "react"
 import { type BadgeDot } from "@shared/ui/components/badge/badge"
 import { ThemeSwatch } from "@shared/ui/compositions/screens/settings"
 import { cn } from "@shared/ui/lib/utils"
+import { useLanguage } from "./language"
 
 export { ThemeSwatch }
 
@@ -204,12 +205,40 @@ function PillDot({ tone }: { tone: BadgeDot }) {
  * tokens.css's own comment): the kit's conformance law reads bare `rounded`
  * more narrowly than R31's own prose allows, so the swatch spells its
  * radius as a token like everything else here. */
-export function SpineSwatch({ spine }: { spine: "ink" | "paper" | "mango" }) {
+export function SpineSwatch({ spine }: { spine: "ink" | "paper" }) {
   return (
     <span
       aria-hidden="true"
       data-spine={spine}
       className="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-sm)] bg-[var(--spine-fill)] shadow-[var(--hairline)]"
     />
+  )
+}
+
+/** Size's own mark — a SPECIMEN, not a colour swatch. Aurora, 22 Sep 2026,
+ * over the side-by-side artifact: "i want each card to have some kind of
+ * preview (also for font size) ... do a speciment chip." The same two
+ * letters, `Aa`, set at the size that ONE option actually sells — never a
+ * fixed box scaled by a picture, the way `SpineSwatch`/`ThemeSwatch` are: a
+ * specimen's whole argument is that the pill grows with the text inside it.
+ * `--text-micro`/`--text-sm`/`--text-lg` (tokens.css) are the three type
+ * steps, never a literal px — the same "read a token, never invent a size"
+ * discipline `--radius-sm` and `--font-weight-bold` below already answer to.
+ * `bg-surface-panel` gives the chip a ground of its own inside the pill's
+ * own `bg-background`, the same paper-step boundary `settings-section.tsx`'s
+ * own header names as the kit's first remedy for a boundary, never a stroke. */
+export function ScaleSwatch({ step }: { step: "compact" | "default" | "large" }) {
+  const { t } = useLanguage()
+  const sizeClass = step === "compact" ? "text-micro" : step === "large" ? "text-lg" : "text-sm"
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-surface-panel px-1 leading-none text-foreground font-[var(--font-weight-bold)]",
+        sizeClass
+      )}
+    >
+      {t("Aa")}
+    </span>
   )
 }

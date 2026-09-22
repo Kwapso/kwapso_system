@@ -31,20 +31,18 @@
 // "so a person choosing needs it" (below) was actually asking for than the
 // menu it used to hide behind.
 //
-// LANGUAGE STAGES TOO NOW — REVERSED, 2026-09-17. "Keep language instant"
-// (above, kept as the historical record) held for three days. The client's
-// ruling, 2026-09-17, verbatim: "Delete these live preview updates as you
-// press a control, and also delete the language changes right away. Size,
-// Appearance, and Background: wait for Save. Actually, I want everything to
-// wait for the save. Nothing changes right away." So the one exception is
-// gone: this file no longer calls `setLang`, no longer calls `save`, no
-// longer shows its own toast, and no longer owns a `saving` state of its
-// own. It is now a plain, controlled pill row, the identical shape
-// `ScaleSection`/`ThemeSection`/`SpineSection` already take — `value` is the
-// PENDING language, `onChange` asks `AppearancePanel` to hold a different
-// one, and the panel is the one place that seeds the pending value from the
-// signed-in session, calls `saveLanguage` and `setLang` on Save, and shows
-// the result. See that file's own header for the fuller account.
+// STAGED FOR FIVE DAYS (2026-09-17 TO 22 SEP 2026), REVERSED BACK TO INSTANT.
+// "Keep language instant" (the 2026-09-14 ruling, below) held for three days,
+// was reversed 2026-09-17 ("I want everything to wait for the save. Nothing
+// changes right away"), and was reversed AGAIN 22 Sep 2026, this time for the
+// whole tab rather than for Language alone: "lets go back to when clicking it
+// gets implemented (without needing to save)." This file is back to the
+// identical shape it always returns to when instant: a plain, controlled
+// pill row — `value` is the CURRENT language, `onChange` asks
+// `AppearancePanel` to apply a different one at once — and the panel is the
+// one place that calls `saveLanguage` and `setLang`, immediately rather than
+// from a Save button. See that file's own header for the fuller account,
+// including how a failed persist is reverted.
 //
 // NO SUBTITLE, THE 2026-09-14 preview-led RULING. She quoted this section's
 // own two sentences back verbatim and asked for them gone: "remove subtitle
@@ -142,22 +140,15 @@ export function LanguageSection({
   })
 
   return (
-    /* R72 (no subtitle under a heading, unless she asked): the two sentences
-       that used to stand here — one above the control, one below it — are
-       both gone; see the header for the ruling and for where the coverage
-       number moved instead. No `SettingsSection` any more — the box is
-       `AppearancePanel`'s, one level up — just the same compact micro-label
-       `ScaleSection` / `ThemeSection` / `SpineSection` each draw, and the
-       control itself. */
-    <div className="flex flex-col gap-2">
-      <h3 className="text-muted-foreground text-micro uppercase">{t("Language")}</h3>
-      <AppearancePillGroup
-        options={options}
-        value={value}
-        disabled={disabled}
-        onValueChange={(next) => onChange(next as Language)}
-        ariaLabel={t("Language")}
-      />
-    </div>
+    /* R72 (no subtitle under a heading, unless she asked): no heading of its
+       own — `AppearancePanel`'s own row furniture (the name, the short line)
+       stands one level up now; this is only the pill row. */
+    <AppearancePillGroup
+      options={options}
+      value={value}
+      disabled={disabled}
+      onValueChange={(next) => onChange(next as Language)}
+      ariaLabel={t("Language")}
+    />
   )
 }

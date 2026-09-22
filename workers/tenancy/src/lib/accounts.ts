@@ -65,6 +65,10 @@ type AccountRow = {
    * global core database, `accounts` is in this team's own). */
   account_manager_user_id: string | null
   deactivated_at: string | null
+  /** 0117 — her ARCHIVED, a second and stronger state than `deactivated_at`
+   * (her INACTIVE, unchanged). See `accountsWhere`'s own header for the
+   * predicate every ordinary read applies. */
+  archived_at: string | null
   created_at: string
   creator_name: string | null
   updated_at: string | null
@@ -144,9 +148,18 @@ type AccountRow = {
  * ONLY FOR A PERSON. A company is nobody's contact, so the CASE keeps the
  * subquery off 24 of every 134 rows and keeps the answer honest rather than
  * empty-by-accident. */
+// 0117 — an ARCHIVED company is invisible everywhere, and the Contacts
+// table's own "Account" column is one of the everywheres: a contact whose
+// only link is to an archived company must read as unlinked (the em dash),
+// not name a record no list, picker or count will ever show again. The
+// `EXISTS` guard reads the linked company's own `archived_at` without a
+// second correlated SELECT for each of the three fields this subquery
+// answers (name, relationship, logo) — one more condition on the same WHERE,
+// not a second read.
 const LINKED_COMPANY = (field: string) => `CASE WHEN account_type = 'individual' THEN (
     SELECT ${field} FROM account_links l
      WHERE l.person_account_id = accounts.id AND l.deactivated_at IS NULL
+       AND EXISTS (SELECT 1 FROM accounts c WHERE c.id = l.account_id AND c.archived_at IS NULL)
      ORDER BY l.is_main_stakeholder DESC,
               (SELECT c.name FROM accounts c WHERE c.id = l.account_id) ASC,
               l.id ASC
@@ -161,6 +174,7 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
   currency, locale, timezone, commercials_visible, alt_names, name_narrows_alone,
   account_manager_user_id,
   deactivated_at,
+  archived_at,
   created_at, creator_name, updated_at, editor_name,
   ${LINKED_COMPANY("(SELECT c.name FROM accounts c WHERE c.id = l.account_id)")} AS company_name,
   ${LINKED_COMPANY("l.relationship")} AS relationship,
@@ -313,7 +327,16 @@ function toAccount(r: AccountRow, scope: AccountScope, sight?: ContactSight): Ac
     // "reads as an absence, not a confident no" the WHERE-level `portal`
     // filter already gives a caller who lacks `portal_users:read`.
     hasPortalLogin: maySeeLogins ? r.has_portal_login === 1 : null,
+    // INACTIVE, unchanged (0007) — `deactivated_at`. Her ruling, 22 Sep 2026,
+    // kept this exact meaning: its own tab, excluded from pickers, and a held
+    // URL still opens the record and everything under it.
     active: r.deactivated_at == null,
+    // ARCHIVED (0117) — a second, stronger flag, independent of `active`
+    // above: a record can be deactivated (inactive) and later archived on
+    // top of that, and un-archiving hands back exactly the active/inactive
+    // state it carried before, never a guess. See `accountsWhere`'s header
+    // for the predicate every ordinary read applies.
+    archived: r.archived_at != null,
     createdAt: r.created_at,
     createdByName: ours ? null : r.creator_name,
     updatedAt: r.updated_at,
@@ -348,14 +371,17 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
  * check to a client that can actually reach page two.
  *
  * `q` searches name, code and email. `type` narrows to entities or individuals.
- * Archived rows are included by default and carry `active` (the manager greys
- * them with a Restore button — the same shape as a retired role); `archived`
- * asks for one of the two piles on its own.
+ * INACTIVE rows are included by default and carry `active: false` (the
+ * manager greys them with a Restore button — the same shape as a retired
+ * role); `inactive` asks for one of the two piles on its own. ARCHIVED rows
+ * (0117, her stronger state) are EXCLUDED by default, unconditionally,
+ * regardless of every other filter here — `archived: "yes"` is the one way
+ * to ask for them, and nothing else on this door widens past that default.
  *
  * THERE WAS A `status` FILTER HERE, and it went with the field (0042). Whether
  * an account is active was being answered twice — by a free-text column that
- * drifted into four spellings of two ideas, and by the archive flag underneath
- * it — and the flag is the half that is true. */
+ * drifted into four spellings of two ideas, and by the deactivate flag
+ * underneath it — and the flag is the half that is true. */
 /** WHAT A CALLER MAY NARROW an accounts read to — the fence plus the four
  * filters, built ONCE so the paged list and the CSV export can never disagree
  * about what a filter means. They are the same question asked for a screen and
@@ -363,7 +389,21 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
 export type AccountFilters = {
   q?: string
   type?: "entity" | "individual"
-  /** "yes" = only the put-away ones, "no" = only the live ones, absent = both */
+  /** HER INACTIVE (unchanged, 0007's `deactivated_at`) — named `archived` on
+   * this door until this round, renamed the same day `archived` gained a
+   * second, stronger meaning (0117). "yes" = only the inactive ones, "no" =
+   * only the active ones, absent = both — but never an archived one either
+   * way, see `archived` below and `accountsWhere`'s own header. */
+  inactive?: "yes" | "no"
+  /** HER ARCHIVED (0117, `archived_at`) — not deleted, but invisible to every
+   * ordinary read. "yes" is the ONE way in: it asks for archived rows and
+   * NOTHING ELSE, ignoring `inactive`/`type`'s entity default and every
+   * other everyday narrowing, because an archived row's prior active/
+   * inactive state is not what this question is asking. Absent (or "no")
+   * is every other caller on this door, including one that never heard of
+   * this field, so `archived_at IS NULL` is the one filter nobody has to
+   * remember to ask for. See `accountsWhere`'s own header for the exact
+   * predicate. */
   archived?: "yes" | "no"
   parentId?: string
   /** WHO CAN SIGN IN — the contacts screen's second tab (client, 2026-09-09:
@@ -469,6 +509,22 @@ function accountsWhere(
   // The narrowing, first, so nothing below can widen past it.
   if (!sight.mayListPeople) filters.push("account_type = 'entity'")
 
+  // 0117 — ARCHIVED IS THE STRONG DEFAULT, checked here, before anything
+  // else. Aurora's ruling, 22 Sep 2026: "archived are not visible anywhere
+  // … archived however are completley invisible" — stronger than inactive,
+  // which still rides its OWN filter below and still shows on its own tab.
+  // `archived: "yes"` is the ONE deliberate exception, the Accounts screen's
+  // own Archived tab and nothing else on this door; every other caller —
+  // including every one written before this field existed — gets the
+  // exclusion for free, which is the whole point of a default: a picker, a
+  // search, a count or an export that never heard of `archived` still never
+  // sees an archived row. When the exception DOES fire, every other
+  // narrowing below still applies around it (search still searches, an
+  // untyped read is still companies-only) — asking for the archived pile is
+  // a real question about a real slice of the collection, not a blank
+  // check that bypasses the rest of this function.
+  filters.push(`archived_at IS ${opts.archived === "yes" ? "NOT NULL" : "NULL"}`)
+
   // A PERSON IS A CONTACT, PERIOD — NOT "A CONTACT UNLESS NOBODY LINKED HER
   // YET" (SCOPE ch.03, glossary "Contact": "the child rows linked under an
   // account are called its contacts … not a table"). Aurora ruled this
@@ -528,10 +584,14 @@ function accountsWhere(
     filters.push("account_type = ?")
     params.push(opts.type)
   }
-  // ARCHIVED IS A FILTER, NOT A FENCE. Both states stay listable (deactivate,
-  // never delete) — this only says which of the two the caller asked for, so the
-  // exact total beside it counts the same question the rows answer.
-  if (opts.archived) filters.push(`deactivated_at IS ${opts.archived === "yes" ? "NOT NULL" : "NULL"}`)
+  // INACTIVE (her ruling, unchanged since 0007) IS A FILTER, NOT A FENCE.
+  // Both active and inactive stay listable (deactivate, never delete) — this
+  // only says which of the two the caller asked for, so the exact total
+  // beside it counts the same question the rows answer. This wire word was
+  // `archived` until this round; renamed the same day `archived` (above)
+  // took on its new, stronger meaning, so a caller cannot ask this door two
+  // different questions with one word.
+  if (opts.inactive) filters.push(`deactivated_at IS ${opts.inactive === "yes" ? "NOT NULL" : "NULL"}`)
   // WHO CAN SIGN IN. A LIVE grant only — `portal_users` keeps the revoked row
   // (deactivate, never delete), so a membership test that ignored
   // `deactivated_at` would put every offboarded contact back on the In portal
@@ -1248,9 +1308,17 @@ export async function setAccountParent(
   return true
 }
 
-/** Archive / restore an account. R17: the current-status predicate rides the
- * UPDATE, so a double-clicked Archive moves zero rows the second time — no
- * duplicate history row, and the route publishes nothing. */
+/** Deactivate / reactivate an account — her INACTIVE (unchanged meaning,
+ * 22 Sep 2026 ruling). R17: the current-status predicate rides the UPDATE,
+ * so a double-clicked Deactivate moves zero rows the second time — no
+ * duplicate history row, and the route publishes nothing.
+ *
+ * THE WORDS CHANGED HERE, NOT THE COLUMN. This function, its activity line
+ * and the button that calls it all used to say "archive"/"archived" — true
+ * English for "put away", and wrong the moment a REAL archived state (0117,
+ * `setAccountArchived` below) exists to mean something stronger. `deactivated_at`
+ * itself, the WHERE clauses and the R17 shape are byte-identical to before
+ * this round; only the words a person reads changed. */
 export async function setAccountActive(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1280,8 +1348,59 @@ export async function setAccountActive(
   if (!changed[0]) return false
 
   await logActivity(cfg, guard.databaseId, actor, {
-    type: active ? "Account restored" : "Account archived",
-    description: `${actor.name} ${active ? "restored" : "archived"} ${account.name}`,
+    type: active ? "Account reactivated" : "Account deactivated",
+    description: `${actor.name} ${active ? "reactivated" : "deactivated"} ${account.name}`,
+    relatedTable: "accounts",
+    relatedRowId: id,
+  })
+  return true
+}
+
+/** Archive / unarchive an account — her ARCHIVED (0117, 22 Sep 2026 ruling),
+ * a second and STRONGER state than `setAccountActive` above, independent of
+ * it: this touches `archived_at`/`archiver_*` only, never `deactivated_at`,
+ * so unarchiving hands the record back to EXACTLY the active/inactive state
+ * it carried before — never a guess reconstructed from one merged column.
+ *
+ * NEVER DELETED — her own words, verbatim: "Archived menas 'delated' (only
+ * that we cnnot delete)." The row, its people (`account_links`) and its
+ * history (`logActivity`, right here) all survive; only every ORDINARY
+ * read stops finding it (`accountsWhere`'s own header has the full list of
+ * doors this closes).
+ *
+ * R17, same shape as `setAccountActive`: the current-status predicate rides
+ * the UPDATE, so a double-clicked Archive moves zero rows the second time. */
+export async function setAccountArchived(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  archived: boolean
+): Promise<boolean> {
+  const account = await accountOrThrow(cfg, guard, scope, id)
+  const fence = accountScopeClause(scope, "id")
+  const now = new Date().toISOString()
+
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    archived
+      ? `UPDATE accounts SET archived_at = ?, archiver_id = ?, archiver_email = ?,
+           archiver_name = ?, updated_at = ?
+         ${where([fence.sql, "id = ?", "archived_at IS NULL"])} RETURNING id`
+      : `UPDATE accounts SET archived_at = NULL, archiver_id = NULL, archiver_email = NULL,
+           archiver_name = NULL, updated_at = ?
+         ${where([fence.sql, "id = ?", "archived_at IS NOT NULL"])} RETURNING id`,
+    archived
+      ? [now, actor.id, actor.email, actor.name, now, ...fence.params, id]
+      : [now, ...fence.params, id]
+  )
+  if (!changed[0]) return false
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: archived ? "Account archived" : "Account unarchived",
+    description: `${actor.name} ${archived ? "archived" : "unarchived"} ${account.name}`,
     relatedTable: "accounts",
     relatedRowId: id,
   })
@@ -1354,11 +1473,15 @@ export async function listAccountLinks(
     cfg,
     guard.databaseId,
     // R14 hard cap — a contact list is bounded; move to paging before this bites.
+    // 0117 — `p.archived_at IS NULL`: an ARCHIVED contact is invisible
+    // everywhere, this contacts panel included, the same way she keeps an
+    // INACTIVE one visible here on purpose (`l.deactivated_at` is read, not
+    // filtered — unchanged, her own "i can still see them … underneath").
     `SELECT l.id, l.account_id, l.person_account_id, p.name AS person_name,
             p.logo_url AS person_logo_url, l.relationship,
             l.is_main_stakeholder, l.deactivated_at
        FROM account_links l JOIN accounts p ON p.id = l.person_account_id
-       ${where([fence.sql, "l.account_id = ?"])}
+       ${where([fence.sql, "l.account_id = ?", "p.archived_at IS NULL"])}
       ORDER BY l.is_main_stakeholder DESC, (l.deactivated_at IS NULL) DESC, p.name ASC
       LIMIT ${LIST_HARD_CAP}`,
     [...fence.params, accountId]
@@ -1442,12 +1565,16 @@ export async function listPersonCompanies(
   }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap — a person belongs to a handful of companies.
+    // R14 hard cap — a person belongs to a handful of companies. 0117 —
+    // `c.archived_at IS NULL`: an ARCHIVED company is invisible everywhere,
+    // this contact's own Companies tab included (inactive stays visible on
+    // purpose, unchanged, `l.deactivated_at` read not filtered — the same
+    // asymmetry `listAccountLinks` above keeps).
     `SELECT l.id, l.account_id, l.person_account_id, c.name AS company_name,
             c.logo_url AS company_logo_url, l.relationship,
             l.is_main_stakeholder, l.deactivated_at
        FROM account_links l JOIN accounts c ON c.id = l.account_id
-       ${where([fence.sql, "l.person_account_id = ?"])}
+       ${where([fence.sql, "l.person_account_id = ?", "c.archived_at IS NULL"])}
       ORDER BY (l.deactivated_at IS NULL) DESC, c.name ASC
       LIMIT ${LIST_HARD_CAP}`,
     [...fence.params, personAccountId]
@@ -1468,7 +1595,7 @@ export async function listPersonCompanies(
  * SAME fence, so a contact's Companies tab badges the number its own list can
  * reach. Never `companies.length`: that is a capped read's ceiling wearing a
  * total's clothes. */
-async function countPersonCompanies(
+export async function countPersonCompanies(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
@@ -1478,7 +1605,15 @@ async function countPersonCompanies(
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM account_links${where([fence.sql, "person_account_id = ?"])}`,
+    // 0117 — joined to `accounts` so an archived company drops out of the
+    // count exactly as it drops out of `listPersonCompanies` above: a badge
+    // that counted differently from its own list is the loudest bug there is.
+    // `fence` still reads the bare `account_id` column (built for the
+    // unaliased table); `l.account_id` is the only column of that name in
+    // this join (`c` is `accounts`, which has no `account_id`), so it
+    // resolves unambiguously without re-qualifying the fence itself.
+    `SELECT COUNT(*) AS n FROM account_links l JOIN accounts c ON c.id = l.account_id
+      ${where([fence.sql, "c.archived_at IS NULL", "l.person_account_id = ?"])}`,
     [...fence.params, personAccountId]
   )
   return rows[0]?.n ?? 0
@@ -1497,7 +1632,12 @@ export async function countAccountLinks(
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM account_links${where([fence.sql, "account_id = ?"])}`,
+    // 0117 — joined to `accounts` so an archived CONTACT (the linked person)
+    // drops out of the count exactly as it drops out of `listAccountLinks`
+    // above. `fence`'s bare `account_id` still resolves unambiguously to
+    // `l.account_id` (`p`, the joined `accounts` row, has no such column).
+    `SELECT COUNT(*) AS n FROM account_links l JOIN accounts p ON p.id = l.person_account_id
+      ${where([fence.sql, "p.archived_at IS NULL", "l.account_id = ?"])}`,
     [...fence.params, accountId]
   )
   return rows[0]?.n ?? 0

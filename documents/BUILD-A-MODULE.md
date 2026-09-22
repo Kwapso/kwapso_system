@@ -559,9 +559,13 @@ write a per-module history query; `useRecordActivity("notes", id)`
 server-side by the module's read right, and hands back page one's rows *and* the
 door's exact total.
 
-The Overview tab is built from `auditItems(...)`
-(`web/lib/audit-overview.ts`), the shared audit block (created by/when, edited
-by/when, status) that keeps Overviews consistent across the app. The tabs render
+The Overview tab carries the record's **own** facts. Who made it and who last
+touched it are **not** among them: since 22 Sep 2026 those four live in the kit's
+ink footer Record column (`<RecordFooterBand audit={…}>`), and a detail that
+repeats them in Overview is drawing the same thing twice. Where you do want one
+audit fact in the list — knowledge keeps `Status` — take it BY NAME from
+`auditFields(...)` (`web/lib/audit-overview.ts`), never by its index in
+`auditItems(...)`; `web/test/audit-fields-by-name.test.ts` is the census. The tabs render
 through the library `TabsView` (knowledge-detail.tsx):
 
 ```tsx
@@ -661,7 +665,7 @@ LAYER 4 — web client + screen
 
 LAYER 5 — record detail  (a <module>.detail recipe, or web/components/<module>/<module>-detail.tsx)
 [ ] Facts + history only? A detail RECIPE gets R2 for free — try that before a component
-[ ] Bespoke detail renders TabsView + Overview (auditItems) + Activity (ActivityFeed) — R2
+[ ] Bespoke detail renders TabsView + Overview (the record's own facts — who/when is the footer's Record column, not a row here) + Activity (ActivityFeed) — R2
 [ ] Activity via useRecordActivity("<module>", id) — the ONE generic path (R5); no new history SQL
 [ ] Every record tab badged from the collection it reveals — Activity = formatCount(activity.total) (R8/R16);
     a tab that shows no collection gets a reasoned RECORD_TAB_COUNT_EXCEPTIONS line

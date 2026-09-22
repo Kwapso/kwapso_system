@@ -20,11 +20,16 @@
 // to land near it. `RECORD_HEAD_CONTAINER`
 // (shared/web/record-heading.tsx, folded into `RECORD_TITLE_TREATMENT`, so
 // every record head wearing R52's one constant already carries it) turns the
-// kit's own `[data-slot=title]` row into that container — the ONE element
-// that already holds both halves of this fold as descendants (the chip row
-// rides inside `title`, the buttons ride inside `actions`) — so a width read
+// kit's own header band (`[data-record-region=header]`, `RecordDetail`'s
+// Region 1) into that container, the element that holds every half of this
+// fold: `HeadActionsFoldMenu` (rides in `aboveTitle`, since kit v1.2.158) AND
+// the wide row (rides in `actions`, inside `<Title>`) alike. So a width read
 // here is a width read against the PANE the record head is drawn in, never
-// the window.
+// the window. RETARGETED 22 SEP 2026 from `[data-slot=title]`, which stopped
+// containing the chip row the same day the kit gave `aboveTitle` its own
+// slot; see `RECORD_HEAD_CONTAINER`'s own comment for the live bug that
+// caught it (two overflow triggers on one record head, the narrow one stuck
+// permanently visible with no container to query).
 //
 // THE BREAKPOINT — measured, not guessed. The wide row this fold answers for
 // is at most four controls at `--space-2h` (10px) gaps: two labelled
@@ -87,11 +92,12 @@
 // pairing its own `HeadActionsFoldMenu` (narrow) with a `RecordActionsMenu`
 // carrying the same `overflow` (wide), so a menu-only action (Archive on a
 // ticket, Edit on a story, Delete on a task) is reachable whether or not the
-// fold is showing. `account-detail.tsx`, `contact-detail.tsx`, `app-detail.tsx`,
-// `knowledge-detail.tsx`, `meeting-detail.tsx`, `process-detail.tsx`,
-// `member-screen.tsx`, `sprint-detail.tsx` and `wave-detail.tsx` all pass
-// their own `actions` to `RecordScreen` too — every one of them a candidate
-// for the same fold, none wired to it yet.
+// fold is showing. SINCE THEN, `account-detail.tsx`, `contact-detail.tsx`,
+// `app-detail.tsx`, `meeting-detail.tsx`, `process-detail.tsx`,
+// `member-screen.tsx`, `sprint-detail.tsx` and `wave-detail.tsx` have wired
+// the identical pair too. `knowledge-detail.tsx` is the one bespoke detail
+// still unwired, a candidate for the same fold whenever it grows more than
+// one standalone action beside its title.
 
 import * as React from "react"
 

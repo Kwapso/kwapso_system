@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 761 strings · 3 languages · 1538 of the entries below are hand-written seed.
+// 760 strings · 3 languages · 1542 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -115,7 +115,6 @@ export const CATALOGUE: Catalogue = {
   "Close": { de: "Schließen", es: "Cerrar", ca: "Tancar" },
   "Closed": { de: "Geschlossen", es: "Cerrado", ca: "Tancat" },
   "Companies": { de: "Unternehmen", es: "Empresas", ca: "Empreses" },
-  "Company": { de: "Unternehmen", es: "Empresa", ca: "Empresa" },
   "Complete": { de: "Abschließen", es: "Completar", ca: "Completar" },
   "Completed": { de: "Abgeschlossen", es: "Completado", ca: "Completat" },
   "Connect": { de: "Verbinden", es: "Conectar", ca: "Connectar" },

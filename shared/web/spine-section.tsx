@@ -17,16 +17,26 @@
 // preview beside this group now; the three cards below carry only the name
 // and the ring.
 //
-// THREE, CUT TO TWO, THEN REVERSED BACK TO THREE. v1.2.28 (2026-09-02) cut
-// `ink` and `paper` to one muted rail, `quiet`, the same day the client ruled
-// "default spine to mango, but everyone can change it during the onboarding
-// or anytime at settings" (that half of the ruling is untouched — see
-// shared/spine.ts). The client then reversed the cut, verbatim, 2026-09-03:
-// "you know, i changed my mind. i want to go back to the 3 options (sorry)"
-// — and explained why, which is the point of the reversal: "my goal is that
-// in light i can choose to have a 'dark' background option". Appearance
-// decides light or dark; Background decides the colour behind everything;
-// Ink is how a person running a LIGHT app gets a dark window.
+// THREE, CUT TO TWO, THEN REVERSED BACK TO THREE, THEN CUT TO TWO AGAIN.
+// v1.2.28 (2026-09-02) cut `ink` and `paper` to one muted rail, `quiet`, the
+// same day the client ruled "default spine to mango, but everyone can change
+// it during the onboarding or anytime at settings" (that half of the ruling
+// is untouched — see shared/spine.ts). The client then reversed the cut,
+// verbatim, 2026-09-03: "you know, i changed my mind. i want to go back to
+// the 3 options (sorry)" — and explained why, which is the point of the
+// reversal: "my goal is that in light i can choose to have a 'dark'
+// background option". Appearance decides light or dark; Background decides
+// the colour behind everything; Ink is how a person running a LIGHT app gets
+// a dark window.
+//
+// MANGO RETIRED, 22 SEP 2026 — the client, ruling on the Appearance settings
+// redesign: "reduce backgorund options to only balck or paper (rmoeve
+// mango)." Two options now, not three: `settingsOptions`, `onboardingOptions`
+// and `compactOptions` below each drop their `mango` entry, matching
+// `shared/spine.ts`'s own `SPINE_VALUES`, which this file's allow-list has
+// always had to agree with (`toSpine` below coerces anything else). See that
+// file's header for the fallback (moved to `paper`) and for why a stored
+// `mango` row needs no migration of its own.
 //
 // THE CARDS ARE THE KIT'S OWN, not reinvented. `AppearanceOptionGroup` is
 // `compositions/screens/settings.tsx`'s own sub-primitive — COMPOSITION-
@@ -47,9 +57,10 @@
 // calls the `save` prop it is handed, on Save — which is also the moment the
 // app-wide repaint happens (`app-shell.tsx` reads `active.user.spine`, and
 // the panel's own `saveSpine` already refreshes it; see that file's header).
-// MANGO stays the fallback (shared/spine.ts) since the client's ruling of
-// 2026-09-02, untouched by any of this. `SpineChoice`, below, is unchanged —
-// onboarding still owns its own submit and was never part of this ruling.
+// THE FALLBACK IS `paper` NOW (shared/spine.ts) — moved off mango the day
+// mango stopped being a choice (22 Sep 2026); see that file's header for why.
+// `SpineChoice`, below, is unchanged in shape — onboarding still owns its own
+// submit and was never part of either ruling.
 //
 // RENAMED FROM "Sidebar" TO "Background", client instruction — untouched by
 // this pass; see the git history on this file for the fuller account.
@@ -125,12 +136,6 @@ export function SpineChoice({
       description: t("A calm, light background that lets the work stand out."),
       picture: <SpinePicture spine="paper" />,
     },
-    {
-      value: "mango",
-      label: t("Mango"),
-      description: t("Warm colour behind the whole app. Easy to find your place."),
-      picture: <SpinePicture spine="mango" />,
-    },
   ]
 
   /* onboarding.tsx's own shorter Background cards, verbatim — transcribed
@@ -148,24 +153,17 @@ export function SpineChoice({
       description: t("Calm, and out of the way."),
       picture: <SpinePicture spine="paper" />,
     },
-    {
-      value: "mango",
-      label: t("Mango"),
-      description: t("Warm, and easy to find."),
-      picture: <SpinePicture spine="mango" />,
-    },
   ]
 
   /* COMPACT: the artifact's tidy pill row, not the kit's card grid — same
-     three names and the same order, no picture and no description (Settings
-     · Appearance's own shared preview carries that argument now), but a
-     swatch survives (her own "also in appearance add colors (like in
-     background)" names this group as the reference). Never used by
-     onboarding, which passes no `compact`. */
+     two names and the same order Settings' own row layout uses, no picture
+     and no description, but a swatch survives (her own "also in appearance
+     add colors (like in background)" names this group as the reference) —
+     the REAL ink and paper colours now carry the whole preview argument.
+     Never used by onboarding, which passes no `compact`. */
   const compactOptions: readonly AppearancePillOption[] = [
     { value: "ink", label: t("Ink"), swatch: <SpineSwatch spine="ink" /> },
     { value: "paper", label: t("Paper"), swatch: <SpineSwatch spine="paper" /> },
-    { value: "mango", label: t("Mango"), swatch: <SpineSwatch spine="mango" /> },
   ]
 
   if (compact) {
@@ -194,13 +192,13 @@ export function SpineChoice({
 }
 
 export function SpineSection({
-  /** The PENDING spine — `AppearancePanel`'s own state, not this
-   * component's. Never saved or applied to the app by this file any more. */
+  /** The CURRENT spine — `AppearancePanel`'s own state, applied through its
+   * `saveSpine` door the instant it changes. This file never calls that door
+   * itself; it only reports which pill was pressed. */
   value,
-  /** A different card was pressed. The panel decides what happens next —
-   * update the pending value, and nothing else, until Save. */
+  /** A different pill was pressed. The panel applies it at once. */
   onChange,
-  /** True while `AppearancePanel`'s own Save is in flight. */
+  /** True while `AppearancePanel`'s own write for THIS control is in flight. */
   disabled = false,
 }: {
   value: Spine
@@ -209,16 +207,5 @@ export function SpineSection({
 }) {
   const { t } = useLanguage()
 
-  return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-muted-foreground text-micro uppercase">{t("Background")}</h3>
-      <SpineChoice
-        value={value}
-        disabled={disabled}
-        onChange={onChange}
-        badgeLabel={t("In use")}
-        compact
-      />
-    </div>
-  )
+  return <SpineChoice value={value} disabled={disabled} onChange={onChange} badgeLabel={t("In use")} compact />
 }

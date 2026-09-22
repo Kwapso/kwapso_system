@@ -328,18 +328,26 @@ import { formatCount } from "@shared/web/format-count"
  * accident. */
 const MIN_MODULE_CARD = "16rem"
 
-/** THE TWO STAGED PANELS' OWN REGISTRY KEYS — see "THE UNSAVED-TAB GUARD"
- * below. `"settings:<tab>"`, never a path: Settings has one URL for every
- * tab, and `web/lib/unsaved-changes.ts`'s own header asks every caller for a
- * stable name for the SCREEN holding the draft. */
-const APPEARANCE_DIRTY_KEY = "settings:appearance"
-// ROLES' OWN KEY IS THE GENERIC SHAPE, NOT A SPECIAL CASE — 2026-09-16
-// correction (this file's header has the two rulings). It used to be
-// `"settings:team"`, fed to a SECOND guard (`handleTeamTabChange`) because
-// Roles lived one level under an outer "team" tab; now Roles IS a top-level
-// tab, so its own key is simply `settings:${tab}` for `tab === "roles"` —
-// the same string `handleTabChange` below already computes for every other
-// tab — and the second guard is gone with the nested strip it was guarding.
+/** ROLES' OWN STAGED-PANEL REGISTRY KEY — see "THE UNSAVED-TAB GUARD" below.
+ * `"settings:<tab>"`, never a path: Settings has one URL for every tab, and
+ * `web/lib/unsaved-changes.ts`'s own header asks every caller for a stable
+ * name for the SCREEN holding the draft.
+ *
+ * APPEARANCE HAD ONE TOO, UNTIL 22 SEP 2026 — `APPEARANCE_DIRTY_KEY`,
+ * deleted along with the rest of the pending/Save shape Aurora's ruling that
+ * day removed ("lets go back to when clicking it gets implemented (without
+ * needing to save)"): `AppearancePanel` (`shared/web/appearance-panel.tsx`)
+ * writes through its four doors the instant a control is pressed now, so
+ * there is no longer a draft on that tab an unmount could ever throw away,
+ * and nothing left for this guard to protect.
+ *
+ * ROLES' OWN KEY IS THE GENERIC SHAPE, NOT A SPECIAL CASE — 2026-09-16
+ * correction (this file's header has the two rulings). It used to be
+ * `"settings:team"`, fed to a SECOND guard (`handleTeamTabChange`) because
+ * Roles lived one level under an outer "team" tab; now Roles IS a top-level
+ * tab, so its own key is simply `settings:${tab}` for `tab === "roles"` —
+ * the same string `handleTabChange` below already computes for every other
+ * tab — and the second guard is gone with the nested strip it was guarding. */
 const ROLES_DIRTY_KEY = "settings:roles"
 
 export function SettingsScreen({
@@ -473,25 +481,23 @@ export function SettingsScreen({
     setTab(next)
   }
 
-  // THE TWO CALLBACKS THEMSELVES, MEMOISED. Each panel's own effect depends
-  // on `[dirty, onDirtyChange]` (see either file's own doc) — the textbook
+  // THE ONE REMAINING CALLBACK, MEMOISED. `RolesMatrix`'s own effect depends
+  // on `[dirty, onDirtyChange]` (see that file's own doc) — the textbook
   // shape for "tell the parent, and tell it `false` on the way out". Handing
   // it a fresh arrow function on every render of THIS screen would change
   // that second dependency every time this screen re-renders for any reason
   // at all (the Modules wall's search box, a tab switch, a live members
   // ping…), which reruns the panel's effect — harmless on its own now that
-  // the target is the registry rather than a `setState` that re-rendered
-  // THIS screen (the loop `verify/appearance-panel`'s own rig caught before
-  // it ever reached the real screen), but still kept `useCallback`'d so a
-  // panel's effect is not asked to re-run for no reason on every unrelated
-  // render. `useCallback` with an empty dependency array is correct because
-  // both closures only ever reach `markDirty` (a stable module export) and a
-  // literal registry key — there is nothing about either closure that a
-  // later render could make stale.
-  const setAppearanceDirty = React.useCallback(
-    (dirty: boolean) => markDirty(APPEARANCE_DIRTY_KEY, dirty),
-    []
-  )
+  // the target is the registry rather than a `setState` that re-rendered THIS
+  // screen, but still kept `useCallback`'d so the effect is not asked to
+  // re-run for no reason on every unrelated render. `useCallback` with an
+  // empty dependency array is correct because the closure only ever reaches
+  // `markDirty` (a stable module export) and a literal registry key — there
+  // is nothing about it a later render could make stale.
+  //
+  // APPEARANCE HAD ITS OWN TWIN HERE, `setAppearanceDirty`, until 22 Sep
+  // 2026 — deleted with `APPEARANCE_DIRTY_KEY` above; see that constant's own
+  // comment for why.
   const setRolesDirty = React.useCallback((dirty: boolean) => markDirty(ROLES_DIRTY_KEY, dirty), [])
 
   // MEMBERS + ROLES — ONE READ, TWO CONTAINERS. `useScreenData` loads members
@@ -739,19 +745,17 @@ export function SettingsScreen({
         {renderFolderTabs({ config: tabsConfig, value: tab, onValueChange: handleTabChange })}
         {(function renderPanel(panel: { value: string }): React.ReactNode {
           if (panel.value === "appearance") {
-            // ONE CONTAINER, FOUR SECTIONS — client ruling, 2026-09-14, the
-            // correction to the preview-led layout that shipped first: "What
-            // I meant by language first was inside the container, just to
-            // make it the top section: Language · Size · Appearance ·
-            // Background." `AppearancePanel` (`shared/web/appearance-panel.tsx`)
-            // now owns all four, Language included, in one `SettingsSection`
-            // box beside the one shared live preview — see that file's own
-            // header for the full account, including why Language sits in the
-            // control column rather than above the preview row. Persisted the
-            // same way the other three are, on the person's own row, so it
-            // follows them between devices; the portal keeps its own compact
-            // twin in the header (`shared/web/language-menu.tsx`), because the
-            // portal has no settings screen at all.
+            // ONE CONTAINER, FOUR ROWS — client ruling, 22 Sep 2026, over a
+            // side-by-side artifact of the redesign: "for Appearance settings
+            // i like option one" — rows, name and a short line on the left,
+            // choices on the right, every choice carrying its own preview
+            // chip. `AppearancePanel` (`shared/web/appearance-panel.tsx`) owns
+            // all four rows, Language included — see that file's own header
+            // for the full account. Persisted the same way as always, on the
+            // person's own row, so it follows them between devices; the
+            // portal keeps its own compact twin in the header
+            // (`shared/web/language-menu.tsx`), because the portal has no
+            // settings screen at all.
             //
             // NO INNER TITLE — the same ruling `module-automations.tsx`'s own
             // call site answers a few lines below, about a different tab:
@@ -763,18 +767,19 @@ export function SettingsScreen({
             // redundant "Appearance" heading one screen-height below the
             // first. See `settings-section.tsx`'s own header for the prop.
             //
-            // EVERY CONTROL STAGES BEHIND A SAVE BUTTON — "we need … some
-            // kind of save button so that I can first preview it and, once
-            // I'm happy with what I see, implement it across the app."
-            // (2026-09-14), widened 2026-09-17 to cover Language too: "I
-            // want everything to wait for the save. Nothing changes right
-            // away." `scaleValue`/`saveScale`, `spineValue`/`saveSpine` and
+            // EVERY CONTROL APPLIES AT ONCE, AGAIN — the pending/Save shape
+            // that stood here from 2026-09-14 to 22 Sep 2026 is gone: "lets go
+            // back to when clicking it gets implemented (without needing to
+            // save)." `scaleValue`/`saveScale`, `spineValue`/`saveSpine` and
             // `saveLanguage` below are unchanged — still the same three
             // doors, Size and Background still read off `active.user` — but
-            // `AppearancePanel` now calls all three once, from its own Save,
-            // rather than on every press. `appearance-panel.tsx`'s own
-            // header has the full account, including why Language was the
-            // one exception for three days and is not any more.
+            // `AppearancePanel` now calls each one the instant its own pill is
+            // pressed, not from a Save button. `appearance-panel.tsx`'s own
+            // header has the full account, including how a refused write is
+            // reverted. NO `onDirtyChange` ANY MORE — there is no longer a
+            // draft on this tab an unmount could throw away (see
+            // `ROLES_DIRTY_KEY`'s own comment above, where
+            // `APPEARANCE_DIRTY_KEY` used to sit beside it).
             return (
               <AppearancePanel
                 saveLanguage={(lang) => auth.setLanguage(lang)}
@@ -788,15 +793,11 @@ export function SettingsScreen({
                   // attribute this component could set itself) — so the
                   // live update this tab sees comes from `active.refresh()`
                   // rather than from realtime, which local dev doesn't even
-                  // proxy. Awaited: the section's own `saving` state should
-                  // cover the whole round trip, card press to rail repaint.
+                  // proxy. Awaited: the control's own busy state covers the
+                  // whole round trip, pill press to rail repaint.
                   await auth.setSpine(spine)
                   await active.refresh()
                 }}
-                // THE UNSAVED-TAB GUARD'S OWN FEED — see `setAppearanceDirty`
-                // above for what it does and why it is memoised rather than
-                // written inline here.
-                onDirtyChange={setAppearanceDirty}
               />
             )
           }

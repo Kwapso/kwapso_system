@@ -194,7 +194,11 @@ describe("raising a ticket in the agency app", () => {
     // A retired account can't be sold to and a contact is not a client, so
     // neither is a thing to file a ticket under — and both are refused by the
     // DOOR, over the whole collection, rather than by a filter over page one.
-    expect(door.accounts).toHaveBeenCalledWith({ q: "berg", type: "entity", archived: "no" })
+    // `inactive`, not `archived` (0117, 22 Sep 2026): this wire word was
+    // `archived` until the same round `archived` gained a real, stronger
+    // meaning of its own (`AccountFilters.archived`, a truly archived row —
+    // excluded from this picker either way, by the door's own default).
+    expect(door.accounts).toHaveBeenCalledWith({ q: "berg", type: "entity", inactive: "no" })
   })
 
   it("sends no client when the ticket is our own", async () => {

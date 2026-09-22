@@ -54,7 +54,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { useConfirm } from "@shared/web/use-confirm"
-import { Key, PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Key, PencilSimple, Power, Archive } from "@shared/ui/foundations/icons"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 import { Badge } from "@shared/ui/components/badge/badge"
 
@@ -381,41 +381,79 @@ export function ContactDetailScreen({
     ],
   }
 
-  /* B1 / CHECKLIST 11.2 — Edit stays visible, archiving moves into the menu with
-   * its red and its confirm intact. */
+  /* B1 / CHECKLIST 11.2 — Edit stays visible, deactivating moves into the menu
+   * with its red and its confirm intact.
+   *
+   * 0117, 22 Sep 2026 — SAME SPLIT AS `account-detail.tsx`, because a contact
+   * IS an `accounts` row (individual type): her ruling separated INACTIVE
+   * (this pair, unchanged meaning, renamed from "archive") from a real,
+   * stronger ARCHIVED (the second pair below, the new word). See that file's
+   * own header for the full account. */
   const overflow: RecordAction[] = canArchive
     ? [
         account.active
           ? {
-              key: "archive",
-              label: t("Archive"),
+              key: "deactivate",
+              label: t("Deactivate"),
               icon: <Power className="size-3.5" />,
               disabled: busy,
               destructive: true,
               onSelect: () =>
                 ask({
-                  title: `Archive ${account.name}?`,
-                  body: "They stop showing in the everyday lists. Everything they are attached to stays exactly where it is, and you can bring them back any time.",
-                  action: "Archive",
+                  title: `Deactivate ${account.name}?`,
+                  body: "They stop showing in the everyday lists and every picker. Everything they are attached to stays exactly where it is, and you can bring them back any time.",
+                  action: "Deactivate",
                   run: () =>
                     run(
                       () => tenancy.setAccountActive(accountId, false),
-                      "Contact archived.",
-                      "Couldn't archive the contact."
+                      "Contact deactivated.",
+                      "Couldn't deactivate the contact."
                     ),
                 }),
             }
           : {
-              key: "restore",
-              label: t("Restore"),
+              key: "reactivate",
+              label: t("Reactivate"),
               icon: <Power className="size-3.5" />,
               disabled: busy,
               onSelect: () =>
                 void run(
                   () => tenancy.setAccountActive(accountId, true),
-                  "Contact restored.",
-                  "Couldn't restore the contact."
+                  "Contact reactivated.",
+                  "Couldn't reactivate the contact."
                 ),
+            },
+        account.archived
+          ? {
+              key: "unarchive",
+              label: t("Unarchive"),
+              icon: <Archive className="size-3.5" />,
+              disabled: busy,
+              onSelect: () =>
+                void run(
+                  () => tenancy.setAccountArchived(accountId, false),
+                  "Contact unarchived.",
+                  "Couldn't unarchive the contact."
+                ),
+            }
+          : {
+              key: "archive",
+              label: t("Archive"),
+              icon: <Archive className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: () =>
+                ask({
+                  title: `Archive ${account.name}?`,
+                  body: "They stop showing everywhere, in every list, picker and count. Everything they are attached to stays exactly where it is, and you can bring them back any time from here.",
+                  action: "Archive",
+                  run: () =>
+                    run(
+                      () => tenancy.setAccountArchived(accountId, true),
+                      "Contact archived.",
+                      "Couldn't archive the contact."
+                    ),
+                }),
             },
       ]
     : []
@@ -478,12 +516,19 @@ export function ContactDetailScreen({
       chips={
         <>
           {/* CLIENT RULING, 17 Sep 2026, verbatim: "contact live green." Used
-              to draw nothing at all on an active contact — only the archived
+              to draw nothing at all on an active contact — only the put-away
               half of this pair had a chip. Both states carry one now, the
               same live/put-away pair every other kind in this ruling reaches
-              for: green while live, grey once archived (unchanged). */}
-          <Badge variant="status" dot={account.active ? "shipped" : "archived"}>
-            {account.active ? t("Live") : t("Archived")}
+              for: green while live, grey once put away.
+              AMENDED 22 Sep 2026 (0117) — THREE STATES, as account-detail.tsx's
+              own chip: her split makes INACTIVE (`!account.active`) and
+              ARCHIVED (`account.archived`) two independent facts, and
+              archived wins the one chip when both are true. */}
+          <Badge
+            variant="status"
+            dot={account.archived || !account.active ? "archived" : "shipped"}
+          >
+            {account.archived ? t("Archived") : account.active ? t("Live") : t("Inactive")}
           </Badge>
           {liveLogin ? <Badge>{t("Can sign in")}</Badge> : null}
           {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
@@ -541,9 +586,10 @@ export function ContactDetailScreen({
                     IT OFFERS COMPANIES AND NOTHING ELSE (`type: "entity"`), which
                     is what makes "put her under herself" unreachable from this
                     screen rather than merely refused by the door: a contact is a
-                    person, and no person is in this list. Archived companies are
+                    person, and no person is in this list. Inactive companies are
                     left out too (`searchAccounts` asks the door for the live
-                    ones) — a put-away company is not something new work is filed
+                    ones, `inactive: "no"`, renamed from `archived` 0117) — a
+                    put-away company is not something new work is filed
                     against — while somebody ALREADY under one still reads it by
                     name here, from the record's own parent, and can be moved off
                     it. The remaining refusals belong to the door: a ring, and an

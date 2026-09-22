@@ -1,7 +1,19 @@
 "use client"
 
-// LIGHT, DARK OR THE MACHINE'S OWN — a compact card row, beside the shared
-// Appearance preview rather than carrying its own picture.
+// LIGHT, DARK OR THE MACHINE'S OWN — one row on Settings · Appearance's row
+// layout (`shared/web/appearance-panel.tsx`), a colour swatch on every pill.
+//
+// APPLIES AT ONCE, 22 SEP 2026 (AGAIN). Aurora: "lets go back to when
+// clicking it gets implemented (without needing to save)." A press here
+// applies instantly — `AppearancePanel` flips the document's `data-theme`
+// attribute and `colorScheme`, and writes `localStorage`, through
+// `applyThemeMode` below, the moment a pill is pressed. This file still owns
+// no state, reads no storage and touches no `document` itself — it is a
+// plain, controlled pill row exactly as it was mid-2026-09-14 to 22 Sep 2026
+// (the staged, Save-gated version, kept below as the historical record) —
+// only the CALLER'S contract changed back to immediate.
+//
+// ═══════════════════ THE STAGED HISTORY (superseded) ═══════════════════════
 //
 // PREVIEW-LED, CLIENT RULING 2026-09-14. She chose the preview-led layout of
 // four Settings · Appearance options a lane put in front of her: one live
@@ -12,39 +24,31 @@
 // panel's (`shared/web/appearance-panel.tsx`) and the picture's job is the
 // live preview's.
 //
-// STAGED, SAME DAY, SECOND RULING. "We need … some kind of save button so
-// that I can first preview it and, once I'm happy with what I see, implement
-// it across the app." Until this pass every press here applied instantly —
-// the document's `data-theme` attribute and `colorScheme` flipped, and
-// `localStorage` was written, the moment a pill was pressed. That is gone:
-// this component no longer owns any state, reads storage, writes storage or
-// touches `document` at all. It is now a plain, controlled pill row — `value`
-// is the PENDING choice, `onChange` asks the panel to hold a different one —
-// and `AppearancePanel` (`shared/web/appearance-panel.tsx`) is the one place
-// that seeds the pending value from storage, applies it to the document, and
-// writes it back, all on Save. See that file's own header for the full
-// account, including why Language (the fourth control on this same panel) is
-// the one exception that still applies the moment it is pressed.
+// STAGED, SAME DAY, SECOND RULING (REVERSED 22 SEP 2026, ABOVE). "We need …
+// some kind of save button so that I can first preview it and, once I'm
+// happy with what I see, implement it across the app." This component used
+// to apply instantly, then staged behind a controlled `value`/`onChange`
+// with `AppearancePanel`'s own Save doing the writing — the shape this file
+// is back to now, just owned by the panel again rather than by a pending
+// value it held.
 //
 // The mechanics that used to live in this file's `choose()` — reading and
 // writing `localStorage`, setting `data-theme` / `colorScheme` on
 // `document.documentElement` — are still here, just moved to plain exported
-// functions (`readStoredMode`, `applyThemeMode`) the panel calls once, on
-// Save. DEVICE-LOCAL AND UNTOUCHED OTHERWISE: there is still no `value`/`save`
-// prop pair passed in from a server round trip — the panel's own "saved"
-// baseline for this control is whatever storage already holds, read the same
-// way `ModeToggle` itself reads it.
+// functions (`readStoredMode`, `applyThemeMode`) `AppearancePanel` calls, the
+// instant a pill is pressed once more. DEVICE-LOCAL AND UNTOUCHED OTHERWISE:
+// there is still no `value`/`save` prop pair passed in from a server round
+// trip — the panel's own baseline for this control is whatever storage
+// already holds, read the same way `ModeToggle` itself reads it.
 //
-// `onResolvedChange` IS UNCHANGED. The shared preview beside this group takes
-// an ALREADY RESOLVED `"light" | "dark"` — `AppearancePreview`'s own header
-// states why it cannot take `"system"` itself: a picture has no clock. So
-// this file still resolves "system" the one place that already knows how —
-// `matchMedia`, the same source `ModeToggle`'s own dusk-switch reads — off
-// the PENDING value now rather than an internally-owned one, and reports the
-// answer up, live: a `change` listener keeps the preview correct across a
-// system flip while the tab is open on "System".
-
-import * as React from "react"
+// `onResolvedChange` IS GONE, 22 SEP 2026, WITH THE PREVIEW IT FED. It
+// existed for exactly one reason — telling `AppearanceTabPreview` an already-
+// resolved `"light" | "dark"`, because a picture has no clock and cannot
+// read "system" itself — and that preview is deleted along with the rest of
+// the pending/Save shape (see this file's own header). The `matchMedia`
+// resolution it drove went with it: nothing downstream of this component
+// needs to know which way "System" currently resolves, only that "system"
+// was pressed, which `value` already says.
 
 import { type ThemeMode } from "@shared/ui/components/mode-toggle/mode-toggle"
 
@@ -110,30 +114,26 @@ export function applyThemeMode(mode: ThemeMode): void {
 }
 
 export function ThemeSection({
-  /** The PENDING choice — `AppearancePanel`'s own state, not this
-   * component's. Never applied to the document by this file any more. */
+  /** The CURRENT choice — `AppearancePanel`'s own state, applied to the
+   * document the instant it changes. This file never touches the document
+   * itself; it only reports which pill was pressed. */
   value,
-  /** A different card was pressed. The panel decides what happens next —
-   * update the pending value, and nothing else, until Save. */
+  /** A different pill was pressed. The panel applies it at once. */
   onChange,
-  /** Told the resolved value ("light"/"dark", never "system") on mount,
-   * on every press, and again whenever the machine's own scheme flips while
-   * "System" is chosen — so the shared preview beside this group is never a
-   * frame behind it. */
-  onResolvedChange,
-  /** True while `AppearancePanel`'s own Save is in flight. */
+  /** True while `AppearancePanel`'s own write for THIS control is in flight
+   * — device-local writes never fail, so this stays `false` in practice, but
+   * the prop survives for the same controlled shape its three neighbours
+   * take. */
   disabled = false,
 }: {
   value: ThemeMode
   onChange: (next: ThemeMode) => void
-  onResolvedChange?: (resolved: "light" | "dark") => void
   disabled?: boolean
 }) {
   const { t } = useLanguage()
 
-  // PILLS: no picture, no per-option description — the live preview beside
-  // this group carries that argument now. A swatch survives, though — her
-  // own second instruction, "also in appearance add colors (like in
+  // PILLS: no picture, no per-option description. A swatch survives, though
+  // — her own second instruction, "also in appearance add colors (like in
   // background)": the same mark Background's own pills carry, same size,
   // same shape, same position, resolved through `ThemeSwatch`'s own tokens.
   const options: readonly AppearancePillOption[] = [
@@ -142,35 +142,15 @@ export function ThemeSection({
     { value: "system", label: t("System"), swatch: <ThemeSwatch tone="system" /> },
   ]
 
-  // The resolved value the preview actually draws, kept correct across a
-  // live system flip while "System" is the PENDING choice — unchanged from
-  // before except that it now tracks `value` (a prop) instead of `chosen`
-  // (a state this file no longer owns).
-  const [systemDark, setSystemDark] = React.useState(false)
-  React.useEffect(() => {
-    if (value !== "system" || typeof window === "undefined" || typeof window.matchMedia !== "function") return
-    const mql = window.matchMedia("(prefers-color-scheme: dark)")
-    setSystemDark(mql.matches)
-    const onMqlChange = (e: MediaQueryListEvent) => setSystemDark(e.matches)
-    mql.addEventListener("change", onMqlChange)
-    return () => mql.removeEventListener("change", onMqlChange)
-  }, [value])
-
-  const resolved: "light" | "dark" = value === "system" ? (systemDark ? "dark" : "light") : value
-  React.useEffect(() => onResolvedChange?.(resolved), [resolved, onResolvedChange])
-
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-muted-foreground text-micro uppercase">{t("Appearance")}</h3>
-      <AppearancePillGroup
-        options={options}
-        value={value}
-        disabled={disabled}
-        onValueChange={(next) => {
-          if (isThemeMode(next)) onChange(next)
-        }}
-        ariaLabel={t("Appearance")}
-      />
-    </div>
+    <AppearancePillGroup
+      options={options}
+      value={value}
+      disabled={disabled}
+      onValueChange={(next) => {
+        if (isThemeMode(next)) onChange(next)
+      }}
+      ariaLabel={t("Appearance")}
+    />
   )
 }

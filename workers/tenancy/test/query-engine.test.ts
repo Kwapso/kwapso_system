@@ -832,17 +832,30 @@ describe("'the tickets' means the same thing at both doors", () => {
   })
 
   it("only a module whose OWN door hides these rows may declare it", () => {
-    // `accounts` and `apps` list their deactivated rows (ordered last), so they
-    // must NOT grow a putAway — a grammar that hid rows its door shows would be
-    // the same bug pointing the other way.
+    // `apps` lists its DEACTIVATED rows (ordered last), so IT must NOT grow a
+    // putAway — a grammar that hid rows its door shows would be the same bug
+    // pointing the other way. `accounts` joined the allow-list on 0117 (22 Sep
+    // 2026), and the field it declares is `archivedAt`, never `deactivatedAt`:
+    // her INACTIVE (unchanged) still lists last, exactly like `apps`; her
+    // ARCHIVED (a second, stronger, independent flag) is what `accountsWhere`
+    // (workers/tenancy/src/lib/accounts.ts) excludes by unconditional default,
+    // and that default is what this generic door now mirrors.
     for (const [name, mod] of Object.entries(QUERY_MODULES)) {
       if (!mod.putAway) continue
-      expect(["tickets", "meetings"], `${name} declares putAway — is that really its door's default?`).toContain(name)
+      expect(
+        ["tickets", "meetings", "accounts"],
+        `${name} declares putAway — is that really its door's default?`
+      ).toContain(name)
       expect(mod.fields.some((f) => f.name === mod.putAway!.field), `${name}.${mod.putAway!.field}`).toBe(true)
       expect(mod.putAway!.reason.length, `${name} needs a reason naming the door it follows`).toBeGreaterThan(40)
     }
-    expect(QUERY_MODULES.accounts.putAway, "the accounts door lists deactivated rows").toBeUndefined()
     expect(QUERY_MODULES.apps.putAway, "the apps door lists deactivated rows").toBeUndefined()
+    // ACCOUNTS' OWN PUTAWAY IS `archivedAt`, NEVER `deactivatedAt` — asserting
+    // the field by name is what keeps this test from passing on a future edit
+    // that quietly repoints it at the field the door does NOT hide by default.
+    expect(QUERY_MODULES.accounts.putAway?.field, "accounts hides ARCHIVED rows, not inactive ones").toBe(
+      "archivedAt"
+    )
   })
 })
 

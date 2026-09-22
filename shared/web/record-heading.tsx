@@ -200,14 +200,45 @@ export const TITLE_ACTIONS_SPLIT =
  * A CONTAINER QUERY, NOT A VIEWPORT ONE — so a narrow PANE inside a wide
  * window still folds, the same reasoning the kit's own `ToolbarRow` states
  * for its own fold (shared/ui/components/toolbar-row/toolbar-row.tsx, "A
- * CONTAINER QUERY, NOT A VIEWPORT ONE"). `[data-slot=title]` — the kit's own
- * `Title` row (components/title/title.tsx) — is the ONE element that already
- * holds both halves of the fold as descendants: the chip row rides inside
- * `title` (`RecordScreen`'s own `identityChips`, folded into the node this
- * file's `title` prop carries), and the buttons ride inside `actions`
- * (`[data-slot=title-actions]`, `Title`'s own sibling slot) — so making THAT
- * element the query container, rather than something narrower, is what lets
- * one width answer for both halves of the fold at once.
+ * CONTAINER QUERY, NOT A VIEWPORT ONE").
+ *
+ * RETARGETED 22 SEP 2026: `[data-slot=title]` STOPPED HOLDING BOTH HALVES.
+ * This selector used to read `[&_[data-slot=title]]:[container-type:
+ * inline-size]`, on the reasoning that `[data-slot=title]` (the kit's own
+ * `Title` row, components/title/title.tsx) was the ONE element holding both
+ * halves of the fold as descendants: the chip row inside `title`, the
+ * buttons inside `actions`. Kit v1.2.158 (round fifty-four, the SAME DAY,
+ * "the head actions meet the title") broke that assumption from underneath
+ * it: `RecordDetail` gained an `aboveTitle` slot, and the app's own
+ * `identityChips` (the node that carries `shared/web/head-actions.tsx`'s
+ * narrow `HeadActionsFoldMenu`) moved OUT of the `title` prop and into
+ * `aboveTitle`, which `record-detail.tsx` renders as a plain SIBLING
+ * *before* `<Title>`, not a descendant of it. `[data-slot=title]` no longer
+ * contains the chip row at all, so `HeadActionsFoldMenu`'s own
+ * `@min-[44rem]:hidden` had no containing block to query against and never
+ * matched: it stayed permanently visible, wide screens included, sitting
+ * right beside the ALSO-visible wide row (`HEAD_ACTIONS_ROW_CLASS`, still
+ * correctly inside `[data-slot=title]` via `actions`). Two overflow
+ * triggers on one record head, live on every screen wired to the fold
+ * (accounts, tickets, stories, waves, contacts…), reported first on an
+ * account: Aurora, 22 Sep 2026, over a screenshot showing both at once.
+ *
+ * `[data-record-region=header]` is the fix: `record-detail.tsx`'s own Region
+ * 1, the transparent band that wraps `mark`, `aboveTitle` AND `<Title>`
+ * together, unconditionally, in BOTH shapes this constant is applied in (see
+ * `REACHED FROM OUTSIDE` below), a genuine strict descendant of wherever
+ * this class lands either way, which `[data-slot=record-detail]` itself is
+ * NOT: the recipe path (`screen-renderer.tsx`) applies this class DIRECTLY
+ * to `[data-slot=record-detail]`'s own root, so a selector naming that same
+ * attribute would need to match itself as well as a descendant, which a
+ * plain `[&_…]` selector cannot do. The header band carries no padding of
+ * its own (its own comment: "no inline padding of its own … it is a child
+ * of the record root, which carries none either"), so its inline size reads
+ * the same as `[data-slot=record-detail]`'s: the row's full available
+ * width, a few tens of pixels wider than `[data-slot=title]`'s old
+ * mark-subtracted box on a record that shows a mark, comfortably inside the
+ * ~35 to 50px translation slack this file's own breakpoint math already
+ * carries (`shared/web/head-actions.tsx`, "THE BREAKPOINT").
  *
  * REACHED FROM OUTSIDE, LIKE EVERY OTHER RULE IN THIS FILE. `shared/ui/` is
  * vendored and pinned (CLAUDE.md, R39): neither `Title` nor `RecordDetail`
@@ -225,7 +256,7 @@ export const TITLE_ACTIONS_SPLIT =
  * container for free — the fold ITSELF is opt-in (a screen has to route its
  * own actions through `shared/web/head-actions.tsx`), but the width it folds
  * against is not something each screen has to remember to wire up. */
-export const RECORD_HEAD_CONTAINER = "[&_[data-slot=title]]:[container-type:inline-size]"
+export const RECORD_HEAD_CONTAINER = "[&_[data-record-region=header]]:[container-type:inline-size]"
 
 /** EVERY DETAIL PATH WEARS EXACTLY THIS — R52.
  *
@@ -265,7 +296,6 @@ export const RECORD_HEAD_CONTAINER = "[&_[data-slot=title]]:[container-type:inli
  * CARRIES `RECORD_HEAD_CONTAINER` TOO, SINCE 18 SEP 2026 — see that
  * constant's own comment. It changes nothing visually on its own (a query
  * container with no `@min-[…]` reader anywhere below it draws exactly as
- * before); it only makes every record head's own `[data-slot=title]` row
- * ABLE to host a `shared/web/head-actions.tsx` fold, the day a screen wires
- * one up. */
+ * before); it only makes every record head's own header band ABLE to host a
+ * `shared/web/head-actions.tsx` fold, the day a screen wires one up. */
 export const RECORD_TITLE_TREATMENT = `${TITLE_ACTIONS_SPLIT} ${RECORD_HEAD_CONTAINER}`

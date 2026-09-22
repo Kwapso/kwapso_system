@@ -41,6 +41,7 @@ import {
   portalStandings,
   switchPortalAccount,
   setAccountActive,
+  setAccountArchived,
   setAccountParent,
   setLinkActive,
   setPortalAccessActive,
@@ -234,32 +235,44 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
  * export door narrow by the same words, so "export what I'm looking at" and
  * "list what I'm looking at" can never mean two different things.
  *
- * `archived` joined the original three when the screen's filter bar moved to the
- * door: a facet applied to the loaded PAGE narrows fifty rows under a badge
- * counting all of them, which is the same sentence R14 already says about
- * search. A filter a person can pick has to be one the server can apply.
+ * `inactive` joined the original three when the screen's filter bar moved to
+ * the door: a facet applied to the loaded PAGE narrows fifty rows under a
+ * badge counting all of them, which is the same sentence R14 already says
+ * about search. A filter a person can pick has to be one the server can
+ * apply. (This wire word was `archived` until 0117, 22 Sep 2026 — renamed
+ * the same day a real, stronger `archived` state was added below, so one
+ * word could no longer answer two different questions.)
  *
  * A `status` filter stood beside it until 0042, when the column it read went:
- * whether an account is live is the archive flag, and asking it twice is how one
- * free-text field grew four spellings of two ideas.
+ * whether an account is live is the deactivate flag, and asking it twice is
+ * how one free-text field grew four spellings of two ideas.
  *
  * `manager` and `country` joined on 14 Sep 2026, the client's own ruling for
  * this screen ("filter by account manager, country, status") — status was
- * already `archived`; the other two were missing because the door did not
- * parse them, and this is where that gap closed. See `AccountFilters` for why
- * `manager` is silently dropped for a portal caller and `country` is not. */
+ * already `inactive` (then still spelled `archived`); the other two were
+ * missing because the door did not parse them, and this is where that gap
+ * closed. See `AccountFilters` for why `manager` is silently dropped for a
+ * portal caller and `country` is not.
+ *
+ * `archived` (0117) is her true put-away-for-good state, her ruling 22 Sep
+ * 2026: "archived are not visible anywhere." "yes" is the Accounts screen's
+ * own Archived tab asking for exactly that pile; every other caller —
+ * including one written before this field existed — gets the default
+ * exclusion `accountsWhere` applies regardless of what this function parses. */
 function accountQuery(url: URL): AccountFilters {
   const rawType = queryText(url.searchParams.get("type"), "Type")
+  const rawInactive = queryText(url.searchParams.get("inactive"), "Inactive")
   const rawArchived = queryText(url.searchParams.get("archived"), "Archived")
   // WHO CAN SIGN IN — the contacts screen's In portal tab, asked of the door
-  // because it PAGES (see `AccountFilters.portal`). Allow-listed to the same two
-  // words `archived` uses rather than trusted: a value outside the pair is
-  // dropped, so the tab is either the question or the whole list, never a
-  // statement built from request text.
+  // because it PAGES (see `AccountFilters.portal`). Allow-listed to the same
+  // two words `inactive`/`archived` use rather than trusted: a value outside
+  // the pair is dropped, so the tab is either the question or the whole
+  // list, never a statement built from request text.
   const rawPortal = queryText(url.searchParams.get("portal"), "Portal")
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
     type: rawType === "entity" || rawType === "individual" ? rawType : undefined,
+    inactive: rawInactive === "yes" || rawInactive === "no" ? rawInactive : undefined,
     archived: rawArchived === "yes" || rawArchived === "no" ? rawArchived : undefined,
     portal: rawPortal === "yes" || rawPortal === "no" ? rawPortal : undefined,
     parentId: queryText(url.searchParams.get("parentId"), "Parent"),
@@ -289,11 +302,12 @@ function accountQuery(url: URL): AccountFilters {
  * worst of the three possible answers, and worse here than anywhere: the columns
  * lead with the import format, so re-importing a silently-truncated export is
  * data loss wearing a round trip's clothes. Over the cap the caller narrows with
- * q / type / archived / portal / parentId / manager / country (the same seven
- * the screen's find bar and `list_accounts` take — `manager` silently dropped
- * for a portal caller, same as the list, see `AccountFilters.manager`), or
- * reads the paged list. Both surfaces get this same sentence from this same
- * door. */
+ * q / type / inactive / archived / portal / parentId / manager / country (the
+ * same eight the screen's find bar and `list_accounts` take — `manager`
+ * silently dropped for a portal caller, same as the list, see
+ * `AccountFilters.manager`; `archived` defaulting closed exactly as the list
+ * does, see `AccountFilters.archived`), or reads the paged list. Both
+ * surfaces get this same sentence from this same door. */
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
@@ -318,13 +332,13 @@ export async function getAccountsExport(request: Request, env: Env): Promise<Res
       "name", "accountType", "code", "email", "phone", "street", "postalCode", "city",
       "country", "industry", "website", "about",
       "parent_account_id", "currency", "locale", "timezone", "commercials_visible",
-      "active", "created_at", "created_by", "updated_at", "updated_by",
+      "active", "archived", "created_at", "created_by", "updated_at", "updated_by",
     ],
     rows.map((r) => [
       r.name, r.accountType, r.code, r.email, r.phone, r.street, r.postalCode, r.city,
       r.country, r.industry, r.website, r.about,
       r.parentAccountId, r.currency, r.locale, r.timezone, r.commercialsVisible,
-      r.active, r.createdAt, r.createdByName, r.updatedAt, r.editedByName,
+      r.active, r.archived, r.createdAt, r.createdByName, r.updatedAt, r.editedByName,
     ])
   )
   return csvResponse("accounts.csv", csv)
@@ -594,7 +608,11 @@ export async function postAccountParent(request: Request, env: Env): Promise<Res
   return json({ ok: true })
 }
 
-/** POST /api/tenancy/accounts/active — archive / restore (never delete). */
+/** POST /api/tenancy/accounts/active — deactivate / reactivate, her INACTIVE
+ * (never delete). Named `active` on the wire since before her 22 Sep 2026
+ * ruling split one word into two states; left unrenamed here (it is the
+ * body FIELD and the route PATH, not a word a person reads) rather than
+ * risk a live door's contract for a rename nothing asked for. */
 export async function postAccountActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
@@ -604,9 +622,32 @@ export async function postAccountActive(request: Request, env: Env): Promise<Res
   )
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
-  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Archive or restore?")
+  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Deactivate or reactivate?")
   // R17: a repeat moves zero rows → no ping, no duplicate history.
   const changed = await setAccountActive(cfg, guard, scope, actor, id, body.active)
+  if (changed) await publishChange(env, guard.teamId, "accounts", id)
+  return json({ ok: true })
+}
+
+/** POST /api/tenancy/accounts/archived — archive / unarchive, her ARCHIVED
+ * (0117, 22 Sep 2026). Never delete: the row, its people and its history all
+ * survive, and unarchiving hands back exactly the active/inactive state the
+ * account carried before — `setAccountArchived` never touches
+ * `deactivated_at`, only `archived_at` beside it. Same gate as
+ * `postAccountActive` (`accounts:delete`) — archiving is the same class of
+ * decision, one notch stronger. */
+export async function postAccountArchived(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(
+    request,
+    env,
+    "accounts",
+    "delete"
+  )
+  const scope = await accountScope(cfg, guard)
+  const id = requireText(body.id, "Account", TEXT_LIMITS.short)
+  if (typeof body.archived !== "boolean") return fail(400, "invalid_input", "Archive or unarchive?")
+  // R17: a repeat moves zero rows → no ping, no duplicate history.
+  const changed = await setAccountArchived(cfg, guard, scope, actor, id, body.archived)
   if (changed) await publishChange(env, guard.teamId, "accounts", id)
   return json({ ok: true })
 }

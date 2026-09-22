@@ -51,12 +51,20 @@ export type AuditField = { label: string; value: string }
  * name or a timestamp, and the fifth is a status word the caller has already put
  * through its own vocabulary.
  *
- * The two NAMES are shortened to a first name on the way through (R54). This is
- * the record-chrome footer's twin — the same two facts, drawn into an Overview
- * DescriptionList instead of the ink footer — and its one caller is the
- * knowledge item, which the portal cannot create, so both people here are ours.
- * There is no client-population prop for that reason; add one the day something
- * a contact can author is drawn through this. */
+ * The two NAMES are shortened to a first name on the way through (R54) — but
+ * NOTHING DRAWS THEM TODAY. This block used to be the record-chrome footer's
+ * twin, the same two facts drawn into an Overview DescriptionList instead of
+ * the ink footer; on 22 Sep 2026 the footer took the four who/when facts and
+ * the Overview duplicate went, the way the ticket page had already resolved it
+ * (`help-detail.tsx`). The one live caller,
+ * `web/components/knowledge/knowledge-detail.tsx`, now selects `.status` and
+ * nothing else. The other four stay here for the caller that wants them in a
+ * DescriptionList again; if none ever comes they go, with `auditItems` below.
+ *
+ * There is no client-population prop, and THAT reason outlived the rows: the
+ * knowledge item is still the only record drawn through this, and the portal
+ * cannot create one, so both people here are ours. Add a prop the day
+ * something a contact can author is drawn through this. */
 export function auditFields(
   a: AuditMeta,
   t: Translate,
@@ -72,8 +80,12 @@ export function auditFields(
 }
 
 /** The five audit rows, in a fixed order, for a caller that genuinely wants
- * every fact as one DescriptionList (none does today — see `auditFields`'s own
- * doc comment for the caller that used to reach for this by position instead).
+ * every fact as one DescriptionList. NONE DOES — not by position and not at
+ * all, since knowledge dropped its four duplicate rows on 22 Sep 2026 (see
+ * `auditFields`'s own doc comment for the caller that used to reach for this
+ * by position instead). It is kept, deliberately, as the one documented shape
+ * for a full audit block; delete it with the four unused fields above the day
+ * it is clear nothing will ask for them.
  * Built FROM `auditFields`, never a second, independently-ordered literal, so
  * the two can never disagree about a label or a value. */
 export function auditItems(a: AuditMeta, t: Translate, lang: Language): AuditField[] {

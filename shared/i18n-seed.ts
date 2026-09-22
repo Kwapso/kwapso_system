@@ -202,19 +202,6 @@ export const SEED: Catalogue = {
     ca: "Tens canvis sense desar.",
   },
 
-  /* ── Settings › Appearance's taller preview, added 2026-09-17
-   * (`shared/web/appearance-tab-preview.tsx`) alongside the ruling that
-   * deleted the two captions directly above. The accessible name is real,
-   * translated copy; everything else the preview draws is Lorem Ipsum, the
-   * same "a picture of the SHAPE, not of anyone's data" reasoning the kit's
-   * own retired preview gave for its own specimen row — kept UNCHANGED
-   * across every language rather than "translated" into nonsense, the same
-   * convention any translated product uses for placeholder Latin. */
-  "A small picture of the app, reflecting your chosen settings": {
-    de: "Ein kleines Abbild der App, das Ihre gewählten Einstellungen zeigt.",
-    es: "Una pequeña imagen de la aplicación que muestra tus ajustes elegidos.",
-    ca: "Una petita imatge de l'aplicació que mostra els teus ajustos triats.",
-  },
 
   /* ── The one unsaved-changes confirm, added 2026-09-14 beside
    * `settings-screen.tsx`'s `handleTabChange` (a dirty Appearance or Team ›
@@ -1613,6 +1600,13 @@ export const SEED: Catalogue = {
   "Actions": { de: "Aktionen", es: "Acciones", ca: "Accions" },
   "Are you sure?": { de: "Sind Sie sicher?", es: "¿Está seguro?", ca: "N'esteu segur?" },
   "AI drafted": { de: "KI-Entwurf", es: "Borrador de IA", ca: "Esborrany d'IA" },
+  // Size's own specimen chip (shared/web/appearance-pill-group.tsx,
+  // `ScaleSwatch`, added 22 Sep 2026, "do a speciment chip") — the same
+  // convention this file already uses for a placeholder that IS the content
+  // rather than a sentence about it (see the Lorem Ipsum note further down):
+  // `Aa` is a letter pair standing for text at a size, not a word, so it is
+  // identical in every language rather than translated into nonsense.
+  "Aa": { de: "Aa", es: "Aa", ca: "Aa" },
   // The waves toolbar and the theme control, hand-written for the same reason
   // everything else here is: the machine translator spends the owner's own key.
   "Appearance": { de: "Darstellung", es: "Apariencia", ca: "Aparença" },
@@ -3448,6 +3442,30 @@ export const SEED: Catalogue = {
   "Assign": { de: "Zuweisen", es: "Asignar", ca: "Assignar" },
   "Awaiting your input": { de: "Wartet auf Ihre Angaben", es: "Pendiente de tu aportación", ca: "Pendent de la teva aportació" },
   "Background": { de: "Hintergrund", es: "Fondo", ca: "Fons" },
+  // Settings › Appearance's own four row descriptions, added 22 Sep 2026 with
+  // the row layout (shared/web/appearance-panel.tsx) — the same register
+  // this block already keeps: German formal (Sie), Spanish and Catalan
+  // informal (tú/et).
+  "What the app speaks to you.": {
+    de: "Die Sprache, in der die App mit Ihnen spricht.",
+    es: "El idioma en el que te habla la aplicación.",
+    ca: "L'idioma en què et parla l'aplicació.",
+  },
+  "Text and controls, throughout the app.": {
+    de: "Text und Bedienelemente in der gesamten App.",
+    es: "Texto y controles en toda la aplicación.",
+    ca: "Text i controls a tota l'aplicació.",
+  },
+  "Follow the system, or choose light or dark.": {
+    de: "Folgen Sie dem System, oder wählen Sie hell oder dunkel.",
+    es: "Sigue el sistema, o elige claro u oscuro.",
+    ca: "Segueix el sistema, o tria clar o fosc.",
+  },
+  "The ground the whole window stands on.": {
+    de: "Der Untergrund, auf dem das gesamte Fenster steht.",
+    es: "El fondo sobre el que se asienta toda la ventana.",
+    ca: "El fons sobre el qual es recolza tota la finestra.",
+  },
   "Bring a spreadsheet in": { de: "Eine Tabelle importieren", es: "Importar una hoja de cálculo", ca: "Importar un full de càlcul" },
   "Calm, and out of the way.": { de: "Ruhig und unaufdringlich.", es: "Tranquilo y discreto.", ca: "Tranquil i discret." },
   "Cancel {title}?": { de: "„{title}“ absagen?", es: "¿Cancelar «{title}»?", ca: "Vols cancel·lar «{title}»?" },
@@ -3526,7 +3544,6 @@ export const SEED: Catalogue = {
   "Load more contacts": { de: "Weitere Kontakte laden", es: "Cargar más contactos", ca: "Carregar més contactes" },
   "Load more inputs": { de: "Weitere Angaben laden", es: "Cargar más aportaciones", ca: "Carregar més aportacions" },
   "Manage choices": { de: "Optionen verwalten", es: "Gestionar opciones", ca: "Gestionar opcions" },
-  "Mango": { de: "Mango", es: "Mango", ca: "Mango" },
   /* The Meetings strip's middle tab (client ruling, 2026-09-09: "tabs for
      meetings: this week, mine, all"). It means THE ONES I WAS IN THE ROOM FOR,
      so it agrees in gender and number with the collection it narrows: 
@@ -3648,8 +3665,6 @@ export const SEED: Catalogue = {
   "Up to {limit}.": { de: "Bis zu {limit}.", es: "Hasta {limit}.", ca: "Fins a {limit}." },
   "View": { de: "Ansicht", es: "Vista", ca: "Vista" },
   "Visible to the client": { de: "Für den Kunden sichtbar", es: "Visible para el cliente", ca: "Visible per al client" },
-  "Warm colour behind the whole app. Easy to find your place.": { de: "Warme Farbe hinter der ganzen App. Man findet sich leicht zurecht.", es: "Color cálido detrás de toda la app. Fácil de ubicarte.", ca: "Color càlid darrere de tota l'app. Fàcil per ubicar-te." },
-  "Warm, and easy to find.": { de: "Warm und leicht zu finden.", es: "Cálido y fácil de encontrar.", ca: "Càlid i fàcil de trobar." },
   "Waves timeline": { de: "Waves-Zeitleiste", es: "Cronología de waves", ca: "Cronologia de waves" },
   "We couldn't check what's waiting on you.": { de: "Wir konnten nicht prüfen, was auf Sie wartet.", es: "No pudimos comprobar qué está pendiente de ti.", ca: "No hem pogut comprovar què està pendent teu." },
   "We couldn't load that ticket.": { de: "Das Ticket konnte nicht geladen werden.", es: "No se pudo cargar ese ticket.", ca: "No s'ha pogut carregar aquest tiquet." },
@@ -4226,6 +4241,19 @@ export const SEED: Catalogue = {
     de: "Alles, was der Assistent über diese App weiß, erscheint hier: ihre Tickets, Prozesskarten und Termine sowie alles, was von Hand dafür abgelegt wurde.",
     es: "Todo lo que el asistente sabe sobre esta app aparecerá aquí: sus tickets, mapas de proceso y reuniones, y todo lo archivado bajo ella a mano.",
     ca: "Tot el que l'assistent sap sobre aquesta app apareixerà aquí: els seus tiquets, mapes de procés i reunions, i tot el que s'hi ha arxivat a mà.",
+  },
+  /* THE ACCOUNT RECORD'S OWN KNOWLEDGE TAB (22 Sep 2026) — the identical pair
+     one line up, for the account scope `knowledge-screen.tsx` gained the same
+     session ("account" scope's own empty state). */
+  "Nothing filed under this account yet.": {
+    de: "Noch nichts unter diesem Konto abgelegt.",
+    es: "Aún no hay nada archivado bajo esta cuenta.",
+    ca: "Encara no hi ha res arxivat sota aquest compte.",
+  },
+  "Everything the assistant knows about this account will show up here: its tickets, meetings and sprints, and anything filed against it by hand.": {
+    de: "Alles, was der Assistent über dieses Konto weiß, erscheint hier: seine Tickets, Termine und Sprints sowie alles, was von Hand dafür abgelegt wurde.",
+    es: "Todo lo que el asistente sabe sobre esta cuenta aparecerá aquí: sus tickets, reuniones y sprints, y todo lo archivado bajo ella a mano.",
+    ca: "Tot el que l'assistent sap sobre aquest compte apareixerà aquí: els seus tiquets, reunions i sprints, i tot el que s'hi ha arxivat a mà.",
   },
   "Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.": {
     de: "Die Karten sind die passenden Tickets, soweit sie geladen wurden. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",

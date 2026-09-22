@@ -1034,3 +1034,71 @@ body {
  * a stated rule. Also three pools become two. The owner's call to reverse —
  * flagged rather than worked around, because chasing parity here would mean
  * re-authoring app-side exactly what the kit is for. */
+
+/* ============================================================================
+   THE AIR ABOVE THE WORKSPACE TAB ROW, HALVED — Aurora, 22 Sep 2026, pointing
+   at her own screenshot: "look at my screenshot. athts the spacing i want
+   reduced" — the empty band between the window's own top edge and the
+   workspace tab row (the open-tab strip, `BreadcrumbFolders` in tab-set mode,
+   `data-slot="breadcrumb-folders"`), not the folder tabs themselves and not
+   the gap above a page title.
+   ============================================================================
+   MEASURED LIVE ON STAGING before this rule (`topband-measure.mjs`, this
+   lane's own scratchpad), T0001's team at 1440x900 and again at 768x1024:
+   the tab row's own top edge sat exactly 24px below the window's top edge,
+   painted by ONE box the whole distance — the kit's own outer screen wrapper,
+   `data-slot="screen-shell-card"` (`shared/ui/compositions/templates/
+   screen-shell.tsx`) — which is where `--shell-gutter-top` is DECLARED
+   (`DENSITY_GUTTER_TOP`, both "comfortable" and "calm" read `var(--space-6)`,
+   24px) and inherited down to the content column's own `pt-[var(--shell-
+   gutter-top)]`, the tab row's immediate parent. No app-owned padding, margin
+   or literal sits between the window edge and that one property — the whole
+   band IS the token.
+
+   NOT A DRAG REGION. This app ships no desktop-window wrapper: no `-webkit-
+   app-region`, no Electron/Tauri shell, nothing in `shared/web/pwa.ts` past
+   `display: "standalone"` — a plain installed-PWA manifest, not `window-
+   controls-overlay`. The band carries no drag handling of any kind, so
+   shrinking it risks nothing about moving the window.
+
+   THE KIT OFFERS NO SMALLER PRESET. `screen-shell.tsx`'s own `density` prop
+   is the only lever ScreenShell exposes for this token, and both values it
+   accepts set the identical 24px — so there is no prop this app can pass to
+   get a reduced number; the token's only other definition lives inside the
+   vendored kit itself, which this app may read and may not edit
+   (`shared/ui/` is pinned; a kit change belongs in kwapso-design, tagged and
+   pulled — the standing rule for every UI change the client asks for here).
+
+   SO THE TOKEN MOVES, ONCE, RATHER THAN A CALL-SITE OVERRIDE. `ScreenShell`
+   is mounted exactly once in this app (`web/components/shell/app-shell.tsx`,
+   "every route renders exactly one of these per document"), so a className
+   override written AT that one JSX call would still be exactly the kind of
+   one-call-site patch the brief for this change warned against — it would
+   also have had to fight Tailwind's own generated utility for the same
+   property at equal specificity, order-dependent and fragile. This rule
+   instead REDECLARES THE TOKEN, in the one place this file already does that
+   for a kit-owned custom property (`--pinned-lead`, `--pinned-chrome-h`,
+   above): a plain selector on the kit's own `data-slot`, later in this
+   stylesheet than `@import "tailwindcss"`, so it wins the cascade at equal
+   specificity by source order — proven by the exact mechanism the R83 rules
+   above already rely on. Every reader of `--shell-gutter-top` — the content
+   column's own leading pad AND `ASIDE_TAB`'s identical read for the
+   assistant's own folder tab — inherits the new value together, which is
+   what keeps "the two columns' tabs start at the same measured y" (screen-
+   shell.tsx's own invariant for this token) true rather than split in two.
+
+   HALVED, NOT SHAVED — `var(--space-3)` (12px) for `var(--space-6)` (24px),
+   a real reduction on the app's own spacing scale, never a literal. Proved by
+   `web/test/workspace-tab-row-gutter.test.ts`, which reads this rule's own
+   source rather than a line number and fails if the override is removed or
+   widened back toward 24px.
+
+   KIT DEBT, LOGGED HONESTLY: the token itself is still declared at 24px
+   upstream (`DENSITY_GUTTER_TOP`, both densities) — this rule is the same
+   shape as every other app-side patch this codebase already carries for a
+   kit gap, and the honest fix is a third density (or a lower `--shell-
+   gutter-top` on the two that exist) shipped in kwapso-design and this
+   override deleted the same day it lands. */
+[data-slot="screen-shell-card"] {
+  --shell-gutter-top: var(--space-3);
+}

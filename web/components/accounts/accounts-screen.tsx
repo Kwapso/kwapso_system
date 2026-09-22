@@ -134,10 +134,23 @@
 // `AccountFilters.archived` parameter the retired Status facet used to send,
 // just asked once, unconditionally, rather than only when a reader had
 // picked "Archived" from a dropdown. Active is DERIVED — `total -
-// inactiveTotal` — rather than a third door call: every account is exactly
-// one of the two (deactivate, never delete — there is no third pile), so the
-// arithmetic is exact whenever both operands are, and a caller who wants to
-// audit the assumption can watch the two badges sum to All's own.
+// inactiveTotal` — rather than a third door call: every NON-ARCHIVED account
+// is exactly one of the two (deactivate, never delete — there is no third
+// pile AMONG THEM), so the arithmetic is exact whenever both operands are,
+// and a caller who wants to audit the assumption can watch the two badges
+// sum to All's own.
+//
+// AMENDED 22 Sep 2026 (0117) — FOUR COUNTS NOW, NOT THREE, and the sentence
+// above is HISTORY: the wire word this screen sent for the Inactive tab's own
+// total was `archived` until this same round, renamed to `inactive` the
+// instant `archived` gained a real, stronger meaning of its own (her ruling,
+// "archived is different than inactive"). A fourth badge, `archivedTotalQ`,
+// asks the identical door a THIRD time, `{ archived: "yes" }`, for her new
+// state's own tab — and "Active + Inactive = All" above is now true only
+// because `total` (All) and `inactiveTotal` both exclude an archived row by
+// the door's own default (`accountsWhere`'s unconditional `archived_at IS
+// NULL` unless asked otherwise); an archived account is never a silent
+// fourth summand hiding inside either operand.
 
 import * as React from "react"
 
@@ -389,7 +402,7 @@ export function AccountsScreen({
   const vocabularyQ = useCached("selectable:all", () => tenancy.selectable().then((r) => r.values))
 
   // THE INACTIVE TAB'S OWN EXACT COUNT (R16) — the door's own `total` for a
-  // read narrowed to `archived: "yes"` and nothing else, the SAME parameter
+  // read narrowed to `inactive: "yes"` and nothing else, the SAME parameter
   // (and the same exactness) the retired Status facet used to send, just
   // asked unconditionally rather than only behind an opened dropdown. Cached
   // by team (R56: one door, once — a tab switch never re-asks this), off
@@ -398,26 +411,53 @@ export function AccountsScreen({
   // one-off string. See this file's header, "THREE EXACT COUNTS (R16), NOT
   // TWO", for why this is a client-side fetch rather than a third
   // always-computed field on the door's own response.
+  //
+  // RENAMED FROM `archived` TO `inactive` (0117, 22 Sep 2026) — the wire word
+  // this door answered to until the same day a real, stronger `archived`
+  // state joined `AccountFilters`. The door's default (no `archived` sent)
+  // already excludes that new state, so this total still counts exactly the
+  // inactive pile, never an archived row riding along uncounted.
   const inactiveTotalQ = useCached(totalKey("accounts-inactive", teamId), () =>
+    tenancy.accounts({ inactive: "yes" }).then((r) => r.total)
+  )
+  // THE ARCHIVED TAB'S OWN EXACT COUNT (R16, 0117) — the identical pattern
+  // beside it: the door's own `total` for a read narrowed to `archived:
+  // "yes"` and nothing else, her stronger, second put-away state. A second
+  // client-side fetch rather than a fourth always-computed field on the
+  // door's own response, for the same reason `inactiveTotalQ` is one and not
+  // a third — see this file's header.
+  const archivedTotalQ = useCached(totalKey("accounts-archived", teamId), () =>
     tenancy.accounts({ archived: "yes" }).then((r) => r.total)
   )
-  // ACTIVE IS DERIVED, NOT FETCHED — `total` (every account, unconditional)
-  // minus the inactive count above. Every account is exactly one of the two
-  // (deactivate, never delete: there is no third pile), so this is exact
-  // whenever both operands have loaded, and it costs no third door read.
+  // ACTIVE IS DERIVED, NOT FETCHED — `total` (every account, unconditional —
+  // and, since 0117, never an archived one either, the door's own default)
+  // minus the inactive count above. Every NON-ARCHIVED account is exactly
+  // one of the two (deactivate, never delete: there is no third pile among
+  // them), so this is exact whenever both operands have loaded, and it costs
+  // no third door read.
   const activeTotal =
     total !== undefined && inactiveTotalQ.data !== undefined ? total - inactiveTotalQ.data : undefined
 
   if (accountsQ.error) return <Skeleton variant="list" lines={4} />
   const loaded = accountsQ.data === undefined ? null : accountsQ.data
 
-  // ACTIVE · INACTIVE · ALL, BY STATUS — client ruling, 16 Sep 2026, verbatim:
-  // "For account status, let's keep active, inactive, and all." Replaces the
-  // entity-type Companies/All pair (this file's header has the whole
-  // account). DEFAULT "active" — her own word — so anything else unrecognised
-  // (unset, or a bookmark still carrying the retired `?tab=companies`) falls
-  // through to it rather than to a value this strip no longer offers.
-  const accountTab = tab === "all" ? "all" : tab === "inactive" ? "inactive" : "active"
+  // ACTIVE · INACTIVE · ARCHIVED · ALL, BY STATUS — client ruling, 16 Sep
+  // 2026, verbatim: "For account status, let's keep active, inactive, and
+  // all." Replaced the entity-type Companies/All pair (this file's header
+  // has the whole account). DEFAULT "active" — her own word — so anything
+  // else unrecognised (unset, or a bookmark still carrying the retired
+  // `?tab=companies`) falls through to it rather than to a value this strip
+  // no longer offers.
+  //
+  // ARCHIVED JOINS THE STRIP (0117, 22 Sep 2026) — "Give the new state a
+  // door and a way back, matching how the existing one is offered": Inactive
+  // already has its own tab, excluded from every other tab and from every
+  // picker; Archived gets the identical shape, one notch stronger — also
+  // excluded from All (the door's own default, `AccountFilters.archived`
+  // unset), which Inactive is NOT. This is the one place in the app an
+  // archived account is ever listed, and the one door back to it.
+  const accountTab =
+    tab === "archived" ? "archived" : tab === "all" ? "all" : tab === "inactive" ? "inactive" : "active"
   const accountsBadge = formatCount(total)
   const accountTabs = [
     {
@@ -439,6 +479,18 @@ export function AccountsScreen({
       label: t("Inactive"),
       icon: "prohibit",
       badge: formatCount(inactiveTotalQ.data),
+      badgeVariant: "" as const,
+    },
+    // ARCHIVED — her stronger state, its own tab, its own exact count
+    // (0117). `TAB_ICONS["archived"]` already resolves to `"archive"`
+    // (shared/web/screen-engine/tabs-view.tsx) — spelled out here anyway so
+    // the two agree on the page rather than by accident, the same reason
+    // Active/Inactive above spell theirs.
+    {
+      value: "archived",
+      label: t("Archived"),
+      icon: "archive",
+      badge: formatCount(archivedTotalQ.data),
       badgeVariant: "" as const,
     },
     { value: "all", label: t("All"), icon: "asterisk", badge: accountsBadge, badgeVariant: "" as const },
@@ -497,29 +549,37 @@ export function AccountsScreen({
           defaultSort="name"
           restingEmpty={loaded !== null && loaded.length === 0}
           restingLoading={loaded === null}
-          // BY STATUS, NOT BY TYPE — `archived` replaces the retired
+          // BY STATUS, NOT BY TYPE — `inactive` replaces the retired
           // `{ type: "entity" }` Companies narrowing; "all" fixes nothing, as
-          // it always did. `AccountFilters.archived` (`workers/tenancy/src/
-          // lib/accounts.ts`) is the same "yes"/"no" pair the retired Status
-          // facet sent — this screen still asks the door the identical
-          // question, only from the tab strip's own fixed narrowing now
-          // rather than from an open-ended filter control.
+          // it always did (and, since 0117, still never an archived row —
+          // the door's own default). `AccountFilters.inactive`
+          // (`workers/tenancy/src/lib/accounts.ts`) is the same "yes"/"no"
+          // pair the retired Status facet sent, renamed from `archived` the
+          // same round a real, stronger `archived` gained its own tab below
+          // — this screen still asks the door the identical question, only
+          // from the tab strip's own fixed narrowing now rather than from an
+          // open-ended filter control. THE ARCHIVED TAB sends `archived:
+          // "yes"` instead and nothing else, her second and stronger state
+          // (0117) — its own pile, not a slice of Active/Inactive/All.
           fixed={
             accountTab === "all"
               ? undefined
-              : { archived: accountTab === "inactive" ? "yes" : "no" }
+              : accountTab === "archived"
+                ? { archived: "yes" }
+                : { inactive: accountTab === "inactive" ? "yes" : "no" }
           }
           // THE STATUS FACET IS GONE HERE, THE TABS REPLACE IT — her own
           // parenthetical, verbatim, next to the status-tab ruling above. The
-          // declaration (`{ field: "archived", … }`,
+          // declaration (`{ field: "inactive", … }`,
           // `web/lib/collection-filters.ts`) is not dropped at its source —
           // that file is outside this lane's four owned files — so it is
           // filtered out of `translatedFacets`' own return array at THIS call
           // site instead: manager and country pass through untouched (her
-          // own "filters manager and country stay"), archived never reaches
-          // `<PagedFind>`'s facet row.
+          // own "filters manager and country stay"), inactive never reaches
+          // `<PagedFind>`'s facet row. (Archived, her stronger state, was
+          // never a facet at all — see the header above.)
           facets={translatedFacets("accounts", t, { manager: managerOptions, country: countryOptions }).filter(
-            (f) => f.field !== "archived"
+            (f) => f.field !== "inactive"
           )}
           fetchPage={(query, cursor) =>
             tenancy

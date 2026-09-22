@@ -2663,6 +2663,10 @@ export const TWO_READS_ONE_DOOR: Record<string, string> = {
     "the OPEN list and the ALL list are kept apart deliberately, and the file says why: ticking a task off the open list REMOVES it from the open list, so a detail screen sourced from that collection would answer \"that record no longer exists\" the moment somebody used the button on it. This is R38's failure prevented by construction; collapsing the two reads would reintroduce it.",
   "web/lib/use-screen-data.ts::useScreenData::listFetch.stories":
     "`listFetch.tasks`'s own shape, one collection along (client ruling, 15 Sep 2026, the Stories tab strip): `storiesQ` is the untouched, everyday backlog (`storiesKey(teamId)`, still read by breadcrumbs, cross-links and the module settings gear exactly as before this pass); `storiesViewQ` is whichever of the five tabs (`now`/`planned`/`backlog`/`completed`/`all`) the Stories screen is actually showing (`storiesKey(teamId, storyView)`). A story moving from Now to Completed leaves one list and joins another the same way a ticked task does, so collapsing the two reads would reintroduce the identical R38 failure `listFetch.tasks`'s own line names.",
+  "web/components/accounts/accounts-screen.tsx::AccountsScreen::tenancy.accounts":
+    "0117, 22 Sep 2026 — `inactiveTotalQ` (`{inactive:\"yes\"}`) and `archivedTotalQ` (`{archived:\"yes\"}`) are two DIFFERENT put-away states now, her own ruling (\"inactive is different than archived\"), each with its own tab and its own exact server total (R16) — the identical shape `entityTotal`/`individualTotal` already are on the list door's own response, just asked a second and third time because this screen owns fetching its two supplementary badges rather than asking a worker file outside this lane's four owned files to grow a matching pair (this file's own header, 'THREE EXACT COUNTS, NOT TWO', amended the same round to four). Collapsing either into the other would badge one tab with the other tab's count.",
+  "web/lib/account-names.ts::useAccountNames::tenancy.accounts":
+    "0117, 22 Sep 2026 — `companiesQ` (`{type:\"entity\"}`, the door's own default, never an archived row) and `archivedQ` (`{type:\"entity\", archived:\"yes\"}`) answer two different questions on purpose, both NAME lookups rather than lists anybody browses: the first keeps a company outside page one from reading as \"An account\" (this file's own header, 25 Aug 2026), the second keeps that same fallback from firing the moment that company is archived — a record reachable through something else (an app, a knowledge source) should still show the real name as plain text rather than a dead label, the decision made for every 'reachable through' surface in the 0117 round. Collapsing the two would mean asking the door's default (which excludes an archived row) to also answer for one.",
 }
 
 /** R72 — THE FILES THAT STILL DRAW A SUBTITLE UNDER A HEADING, and the reason
@@ -2883,8 +2887,10 @@ export const PAPER_ON_PURPOSE: Record<string, string> = {
   "web-portal/components/home-screen.tsx":
     "the TimeGivenBack tile - a single metric link tile to /impact, routed through the kit's own Card (21 Sep 2026 audit, replacing a hand-rolled bg-surface-panel box). Aurora's own words, reused from the identical Effort-tile ruling: \"this is a metric, like in kit\" - the same register web/components/work/effort-card.tsx's three tiles already read, a per-record object a reader presses rather than a page region they read.",
   // ── shared/web/ ─────────────────────────────────────────────────────────
-  "shared/web/appearance-tab-preview.tsx":
-    "a DRAWING of a card, not a card. This is the Appearance tab's live preview of the shell, and the card inside it stands for `ScreenShell`'s own card at miniature scale - painting it plain would make the preview stop showing the thing it exists to show.",
+  // "shared/web/appearance-tab-preview.tsx" stood here — the Appearance tab's
+  // live preview of the shell — until 22 Sep 2026, when Aurora's ruling
+  // ("lets go back to when clicking it gets implemented (without needing to
+  // save)") deleted the preview outright rather than leaving it to fix.
 }
 
 // ── R67, WIDENED — A COLLECTION NESTED IN A RECORD-DETAIL TAB NEEDS ITS OWN
@@ -4706,6 +4712,8 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
  * Rot-checked twice: a path that comes back, or one nothing names any more,
  * turns the build red, so the list can only shrink. */
 export const GONE_ON_PURPOSE: Record<string, string> = {
+  "shared/web/appearance-tab-preview.tsx":
+    "the Appearance tab's live preview, deleted 22 Sep 2026 at Aurora's ruling (\"i dont like how to previsualize, lets go back to when clicking it gets implemented (without needing to save)\") — a control applies to the real page now, which is the preview. shared/web/appearance-panel.tsx's own header, shared/i18n-seed.ts's orphan note on the preview's own accessible-name string, and this registry's own PAPER_ON_PURPOSE/HAND_ROLLED_OK comments all name this path precisely BECAUSE it is gone.",
   "web/components/screens/profile-screen.tsx":
     "the standalone /profile screen, retired 17 Sep 2026 at the client's own ruling ('I go to the nav bar, on my name, and to my profile. This page should not exist. It should lead me to the same page that I arrive at when I go to Settings, Members, and I click on one member.'). The nav bar's own name (profile-menu.tsx) now opens the signed-in person's own team-scoped member record (member-screen.tsx) by id, the same screen a card on Settings › Members opens for anybody else. UI-RULEBOOK.md's L26 entry and its N8 width census both name this path precisely BECAUSE it is gone — L26 is the retirement record itself, and N8's table is measured history of a cap that no longer exists anywhere, this file included.",
   "web/lib/app-stage-icon.tsx":
@@ -5335,16 +5343,12 @@ export const AUTH_PUBLISH_EXEMPT: Record<string, string> = {
  * `agent-markdown.tsx`'s link transition (2026-09-13, once the assistant's
  * prose and `ArticleBody`'s were unified onto one renderer). */
 export const HAND_ROLLED_OK: Record<string, string> = {
-  "shared/web/appearance-tab-preview.tsx":
-    "The Appearance panel's live preview animates its fake title's `font-size` " +
-    "in step with the heading-cap slider (`transition-[font-size] duration-200`), " +
-    "so a reader sees the cap move rather than jump. None of the four named " +
-    "shapes fits a resizing property tied to a live prop rather than a hover, a " +
-    "row or a route: `motion-hover` transitions colour/border/fill/stroke only, " +
-    "never `font-size`, and there is no fifth 'a value scrubbed live' class in " +
-    "the kit's vocabulary to reach for instead. The preview's OWN ground colour " +
-    "swap two lines above this one is not pinned here — it is a genuine fill " +
-    "swap and now reads `motion-hover`.",
+  // Emptied a third time, 22 Sep 2026: its one entry
+  // (`shared/web/appearance-tab-preview.tsx`, the Appearance panel's live
+  // preview) was deleted whole, not fixed — Aurora's ruling that day removed
+  // the preview itself ("i dont like how to previsualize, lets go back to
+  // when clicking it gets implemented"), so the hand-rolled `font-size`
+  // transition this entry excused no longer exists to excuse.
 }
 
 // ── tab-shape (rules.test.ts) ───────────────────────────────────────────────

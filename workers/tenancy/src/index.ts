@@ -27,7 +27,8 @@
 //   POST /api/tenancy/accounts             -> create an account (company or person)
 //   POST /api/tenancy/accounts/update      -> edit an account's own fields
 //   POST /api/tenancy/accounts/parent      -> move it under another (loop-refused)
-//   POST /api/tenancy/accounts/active      -> archive / restore (never deleted)
+//   POST /api/tenancy/accounts/active      -> deactivate / reactivate, her INACTIVE (never deleted)
+//   POST /api/tenancy/accounts/archived    -> archive / unarchive, her ARCHIVED (0117, stronger, never deleted)
 //   POST /api/tenancy/accounts/links       -> link a person to an account
 //   POST /api/tenancy/accounts/links/active-> unlink / relink a person
 //   GET  /api/tenancy/portal-users         -> who can log in (?accountId)
@@ -189,6 +190,7 @@ import {
   getPortalUsers,
   postSwitchPortalAccount,
   postAccountActive,
+  postAccountArchived,
   postAccountParent,
   postCreateAccount,
   postGrantPortalAccess,
@@ -295,6 +297,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/accounts/update": { handler: postUpdateAccount, kind: "mutation" },
   "POST /api/tenancy/accounts/parent": { handler: postAccountParent, kind: "mutation" },
   "POST /api/tenancy/accounts/active": { handler: postAccountActive, kind: "mutation" },
+  "POST /api/tenancy/accounts/archived": { handler: postAccountArchived, kind: "mutation" },
   "POST /api/tenancy/accounts/links": { handler: postLinkPerson, kind: "mutation" },
   "POST /api/tenancy/accounts/links/active": { handler: postLinkActive, kind: "mutation" },
   "GET /api/tenancy/portal-users": { handler: getPortalUsers, kind: "read" },

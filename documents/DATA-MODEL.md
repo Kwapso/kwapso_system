@@ -1180,10 +1180,29 @@ both are deliberately generous rather than tuned.
 
 `account_links`: audit block + `account_id` (the company side),
 `person_account_id` (the person's own account row), `relationship`,
-`is_main_stakeholder`. This is what the parent pointer **cannot** say. Marta is a
-contact of Bergman *and* of Delaval, and a single parent has room for one. A
-partial unique index on the active pair is the duplicate race guard. "Contact" is
-a role word, not a table: it is this row.
+`is_main_stakeholder`. This is what the parent pointer **cannot** say: a single
+parent pointer holds one account, so a table beside it is what let Marta be
+recorded as a contact of Bergman *and* of Delaval, one row per company. A partial
+unique index on the active pair is the duplicate race guard. "Contact" is a role
+word, not a table: it is this row.
+
+**THE REASONING ABOVE STOPPED APPLYING ON 22 SEP 2026. IT IS NOT OVERRULED; ITS
+PREMISE CHANGED.** Aurora's ruling that day: one person can only be at one
+company. The cap `account_links` existed to avoid ("a single parent has room for
+one") is now the rule itself, so the argument that made `account_links`
+necessary has nothing left to defend: it was correct about what a single pointer
+cannot express while more than one company was allowed, and once more than one
+is not allowed there is no longer a gap for it to fill. The evidence behind the
+ruling: on the live data exactly three people sit at two companies today, and
+all three are test rows. The canonical example this document named, Marta at
+Bergman *and* Delaval, is itself seed data
+(`workers/tenancy/test/spine-harness.ts`) on `bergman.example` and
+`delaval.example`, both reserved test domains (RFC 2606); no real contact is
+affected. The fix is a SHAPE change, not a validation: the contacts table will
+carry a single account column, so there is nowhere to put a second one and no
+door has to remember the rule; a contact still belongs to a company, or to none
+at all. That change, including retiring `account_links` and the reasoning above,
+belongs to the session doing the table split, not this one.
 
 `portal_users`: audit block + `account_id`, `user_id` (the GLOBAL users row),
 `app_restriction`, and `current_account_id` (added by `0008`, below). **The login

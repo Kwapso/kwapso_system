@@ -436,8 +436,9 @@ the case that actually bites — a new `foo-detail.tsx` shipped without tabs tur
 this red.
 
 `knowledge-detail.tsx` is the shortest model to copy: a `TabsView` whose panels are
-`Source` (the words themselves) / `Overview` (a description list built from
-`auditItems(...)`) / `Activity` (an `ActivityFeed` fed by the generic
+`Source` (the words themselves) / `Overview` (a description list of the record's
+own facts, with `Status` selected by name from `auditFields(...)` — who/when is the
+ink footer's Record column, not a row here) / `Activity` (an `ActivityFeed` fed by the generic
 `useRecordActivity("knowledge_sources", id)` path). The record's own tab carries no
 badge; Activity carries `formatCount(activity.total)`.
 

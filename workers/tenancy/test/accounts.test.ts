@@ -18,6 +18,7 @@ import { accountScope } from "@shared/workers/account-scope"
 import { MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
 import {
   countAccountLinks,
+  countPersonCompanies,
   createAccount,
   getAccount,
   grantPortalAccess,
@@ -27,6 +28,7 @@ import {
   listAccountsForExport,
   listPersonCompanies,
   setAccountActive,
+  setAccountArchived,
   setAccountParent,
   setLinkActive,
   setPortalAccessActive,
@@ -362,25 +364,155 @@ describe("one live login per person", () => {
   })
 })
 
-describe("archiving is idempotent (R17)", () => {
-  it("a double-clicked archive moves rows once and writes history once", async () => {
+// DEACTIVATE / REACTIVATE (her INACTIVE, unchanged meaning) — renamed from
+// "archive"/"archived" 0117, 22 Sep 2026, the same round a real, stronger
+// `setAccountArchived` joined it below. The mechanism, the WHERE clauses and
+// the R17 shape are untouched; only the activity TYPE string changed
+// ("Account archived" → "Account deactivated"), which is what these two
+// cases assert.
+describe("deactivating is idempotent (R17)", () => {
+  it("a double-clicked deactivate moves rows once and writes history once", async () => {
     expect(await setAccountActive(cfg, guard, staff, actor, IDS.victimAccount, false)).toBe(true)
     expect(await setAccountActive(cfg, guard, staff, actor, IDS.victimAccount, false)).toBe(false)
     const history = db()
-      .prepare("SELECT COUNT(*) n FROM activity WHERE related_row_id = ? AND type = 'Account archived'")
+      .prepare("SELECT COUNT(*) n FROM activity WHERE related_row_id = ? AND type = 'Account deactivated'")
       .get(IDS.victimAccount) as { n: number }
     expect(history.n).toBe(1)
     expect(await setAccountActive(cfg, guard, staff, actor, IDS.victimAccount, true)).toBe(true)
     expect(await setAccountActive(cfg, guard, staff, actor, IDS.victimAccount, true)).toBe(false)
   })
 
-  it("an archived account keeps its children and its links", async () => {
+  it("an inactive account keeps its children and its links", async () => {
     await setAccountActive(cfg, guard, staff, actor, IDS.victimAccount, false)
     expect(parentOf(IDS.victimChild)).toBe(IDS.victimAccount)
     const links = db().prepare("SELECT COUNT(*) n FROM account_links WHERE account_id = ?").get(
       IDS.victimAccount
     ) as { n: number }
     expect(links.n).toBe(1)
+  })
+})
+
+// ARCHIVED (0117, 22 Sep 2026) — her second, stronger state, independent of
+// `setAccountActive` above: not deleted, but invisible to every ordinary
+// read this file's other suites already lock (the list, its counts, the
+// pickers `searchAccounts` stands on, a contact's related-account count).
+// This block proves the write itself (R17, independence from `active`,
+// never-delete) and hands the "invisible everywhere" half to the suites
+// below, each keyed by the expression it guards rather than a line number.
+describe("archiving (her stronger state) is idempotent (R17), and is not deactivating", () => {
+  it("a double-clicked archive moves rows once and writes history once", async () => {
+    expect(await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)).toBe(true)
+    expect(await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)).toBe(false)
+    const history = db()
+      .prepare("SELECT COUNT(*) n FROM activity WHERE related_row_id = ? AND type = 'Account archived'")
+      .get(IDS.victimAccount) as { n: number }
+    expect(history.n).toBe(1)
+    expect(await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, false)).toBe(true)
+    expect(await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, false)).toBe(false)
+  })
+
+  it("never touches deactivated_at — unarchiving hands back exactly the active/inactive state it carried before", async () => {
+    // Deactivate first (her INACTIVE), THEN archive on top of it.
+    await setAccountActive(cfg, guard, staff, actor, IDS.victimAccount, false)
+    await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)
+    const midway = db()
+      .prepare("SELECT deactivated_at, archived_at FROM accounts WHERE id = ?")
+      .get(IDS.victimAccount) as { deactivated_at: string | null; archived_at: string | null }
+    expect(midway.deactivated_at).not.toBe(null)
+    expect(midway.archived_at).not.toBe(null)
+    // Unarchive: deactivated_at must still read INACTIVE — never silently
+    // reactivated as a side effect of the unarchive write.
+    await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, false)
+    const after = db()
+      .prepare("SELECT deactivated_at, archived_at FROM accounts WHERE id = ?")
+      .get(IDS.victimAccount) as { deactivated_at: string | null; archived_at: string | null }
+    expect(after.deactivated_at).not.toBe(null)
+    expect(after.archived_at).toBe(null)
+  })
+
+  it("an archived account keeps its children and its links — never deleted", async () => {
+    await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)
+    expect(parentOf(IDS.victimChild)).toBe(IDS.victimAccount)
+    const links = db().prepare("SELECT COUNT(*) n FROM account_links WHERE account_id = ?").get(
+      IDS.victimAccount
+    ) as { n: number }
+    expect(links.n).toBe(1)
+  })
+})
+
+// THE PROOF THAT AN ARCHIVED ROW CANNOT LEAK — the list, its counts, the
+// detail door (which stays open, her own "way back"), a picker, and a
+// contact's related-account count. Each case is keyed by the EXPRESSION it
+// guards (named in its own title) rather than by a line number, per the
+// brief: a line number rots on the very next edit above it.
+describe("an archived account cannot leak into a list, a count, or a picker (0117)", () => {
+  it("accountsWhere's default `archived_at IS NULL` — the list drops it, and `total` drops with it", async () => {
+    const before = await listAccounts(cfg, guard, staff, { mayListPeople: true, maySeeLogins: true })
+    const beforeIds = before.rows.map((r) => r.id)
+    expect(beforeIds).toContain(IDS.victimAccount)
+
+    expect(await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)).toBe(true)
+
+    const after = await listAccounts(cfg, guard, staff, { mayListPeople: true, maySeeLogins: true })
+    expect(after.rows.map((r) => r.id)).not.toContain(IDS.victimAccount)
+    expect(after.total).toBe(before.total - 1)
+
+    // THE WAY BACK — `archived: "yes"` is the one door in, and it is exact.
+    const archivedOnly = await listAccounts(
+      cfg,
+      guard,
+      staff,
+      { mayListPeople: true, maySeeLogins: true },
+      { archived: "yes" }
+    )
+    expect(archivedOnly.rows.map((r) => r.id)).toContain(IDS.victimAccount)
+    expect(archivedOnly.total).toBe(1)
+  })
+
+  it("an archived row is excluded from the CSV export by the same default", async () => {
+    await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)
+    const { rows } = await listAccountsForExport(cfg, guard, staff, { mayListPeople: true, maySeeLogins: true })
+    expect(rows.map((r) => r.id)).not.toContain(IDS.victimAccount)
+  })
+
+  it("the detail door stays open — her own way back — and the row reads `archived: true`", async () => {
+    await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)
+    const detail = await getAccount(cfg, guard, staff, IDS.victimAccount)
+    expect(detail.account.archived).toBe(true)
+    expect(detail.account.id).toBe(IDS.victimAccount)
+  })
+
+  it("countAccountLinks drops an archived CONTACT, and listAccountLinks agrees — the badge never outruns its own list", async () => {
+    const before = await countAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    const beforeLinks = await listAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    expect(before).toBe(beforeLinks.length)
+    expect(before).toBeGreaterThan(0)
+
+    // Archive the PERSON on the other end of the link, not the company.
+    const link = beforeLinks[0]
+    await setAccountArchived(cfg, guard, staff, actor, link.personAccountId, true)
+
+    const after = await countAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    const afterLinks = await listAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    expect(after).toBe(before - 1)
+    expect(after).toBe(afterLinks.length)
+    expect(afterLinks.map((l) => l.personAccountId)).not.toContain(link.personAccountId)
+  })
+
+  it("countPersonCompanies drops an archived COMPANY, and listPersonCompanies agrees", async () => {
+    const beforeLinks = await listAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    const personId = beforeLinks[0].personAccountId
+
+    const before = await countPersonCompanies(cfg, guard, staff, personId)
+    expect(before).toBeGreaterThan(0)
+
+    await setAccountArchived(cfg, guard, staff, actor, IDS.victimAccount, true)
+
+    const after = await countPersonCompanies(cfg, guard, staff, personId)
+    const afterCompanies = await listPersonCompanies(cfg, guard, staff, personId)
+    expect(after).toBe(before - 1)
+    expect(after).toBe(afterCompanies.length)
+    expect(afterCompanies.map((c) => c.accountId)).not.toContain(IDS.victimAccount)
   })
 })
 

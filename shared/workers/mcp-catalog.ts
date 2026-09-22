@@ -117,16 +117,16 @@ export const MCP_ONLY_TOOLS: McpOnlyTool[] = [
   {
     name: "export_accounts_csv",
     summary:
-      "Every account you can see as CSV, companies and people, full fields + audit. Narrows by the same seven filters as list_accounts.",
+      "Every account you can see as CSV, companies and people, full fields + audit. Narrows by the same eight filters as list_accounts.",
     detail:
-      "The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME seven filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `archived` ('yes' or 'no'), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot), `parentId`, `manager` (a staff member's user id), `country` (an exact match against the team's Country vocabulary). Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR — a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
-    inputSchema: obj({ q: S, type: S, archived: S, portal: S, parentId: S, manager: S, country: S }),
+      "The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME eight filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `inactive` ('yes' or 'no'), `archived` ('yes' for only the archived ones; omitted excludes them, the same default every other account read carries), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot), `parentId`, `manager` (a staff member's user id), `country` (an exact match against the team's Country vocabulary). Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR — a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
+    inputSchema: obj({ q: S, type: S, inactive: S, archived: S, portal: S, parentId: S, manager: S, country: S }),
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/accounts/export",
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "archived", "portal", "parentId", "manager", "country"])
+      for (const key of ["q", "type", "inactive", "archived", "portal", "parentId", "manager", "country"])
         if (typeof i[key] === "string" && i[key]) q.push(`${key}=${encodeURIComponent(String(i[key]))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

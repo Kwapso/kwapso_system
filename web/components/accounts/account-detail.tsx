@@ -65,7 +65,7 @@ import { useRemembered } from "@shared/web/remembered"
 import { useConfirm } from "@shared/web/use-confirm"
 
 import { ClientOrgPanel } from "@/components/accounts/client-org-panel"
-import { Power, PencilSimple } from "@shared/ui/foundations/icons"
+import { Power, Archive, PencilSimple } from "@shared/ui/foundations/icons"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 import { Badge } from "@shared/ui/components/badge/badge"
 
@@ -83,15 +83,14 @@ import {
 } from "@/components/accounts/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/accounts/contact-detail"
 import { AppFormDialog } from "@/components/apps/app-form-dialog"
-import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/work/todo-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
 import { useSessionUserId } from "@/lib/use-active-team"
-import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
+import { KnowledgeScreen } from "@/components/knowledge/knowledge-screen"
 import { RichText } from "@shared/web/rich-text-view"
 import { ImpactPanel } from "@/components/process/impact-panel"
 import { createAppFrom } from "@/components/apps/apps-screen"
-import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work/work-panels"
+import { AppsPanel, TodosPanel, sliceKey } from "@/components/work/work-panels"
 import { OverviewList } from "@/components/records/overview-list"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
@@ -109,7 +108,6 @@ import {
   accountsKey,
   appsKey,
   listFetch,
-  sprintsKey,
   todosKey,
   totalKey,
 } from "@/lib/live-resources"
@@ -117,12 +115,9 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
-import { WaveCollection } from "@/components/work/waves-screen"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
-import { MARK_GROUP, markMap } from "@/lib/type-marks"
-import type { SelectableValue } from "@shared/types"
 
 export function AccountDetailScreen({
   teamId,
@@ -149,12 +144,6 @@ export function AccountDetailScreen({
   // flaky". Every read below is about THIS record or the form that edits it, so
   // every one of them has that dependency already.
   const have = detailQ.data !== undefined
-  // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
-  // nested panel on it. The same key the Dropdown values manager writes, so
-  // an emoji changed there reaches these rows with no deploy.
-  const teamVocabulary = useCached<SelectableValue[]>(have ? `selectable:${teamId}` : null, () =>
-    tenancy.selectable().then((r) => r.values)
-  )
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends. Hand-rolling
   // this read is what let a badge and its feed disagree elsewhere.
@@ -200,20 +189,32 @@ export function AccountDetailScreen({
   const canCreateContacts = canLinkContacts && can("accounts", "create")
   // THE WORK HANGING OFF THIS CLIENT. Apps are the record directly below an
   // account (an app belongs to ONE account, always — the owner's ruling), and
-  // the sprints and to-dos beside them are the two other collections a door
-  // will narrow to one account. Each tab is gated on its own module, so a role
-  // that cannot read the work engine simply does not see those tabs.
+  // to-dos beside them are the other collection a door will narrow to one
+  // account. Each tab is gated on its own module, so a role that cannot read
+  // inputs simply does not see that tab.
+  //
+  // WAVES AND PHASES LEFT THIS RECORD, Aurora ruling, 22 Sep 2026, verbatim:
+  // "remove waves & phases from account detail page." Neither component
+  // moved: `WaveCollection` still draws the sidebar Waves page
+  // (`web/components/work/waves-screen.tsx`, `WavesScreen`), and
+  // `SprintsPanel` is still an app's own Phases tab
+  // (`web/components/apps/app-detail.tsx`), only THIS record's own two tabs
+  // into them, and the write dialog that hung off the Phases tab, are gone.
+  // The wave/sprint-account counts (`totalKey("waves-account", …)`,
+  // `totalKey("sprints-account", …)`) still exist server-side and still feed
+  // `useRecordCounts` above; they were shared badge plumbing this record
+  // never owned, and other callers still invalidate them (see
+  // `wave-detail.tsx`'s own `sliceKey("sprints-account", …)`); only the two
+  // `useCachedValue` reads that turned them into THIS screen's tab badges
+  // are removed, below.
   const canSeeApps = can("processes", "read")
   const canWriteApps = can("processes", "create")
-  const canSeeWork = can("work", "read")
-  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Selling a block of work is
-  // `work:create` and asking a client for something is `inputs:create`
-  // (renamed from `todos:create` 15 Sep 2026, team migration 0096) — the
-  // rights the SPRINT door and the TO-DO door gate on. Standing on an account
-  // record is not a right; `accounts:*` says nothing about whether a person may
-  // put work on the backlog. The door decides either way (R10); these only
-  // decide whether we draw a button that would come back a 403.
-  const canWriteWork = can("work", "create")
+  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Asking a client for something is
+  // `inputs:create` (renamed from `todos:create` 15 Sep 2026, team migration
+  // 0096), the right the TO-DO door gates on. Standing on an account record
+  // is not a right; `accounts:*` says nothing about whether a person may put
+  // an input on the backlog. The door decides either way (R10); this only
+  // decides whether we draw a button that would come back a 403.
   // MODULE RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0096).
   const canSeeTodos = can("inputs", "read")
   const canAskTodo = can("inputs", "create")
@@ -241,11 +242,12 @@ export function AccountDetailScreen({
   // like a zero and like a still-loading total, and stays distinguishable from
   // both in the cache.
   const appsTotal = useCachedValue<number | null>(totalKey("apps-account", accountId))
-  const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-account", accountId))
-  // WHAT THEY BOUGHT IT ALL INSIDE. The exact server COUNT(*) for this client,
-  // through the same badge door as every other tab (R16).
-  const wavesTotal = useCachedValue<number | null>(totalKey("waves-account", accountId))
   const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
+  // THE KNOWLEDGE TAB'S OWN BADGE — the same `knowledge-account` sidecar
+  // `useRecordCounts("accounts", …)` above already primed (shared/record-counts.ts),
+  // read the identical way `appsTotal`/`todosTotal` are: no second fetch, the
+  // exact server COUNT(*) (R16).
+  const knowledgeTotal = useCachedValue<number | null>(totalKey("knowledge-account", accountId))
 
   // The one deep-linkable tab. `?tab=organisation` is what the step form's
   // "add or edit their roles and tools" link carries — the management surface
@@ -259,16 +261,35 @@ export function AccountDetailScreen({
   // destination a person asked for.
   const askedTab = () =>
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab")
+  // THE TABS THIS ROLE CAN ACTUALLY SEE: every value `tabsConfig` below can
+  // carry, gated the identical way. REVIVED AGAINST THIS SET, not accepted
+  // blindly: `useRemembered`'s own contract for exactly this case ("a tab
+  // that no longer exists on this record", shared/web/remembered.tsx), the
+  // same seam `module-settings-screen.tsx` reaches for when a tab it used to
+  // draw is gone. Waves and Phases left this record on 22 Sep 2026 (Aurora:
+  // "remove waves & phases from account detail page"); a memory from before
+  // that still holding either word must land on Overview rather than a blank
+  // panel with no tab selected.
+  const knownTabs = [
+    "overview",
+    ...(canSeeApps ? ["apps", "impact", "organisation"] : []),
+    ...(canSeeTodos ? ["todos"] : []),
+    ...(canReadKnowledge ? ["knowledge"] : []),
+  ]
   const [tab, setTab] = useRemembered(
     "tab",
     () => (askedTab() === "organisation" ? "organisation" : "overview"),
-    (found) => (askedTab() ? undefined : typeof found === "string" ? found : undefined)
+    (found) =>
+      askedTab()
+        ? undefined
+        : typeof found === "string" && knownTabs.includes(found)
+          ? found
+          : undefined
   )
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
   const [newContactOpen, setNewContactOpen] = React.useState(false)
   const [appOpen, setAppOpen] = React.useState(false)
-  const [sprintOpen, setSprintOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
 
   /** Re-read what this screen shows after our own write. (Everyone else's screen
@@ -513,6 +534,15 @@ export function AccountDetailScreen({
       // already shows, under a second name. The PARENT POINTER is untouched: a
       // company still sits under its holding company, the form still moves it,
       // and the header still links up the tree.
+      //
+      // NO WAVES OR PHASES TAB EITHER, Aurora ruling, 22 Sep 2026, verbatim:
+      // "remove waves & phases from account detail page." Both collections
+      // stand on their own now: Waves has the sidebar page (`WavesScreen` /
+      // `WaveCollection`, web/components/work/waves-screen.tsx) and Phases is
+      // still an app's own tab (`SprintsPanel`, web/components/apps/
+      // app-detail.tsx). Neither component moved or lost its other host,
+      // only this record's own two tabs into them did, along with the
+      // write-a-phase dialog that hung off the Phases tab here.
       // The work hanging off this client, each behind its own read right.
       ...(canSeeApps
         ? [
@@ -565,24 +595,6 @@ export function AccountDetailScreen({
             },
           ]
         : []),
-      ...(canSeeWork
-        ? [
-            {
-              value: "waves",
-              label: t("Waves"),
-              icon: CONCEPT_ICON.waves,
-              badge: formatCount(wavesTotal),
-              badgeVariant: "" as const,
-            },
-            {
-              value: "sprints",
-              label: t("Phases"),
-              icon: CONCEPT_ICON.sprints,
-              badge: formatCount(sprintsTotal),
-              badgeVariant: "" as const,
-            },
-          ]
-        : []),
       ...(canSeeTodos
         ? [
             {
@@ -604,7 +616,7 @@ export function AccountDetailScreen({
               value: "knowledge",
               label: t("Knowledge"),
               icon: CONCEPT_ICON.knowledge,
-              badge: "",
+              badge: formatCount(knowledgeTotal),
               badgeVariant: "" as const,
             },
           ]
@@ -618,42 +630,91 @@ export function AccountDetailScreen({
   }
 
   const openAccount = (id: string) => softNavigate(`${basePath}/${id}`)
+  // THE TEAM ROOT, for a knowledge source opened from this account's own tab —
+  // it lives at its own address, not nested under this account's, the identical
+  // `urlPrefix` app-detail.tsx builds for its own Knowledge tab's `onIntent`.
+  const urlPrefix = basePath.replace(/\/accounts$/, "")
 
   /* B1 / CHECKLIST 11.2 — Edit stays visible, archiving moves into the menu with
    * its red and its confirm intact. */
+  // 0117, 22 Sep 2026 — HER RULING SPLIT ONE WORD INTO TWO ACTIONS. "Archive"
+  // used to mean what she now calls INACTIVE (put away, still fully
+  // reachable, its own tab); the button, the confirm and the toast below all
+  // now speak of DEACTIVATE/REACTIVATE instead, unchanged in every way but
+  // the words. ARCHIVE now names her real, stronger state — a second pair of
+  // menu items, "Give the new state a door and a way back, matching how the
+  // existing one is offered": the identical shape, one confirm for the
+  // destructive half and none for the way back.
   const overflow: RecordAction[] = canArchive
     ? [
         account.active
           ? {
-              key: "archive",
-              label: t("Archive"),
+              key: "deactivate",
+              label: t("Deactivate"),
               icon: <Power className="size-3.5" />,
               disabled: busy,
               destructive: true,
               onSelect: () =>
                 ask({
-                  title: `Archive ${account.name}?`,
-                  body: "It stops showing in the everyday lists. Everything on it, its people and its history, stays exactly where it is, and you can bring it back any time.",
-                  action: "Archive",
+                  title: `Deactivate ${account.name}?`,
+                  body: "It stops showing in the everyday lists and every picker. Everything on it, its people and its history, stays exactly where it is, and you can bring it back any time.",
+                  action: "Deactivate",
                   run: () =>
                     run(
                       () => tenancy.setAccountActive(accountId, false),
-                      "Account archived.",
-                      "Couldn't archive the account."
+                      "Account deactivated.",
+                      "Couldn't deactivate the account."
                     ),
                 }),
             }
           : {
-              key: "restore",
-              label: t("Restore"),
+              key: "reactivate",
+              label: t("Reactivate"),
               icon: <Power className="size-3.5" />,
               disabled: busy,
               onSelect: () =>
                 void run(
                   () => tenancy.setAccountActive(accountId, true),
-                  "Account restored.",
-                  "Couldn't restore the account."
+                  "Account reactivated.",
+                  "Couldn't reactivate the account."
                 ),
+            },
+        // ARCHIVE / UNARCHIVE — her stronger state (0117). NEVER deletes, her
+        // own words: "Archived menas 'delated' (only that we cnnot delete)."
+        // Offered regardless of active/inactive, because either can be
+        // archived; unarchiving hands back exactly the active/inactive state
+        // the account carried before, unchanged by this pair.
+        account.archived
+          ? {
+              key: "unarchive",
+              label: t("Unarchive"),
+              icon: <Archive className="size-3.5" />,
+              disabled: busy,
+              onSelect: () =>
+                void run(
+                  () => tenancy.setAccountArchived(accountId, false),
+                  "Account unarchived.",
+                  "Couldn't unarchive the account."
+                ),
+            }
+          : {
+              key: "archive",
+              label: t("Archive"),
+              icon: <Archive className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: () =>
+                ask({
+                  title: `Archive ${account.name}?`,
+                  body: "It stops showing everywhere, in every list, picker and count. Everything on it, its people and its history, stays exactly where it is, and you can bring it back any time from here.",
+                  action: "Archive",
+                  run: () =>
+                    run(
+                      () => tenancy.setAccountArchived(accountId, true),
+                      "Account archived.",
+                      "Couldn't archive the account."
+                    ),
+                }),
             },
       ]
     : []
@@ -704,19 +765,49 @@ export function AccountDetailScreen({
       // took the eyebrow out of the full header); the breadcrumb above this
       // header is what names the record type now.
       recordNumber={account.code || undefined}
-      collectionLabel={t("Company")}
+      // NO `collectionLabel` ANY MORE. Aurora ruling, 22 Sep 2026, verbatim:
+      // "on ocmpanies the first chip must be the id (in black). rmeove this
+      // 'company' one (all of them are companies)." This screen only ever
+      // renders for the entity half of the `accounts` table (the individual
+      // half hands off to `ContactDetailScreen` above), so every record this
+      // chip could ever sit on already reads "Company"; restating it on each
+      // one is the same "eyebrow said it already" mistake `contact-detail.tsx`
+      // was corrected out of on 2026-08-31, not a different one. That
+      // screen's own note claiming this chip was "NOT the same mistake" is
+      // superseded by this ruling. `recordNumber` above is unchanged and
+      // still renders FIRST: `RecordRef` (shared/web/record-ref.tsx), the
+      // one black-chip component every kind with a reference already uses
+      // (a ticket, a story, a sprint…), is what `record-chrome.tsx`'s own
+      // `identityChips` always draws before `collectionLabel` or `chips`,
+      // so removing this one prop does not reorder anything: the id chip was
+      // already first and already black, and now it is simply the only chip
+      // ahead of the status pill.
       // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31, reading
       // their own screenshot of an account back: a status chip carries a dot).
-      // An account's only two states are live and archived (glossary: "An
-      // account has none [no status]: it is live, or it is archived").
       // REWIRED 17 Sep 2026 — her ruling that session, verbatim: "account
       // active green dot." The live half used to stay wordless; it carries
       // the kit's own `shipped` (green) dot now, the same live/put-away pair
-      // every other kind in this ruling reaches for. Archived is unchanged.
+      // every other kind in this ruling reaches for.
+      //
+      // AMENDED 22 Sep 2026 (0117) — THREE STATES NOW, NOT TWO. Her ruling
+      // split "archived" into INACTIVE (unchanged meaning, `account.active
+      // === false`) and a real, stronger ARCHIVED (`account.archived`,
+      // independent of `active`). The glossary's old sentence ("An account
+      // has none [no status]: it is live, or it is archived") is HISTORY —
+      // see `shared/glossary.ts`'s own account entry for the current one.
+      // ARCHIVED WINS THE CHIP when both are true (an inactive account can
+      // also be archived): the stronger fact is the one worth a person's
+      // attention, the same "worse fact wins the one chip" shape a ticket's
+      // own status chip already follows. Both put-away states share the grey
+      // `archived` dot tone (`shared/status-tones.ts` — a colour name, not a
+      // word shown to anyone), told apart by the LABEL instead.
       chips={
         <>
-          <Badge variant="status" dot={account.active ? "shipped" : "archived"}>
-            {account.active ? t("Active") : t("Archived")}
+          <Badge
+            variant="status"
+            dot={account.archived || !account.active ? "archived" : "shipped"}
+          >
+            {account.archived ? t("Archived") : account.active ? t("Active") : t("Inactive")}
           </Badge>
           {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
               `help-detail.tsx`'s own ("aign the menu to the chips"). */}
@@ -860,29 +951,6 @@ export function AccountDetailScreen({
                 onNew={canWriteApps ? () => setAppOpen(true) : undefined}
               />
             )
-          if (tabItem.value === "waves")
-            return (
-              <WaveCollection
-                teamId={teamId}
-                /* NESTED, like every other child on this record: a wave opened
-                   from here keeps the client in the address, so the trail reads
-                   Client › Waves › the wave and Back goes where it came from. */
-                basePath={`${basePath}/${accountId}/waves`}
-                accountId={accountId}
-              />
-            )
-          if (tabItem.value === "sprints")
-            return (
-              <SprintsPanel
-                marks={markMap(teamVocabulary.data, MARK_GROUP.sprint)}
-                ownerKind="account"
-                ownerId={accountId}
-                filter={{ accountId }}
-                host={{ base: `${basePath}/${accountId}` }}
-                onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
-                emptyText={`Nothing has been sold to ${account.name} yet.`}
-              />
-            )
           if (tabItem.value === "todos")
             return (
               <TodosPanel
@@ -893,24 +961,35 @@ export function AccountDetailScreen({
               />
             )
           // THE KNOWLEDGE BASE, IN CONTEXT (7.15), THE SAME WAY AN APP DOES IT
-          // (8.9). One thing travels now and it does both jobs: `context` is the
-          // record's own details prepended to the question, and it NAMES THE
-          // CLIENT, which is how the compartment is chosen — the assistant asks
-          // the same door and does not hold the account's id, so the door
-          // resolves the client from the question's own words and R23's `reason`
-          // still says which compartment it searched. The box SHOWS what it
-          // added, because a question quietly changed on the way is an answer
-          // nobody can account for. It is written as a phrase that reads after
-          // the word "About", exactly as the app's does.
+          // (8.9). Aurora, 22 Sep 2026: "replicate how it looks in main
+          // knowelegde ... search, button to ask, preview the content, filters
+          // by type" and "in knoweledge when isnide app or acount, make ask a
+          // button in the toolbar" — a real gallery, the same `KnowledgeScreen`
+          // an app's own Knowledge tab already renders
+          // (web/components/apps/app-detail.tsx), narrowed to this account's
+          // own compartment (`account:<id>`) instead of an `appId`. This used
+          // to mount the old one-shot ask box alone — no toolbar, no cards, no
+          // filters — which is the band of empty page she reported; the
+          // gallery's own toolbar, search box, type filter and Ask button
+          // (inside the toolbar, R48/R50) fill it now.
           if (tabItem.value === "knowledge")
             return (
-              <AskTheAssistant
-                context={[
-                  `the account ${account.name}`,
-                  account.industry ? `in ${account.industry}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
+              <KnowledgeScreen
+                scope={{
+                  kind: "account",
+                  teamId,
+                  accountId,
+                  accountName: account.name,
+                  // A KNOWLEDGE SOURCE OPENS AT ITS OWN ADDRESS, not nested
+                  // under this account's — the identical destination
+                  // `app-detail.tsx`'s own `onIntent` sends (R37: through the
+                  // soft-navigation bus, never a bare `<a href>`).
+                  onIntent: (intent) => {
+                    if (intent.kind === "open") softNavigate(`${urlPrefix}/${intent.module}/${intent.id}`)
+                  },
+                }}
+                t={t}
+                can={can}
               />
             )
 
@@ -974,54 +1053,24 @@ export function AccountDetailScreen({
         }}
       />
 
-      {/* MOUNTED ONLY WHEN OPEN, unlike the app and contact dialogs above. These
-          two resolve the team THEMSELVES (`useActiveTeam`) and fetch their own
-          pickers, so keeping them mounted behind a closed dialog would cost every
-          reader of an account record a router subscription and two list reads for
-          a form nobody has asked for. The draft survives either way — it lives in
-          session storage, which is the whole point of Law R7.
+      {/* MOUNTED ONLY WHEN OPEN, unlike the app and contact dialogs above. This
+          one resolves the team ITSELF (`useActiveTeam`) and fetches its own
+          picker, so keeping it mounted behind a closed dialog would cost every
+          reader of an account record a router subscription and a list read for
+          a form nobody has asked for. The draft survives either way — it lives
+          in session storage, which is the whole point of Law R7.
 
-          A BLOCK OF WORK SOLD TO THIS CLIENT, written from their own record with
-          the client already chosen. A sprint cannot be moved to another client
-          afterwards (the update door refuses it), so being on the right record
-          when you write it down is the whole safeguard — the same argument the
-          app form above makes. The APP is left as a question: a client has more
-          than one system and the sprint has to say which. */}
-      {sprintOpen && (
-      <SprintFormDialog
-        open={sprintOpen}
-        onOpenChange={setSprintOpen}
-        // THE WHOLE ROW: `AccountAppPicker` narrows by `accountId` itself
-        // (ruling 2, 16 Sep 2026), so the field it reads must survive this
-        // filter rather than being mapped away right after it is used.
-        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === accountId)}
-        fixedAccount={{ id: accountId, name: account.name }}
-        draftKey={`sprint:add:account:${accountId}`}
-        onSubmit={async (v) => {
-          await contentApi.createSprint({
-            name: v.name,
-            goal: v.goal || undefined,
-            sprintType: v.sprintType || undefined,
-            accountId,
-            appId: v.appId || undefined,
-            startsOn: v.startsOn || undefined,
-            endsOn: v.endsOn || undefined,
-            soldPriceCents: v.soldPriceCents,
-            currency: v.currency || undefined,
-          })
-          // The new sprint arrives ALREADY on this client, so the slice this tab
-          // reads is the one cache that has to be told. Everyone else's screen is
-          // patched by the publish the door already sends (R1/R15).
-          invalidate(sliceKey("sprints-account", accountId))
-          invalidate(sprintsKey(teamId))
-          toast.success(t("Phase started."))
-        }}
-      />
-      )}
+          THE PHASE FORM THAT USED TO STAND HERE, written from the account's
+          own record with the client already chosen, left with the Phases tab
+          it opened from (Aurora, 22 Sep 2026: "remove waves & phases from
+          account detail page"). A phase is still sold from an app's own
+          record (`app-detail.tsx`'s own `SprintFormDialog`), which is where a
+          client's own systems already live; this record no longer offers a
+          second door to the same write.
 
-      {/* SOMETHING WE NEED FROM THIS CLIENT. Same shape again: the client is a
-          fact about where you are standing, and it is the field that decides
-          whose portal this lands in. */}
+          SOMETHING WE NEED FROM THIS CLIENT. The client is a fact about where
+          you are standing, and it is the field that decides whose portal this
+          lands in. */}
       {todoOpen && (
       <TodoFormDialog
         open={todoOpen}

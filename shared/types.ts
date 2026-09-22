@@ -1436,8 +1436,19 @@ export type Account = {
    * right reads an absence rather than a confident "no". Always `null` on a
    * COMPANY row (nobody signs in as a company). */
   hasPortalLogin?: boolean | null
-  /** false once archived (deactivate-never-delete) */
+  /** false once INACTIVE (deactivate-never-delete, `deactivated_at`). Unchanged
+   * meaning (Aurora's ruling, 22 Sep 2026): its own tab, excluded from
+   * pickers and choice components, and a held URL still opens the record and
+   * everything under it. */
   active: boolean
+  /** true once ARCHIVED (0117, `archived_at`) — a second and STRONGER state
+   * than `active` above, independent of it: not deleted (the row, its
+   * people and its history all survive), but invisible to every ordinary
+   * list, facet, picker, search and count, reachable only through the
+   * Accounts screen's own Archived tab or a held id. Aurora's ruling, 22 Sep
+   * 2026, verbatim: "archived are not visible anywhere … archived however
+   * are completley invisible." */
+  archived: boolean
   /** the audit block, for the detail Overview tab (the same shape every record
    * shows — see TeamRole). */
   createdAt?: string | null

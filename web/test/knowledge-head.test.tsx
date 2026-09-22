@@ -147,7 +147,10 @@ describe("the knowledge toolbar — present, search included again (17 Sep 2026,
     const src = readKnowledgeScreen()
     const at = src.indexOf("<PagedFind<KnowledgeSource>")
     expect(at).toBeGreaterThan(-1)
-    const tag = src.slice(at, at + 1800)
+    // 2200, NOT 1800 — 22 Sep 2026, the account scope widened `fixed=` from a
+    // single-line ternary into a three-way one (team/app/account), pushing
+    // every later prop further from the tag's own start.
+    const tag = src.slice(at, at + 2200)
     expect(tag, "her ruling: \"Also add the search to the toolbar. It's missing.\"").not.toContain("search={false}")
     expect(tag).toMatch(/placeholder=\{t\(/)
     expect(tag).toMatch(/\bfacets=\{/)

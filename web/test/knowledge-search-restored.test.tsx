@@ -152,12 +152,16 @@ describe("the real knowledge call site (knowledge-screen.tsx) — the wiring", (
     expect(at, "the knowledge module's own <PagedFind<KnowledgeSource>> call site").toBeGreaterThan(-1)
 
     // A FIXED WINDOW, not a walk to the tag's own closing `>` — the same
-    // reason rules.test.ts's own `findBars()` reads 1,800 characters on
-    // rather than parsing the tag precisely: `<PagedFind<KnowledgeSource>`
-    // carries a generic, so a bracket-depth walk that does not also track
-    // angle-depth stops at the GENERIC's own `>` four characters in and
-    // reports every prop below it as absent.
-    const tag = src.slice(at, at + 1800)
+    // reason rules.test.ts's own `findBars()` reads on a fixed window rather
+    // than parsing the tag precisely: `<PagedFind<KnowledgeSource>` carries a
+    // generic, so a bracket-depth walk that does not also track angle-depth
+    // stops at the GENERIC's own `>` four characters in and reports every
+    // prop below it as absent.
+    //
+    // 2200, NOT 1800 — 22 Sep 2026, the account scope widened `fixed=` from a
+    // single-line ternary into a three-way one (team/app/account), pushing
+    // every later prop further from the tag's own start.
+    const tag = src.slice(at, at + 2200)
 
     // THE FIX: `search={false}` is gone — the row draws its own default now.
     expect(

@@ -190,6 +190,18 @@
 //     module's own `types` (its free-text-with-datalist shape, unchanged
 //     since before this table existed) skips the step outright rather than
 //     pre-filling a `<Select>` the reader would still have to press.
+//
+// AMENDED, 22 SEP 2026 — ONE CALL PER TYPE, NOT PER PAGE. Aurora's ruling
+// (this file's own `scope.type` field, just above, has it in full): a
+// module's own settings page no longer draws one shared table for every
+// vocabulary section it owns, it draws one narrowed table PER TYPE, each on
+// its own tab. `scope.segment` alone is still a real, narrower-than-nothing
+// scope (kept typed for the shape this file always offered), but its one
+// caller (`module-settings-screen.tsx`) always adds `scope.type` now, so in
+// practice every module-settings mounting is narrowed the rest of the way.
+// The three bullets above still hold; `scope.type`'s own header states the
+// fourth narrowing it adds on top (the Where column, dropped rather than
+// merely faceted off).
 
 import * as React from "react"
 
@@ -319,6 +331,37 @@ export function SettingsChoicesPanel({
    * `TEAM_SECTIONS` both answer to. */
   scope?: {
     segment: string
+    /** THE ONE VOCABULARY GROUP THIS EXACT MOUNTING DRAWS — 22 Sep 2026,
+     * Aurora's ruling: "instead of chocies do type ... on each module
+     * should be the tab for each type" (module-settings-screen.tsx's own
+     * `typeTabValue`/`choiceTypeLabel` header has it in full). ABSENT means
+     * `segment` alone still narrows to every type that page's vocabulary
+     * sections own (the shape this file drew until this ruling — kept for
+     * the type this file itself has no other caller for today); PRESENT
+     * narrows one step further, to exactly one `selectable_data.type` —
+     * what a module-settings tab now always passes, one call per type
+     * rather than one call per page.
+     *
+     * THREE THINGS NARROW WITH IT, the same shape `segment` alone already
+     * takes one level up (this file's header, "THREE THINGS NARROW WITH
+     * IT"), applied one step further:
+     *   • `groupHome`/`rows` — to this one type's own values, never the
+     *     page's whole vocabulary.
+     *   • THE WHERE COLUMN — DROPPED, not merely faceted off. The column
+     *     exists to say which field a row belongs to when more than one
+     *     could be on screen (this file's header, "THE WHERE COLUMN"); a
+     *     single type never leaves that ambiguous, and the tab drawing this
+     *     table already says the type out loud, so the column would repeat
+     *     what the reader already knows on every row for no new fact — the
+     *     same "redundant, never adds a fact" refusal the Module column
+     *     itself failed under `scope.segment` alone.
+     *   • THE ADD DIALOG'S FIRST STEP — narrows the SAME way `scopedModule`
+     *     already narrows the module step to nothing: `moduleOptions[0]
+     *     .types` resolves to exactly `[type]`, so the group step inside
+     *     the type step (Accounts' Industry-or-Country datalist) also
+     *     disappears — the dialog opened from the Industry tab can only
+     *     ever create an Industry. */
+    type?: string
     /** THE IMPORT DOOR, CARRIED THROUGH — `SelectableScreen`'s own scoped
      * mounting drew this beside "New value" (client ruling quoted in that
      * file's header: "each module's settings page gets its own import and
@@ -366,6 +409,9 @@ export function SettingsChoicesPanel({
   // WHETHER THIS READER MAY ADD A VALUE AT ALL — the same right the create
   // door gates (`selectable_data:create`, `postCreateSelectable`), asked once,
   // here, the same way `SelectableScreen` asks it for its own "New value".
+  // THE RIGHT ALONE DOES NOT DRAW THE BUTTON: `canAdd` below is what the
+  // toolbar and the dialog actually gate on, and it asks this AND whether
+  // this mounting has a vocabulary that can grow at all.
   const canCreate = can("selectable_data", "create")
   // RENAME / PROTECT and DEACTIVATE, the two other rights `valueActions`
   // below gates on — the same two `SelectableScreen`'s own row menu asked.
@@ -384,20 +430,50 @@ export function SettingsChoicesPanel({
   // Built off the SAME walk that builds `groupHome` below (`modulesWithChoices`
   // × its own vocabulary sections), narrowed to sections that can actually
   // grow (`create: true` — `ModuleSettingsSection.colour`'s own sibling flag).
-  // A module with no creatable vocabulary today never happens (every section
-  // reaching this screen is `create: true`), but the filter is here so a
-  // future `create: false` vocabulary — one whose words the app owns, like
-  // the retired Ticket status page — does not silently gain an Add button
-  // this screen never meant to offer it.
+  // THAT FUTURE ARRIVED: Tickets' one section is `create: false` (the locked
+  // four — `MODULE_SETTINGS`, module-settings-screen.tsx), so a mounting
+  // scoped to it resolves this list to `[]` rather than to a picker over
+  // words the door would refuse. `canAdd` below carries the same fact up to
+  // the BUTTON, which this filter alone never could.
   const moduleOptions: ChoiceModuleOption[] = modulesWithChoices
     .map(({ page, sections }) => ({
       segment: page.segment,
       title: page.title,
       types: sections
         .filter((s): s is Extract<typeof s, { kind: "vocabulary" }> => s.kind === "vocabulary" && s.create)
-        .flatMap((s) => s.types),
+        .flatMap((s) => s.types)
+        // THE TYPE NARROWING — see `scope.type`'s own header. Absent, every
+        // creatable type on the page; present, exactly the one this tab is
+        // for, so the dialog's own group step (Accounts' Industry-or-Country
+        // datalist) never offers a group this tab is not for.
+        .filter((type) => !scope?.type || type === scope.type),
     }))
     .filter((m) => m.types.length > 0)
+
+  // AND WHETHER THERE IS ANYTHING HERE FOR THAT RIGHT TO ACT ON — the second
+  // half of the same question `canCreate` asks, 22 Sep 2026.
+  //
+  // `canCreate` is a right; `moduleOptions` is the vocabulary that right could
+  // grow. THE TWO CAME APART the day a vocabulary declared `create: false` —
+  // Tickets, whose one section is the locked four (`MODULE_SETTINGS`,
+  // module-settings-screen.tsx: "THE ONE VOCABULARY THAT CANNOT GROW"). Scoped
+  // to that page, the filter just above resolves `moduleOptions` to `[]` while
+  // `canCreate` stays true for any reader holding `selectable_data:create`, so
+  // the toolbar drew "New value" and the dialog behind it opened on an empty
+  // group picker: a control whose only possible answer is a `locked_group` 400
+  // at the door, which is precisely the shape `create: false` exists to keep
+  // off the screen ("a control that can only ever be refused should not be a
+  // control"). The flag was already honoured in the PICKER and nowhere in the
+  // BUTTON, which is why the comment beside `moduleOptions` above could be
+  // written for this case and still not prevent it.
+  //
+  // `moduleOptions.length > 0` IS THE WHOLE TEST, and it is exact rather than
+  // approximate: the `.filter((m) => m.types.length > 0)` on the line above
+  // already guarantees every surviving entry offers at least one creatable
+  // type, so a non-empty list always has somewhere for a new value to land —
+  // including under `scope.type`, where the type filter runs BEFORE that same
+  // `.filter` and an uncreatable tab therefore drops out here too.
+  const canAdd = canCreate && moduleOptions.length > 0
 
   // NOTHING THIS READER MAY SET, ANYWHERE — the same refusal the Modules tab
   // and a module's own settings page give (`NoAccess`, "You don't have
@@ -420,7 +496,14 @@ export function SettingsChoicesPanel({
   for (const { page, sections } of modulesWithChoices) {
     for (const s of sections) {
       if (s.kind !== "vocabulary") continue
-      for (const type of s.types) groupHome.set(type, { segment: page.segment, title: page.title, colour: s.colour })
+      for (const type of s.types) {
+        // THE TYPE NARROWING — see `scope.type`'s own header. Skips every
+        // type but the one this tab is for, so `rows` below (filtered
+        // through `groupHome.has`) narrows for free, exactly the way
+        // `scope.segment` alone already narrows `groupHome` one level up.
+        if (scope?.type && type !== scope.type) continue
+        groupHome.set(type, { segment: page.segment, title: page.title, colour: s.colour })
+      }
     }
   }
 
@@ -627,32 +710,48 @@ export function SettingsChoicesPanel({
   // The Module-into-Where fold is unaffected and unrelated: two different
   // facts folded into two different columns for two different reasons, on
   // the same table, is not a pattern straining under its own rule.
-  const columns: TableColumn[] = [
-    { key: "value", label: t("Value"), searchKey: "valueText" },
-    // STATUS, THE SECOND COLUMN, her later reading, above. `statusText`
-    // (the plain three-way word, Protected/Active/Inactive) is the search
-    // key, since the cell itself (`status`) is a node, a `Badge`, not text,
-    // the same reason `value` above reads a sibling `*Text` field rather
-    // than its own key.
-    { key: "status", label: t("Status"), searchKey: "statusText" },
-    // DETAILS, THIRD: text only now (`choiceDetailsCell`'s own header, deep-
-    // link/shape.tsx). No `searchKey`/`sort`: the cell is a decoration (a
-    // duration badge, or nothing), never a fact this table orders or
-    // searches by, the same shape the `actions` column below has always
-    // taken and for the same reason.
-    { key: "details", label: t("Details") },
-    { key: "where", label: t("Where"), searchKey: "whereText" },
-    // ADDED, who over when, folded back into one cell (see above).
-    // `addedText` (the plain first name, R54-trimmed) is the search key,
-    // since the cell itself (`added`) is a node, not text.
-    { key: "added", label: t("Added"), searchKey: "addedText" },
-    // NO `label`/`sort`: an actions column is a control, never a fact to
-    // order the table by (the same shape `record-table.tsx`'s OWN built-in
-    // `actions` slot draws, used instead of that slot because its fixed
-    // labels cannot say "Activate" on one row and "Deactivate" on the next,
-    // see this file's header).
-    { key: "actions", label: "" },
-  ]
+  // THE WHERE COLUMN, DROPPED UNDER `scope.type` — 22 Sep 2026, see that
+  // field's own header. Two full literals rather than one array with a
+  // spliced-in element: `web/test/table-column-budget.test.ts`'s own census
+  // (R82) recognises a `TableColumn[]` literal by every element being an
+  // object literal carrying both `key` and `label` — a spread element reads
+  // as "not this shape" and the WHOLE array falls out of the census's
+  // reach, which would silently stop checking either branch against the
+  // six-column ceiling. Two plain literals stay inside it.
+  const columns: TableColumn[] = scope?.type
+    ? [
+        { key: "value", label: t("Value"), searchKey: "valueText" },
+        { key: "status", label: t("Status"), searchKey: "statusText" },
+        { key: "details", label: t("Details") },
+        { key: "added", label: t("Added"), searchKey: "addedText" },
+        { key: "actions", label: "" },
+      ]
+    : [
+        { key: "value", label: t("Value"), searchKey: "valueText" },
+        // STATUS, THE SECOND COLUMN, her later reading, above. `statusText`
+        // (the plain three-way word, Protected/Active/Inactive) is the search
+        // key, since the cell itself (`status`) is a node, a `Badge`, not text,
+        // the same reason `value` above reads a sibling `*Text` field rather
+        // than its own key.
+        { key: "status", label: t("Status"), searchKey: "statusText" },
+        // DETAILS, THIRD: text only now (`choiceDetailsCell`'s own header, deep-
+        // link/shape.tsx). No `searchKey`/`sort`: the cell is a decoration (a
+        // duration badge, or nothing), never a fact this table orders or
+        // searches by, the same shape the `actions` column below has always
+        // taken and for the same reason.
+        { key: "details", label: t("Details") },
+        { key: "where", label: t("Where"), searchKey: "whereText" },
+        // ADDED, who over when, folded back into one cell (see above).
+        // `addedText` (the plain first name, R54-trimmed) is the search key,
+        // since the cell itself (`added`) is a node, not text.
+        { key: "added", label: t("Added"), searchKey: "addedText" },
+        // NO `label`/`sort`: an actions column is a control, never a fact to
+        // order the table by (the same shape `record-table.tsx`'s OWN built-in
+        // `actions` slot draws, used instead of that slot because its fixed
+        // labels cannot say "Activate" on one row and "Deactivate" on the next,
+        // see this file's header).
+        { key: "actions", label: "" },
+      ]
 
   // Create — the dialog calls this; it throws on failure so the dialog
   // surfaces the reason and stays open, and closes itself on success. Same
@@ -756,7 +855,7 @@ export function SettingsChoicesPanel({
     <>
       <CollectionCreateActionProvider
         action={
-          canCreate
+          canAdd
             ? {
                 label: scope ? t("New value") : t("New choice"),
                 icon: <Plus className="size-4" />,
@@ -767,13 +866,19 @@ export function SettingsChoicesPanel({
         }
       >
         <RecordTable columns={columns} rows={tableRows} config={config} useKitPanel />
-        {canCreate && (
+        {canAdd && (
           <SelectableFormDialog
             open={addOpen}
             onOpenChange={setAddOpen}
             {...(scopedModule ? { types: scopedModule.types } : { modules: moduleOptions })}
             onSubmit={addValue}
-            draftKey={`selectable-add:${teamId}:${scope?.segment ?? "choices"}`}
+            // TYPE FIRST, SEGMENT SECOND — a page that now mounts one call
+            // per TYPE (Accounts: Industry, then Country) must not share one
+            // draft slot between them; `scope.type` is unique across the
+            // whole app (`typeTabValue`'s own header, module-settings-
+            // screen.tsx), so it alone is enough to tell two tabs' drafts
+            // apart even though both carry the same `segment`.
+            draftKey={`selectable-add:${teamId}:${scope?.type ?? scope?.segment ?? "choices"}`}
           />
         )}
       </CollectionCreateActionProvider>

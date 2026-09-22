@@ -119,11 +119,14 @@ type ParagraphOffence = { file: string; line: number; text: string }
  * every way this law cares about (a label, a control, nothing else between
  * them) even though it never imports `FormShell` — she said so directly,
  * over Settings › Appearance: "too many descriptions everywhere ... delete
- * these live preview updates as you press a control." Two panels draw the
- * bar today (`shared/web/appearance-panel.tsx`, `web/components/team/
- * roles-matrix.tsx`); neither carried a bare-`<p>` hint at the time this
- * marker widened, so the second clause below extends the census's REACH
- * without moving its own goalposts. */
+ * these live preview updates as you press a control." One panel draws the
+ * bar today (`web/components/team/roles-matrix.tsx`); it carried no
+ * bare-`<p>` hint at the time this marker widened, so the second clause
+ * below extends the census's REACH without moving its own goalposts.
+ * `shared/web/appearance-panel.tsx` was the other caller until 22 Sep 2026,
+ * when its own pending/Save shape (and the bar with it) was removed — see
+ * that file's own header; this marker still names the import rather than the
+ * file, so nothing here needed to change when it stopped applying to it. */
 const FORM_FILE_MARKERS = ["@shared/web/form-shell", "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"]
 
 /** Does this file render a form at all? See `FORM_FILE_MARKERS` above. */

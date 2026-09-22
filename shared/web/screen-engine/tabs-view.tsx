@@ -238,13 +238,39 @@ export const TAB_ICONS: Record<string, IconName> = {
   members: "users-three",
   integrations: "key",
   choices: "git-commit",
-  // A MODULE SETTINGS PAGE'S OWN TWO TABS (client ruling, 2026-09-11/14: "on
+  // A MODULE SETTINGS PAGE'S OWN TABS (client ruling, 2026-09-11/14: "on
   // every module settings page, add two tabs: 1. Automations 2. Choice
   // components"), module-settings-screen.tsx. `choices` above already carries
   // the word this app's glossary uses for the second tab
   // (`dropdownValues.term`, shared/glossary.ts); `automations` is new — the
   // bolt is the ordinary shorthand for "this happens by itself".
   automations: "lightning",
+  // ── ONE TAB PER CHOICE TYPE, 22 SEP 2026 — SUPERSEDES THE SECOND TAB ABOVE
+  // ON A MODULE'S OWN SETTINGS PAGE. Aurora, verbatim: "on the settttings for
+  // each module, i think t owuld make more sense to have one tab for each
+  // choice type: fe: for tickets, instead of chocies do type (with type
+  // emoji) and so on everywhere. the choices tab with column for type shoudl
+  // only be on main settings." `choices` (above) stays — it is still the
+  // MAIN Settings screen's own combined tab, her own exception — but a
+  // module's own page no longer draws it; it draws one of these instead, one
+  // per type `module-settings-screen.tsx`'s own `typeTabValue`/
+  // `choiceTypeLabel` derive off that module's declared `types`. Keyed by the
+  // TYPE's own slug (guaranteed unique, `shared/selectable-homes.ts`'s own
+  // keys), not by the generic field word, so two types that happen to fill
+  // the same kind of field (three of these are all "Type") never collide on
+  // one tab strip — but they share ONE glyph, because they are one concept:
+  // "same tab, same glyph" is this table's own rule, applied within a page
+  // the same way it already applies across screens.
+  "ticket-type": "tag",
+  "story-type": "tag",
+  "phase-type": "tag",
+  "meeting-type": "tag",
+  department: "identification-card",
+  industry: "factory",
+  country: "flag",
+  "app-stage": "stairs",
+  "deliverable-kind": "tag-simple",
+  "brand-asset-category": "shapes",
 }
 
 /** What a tab actually draws. Every tab resolves an icon now: the vocabulary

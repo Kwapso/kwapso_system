@@ -51,7 +51,7 @@ export const GLOSSARY_ENTRIES: readonly GlossarySeedEntry[] = [
   { word: "Ticket stages", definition: "The path a ticket travels, most of it moved by something happening rather than by somebody choosing it." },
   { word: "Closed", definition: "The ticket pile showing everything Resolved, the finished half, as against Open (everything still ours to do something about)." },
   { word: "Account", definition: "A company or a person you work with, both live in the same list." },
-  { word: "Contact", definition: "A person linked to an account. The same person can be a contact of more than one." },
+  { word: "Contact", definition: "A person who belongs to one company, or to none at all." },
   { word: "Portal", definition: "The client-facing app where an account's own contacts sign in to see their own tickets, stories and files, kept separate from the team's own app, which we call the system." },
   { word: "Client login", definition: "A team member on the other side of the fence, an ordinary member whose account is a client's, so staff-only material stays hidden from them." },
   { word: "Stakeholder", definition: "Someone kept in the loop on a ticket, the person who raised it, your admins, and anyone else mentioned." },

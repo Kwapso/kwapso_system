@@ -49,6 +49,7 @@ const BERGMAN: Account = {
   nameNarrowsAlone: "unreviewed",
   accountManagerId: null,
   active: true,
+  archived: false,
   createdAt: "2026-08-18T09:00:00.000Z",
   createdByName: null,
   updatedAt: null,

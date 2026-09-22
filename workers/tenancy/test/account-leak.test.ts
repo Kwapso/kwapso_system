@@ -375,9 +375,19 @@ const BURGLARIES: Burglary[] = [
   },
   {
     route: "POST /api/tenancy/accounts/active",
-    why: "archive the victim's account out from under them",
+    why: "deactivate the victim's account out from under them",
     attack: () => req("POST /api/tenancy/accounts/active", { id: IDS.victimAccount, active: false }),
     honest: () => req("POST /api/tenancy/accounts/active", { id: IDS.victimAccount, active: false }),
+    expect: "refused",
+  },
+  {
+    // 0117, 22 Sep 2026 — her stronger state, `setAccountArchived`'s own
+    // route, same gate (`accounts:delete`) as `active` above and the same
+    // fence-riding UPDATE shape — the identical attack, one notch stronger.
+    route: "POST /api/tenancy/accounts/archived",
+    why: "archive the victim's account out from under them — her stronger, second state",
+    attack: () => req("POST /api/tenancy/accounts/archived", { id: IDS.victimAccount, archived: true }),
+    honest: () => req("POST /api/tenancy/accounts/archived", { id: IDS.victimAccount, archived: true }),
     expect: "refused",
   },
   {

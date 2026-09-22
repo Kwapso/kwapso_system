@@ -32,10 +32,14 @@ export function pickerKey(kind: string, teamId: string | null | undefined): stri
 
 /** CLIENTS AND PEOPLE — the accounts door (`q` searches name, code and email).
  *
- * `archived: "no"` is the door's own way of saying what every picker used to say
- * in the browser with `.filter(a => a.active)`: a put-away company is still a
- * row, and still readable on its own record, but it is not something new work
- * should be filed against.
+ * `inactive: "no"` is the door's own way of saying what every picker used to
+ * say in the browser with `.filter(a => a.active)`: a put-away company is
+ * still a row, and still readable on its own record, but it is not something
+ * new work should be filed against. (This wire word was `archived` until
+ * 0117, 22 Sep 2026, renamed the same day `archived` gained a real, stronger
+ * meaning: a truly archived account is excluded from this picker by the
+ * door's own default regardless of what this call sends, the same as every
+ * other caller on `GET /api/tenancy/accounts` that never asks for it.)
  *
  * NO HINT. Client ruling, 17 Sep 2026, verbatim: *"On all add screens, when
  * I'm picking an account, do only show me the icon and the name, no email or
@@ -54,7 +58,7 @@ export async function searchAccounts(
   term: string,
   opts: { type?: "entity" | "individual" } = {}
 ): Promise<PickerOption[]> {
-  const r = await tenancy.accounts({ q: term || undefined, type: opts.type, archived: "no" })
+  const r = await tenancy.accounts({ q: term || undefined, type: opts.type, inactive: "no" })
   // THE FACE (R35) AND NOTHING ELSE, through the one seam that says what an
   // account looks like as an option (`accountOption`). No `hint` — see the
   // ruling above.

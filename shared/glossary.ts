@@ -87,7 +87,7 @@ export const GLOSSARY = {
   // screens with nothing saying what it meant.
   company: { term: "Company", def: "An account that is a business rather than a person." },
   parentAccount: { term: "Parent account", def: "The account this one sits under, like a business under its holding company." },
-  contact: { term: "Contact", def: "A person linked to an account. The same person can be a contact of more than one." },
+  contact: { term: "Contact", def: "A person who belongs to one company, or to none at all." },
   referenceCode: { term: "Reference", def: "A short code you give an account so it's easy to say out loud. It's a label, not its identity." },
   portalAccess: { term: "Portal access", def: "A login that lets someone at an account see their own work here. Take it away and their records stay." },
   archive: { term: "Archive", def: "Put a record away without losing it, it stops showing in the everyday lists, and nothing is deleted." },
@@ -267,7 +267,14 @@ export const GLOSSARY = {
   passage: { term: "Passage", def: "The part of a source an answer quotes. Press a citation to read the passage it came from." },
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },
-  status: { term: "Status", def: "Where a record sits in its lifecycle, a ticket runs new to resolved. An account has none: it is live, or it is archived." },
+  status: { term: "Status", def: "Where a record sits in its lifecycle, a ticket runs new to resolved. An account has none: it is active, inactive, or archived." },
+  // ARCHIVED (0117, 22 Sep 2026) — her ruling split one word into two facts.
+  // This entry replaces the account half of the retired sentence above
+  // ("it is live, or it is archived"), which was true of what she now calls
+  // Inactive and stopped being true the moment a real Archived joined it.
+  // See `deactivate` above for the OTHER state (Active / Inactive), unchanged
+  // and already glossaried there.
+  archived: { term: "Archived", def: "Put away for good, never deleted, and shown, found, or counted nowhere. Stronger than Inactive, which still has its own tab and still opens." },
   // ONE WORD FOR WHAT SORT OF THING A RECORD IS (R6, decided 2026-08-19). A
   // ticket said Type, a sprint and a story said Kind, a deliverable said Kind
   // and a brand asset said Category — four words for one field, on screens a

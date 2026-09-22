@@ -27,7 +27,11 @@ import {
   HEAD_ACTIONS_ROW_CLASS,
   type HeadActionItem,
 } from "@shared/web/head-actions"
-import { clampRecordHeading, TITLE_ACTIONS_SPLIT } from "@shared/web/record-heading"
+import {
+  clampRecordHeading,
+  TITLE_ACTIONS_SPLIT,
+  RECORD_HEAD_CONTAINER,
+} from "@shared/web/record-heading"
 import { RecordActionsMenu } from "@/components/records/record-chrome"
 import { Trash } from "@shared/ui/foundations/icons"
 
@@ -292,5 +296,136 @@ describe("the title column stays in flow beside the actions, and its own clamp c
     // `title-length.test.ts` are this law's own suites; this assertion is
     // the same law read from the fold's side of the fix.
     expect(span.className).not.toMatch(/line-clamp/)
+  })
+})
+
+// ============================================================================
+// A RECORD HEAD CANNOT DRAW TWO OVERFLOW MENUS AGAIN, 22 Sep 2026. Aurora's
+// screenshot of a company record showed both halves of the fold visible at
+// once: `HeadActionsFoldMenu` "sitting alone on the chip row," and
+// `RecordActionsMenu` "beside the pencil below it," on a plain desktop
+// screenshot the wide row's own `@min-[44rem]:flex` should have owned alone.
+//
+// THE CAUSE. `RECORD_HEAD_CONTAINER` (shared/web/record-heading.tsx) used to
+// target `[data-slot=title]` on the theory that it was the one element
+// holding both halves of the fold as descendants. Kit v1.2.158 (round
+// fifty-four, the SAME DAY, "the head actions meet the title") gave
+// `RecordDetail` an `aboveTitle` slot and moved the app's own `identityChips`
+// (the node carrying `HeadActionsFoldMenu`) out of the `title` prop and into
+// it, rendered as a plain SIBLING before `<Title>`, never a descendant of
+// it. `[data-slot=title]` stopped containing the chip row, so
+// `HeadActionsFoldMenu`'s own `@min-[44rem]:hidden` had no containing block
+// to query and never matched: it stayed visible at every width, wide
+// screens included, sitting beside the wide row's own correctly-toggling
+// `HEAD_ACTIONS_ROW_CLASS` (still inside `[data-slot=title]` via `actions`).
+//
+// jsdom does not evaluate `@container` at all (this file's own header), so
+// this suite cannot shrink a real box and watch either half toggle. What it
+// CAN prove, the same way `tab-strip-escape-matches-padding.test.ts` proves
+// its own fix, is that the facts the retargeted selector depends on are
+// still true off the vendored kit's own disk: that the new target really is
+// an ancestor of BOTH halves, in BOTH shapes `RECORD_TITLE_TREATMENT` is
+// ever applied in. A change to any one of them is this exact regression
+// again, whether or not `RECORD_HEAD_CONTAINER`'s own string still reads
+// correctly.
+describe("RECORD_HEAD_CONTAINER retargeted 22 Sep 2026 -- the fold's query container is a real ancestor of both halves", () => {
+  const kitRecordDetail = read("shared/ui/components/record-detail/record-detail.tsx")
+  const kitRecordChromeComposition = read(
+    "shared/ui/compositions/templates/record-chrome.tsx"
+  )
+  const screenRenderer = read("shared/web/screen-engine/screen-renderer.tsx")
+
+  it("targets the header band, not [data-slot=title], which stopped holding aboveTitle", () => {
+    expect(RECORD_HEAD_CONTAINER).toMatch(/\[data-record-region=header\]/)
+    expect(RECORD_HEAD_CONTAINER).toMatch(/container-type:inline-size/)
+    // The retired shape: a selector reaching only [data-slot=title] is
+    // exactly what stopped containing the chip row.
+    expect(RECORD_HEAD_CONTAINER).not.toMatch(/\[data-slot=title\]\]:\[container-type/)
+  })
+
+  it("the kit's header region really nests both aboveTitle and <Title>, straight off record-detail.tsx", () => {
+    // Sliced by unique markers, never a line number, so an edit above this
+    // region cannot rot the key -- the same discipline this repo's own
+    // rulebook asks for (never-key-an-exemption-by-line). The marker text
+    // appears twice (the prop's own doc comment, then the actual render) --
+    // `lastIndexOf` reaches past the doc comment to the render itself, the
+    // half this test needs.
+    const start = kitRecordDetail.lastIndexOf("---- Region 1 · the transparent header band")
+    const end = kitRecordDetail.indexOf("---- The stage hero", start)
+    expect(start, "record-detail.tsx still marks Region 1 the way this test expects").toBeGreaterThan(-1)
+    expect(end, "the marker after Region 1 still exists").toBeGreaterThan(start)
+    const region1 = kitRecordDetail.slice(start, end)
+
+    expect(region1, "Region 1 still opens the header band this constant targets").toMatch(
+      /data-record-region="header"/
+    )
+    expect(region1, "aboveTitle still renders somewhere inside the header band").toMatch(
+      /\{aboveTitle !== undefined && aboveTitle !== null \? aboveTitle : null\}/
+    )
+    expect(region1, "<Title>, which carries `actions`, still renders inside the same header band").toMatch(
+      /<Title/
+    )
+    // aboveTitle renders BEFORE <Title> in source order, inside the region --
+    // a SIBLING, never a passenger of `title`, the exact shape that broke the
+    // old [data-slot=title]-only selector and is why the container now has
+    // to sit one level further out.
+    const aboveTitleAt = region1.indexOf("aboveTitle !== undefined")
+    const titleAt = region1.indexOf("<Title")
+    expect(aboveTitleAt).toBeGreaterThan(-1)
+    expect(titleAt).toBeGreaterThan(aboveTitleAt)
+  })
+
+  it("data-record-region=header is never the same element as data-slot=record-detail, on either attachment path", () => {
+    // BESPOKE PATH -- record-chrome.tsx's own composition hands `className`
+    // to ITS OWN root (`data-slot="record-chrome"`) and forwards no
+    // `className` to `<RecordDetail>` at all, so `data-record-region=header`
+    // (rendered inside `<RecordDetail>`) is a genuine descendant of wherever
+    // this class lands.
+    const chromeRootStart = kitRecordChromeComposition.indexOf('data-slot="record-chrome"')
+    const chromeRecordDetailStart = kitRecordChromeComposition.indexOf("<RecordDetail")
+    expect(chromeRootStart).toBeGreaterThan(-1)
+    expect(chromeRecordDetailStart).toBeGreaterThan(chromeRootStart)
+    const chromeRootToRecordDetail = kitRecordChromeComposition.slice(
+      chromeRootStart,
+      chromeRecordDetailStart
+    )
+    expect(
+      chromeRootToRecordDetail,
+      "record-chrome.tsx's own composition still owns the className it is handed"
+    ).toMatch(/className=\{cn\(/)
+    const recordDetailCallStart = kitRecordChromeComposition.indexOf("<RecordDetail")
+    // A generous slice past the opening tag's first attributes is enough to
+    // prove no `className` prop rides along -- the tag itself is what would
+    // carry it.
+    const recordDetailOpeningProps = kitRecordChromeComposition.slice(
+      recordDetailCallStart,
+      recordDetailCallStart + 400
+    )
+    expect(
+      recordDetailOpeningProps,
+      "the bespoke path still never hands RecordDetail its own className"
+    ).not.toMatch(/\bclassName=/)
+
+    // RECIPE PATH -- screen-renderer.tsx applies RECORD_TITLE_TREATMENT
+    // DIRECTLY on <RecordDetail>'s own root, self-attachment rather than an
+    // ancestor. A plain `[&_[data-slot=X]]` descendant selector matches only
+    // when X sits BELOW wherever the class lands, never on the class-bearing
+    // element itself -- which is exactly why `[data-slot=record-detail]`
+    // itself was never a safe retarget: this path attaches the class TO
+    // that element, not above it. `data-record-region=header` is safe
+    // precisely because record-detail.tsx never puts that attribute on its
+    // OWN root (proven above, its root instead carries
+    // `data-slot="record-detail"`), so the header band is always the
+    // strict descendant this selector needs, on both paths.
+    expect(screenRenderer).toMatch(/<RecordDetail/)
+    expect(screenRenderer).toMatch(/className=\{cn\("w-full",\s*RECORD_TITLE_TREATMENT\)\}/)
+    expect(kitRecordDetail).toMatch(/data-slot="record-detail"/)
+    const recordDetailRootStart = kitRecordDetail.indexOf('data-slot="record-detail"')
+    const recordDetailRootTagEnd = kitRecordDetail.indexOf(">", recordDetailRootStart)
+    const recordDetailOwnRootTag = kitRecordDetail.slice(recordDetailRootStart - 40, recordDetailRootTagEnd)
+    expect(
+      recordDetailOwnRootTag,
+      "record-detail.tsx's own root carries data-slot=record-detail, never data-record-region=header on the same element"
+    ).not.toMatch(/data-record-region="header"/)
   })
 })

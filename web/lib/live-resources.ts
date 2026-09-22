@@ -1721,6 +1721,12 @@ export const TEAM_RESOURCES: Record<
     //   list cache. A ping cannot name which app a row concerns either, so it
     //   drops by prefix exactly as the shape and the map already do.
     //
+    //   THE ACCOUNT'S OWN GALLERY (22 Sep 2026) — `knowledge-account-of:<accountId>`,
+    //   the identical shape one line above, for the account record's own
+    //   Knowledge tab (`knowledge-screen.tsx`'s "account" scope). A source
+    //   filed under, or mirrored onto, an account's own compartment moves
+    //   this key the same way a change to an app-filed source moves its own.
+    //
     //   EVERY KIND TAB'S OWN FOUND CACHE (20 Sep 2026) — `find:knowledge:…`
     //   (paged-find.tsx's `findKeyFor`). The kind-tab strip's `fixed={{ kind:
     //   activeTab }}` (knowledge-screen.tsx) makes `<PagedFind>`'s own
@@ -1731,7 +1737,13 @@ export const TEAM_RESOURCES: Record<
     //   open kind tab reading a stale answer until reload. Proved live: 54
     //   glossary rows seeded, the tab open on the request that seeded them,
     //   stayed empty for the rest of the session.
-    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX, "knowledge-app-of:", "find:knowledge:"],
+    slicePrefix: [
+      KNOWLEDGE_SHAPE_PREFIX,
+      RECORD_MAP_PREFIX,
+      "knowledge-app-of:",
+      "knowledge-account-of:",
+      "find:knowledge:",
+    ],
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

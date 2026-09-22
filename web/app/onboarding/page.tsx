@@ -47,13 +47,23 @@
 // screen before this ships — it is the one thing here a test cannot see,
 // because jsdom lays nothing out.
 //
-// SKIPPING IT LANDS ON MANGO, and lands there by writing NOTHING. The cards
-// open on `toSpine(user.spine)` — mango for anybody who has never chosen — and
-// the submit posts only when the person moved them, so `users.spine` stays
-// NULL for somebody who simply took the default. NULL means "never chosen" and
-// shared/spine.ts keeps that distinct from a deliberate mango on purpose; a
-// screen that wrote mango just for being looked at would destroy the
-// distinction for every person who ever onboards.
+// SKIPPING IT LANDS ON THE FALLBACK, and lands there by writing NOTHING. The
+// cards open on `toSpine(user.spine)` — mango until 22 Sep 2026, paper since
+// (shared/spine.ts's own header has the retirement and why the fallback
+// moved with it) — for anybody who has never chosen, and the submit posts
+// only when the person moved them, so `users.spine` stays NULL for somebody
+// who simply took the default. NULL means "never chosen" and shared/spine.ts
+// keeps that distinct from a deliberate choice on purpose; a screen that
+// wrote a value just for being looked at would destroy the distinction for
+// every person who ever onboards.
+//
+// MANGO IS GONE FROM THIS SCREEN TOO, 22 SEP 2026 — the client's ruling on
+// the Appearance settings redesign ("reduce backgorund options to only balck
+// or paper (rmoeve mango)") named Background generally, not Settings alone,
+// and `SpineChoice` is the identical control both screens draw — see this
+// file's header above and shared/web/spine-section.tsx's own header. Two
+// cards now, not three; everything else this header says about the shape
+// (the kit's card grid, the taller screen, `short` captions) is unchanged.
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
@@ -175,9 +185,10 @@ export default function OnboardingPage() {
   const [lastName, setLastName] = React.useState("")
   const [photo, setPhoto] = React.useState<string | undefined>()
   // THE SPINE, HELD LOCALLY UNTIL THE SUBMIT. `savedSpine` is what the row says
-  // right now (null for almost everybody here, which reads as mango); `spine` is
-  // what the cards show. Keeping both is what lets the submit post ONLY when the
-  // person actually moved the cards — see `finish`.
+  // right now (null for almost everybody here, which reads as the fallback —
+  // paper, since 22 Sep 2026); `spine` is what the cards show. Keeping both is
+  // what lets the submit post ONLY when the person actually moved the cards —
+  // see `finish`.
   const [savedSpine, setSavedSpine] = React.useState<string | null>(null)
   const [spine, setSpine] = React.useState<Spine>(toSpine(null))
   const [busy, setBusy] = React.useState(false)
@@ -230,8 +241,8 @@ export default function OnboardingPage() {
         setPhoto(user.imageUrl ?? undefined)
         // Read, not assumed. Somebody who bounced back here (a removed member,
         // a failed team creation) may already have chosen a spine in a previous
-        // life, and showing them mango would be this screen telling them their
-        // own setting is something else.
+        // life, and showing them the fallback would be this screen telling them
+        // their own setting is something else.
         setSavedSpine(user.spine ?? null)
         setSpine(toSpine(user.spine))
         setChecking(false)
@@ -276,10 +287,10 @@ export default function OnboardingPage() {
       // acceptance.
       //
       // AND ONLY WHEN THEY MOVED IT. Equal to what the row already says (which
-      // is null → mango for almost everybody) means the person took the
+      // is null → the fallback for almost everybody) means the person took the
       // default, and taking the default writes nothing — `users.spine` stays
       // null, which is the honest record of "never chosen" that shared/spine.ts
-      // keeps distinct from a deliberate mango.
+      // keeps distinct from a deliberate choice.
       if (spine !== toSpine(savedSpine)) {
         await auth.setSpine(spine)
         setSavedSpine(spine)

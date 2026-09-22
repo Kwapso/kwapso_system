@@ -155,6 +155,11 @@ export const VERB_BY_LAST_WORD: Record<string, ActivityVerb> = {
   reinstated: "restored",
   reopened: "restored",
   relinked: "restored",
+  // 0117, 22 Sep 2026 — "Account unarchived" (setAccountArchived's own
+  // activity line, workers/tenancy/src/lib/accounts.ts): her stronger
+  // state's own way back, the identical "put back" reading `restored`/
+  // `reactivated` already carry.
+  unarchived: "restored",
   // ── deleted ───────────────────────────────────────────────────────────────
   deleted: "deleted",
   // ── viewed ────────────────────────────────────────────────────────────────

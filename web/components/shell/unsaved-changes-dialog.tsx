@@ -1,9 +1,11 @@
 "use client"
 
 // THE ONE UNSAVED-CHANGES CONFIRM — R59 (a yes/no warning is the kit's
-// `AlertDialog`, never a `Sheet`). Two callers stage a draft behind a
-// Save/Discard bar today (`AppearancePanel`, `RolesMatrix` — see either
-// file's own header) and two seams can throw one away: `settings-screen.tsx`'s
+// `AlertDialog`, never a `Sheet`). One caller stages a draft behind a
+// Save/Discard bar today (`RolesMatrix` — see that file's own header;
+// `AppearancePanel` was the other until 22 Sep 2026, when its own pending/
+// Save shape was removed — see `shared/web/appearance-panel.tsx`'s own
+// header) and two seams can throw one away: `settings-screen.tsx`'s
 // own tab strip (a LOCAL switch, no navigation), and the app's nav bus / Back
 // / tab-close (a REAL navigation, `web/lib/nav.ts`'s `guardNavigate` and
 // `use-host-nav.ts`). Both raise this exact component rather than two

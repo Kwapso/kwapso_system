@@ -133,6 +133,13 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     // rates also killed it"), the Rates tab it badged went with it, and a line
     // here for a tab nothing draws would answer `null` for a permission nobody
     // holds — which is the exact reading this registry exists to make impossible.
+    // EVERYTHING WE KNOW ABOUT THIS CLIENT (client ruling, 22 Sep 2026: "replicate
+    // how it looks in main knowelegde... same for knowelegde inside apps" — read
+    // together with the app's own identical line above, the account record's
+    // Knowledge tab is the same real collection now, narrowed to this account's
+    // own compartment (`SourceFilters.compartment`, `account:<id>`) rather than
+    // to an `appId`.
+    { key: "knowledge-account", module: "knowledge", resource: "knowledge", door: "content" },
   ],
   apps: [
     { key: "sprints-app", module: "work", resource: "sprints", door: "content" },

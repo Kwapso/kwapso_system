@@ -481,7 +481,16 @@ export const tenancy = {
       type?: string
       /** the team's own word for where an account stands, as stored */
       status?: string
-      /** "yes" = only the put-away ones, "no" = only the live ones */
+      /** HER INACTIVE (unchanged, 0007's `deactivated_at`) — "yes" = only the
+       * inactive ones, "no" = only the active ones. Named `archived` on this
+       * door until 0117 (22 Sep 2026), renamed the same day `archived` below
+       * gained a real, stronger meaning of its own. */
+      inactive?: string
+      /** HER ARCHIVED (0117, 22 Sep 2026, `archived_at`) — not deleted, but
+       * invisible to every ordinary read. "yes" is the ONE way in, asked by
+       * exactly one caller in this app: the Accounts screen's own Archived
+       * tab. Every other caller, including one that omits this field
+       * entirely, gets the door's own default exclusion. */
       archived?: string
       /** "yes" = only the people holding a live portal login, "no" = only those
        * without one. The contacts screen's In portal tab sends this rather than
@@ -538,9 +547,13 @@ export const tenancy = {
    * close a loop comes back as a plain sentence (409). */
   setAccountParent: (id: string, parentAccountId: string | null) =>
     api<{ ok: true }>("/api/tenancy/accounts/parent", post({ id, parentAccountId })),
-  /** Archive / restore — never deleted. */
+  /** Deactivate / reactivate, her INACTIVE — never deleted. */
   setAccountActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/accounts/active", post({ id, active })),
+  /** Archive / unarchive, her ARCHIVED (0117) — a second and stronger state
+   * than `setAccountActive` above, independent of it. Never deleted. */
+  setAccountArchived: (id: string, archived: boolean) =>
+    api<{ ok: true }>("/api/tenancy/accounts/archived", post({ id, archived })),
 
   linkPerson: (input: {
     accountId: string

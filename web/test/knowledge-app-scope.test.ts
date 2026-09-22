@@ -75,17 +75,23 @@ describe("the app record's Knowledge tab mounts the shared gallery, scoped to th
 })
 
 describe("the app scope's own read carries the app id (R14, R16)", () => {
+  // 22 SEP 2026 — this file's own resting-read block widened to serve a
+  // SECOND record host ("account", knowledge-account-scope.test.ts carries
+  // its own four proofs), so the app branch's exact expressions moved from a
+  // single-key object into an `isApp ? … : …` pair. The FACTS these assert
+  // are unchanged: an app still narrows by `appId`, over the same `sliceKey`
+  // seam, and the paged find still fixes the same filter.
   it("knowledge-screen.tsx asks the door for `appId`, over the sliceKey seam every app-record collection uses", () => {
     const src = read("web", "components", "knowledge", "knowledge-screen.tsx")
-    expect(src, "the app scope's own resting read").toMatch(
-      /contentApi\.knowledge\(\{\s*appId:\s*isApp \? scope\.appId : ""\s*\}\)/
-    )
+    expect(src, "the app scope's own resting read").toMatch(/isApp \? \{ appId: scope\.appId \} : \{ compartment:/)
     expect(src, "the same sliceKey seam sprints/stories/tickets/meetings/deliverables already use for this app").toMatch(
       /sliceKey\("knowledge-app",\s*scope\.appId\)/
     )
     // fixed={{ appId }} is what makes every SEARCHED/SORTED/FILTERED page ask
     // the same narrowed question too — not only the resting read.
-    expect(src, "the paged find's own fixed narrowing").toMatch(/fixed=\{isApp \? \{ appId: scope\.appId \}/)
+    expect(src, "the paged find's own fixed narrowing").toMatch(
+      /fixed=\{\s*isApp\s*\?\s*\{ appId: scope\.appId \}/
+    )
   })
 
   it("the door parses and filters by `appId` (workers/content)", () => {
@@ -142,14 +148,32 @@ describe('the "app" agent scope opens a NEW conversation, never "knowledge"', ()
     expect(panelAt).toBeGreaterThan(scopeAt)
   })
 
-  it("the app scope's own button reads variant=\"inverse\" (R84 — it is not the record's own title component)", () => {
+  it("the record-host branch (app AND account) reads variant=\"inverse\" (R84 — neither has the record's own title component)", () => {
+    // 22 SEP 2026 — the standalone `if (scope.kind === "app")` branch widened
+    // into `if (isRecordHost)` (`isApp || isAccount`) the same session the
+    // account scope landed, because both hosts share the identical outer Ask
+    // fallback now. The fact this asserts is unchanged either way: neither
+    // record host ever draws a mango button.
     const src = read("web", "components", "knowledge", "knowledge-screen.tsx")
-    const appReturnAt = src.indexOf('if (scope.kind === "app")')
+    const recordReturnAt = src.indexOf("if (isRecordHost)")
     const teamReturnAt = src.indexOf("<CountedAbove")
-    expect(appReturnAt).toBeGreaterThan(-1)
-    expect(teamReturnAt).toBeGreaterThan(appReturnAt)
-    const appBlock = src.slice(appReturnAt, teamReturnAt)
-    expect(appBlock, "never mango outside the record's own title component").toMatch(
+    expect(recordReturnAt, "the record-host branch exists").toBeGreaterThan(-1)
+    expect(teamReturnAt).toBeGreaterThan(recordReturnAt)
+    const recordBlock = src.slice(recordReturnAt, teamReturnAt)
+    expect(recordBlock, "never mango outside the record's own title component").toMatch(
+      /variant="inverse"[\s\S]{0,80}onClick=\{openAskConversation\}/
+    )
+  })
+
+  it('the toolbar\'s own actions slot ALSO offers Ask, for both record hosts, once the toolbar draws (22 Sep 2026 ruling: "make ask a button in the toolbar")', () => {
+    const src = read("web", "components", "knowledge", "knowledge-screen.tsx")
+    const actionsAt = src.indexOf("actions={() =>")
+    expect(actionsAt, "the paged find's own actions slot").toBeGreaterThan(-1)
+    const actionsTag = src.slice(actionsAt, actionsAt + 900)
+    expect(actionsTag, "isRecordHost is asked FIRST, before the team-only create actions").toMatch(
+      /isRecordHost \? \(/
+    )
+    expect(actionsTag, "never mango inside a nested toolbar").toMatch(
       /variant="inverse"[\s\S]{0,80}onClick=\{openAskConversation\}/
     )
   })

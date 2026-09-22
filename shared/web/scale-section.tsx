@@ -1,7 +1,36 @@
 "use client"
 
-// HOW BIG THE APP IS — a compact card row, beside the shared Appearance
-// preview rather than carrying its own picture.
+// HOW BIG THE APP IS — one row on Settings · Appearance's row layout, a
+// specimen chip on every pill.
+//
+// A ROW, NOT A CARD-COLUMN ENTRY — 22 SEP 2026, THE SIDE-BY-SIDE ARTIFACT SHE
+// PICKED. The preview-led layout (below, kept as the historical record) drew
+// this as a compact pill group under its own micro-label, beside one shared
+// live preview. She rejected the pre-visualisation outright ("i dont like
+// how to previsualize") and, over a fresh side-by-side artifact, picked
+// option one and asked for more: "i want each card to have some kind of
+// preview (also for font size)" and named the shape for THIS control
+// specifically: "do a speciment chip". `shared/web/appearance-panel.tsx` now
+// draws the row furniture (the name, the short line, the layout) — this file
+// draws only the pills, each one carrying a specimen: the same two letters,
+// `Aa`, set at the size that OPTION actually sells, through `ScaleSwatch`
+// below. No heading, no box, no live preview elsewhere on the page to carry
+// the argument instead — every option previews itself now.
+//
+// APPLIES AT ONCE, ON PRESS — THE SAME RULING, OVER THE WHOLE TAB. "Let's go
+// back to when clicking it gets implemented (without needing to save)." The
+// pending/Save contract two rulings below installed is gone again: this file
+// holds no state and calls neither `applyScale` nor a `save` door — it never
+// did either, even mid-2026-09-14 to 22 Sep 2026 — `AppearancePanel` is the
+// one place that owns "what is showing right now" and reaches for both, the
+// instant a pill is pressed, with no staging step between the two.
+//
+// `applyScale` SURVIVES, EXPORTED. It is still the one function that puts a
+// scale on the document (`web/components/shell/app-shell.tsx` calls it on
+// load, from the person's saved preference, and `AppearancePanel` calls it
+// again, optimistically, the instant a pill is pressed).
+//
+// ═══════════════════ THE PREVIEW-LED HISTORY (superseded) ═══════════════════
 //
 // PREVIEW-LED, CLIENT RULING 2026-09-14. She chose the preview-led layout of
 // four Settings · Appearance options a lane put in front of her: one live
@@ -14,33 +43,19 @@
 // mechanism (one root font size, nothing added or removed) at a size worth
 // looking at instead of three 58px thumbnails.
 //
-// STAGED, SAME DAY, SECOND RULING. "We need … some kind of save button so
-// that I can first preview it and, once I'm happy with what I see, implement
-// it across the app." This component used to be OPTIMISTIC — a press resized
-// the whole app immediately (`applyScale` on `<html>`) and the save followed,
-// reverting the size if it failed. That contract is gone: this file no
-// longer holds any state, calls `applyScale`, calls `save`, or shows a toast.
-// It is now a plain, controlled pill row — `value` is the PENDING step,
-// `onChange` asks `AppearancePanel` to hold a different one — and the panel
-// is the one place that seeds the pending step from the person's saved row,
-// calls `applyScale` and the `save` prop it is handed, and shows the result,
-// all on Save. See that file's own header for the fuller account.
-//
-// `onChosenChange` IS GONE. It existed to tell the shared preview what was
-// chosen the instant a card was pressed, before the save settled. Now that
-// this component takes its pending value as a controlled `value` prop, the
-// panel already has that value the moment it changes state — there is
-// nothing left for a callback to forward.
-//
-// `applyScale` SURVIVES, EXPORTED, BUT NO LONGER CALLED FROM THIS FILE. It is
-// still the one function that puts a scale on the document
-// (`web/components/shell/app-shell.tsx` calls it on load, from the person's
-// SAVED preference) and `AppearancePanel` now calls it too, once, on Save —
-// never from a press in this file any more.
+// STAGED, SAME DAY, SECOND RULING (REVERSED 22 SEP 2026, ABOVE). "We need …
+// some kind of save button so that I can first preview it and, once I'm
+// happy with what I see, implement it across the app." This component used
+// to be OPTIMISTIC — a press resized the whole app immediately (`applyScale`
+// on `<html>`) and the save followed, reverting the size if it failed. That
+// contract went, briefly, to a plain controlled pill row fed a PENDING value
+// from `AppearancePanel`'s own Save button — and is gone again now, back to
+// (a version of) the original: optimistic, immediate, reverted on failure,
+// just owned by the panel rather than by this file.
 
 import * as React from "react"
 
-import { AppearancePillGroup, type AppearancePillOption } from "./appearance-pill-group"
+import { AppearancePillGroup, ScaleSwatch, type AppearancePillOption } from "./appearance-pill-group"
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"
 
@@ -52,28 +67,30 @@ export function applyScale(value: string | null | undefined, door: "agency" | "p
   document.documentElement.style.fontSize = `${scaleFontSize(value, door)}px`
 }
 
-/** `SCALE_STEPS`' own order maps positionally onto the preview's three steps
- * — `AppearancePreview`'s own header states the same convention `ScalePicture`
- * already used: only the WORD and the picture move, `value` stays
- * `SCALE_STEPS[*].value`, which this app has stored since before the card row
- * existed (`"compact" | "comfortable" | "large"`, not the kit's own
+/** `SCALE_STEPS`' own order maps positionally onto the three steps
+ * `ScaleSwatch` draws: only the WORD and the specimen size move, `value`
+ * stays `SCALE_STEPS[*].value`, which this app has stored since before the
+ * card row existed (`"compact" | "comfortable" | "large"`, not the kit's own
  * `"default"` middle key). A value this build does not recognise reads as the
- * middle step, matching `shared/scale.ts`'s own `toScale` fallback. */
-export function previewScaleStep(value: string | null | undefined): "compact" | "default" | "large" {
+ * middle step, matching `shared/scale.ts`'s own `toScale` fallback.
+ * FILE-PRIVATE — no `export` any more (22 Sep 2026, `dead-exports.test.ts`'s
+ * own fix): the only caller left, `AppearancePanel`'s retired live preview,
+ * is deleted; this file is the only one left that needs the mapping, to draw
+ * each of its own three options' specimen chips. */
+function previewScaleStep(value: string | null | undefined): "compact" | "default" | "large" {
   const index = SCALE_STEPS.findIndex((s) => s.value === value)
   return index === 0 ? "compact" : index === 2 ? "large" : "default"
 }
 
 export function ScaleSection({
-  /** The PENDING step — `AppearancePanel`'s own state, not this component's.
-   * Never applied to the document by this file any more. */
+  /** The CURRENT step — `AppearancePanel`'s own state, applied to the
+   * document the instant it changes. This file never touches the document
+   * itself; it only reports which pill was pressed. */
   value,
-  /** A different card was pressed. The panel decides what happens next —
-   * update the pending value, and nothing else, until Save. */
+  /** A different pill was pressed. The panel applies it at once — see its
+   * own header. */
   onChange,
-  /** True while `AppearancePanel`'s own Save is in flight — frozen for the
-   * same reason a `saving` press used to freeze this row, just decided one
-   * level up now that the commit is the panel's, not this row's. */
+  /** True while `AppearancePanel`'s own write for THIS control is in flight. */
   disabled = false,
 }: {
   value: string
@@ -82,25 +99,24 @@ export function ScaleSection({
 }) {
   const { t } = useLanguage()
 
-  // PILLS: no picture, no per-option description, no swatch — the live
-  // preview beside this group carries the picture and Size has no colour of
-  // its own to show. Only the label and the pressed ring survive.
+  // PILLS: the specimen chip is the picture now — her own words, "do a
+  // speciment chip" — the same two letters set at the size that option
+  // sells, through `ScaleSwatch`. `previewScaleStep` maps each option's own
+  // stored value onto its own step positionally, the identical mapping it
+  // always made; only who calls it moved.
   const options: readonly AppearancePillOption[] = [
-    { value: SCALE_STEPS[0].value, label: t("Compact") },
-    { value: SCALE_STEPS[1].value, label: t("Regular") },
-    { value: SCALE_STEPS[2].value, label: t("Large") },
+    { value: SCALE_STEPS[0].value, label: t("Compact"), swatch: <ScaleSwatch step={previewScaleStep(SCALE_STEPS[0].value)} /> },
+    { value: SCALE_STEPS[1].value, label: t("Regular"), swatch: <ScaleSwatch step={previewScaleStep(SCALE_STEPS[1].value)} /> },
+    { value: SCALE_STEPS[2].value, label: t("Large"), swatch: <ScaleSwatch step={previewScaleStep(SCALE_STEPS[2].value)} /> },
   ]
 
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-muted-foreground text-micro uppercase">{t("Size")}</h3>
-      <AppearancePillGroup
-        options={options}
-        value={value}
-        disabled={disabled}
-        onValueChange={onChange}
-        ariaLabel={t("Size")}
-      />
-    </div>
+    <AppearancePillGroup
+      options={options}
+      value={value}
+      disabled={disabled}
+      onValueChange={onChange}
+      ariaLabel={t("Size")}
+    />
   )
 }
