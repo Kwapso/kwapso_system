@@ -493,16 +493,17 @@ describe("AssignedToCard", () => {
     })
   })
 
-  // THE TILE'S OWN EYEBROW (R108, 22 Sep 2026): NO chip at all for the
-  // record's own person any more: the panel's own title above the tile
-  // already reads "Assigned to" in the identical eyebrow register, so
-  // repeating it a second time over the tile is the duplicate her
-  // screenshot flagged, and the duplicate is gone, not the panel's own
-  // title. "From the app" (the app's own name kept on its existing muted
-  // second line) survives when inherited, because it says something the
-  // panel's own title does not. Scoped to the tile itself (`data-slot=
-  // "assignee-tile"`) so the panel's own "Assigned to" title is never
-  // mistaken for a tile eyebrow that no longer exists.
+  // THE TILE'S OWN EYEBROW (R108, 22 Sep 2026, THEN AURORA'S OVERRULE THE
+  // SAME DAY, verbatim: "under assigned to remove 'From the app'"): NO chip
+  // at all over this tile, ever, own person or inherited. The panel's own
+  // title above the tile already reads "Assigned to" in the identical
+  // eyebrow register; R108 first kept "From the app" for the inherited case
+  // on the reading that it said something the title did not, and she
+  // overruled that reading — the app's own name still reads on its existing
+  // muted "Inherited from <app>" line, only the eyebrow itself is gone.
+  // Scoped to the tile itself (`data-slot="assignee-tile"`) so the panel's
+  // own "Assigned to" title is never mistaken for a tile eyebrow that no
+  // longer exists.
   describe("the tile's own eyebrow, in both states", () => {
     it("draws no eyebrow at all when the record carries its own person (R108: the panel title already says it)", () => {
       render(<AssignedToCard assigneeId="u-staff" assigneeName="Alaap Kanchwala" members={MEMBERS} />)
@@ -511,15 +512,18 @@ describe("AssignedToCard", () => {
       expect(within(tile).queryByText("From the app")).toBeNull()
     })
 
-    it("reads 'From the app' when inherited, with the app's own name on its own muted line", () => {
+    it("draws no eyebrow when inherited either, 'From the app' removed 22 Sep 2026, the app's own name still on its own muted line", () => {
       render(
         <AssignedToCard appId="app-1" appName="Bergman dispatch" appAssigneeId="u-lead" members={MEMBERS} />
       )
       const tile = document.querySelector('[data-slot="assignee-tile"]') as HTMLElement
-      expect(within(tile).getByText("From the app")).toBeTruthy()
+      expect(within(tile).queryByText("From the app")).toBeNull()
       expect(within(tile).queryByText("Assigned to")).toBeNull()
       expect(within(tile).getByText(/Inherited from/)).toBeTruthy()
       expect(within(tile).getByText(/Bergman dispatch/)).toBeTruthy()
+      // No chip at all now, so the person row is this tile's only child,
+      // the same shape the ticket's-own-person case already drew.
+      expect(tile.children).toHaveLength(1)
     })
   })
 

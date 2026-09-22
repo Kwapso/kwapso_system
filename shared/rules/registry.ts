@@ -1043,6 +1043,48 @@ export const NO_NESTED_SCROLL_EXEMPT: Record<string, string> = {
  * `maxHeight`/`columnMaxHeight` back on, which this list can never excuse. */
 export const TABLE_BOARD_SCROLL_EXEMPT: Record<string, string> = {}
 
+/** A LOCAL HORIZONTAL SCROLLER'S OWN FLOOR MUST NOT REACH THE PAGE. Measured
+ * live against staging, 22 Sep 2026, chasing Aurora's report: "i see a small
+ * horizotnal scroll within the main content at the bottom, shoudl not be."
+ * `web/app/globals.css`'s "THE PAGE DOES NOT SCROLL SIDEWAYS. EVER." rule
+ * holds at the true root (`html`/`body`, `overflow-x: clip`) — this bug lived
+ * one layer in, on `[data-slot="screen-shell-body"]` itself (the kit's own
+ * main-content pane), which computes `overflow-x: auto` on its own the
+ * moment its sibling `overflow-y: auto` is set and nothing says otherwise
+ * (the same CSS pairing `app-shell.tsx`'s own rail-content comment already
+ * names for the rail's vertical list). So the WHOLE PANE grows a horizontal
+ * scrollbar the instant anything inside it is even a few pixels wider than
+ * available, and unlike the root, nothing there was clipping it.
+ *
+ * THE SHAPE, traced to its exact cause by a live descendant walk
+ * (`getBoundingClientRect` on every node under the pane, at 1280x800 and
+ * 760x900) rather than by reading: `web/components/tickets/ticket-stages.tsx`
+ * deliberately floors its own stage ladder wider than it may have room for —
+ * `style={{ minWidth: calc(N * STAGE_COLUMN) }}` on the kit's `StatusStepper`
+ * — and wraps it in a `min-w-0 overflow-x-auto` div specifically so the
+ * ladder scrolls LOCALLY rather than growing an ancestor ("so a flex
+ * ancestor cannot let this box grow to its content instead of clipping it,"
+ * that wrapper's own comment). The wrapper's `min-w-0` broke the chain for
+ * ITSELF; the `<section>` one level further out (the ladder's own top-level
+ * element) carried no `min-w-0` of its own, so ITS automatic minimum width
+ * was still the ladder's full floor, and that reached `screen-shell-body`
+ * as 155-180px of real, visible horizontal scroll at 760px. Fixed by adding
+ * `min-w-0` to that `<section>` — the same fix this table's own census
+ * checks for on every other site shaped like it.
+ *
+ * THE CENSUS (`web/test/local-scroll-floor-contained.test.ts`): every JSX
+ * element in `web/` or `web-portal/` carrying an inline `style` whose
+ * `minWidth` is a COMPUTED value (a template literal or any non-literal
+ * expression — a plain number/string `minWidth` is an ordinary fixed box,
+ * not a "this may be wider than its parent, on purpose" floor) is walked up
+ * its own JSX ancestor chain for the nearest `overflow-x-auto`/`overflow-x-
+ * scroll` wrapper (the local scroller the floor is meant to stay inside),
+ * and THAT wrapper's own next ancestor must carry `min-w-0` — the exact link
+ * that was missing. Keyed by `<file>#<the minWidth expression's own text>`,
+ * never a line number. Empty on the day this law shipped: the one site that
+ * needed it is fixed above. */
+export const LOCAL_SCROLL_FLOOR_EXEMPT: Record<string, string> = {}
+
 /** R88 — THE REASONED, ROT-CHECKED WAY OUT for a title-row `<AddButton>`
  * (outside a `<ToolbarRow>`'s own `actions`/`renderActions` slot) that is
  * NOT drawn inside `<EmptyGatedPanel>` (`web/components/deep-link/

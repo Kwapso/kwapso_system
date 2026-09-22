@@ -610,6 +610,25 @@ function ribbonPath(r: Ribbon) {
    A separate component only so the main render stays readable. It is the same
    matrix the ribbons draw, with both margins, because a screen reader can
    navigate a table cell by cell and cannot navigate a sentence.
+
+   `table-fixed` ALONGSIDE `sr-only`, NOT INSTEAD OF IT — CLIENT RULING, 22 SEP
+   2026: *"i see a small horizotnal scroll within the main content at the
+   bottom, shoudl not be."* Measured cause: `sr-only` sets `width: 1px`, but a
+   `<table>` defaults to automatic layout, and automatic layout is defined to
+   IGNORE a specified width when the content's own min-content width is
+   larger — the used width becomes whatever the content needs instead. This
+   table measured 381px on staging at 1280 wide. Being absolutely positioned
+   (also from `sr-only`) does not save it: it still contributes its own
+   381px box to the scrollable overflow area of the shell's body, which is
+   the nearest scrolling ancestor, so an invisible table pushed the visible
+   page sideways by 21px. `table-fixed` (`table-layout: fixed`) makes the
+   specified width authoritative regardless of content, so the declared 1px
+   is what the table actually renders at, and `sr-only`'s own `overflow:
+   hidden`/`clip: rect(0,0,0,0)` clip whatever a cell's content paints past
+   that box. No dedicated visually-hidden primitive exists in this kit beyond
+   the `sr-only` utility class (checked: no `VisuallyHidden` component, no
+   second convention) — this pairs with it rather than replacing it, so the
+   table stays exactly as reachable to a screen reader as before.
    ------------------------------------------------------------------------- */
 function MatrixTable(props: {
   caption: string;
@@ -630,7 +649,7 @@ function MatrixTable(props: {
   const grand = fromNodes.reduce((sum, f) => sum + rowTotal(f.id), 0);
 
   return (
-    <table data-slot="sankey-table" className="sr-only">
+    <table data-slot="sankey-table" className="sr-only table-fixed">
       <caption>{caption}</caption>
       <thead>
         <tr>

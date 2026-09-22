@@ -188,7 +188,80 @@ if (!/data-slot="rail-indicator"/.test(railSrc)) {
 }
 
 /* ----------------------------------------------------------------------------
-   5 · THE TIMING IS THE SHARED TOKENS, NEVER A NEW NUMBER. Pinned in BOTH
+   5 · THE LABEL READS ON THE INDICATOR — her ruling on v1.2.157, verbatim:
+   "good. but now the tab and the text are the same color and i cannot read
+   it." Two independent ways that regresses, both pinned here:
+
+     (a) THE REDUCED TREATMENT'S INK MUST PAIR WITH THE INDICATOR'S OWN FILL.
+         `ACTIVE_TREATMENT_WITH_INDICATOR` sets no fill of its own (checked
+         above) — the indicator behind it is what the label sits on now, not
+         the rail's own ground — so its ink has to be `--spine-active-ink`,
+         the token the indicator's `--spine-active-fill` was always paired
+         against, spent as a token rather than a literal hex (PATTERN §4,
+         the same discipline the rest of this file follows). A reduced
+         treatment that dropped this ink, or one that pointed the indicator's
+         own fill at a different token than the row's static
+         `ACTIVE_TREATMENT` already pairs, would silently break the contrast
+         the static row has always had — this check fails on either half of
+         that drift, not just the row's.
+
+     (b) THE INDICATOR MUST NOT BE ABLE TO PAINT IN FRONT OF THE LABEL. A
+         `position: absolute` indicator (below) and a `position: static` row
+         are not tree-order-comparable — CSS's own stacking order (Appendix
+         E) paints every non-positioned in-flow descendant BEFORE any
+         positioned one, regardless of which comes first in the DOM. That is
+         the actual fault the ruling above describes: it shipped with the
+         indicator first in the DOM and the row carrying no `position` at
+         all, so the indicator painted over every label no matter the
+         markup order — confirmed live in `verify/rail/`, where the active
+         row rendered as a solid fill with no visible label, not merely a
+         low-contrast one. `ROW_SHAPE` fixes this by making every row
+         `relative` too, the same line `tabs.tsx`'s `TRIGGER_SKIN` carries
+         for the identical reason: two `position` elements at stack level 0
+         (the indicator and the row) resolve their order by TREE order, and
+         the indicator is placed first in the DOM on purpose so that
+         ordering — now real, not accidental — keeps it behind. Losing
+         `relative` off `ROW_SHAPE` reopens the exact bug this section is
+         named for, even though nothing about the indicator's own markup or
+         colour would have changed.
+   -------------------------------------------------------------------------- */
+if (
+  !/const ACTIVE_TREATMENT_WITH_INDICATOR = \[\s*\n\s*"text-\[var\(--spine-active-ink\)\]",/.test(
+    railSrc,
+  )
+) {
+  findings.push(
+    `${railRel}'s ACTIVE_TREATMENT_WITH_INDICATOR does not set text-[var(--spine-active-ink)] — once the row stops ` +
+      "painting its own fill, its ink is the ONLY thing left to contrast against the travelling indicator's fill, " +
+      "and it has to be the token the indicator's own fill is paired against, not a dropped or literal value.",
+  );
+}
+if (
+  !/"motion-rail-indicator pointer-events-none absolute rounded-pill",\s*\n\s*"bg-\[var\(--spine-active-fill\)\]",/.test(
+    railSrc,
+  )
+) {
+  findings.push(
+    `${railRel}'s indicator span does not paint bg-[var(--spine-active-fill)] — that is the exact fill ` +
+      "ACTIVE_TREATMENT_WITH_INDICATOR's ink is paired against; a different token here breaks the pairing even if " +
+      "the row's own ink is untouched.",
+  );
+}
+if (
+  !/const ROW_SHAPE = cn\(\s*\n\s*"relative flex min-w-0 items-center gap-\[var\(--space-2\)\]",/.test(railSrc)
+) {
+  findings.push(
+    `${railRel}'s ROW_SHAPE does not open with "relative flex …" — without \`relative\` every row is ` +
+      "position: static, which CSS's own stacking order always paints BEHIND a position: absolute sibling " +
+      "regardless of DOM order, so the indicator span (position: absolute, deliberately first in the DOM) would " +
+      "paint IN FRONT of the label no matter how the markup is ordered. This is the exact fault behind her " +
+      '"i cannot read it" ruling on v1.2.157 — confirmed live in verify/rail/, where the active row rendered as a ' +
+      "solid fill with no visible label at all.",
+  );
+}
+
+/* ----------------------------------------------------------------------------
+   6 · THE TIMING IS THE SHARED TOKENS, NEVER A NEW NUMBER. Pinned in BOTH
    directions: motion.css must declare .motion-rail-indicator on the two
    tokens .motion-tab-indicator already uses, and rail.tsx must actually wear
    that class (a class that exists but is never applied is dead weight, not a
@@ -213,6 +286,8 @@ console.log(
   "OK rail indicator check: rail.tsx measures the active row's offsetTop/offsetHeight from an SSR-safe layout " +
     "effect, watches data-active/childList with a MutationObserver and the nav plus every row with a " +
     "ResizeObserver (re-binding on [groups, isCollapsed, closed, current]), RailIndicatorContext gates the row's " +
-    "own fill off once the indicator is live, the indicator itself is undrawn until the first measurement lands, " +
-    "and both files spend only the shared --duration-entrance/--ease-move tokens for the travel.",
+    "own fill off once the indicator is live, the reduced treatment's ink is paired against the indicator's own " +
+    "fill token, ROW_SHAPE keeps every row position: relative so the indicator cannot paint in front of the label " +
+    "no matter the DOM order, the indicator itself is undrawn until the first measurement lands, and both files " +
+    "spend only the shared --duration-entrance/--ease-move tokens for the travel.",
 );

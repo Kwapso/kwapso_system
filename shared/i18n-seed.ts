@@ -4543,14 +4543,6 @@ export const SEED: Catalogue = {
    * fallback sentence for a task carrying no due date at all. ──────────── */
   "No deadline set.": { de: "Keine Frist festgelegt.", es: "Sin fecha límite.", ca: "Sense data límit." },
 
-  /* ── The Assigned to card's own eyebrow, redesigned as the Stakeholders
-   * card's twin (Aurora, 21 Sep 2026, verbatim: "I wanted the 'Assigned to'
-   * to be like this: the count and the horizontal card. Redesign it."). The
-   * tile's eyebrow reads "Assigned to" when the record carries its own
-   * person (the existing seed entry above) and this new "From the app" when
-   * it does not and the app's lead is answering instead, the app's own name
-   * stays on the existing "Inherited from <app>" line beneath it. ────────── */
-  "From the app": { de: "Von der App", es: "De la app", ca: "De l'app" },
 
 
   /* ── THE STORY DETAIL PAGE, ONE PAGE, NO TABS (Aurora's design review, 21

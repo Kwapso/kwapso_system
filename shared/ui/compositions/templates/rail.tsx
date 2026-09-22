@@ -554,9 +554,34 @@ const ACTIVE_TREATMENT_WITH_INDICATOR = [
    THE ROW — one shape, three skins, two elements.
    -------------------------------------------------------------------------- */
 
-/** Geometry shared by every entry, lit or not, link or button. */
+/** Geometry shared by every entry, lit or not, link or button.
+ *
+ *  `relative` — THE FIX FOR THE INDICATOR PAINTING OVER THE LABEL, 22 SEP
+ *  2026. Her ruling on v1.2.157, verbatim: "good. but now the tab and the
+ *  text are the same color and i cannot read it." The indicator span below
+ *  is `position: absolute` and was placed first in the DOM on the theory
+ *  that DOM order alone decides paint order — it does not. Appendix E's
+ *  stacking order paints ALL in-flow, non-positioned descendants (step 3)
+ *  before ANY positioned descendant at stack level 0 (step 6), regardless of
+ *  tree order between the two groups; tree order only breaks ties WITHIN a
+ *  step. A `position: static` row (this class, before today, set no
+ *  position at all) is step 3 and a `position: absolute` indicator is step
+ *  6, so the indicator painted on top of every row's label no matter which
+ *  came first in the markup — confirmed live in `verify/rail/`: the active
+ *  row rendered as a solid fill with NO visible label at all, not a
+ *  low-contrast one. `tabs.tsx`'s own `TRIGGER_SKIN` already carries this
+ *  exact line (`"relative -mb-px …"`) for the identical reason — see its
+ *  indicator's own comment, "First in the DOM so positioned siblings paint
+ *  over it: the indicator is BEHIND its label, not on top of it" — and this
+ *  file's indicator comment used the same sentence while the row itself
+ *  never met the "positioned" half of it. `relative` promotes every row to
+ *  a stack-level-0 positioned descendant too, the SAME step 6 the indicator
+ *  occupies, and step 6 breaks its own ties by tree order — indicator first,
+ *  rows after — so the row now paints over the indicator explicitly, not by
+ *  luck. No `z-index` is added: two step-6 siblings ordered by tree order is
+ *  the same mechanism `tabs.tsx` relies on, unembellished. */
 const ROW_SHAPE = cn(
-  "flex min-w-0 items-center gap-[var(--space-2)]",
+  "relative flex min-w-0 items-center gap-[var(--space-2)]",
   "border-0 bg-transparent no-underline select-none",
   /* NO WEIGHT HERE — see `ACTIVE_TREATMENT`. Every row used to be 500 and the
      lit/quiet distinction was carried entirely by colour; client ruling D5=C
@@ -1748,8 +1773,18 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             isCollapsed && "items-center gap-[var(--space-3)]",
           )}
         >
-          {/* THE INDICATOR — first in the DOM so the rows paint over it, same
-              order as `TabsList`'s own. Undrawn until the first measurement
+          {/* THE INDICATOR — first in the DOM so positioned siblings paint
+              over it: the indicator is BEHIND every row's label, not on top
+              of it, same sentence `TabsList`'s own indicator comment states.
+              THAT SENTENCE IS ONLY TRUE BECAUSE `ROW_SHAPE` NOW CARRIES
+              `relative` — see its own comment for the stacking-order bug
+              this fixes (22 Sep 2026): a `position: absolute` span and a
+              `position: static` row are NOT tree-order-comparable, no matter
+              which the markup puts first, and the absolute one always wins.
+              `relative` makes every row a positioned, stack-level-0 sibling
+              of this span, the same step the indicator occupies, so THIS
+              step's tie-break — tree order — is what actually keeps the
+              indicator behind the label. Undrawn until the first measurement
               lands (no `indicatorMark`), so there is no slide-in from nowhere
               on first paint: the active row's own fill (`ACTIVE_TREATMENT`)
               carries the mark until this exists, and `RailIndicatorContext`

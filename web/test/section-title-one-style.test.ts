@@ -24,10 +24,13 @@
 // title itself became the eyebrow. `AssignedToCard`
 // (`web/components/tickets/help-stakeholders.tsx`) drops that inner chip for the
 // ticket's own assignee now (the section title already says it); "From the app"
-// survives, because it says something the title does not. Every OTHER section
-// with several facts under one title (Stakeholders' own "Raised by"/"On the
-// loop", the merged Phase/Wave facts) keeps both, on purpose: the inner labels
-// there say something the section title does not.
+// first survived the inherited case on the reading that it said something the
+// title did not, then Aurora overruled that reading the same day, verbatim:
+// "under assigned to remove 'From the app'" — no chip at all now, own person or
+// inherited. Every OTHER section with several facts under one title
+// (Stakeholders' own "Raised by"/"On the loop", the merged Phase/Wave facts)
+// keeps both, on purpose: the inner labels there say something the section
+// title does not.
 //
 // THE CENSUS, OFF THE DISK, over every file in web/components and
 // web-portal/components: every literal `<h2`/`<h3`/`<h4` whose OWN `className`

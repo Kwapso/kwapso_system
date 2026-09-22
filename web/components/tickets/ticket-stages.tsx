@@ -546,7 +546,29 @@ export function TicketStages({
     // nobody got round to adding. `UNCONTAINED_SECTION_OK`
     // (shared/rules/registry.ts) carries the entry and her words, the same
     // shape the Tasks progress line's own entry uses.
-    <section className="flex flex-col gap-[var(--space-3)]" aria-label={t("Stages")}>
+    // `min-w-0` HERE TOO, NOT ONLY ON THE SCROLLING WRAPPER BELOW — measured
+    // live, 22 Sep 2026, after Aurora reported "a small horizontal scroll
+    // within the main content at the bottom" on the ticket page at narrow
+    // widths. The wrapper immediately below already carries its own
+    // `min-w-0 overflow-x-auto` specifically "so a flex ancestor cannot let
+    // this box grow to its content instead of clipping it" (its own
+    // comment) — but that only zeroes the WRAPPER's own contribution to
+    // ITS parent, this `<section>`. Without `min-w-0` here too, THIS
+    // element (a flex item in the record head's own column) still computed
+    // its automatic minimum width off the ladder's content (nine stages ×
+    // `STAGE_COLUMN`, ~1080px), which is wider than the wrapper's own
+    // scrollable box and bled that difference straight into
+    // `[data-slot="screen-shell-body"]` (confirmed live: at 760px the main
+    // pane measured `scrollWidth` 155-180px past its own `clientWidth`,
+    // traced by a live descendant walk to nothing but this ladder's own
+    // rects — `screen-shell-body` computes `overflow-x: auto` on its own
+    // the moment its sibling `overflow-y: auto` is set and `overflow-x` is
+    // left unset, so ANY bleed here becomes a real, visible horizontal
+    // scrollbar on the page's main content, not just an internal one).
+    // `min-w-0` breaks that: a flex item's automatic minimum size is 0 the
+    // moment something in the chain says so, and this is the first link
+    // that did not.
+    <section className="flex min-w-0 flex-col gap-[var(--space-3)]" aria-label={t("Stages")}>
       {/* THE RAIL SCROLLS, THE PAGE NEVER DOES (R29). `min-w-0` so a flex
           ancestor cannot let this box grow to its content instead of clipping
           it; `tabIndex` because a scrolling region no keyboard can reach is a

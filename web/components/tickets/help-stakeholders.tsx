@@ -356,13 +356,25 @@ export function HelpStakeholders({
  * when it did not, but once the panel's own title above IS "Assigned to"
  * in the same eyebrow register R108 gave it, repeating the identical word a
  * second time over the tile is a label agreeing with its own heading; her
- * screenshot showed exactly that duplicate. So the tile's own `chip` is
- * `undefined` for the ticket's own person now, and only "From the app"
- * survives, because that word says something the title does not, with the
- * app's own name kept on the existing second, muted line ("Inherited from
- * <app>", `PersonCard`'s own `secondary` slot) rather than folded into the
- * eyebrow itself, so a translator never has to reorder a name inside a
- * sentence. This card still stands DIRECTLY on the page
+ * screenshot showed exactly that duplicate. So the tile's own `chip` was
+ * made `undefined` for the ticket's own person, and "From the app" was kept
+ * for the inherited case on the reading that it said something the title
+ * did not.
+ *
+ * AURORA OVERRULED THAT READING, 22 SEP 2026, verbatim: "under assigned to
+ * remove 'From the app'." She had the chip-vs-title-word question already
+ * settled by R108's own reasoning above and decided the inherited case the
+ * same way regardless: no chip at all over the assignee tile, ever. The
+ * app's own name stays exactly where it already was, the second, muted line
+ * ("Inherited from <app>", `PersonCard`'s own `secondary` slot) — that
+ * sentence still says something the panel's title does not, only the
+ * eyebrow above the tile is gone. So `StakeholderTile`'s own `chip` prop is
+ * never passed by this call site any more (it stays on the component for
+ * Raised by, which still wears one), and the header row it used to sit in
+ * (`{(chip || action) && (…)}` inside `StakeholderTile`) draws nothing for
+ * this tile, `action` never having had a caller here either — not a dead
+ * prop on the shared component, which Raised by still uses, but a dead row
+ * for this one call. This card still stands DIRECTLY on the page
  * ground (R67): `TicketSidePanel`'s own `Card` is `variant="default"`,
  * never nested inside `<HelpStakeholders>` or the Stakeholders panel's own
  * `TicketSidePanel`.
@@ -449,16 +461,12 @@ export function AssignedToCard({
           picture={assigneeMember?.photo}
           mark={nameInitials(assignee.name ?? "")}
           markName={assignee.name ?? undefined}
-          // R108, 22 Sep 2026: no chip at all for the ticket's own person.
-          // the panel's own title above already says "Assigned to" in the
-          // identical eyebrow register, so repeating it here would be the
-          // duplicate her screenshot flagged. "From the app" survives
-          // because it says something the title does not.
-          chip={
-            assignee.inherited ? (
-              <span className="text-micro text-muted-foreground uppercase">{t("From the app")}</span>
-            ) : undefined
-          }
+          // R108, 22 Sep 2026, then Aurora's overrule the same day ("under
+          // assigned to remove 'From the app'", this component's own header
+          // above): no chip at all over this tile, ever, own person or
+          // inherited. The panel's own title above already says "Assigned
+          // to"; the inherited fact still reads on the muted "Inherited
+          // from <app>" line below (`secondary`, below).
           title={<CardTitle className="text-sm">{assignee.name}</CardTitle>}
           secondary={
             assignee.inherited ? (
