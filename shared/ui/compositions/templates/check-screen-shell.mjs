@@ -1696,19 +1696,24 @@ console.log(
    ========================================================================= */
 const airFindings = [];
 
-/* 1 · THE TOP IS ITS OWN TOKEN, AT THE NUMBER SHE NAMED. A second token
-   rather than a wider `--shell-gutter` because the shell gutter is also the
-   measure between the rail and the card and between the card and the
-   assistant, and the 21 Sep page keeps those at 16. */
+/* 1 · THE TOP IS ITS OWN TOKEN, AT THE NUMBER SHE NAMED - HALVED 22 SEP 2026.
+   A second token rather than a wider `--shell-gutter` because the shell
+   gutter is also the measure between the rail and the card and between the
+   card and the assistant, and the 21 Sep page keeps those at 16. Aurora
+   reversed her own 21 Sep ruling the next day, over her own screenshot of
+   this same band: "look at my screenshot. athts the spacing i want
+   reduced" - --space-6 (24) back down to --space-3 (12), the number she
+   named this time. */
 if (
-  !/const DENSITY_GUTTER_TOP: Record<ScreenDensity, string> = \{\s*comfortable: "\[--shell-gutter-top:var\(--space-6\)\]",\s*calm: "\[--shell-gutter-top:var\(--space-6\)\]",\s*\};/.test(
+  !/const DENSITY_GUTTER_TOP: Record<ScreenDensity, string> = \{\s*comfortable: "\[--shell-gutter-top:var\(--space-3\)\]",\s*calm: "\[--shell-gutter-top:var\(--space-3\)\]",\s*\};/.test(
     src,
   )
 ) {
   airFindings.push(
-    `${rel} does not declare DENSITY_GUTTER_TOP at [--shell-gutter-top:var(--space-6)] at both densities - ` +
-      "the air above the nav row is the client's own 24, ruled 21 Sep 2026, and it is a separate token from " +
-      "--shell-gutter precisely so widening it does not move the rail and assistant seams with it.",
+    `${rel} does not declare DENSITY_GUTTER_TOP at [--shell-gutter-top:var(--space-3)] at both densities - ` +
+      "the air above the nav row is the client's own 12, ruled 22 Sep 2026 (reversing her own 21 Sep 24), and " +
+      "it is a separate token from --shell-gutter precisely so moving it does not move the rail and assistant " +
+      "seams with it.",
   );
 }
 if (!/DENSITY_GUTTER_TOP\[density\],/.test(src)) {
@@ -2044,7 +2049,7 @@ if (airFindings.length > 0) {
 }
 
 console.log(
-  "OK screen-shell air/bottom-edge check: the air above the nav is --shell-gutter-top (--space-6) at both " +
+  "OK screen-shell air/bottom-edge check: the air above the nav is --shell-gutter-top (--space-3) at both " +
     "densities and is spent on the screen; the content column pays that top and no bottom gutter, and the aside " +
     "dock pays none either, so the card and the assistant both reach the window's bottom edge together; " +
     "ASIDE_TAB reads the same top token, so the two columns' tabs still start at one y; CARD_FLUSH squares the " +

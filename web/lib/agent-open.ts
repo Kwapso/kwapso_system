@@ -75,46 +75,22 @@ export function useAgentOpen(): boolean {
   )
 }
 
-/* ---------------------------- asking it something --------------------------- */
-
-// A QUESTION HANDED TO THE ASSISTANT FROM A SCREEN — the knowledge base's own
-// ask box, and the same box on an account's or an app's knowledge tab.
-//
-// It lives here rather than in the panel for the reason the open flag does: the
-// panel is mounted ONCE at the root and the screen doing the asking is somewhere
-// else entirely, so the two can only meet at a module-level store. It is NOT
-// mirrored to sessionStorage — an open panel should survive a reload, an
-// unanswered question should not be asked twice.
-//
-// Taken exactly once. `useAgentChat` clears it the moment it sends, so a re-render
-// (or a second panel, in a test) cannot re-ask and re-spend a credit.
-
-let question: string | null = null
-
-/** Open the assistant and ask it this. */
-export function askAssistant(text: string): void {
-  const q = text.trim()
-  if (!q) return
-  question = q
-  for (const fn of subscribers) fn()
-  setAgentOpen(true)
-}
-
-/** The question waiting to be asked, or null. */
-export function usePendingQuestion(): string | null {
-  return useSyncExternalStore(
-    (cb) => {
-      subscribers.add(cb)
-      return () => subscribers.delete(cb)
-    },
-    () => question,
-    () => null
-  )
-}
-
-/** Sent — forget it, so it is never asked twice. */
-export function clearPendingQuestion(): void {
-  if (question === null) return
-  question = null
-  for (const fn of subscribers) fn()
-}
+/* ---------------------------------------------------------------------------
+ * ASKING IT SOMETHING FROM A SCREEN used to live here — a `question` module
+ * variable, `askAssistant()` to set it and open the panel, `usePendingQuestion`/
+ * `clearPendingQuestion` for `useAgentChat` to pick it up and send it once. It
+ * was the knowledge base's own one-shot ask box (`ask-the-assistant.tsx`)
+ * handing a typed question to the panel across the same root-mount gap
+ * `useAgentOpen` bridges.
+ *
+ * REMOVED 22 Sep 2026, WITH ITS ONLY CALLER. The knowledge gallery's own "Ask"
+ * (`knowledge-screen.tsx`'s `openAskConversation`) replaced the typed-then-handed-off
+ * box — Aurora's ruling, 22 Sep 2026, "make ask a button in the toolbar" — with
+ * opening a scoped assistant tab directly (`pickAgentTabScope` + `setAgentOpen`)
+ * and letting the person type straight into the panel's own composer. Nothing
+ * else ever called `askAssistant`, so once the box it served (`ask-the-assistant.tsx`,
+ * orphaned the same day the account Knowledge tab stopped mounting it) was deleted,
+ * this whole relay had no producer left — checked: no other screen, and neither
+ * front door's portal, ever imported it. Kept only as a shape to reach for if a
+ * future screen wants to hand the panel a question it did not type — the
+ * mechanism was sound, it just has no caller today. */

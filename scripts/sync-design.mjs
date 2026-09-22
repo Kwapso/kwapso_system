@@ -151,7 +151,17 @@ const main = async () => {
     console.error("usage: node scripts/sync-design.mjs [<tag>] --from <path-to-local-kit-clone>")
     process.exit(1)
   }
-  const positional = rawArgs.filter((_, i) => i !== fromFlagAt && i !== fromFlagAt + 1)
+  // GUARDED AGAINST THE ABSENT FLAG, 22 Sep 2026. This read
+  // `i !== fromFlagAt && i !== fromFlagAt + 1`, and when `--from` is absent
+  // `fromFlagAt` is -1, so the second clause became `i !== 0` and silently ate
+  // the TAG. `sync-design.mjs v1.2.163` therefore fell through to the pinned
+  // tag and re-vendored the version already on disk, reporting success. It
+  // only stayed invisible because every earlier GitHub sync happened to name
+  // the tag that was already pinned. A tag argument that is quietly discarded
+  // is how the wrong kit ships, so the flag's own indices are only excluded
+  // when the flag is actually there.
+  const drop = fromFlagAt === -1 ? new Set() : new Set([fromFlagAt, fromFlagAt + 1])
+  const positional = rawArgs.filter((_, i) => !drop.has(i))
 
   const pinned = existsSync(join(TARGET, "VERSION.json"))
     ? JSON.parse(readFileSync(join(TARGET, "VERSION.json"), "utf8")).tag

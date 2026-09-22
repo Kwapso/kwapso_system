@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 760 strings · 3 languages · 1542 of the entries below are hand-written seed.
+// 759 strings · 3 languages · 1539 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -735,7 +735,6 @@ export const CATALOGUE: Catalogue = {
   "Your name goes on anything you send us, so we know who we're talking to.": { de: "Dein Name wird auf allem angebracht, das du uns sendest, damit wir wissen, mit wem wir sprechen.", es: "Tu nombre aparece en todo lo que nos envías, para que sepamos con quién estamos hablando.", ca: "El teu nom apareix en tot allò que ens envies, perquè sapiguem amb qui estem parlant." },
   "Your photo": { de: "Dein Foto", es: "Tu foto", ca: "La teva foto" },
   "Your profile": { de: "Dein Profil", es: "Tu perfil", ca: "El teu perfil" },
-  "Your question is asked about": { de: "Deine Frage wird gestellt zu", es: "Tu pregunta trata sobre", ca: "La teva pregunta es fa sobre" },
   "Your teams": { de: "Deine Teams", es: "Tus equipos", ca: "Els teus equips" },
   "a month": { de: "ein Monat", es: "un mes", ca: "un mes" },
   "added": { de: "hinzugefügt", es: "añadido", ca: "afegit" },

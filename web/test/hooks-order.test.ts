@@ -7,13 +7,57 @@
 // fix — the containment half is the ErrorBoundary in the root layout.
 //
 // A SCANNER WITH A BLIND SPOT IS A CHECK THAT IS SILENTLY OFF, so the scanner is
-// itself locked by fixtures below. Three real blind spots have been found this way
-// (each waved a whole file through): a `React.`-namespaced hook; a destructured
-// param's `{` mistaken for the body; and — the subtle one — a guard written the
-// ordinary way, `if (!ready) {\n return null\n}`, whose return sits at brace depth
-// 2 and so never registered as a return at all. Hence the rule the walk now uses:
-// a return counts unless it is inside a NESTED FUNCTION (a callback's own return
-// is its own; an `if`/`try`/`switch` block's return is the component's).
+// itself locked by fixtures below. Four real blind spots have been found this way
+// (each waved a whole file through, or invented a finding that was not there): a
+// `React.`-namespaced hook; a destructured param's `{` mistaken for the body; a
+// guard written the ordinary way, `if (!ready) {\n return null\n}`, whose return
+// sits at brace depth 2 and so never registered as a return at all; and (22 Sep
+// 2026) a NESTED FUNCTION DECLARATION CARRYING A RETURN-TYPE ANNOTATION —
+// `function helper(x: string): number | undefined { ... }` inside a component.
+// Hence the rule the walk now uses: a return counts unless it is inside a NESTED
+// FUNCTION (a callback's own return is its own; an `if`/`try`/`switch` block's
+// return is the component's).
+//
+// THE FOURTH ONE WAS THE DANGEROUS DIRECTION. `opensNestedFunction` decided
+// "nested or not" by looking at the single character before the `{`: `=> {` for
+// an arrow, `) {` for everything else, anything else a plain block. A return-type
+// annotation (`): T {`) puts the type's own last character there instead, so the
+// helper read a genuine nested function as a bare block — its body's own
+// `return` statements were then credited to the ENCLOSING component, and a
+// `use*()` call written after the helper, however many statements later, was
+// flagged as following an early return that was never the component's own.
+// `module-settings-screen.tsx`'s `typeValueCount` (a private helper with exactly
+// this shape) tripped it this way; reshaping that one function to dodge the scan
+// would have left every OTHER annotated nested declaration in this codebase
+// still invisible to it — worse, in the direction this comment opens with: a
+// scanner that cannot find where a nested function BEGINS cannot reliably find
+// where one ENDS either, and the same misreading that INVENTS a false early
+// return here could just as easily SWALLOW a real one inside a block it
+// wrongly calls "nested" — the false negative, silently missing the exact crash
+// class this file exists to catch. So the scanner was fixed, not the component.
+//
+// `returnTypeParenBeforeBrace` (below) is the fix: when the character right
+// before the `{` is not `)` and not the end of `=> `, it walks backward once
+// more through what LOOKS like an ordinary TYPE EXPRESSION — identifiers, dotted
+// paths, `,`/`|`/`&`/`?`, whitespace, quoted literal types, and BALANCED
+// `<>`/`()`/`[]`/`{}` — until it either reaches a top-level `:` sitting directly
+// after a `)` (a return-type annotation: hand the `)` back so the existing
+// paren-matching walk resumes exactly as it would have for `) {`) or runs into
+// a character it does not recognise as part of an ordinary type (bail, unchanged
+// from before this fix). BAILING IS THE SAFE DIRECTION HERE, not a remaining
+// gap papered over: an unrecognised shape falls back to "not nested" — the
+// direction that produces a NOISY false positive (an extra, wrong finding, the
+// same failure mode this whole class already is), never a false negative that
+// hides a real one. Two shapes are named, not silently guessed past, because
+// they are genuinely outside what a backward character walk can resolve without
+// a real parser: a return type that itself contains an ARROW (a function-type
+// return value, `(): (x: number) => string {`) reads its own `=>` as this
+// scanner's arrow-detection and gives up on the type; and a TEMPLATE LITERAL
+// TYPE with a `${...}` interpolation is walked only as far as its balanced
+// braces, never evaluated. Both are rare enough in house style (verified: zero
+// hits across the current scanned tree) that bailing on them costs a false
+// positive nobody has hit yet, not a silent hole — if one ever lands, this
+// scanner will flag it wrong and loud, which is the failure mode to have.
 
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -56,13 +100,79 @@ function stripNoise(src: string): string {
  * the enclosing component, which is exactly what makes them early returns. */
 const BLOCK_KEYWORDS = new Set(["if", "for", "while", "switch", "catch"])
 
+/** Plausible characters inside an ORDINARY type expression, walked backward:
+ * word characters, `$` (a type param can be named `$T` in this codebase's own
+ * style, and the check has to accept what it would accept going forward),
+ * `.` (a namespaced type), `,`/`|`/`&`/`?` (tuple/union/intersection/optional),
+ * whitespace, and the three quote characters (a string-literal type,
+ * `"asc" | "desc"`, exactly the shape `paged-sort.test.ts`'s own door reads
+ * off this codebase's real sort menus). Deliberately NOT `=` or `>` on its
+ * own — those belong to `=>`, and a return type containing an arrow is one of
+ * the two named gaps below. */
+const TYPE_CHAR = /[\w$.,|&?\s"'`-]/
+
+/** Given the index of the last non-whitespace character before a `{` that is
+ * NOT itself a `)` (so the immediate, common case in `opensNestedFunction`
+ * already returned), asks whether this is instead the END of a return-type
+ * annotation — `): SomeType {` — by walking backward through what looks like
+ * an ordinary type expression, tracking `<>`/`()`/`[]`/`{}` balance so a
+ * generic, a tuple, an array type or an inline object type does not throw the
+ * walk off, until it either finds a top-level `:` sitting directly after a
+ * `)` (returns that `)`'s index, so the caller's existing paren-matching walk
+ * resumes exactly as it would for the ordinary `) {` case) or meets a
+ * character it does not recognise as part of an ordinary type (returns
+ * `undefined` — the SAFE direction: falling back to "not nested" costs a
+ * noisy false positive, never a silent false negative; see this file's own
+ * header for the two shapes this deliberately still does not resolve). */
+function returnTypeParenBeforeBrace(src: string, j: number): number | undefined {
+  let i = j
+  let angle = 0
+  let paren = 0
+  let bracket = 0
+  let brace = 0
+  while (i >= 0) {
+    const c = src[i]
+    if (angle === 0 && paren === 0 && bracket === 0 && brace === 0 && c === ":") {
+      let k = i - 1
+      while (k >= 0 && /\s/.test(src[k])) k--
+      return src[k] === ")" ? k : undefined
+    }
+    if (c === ">") angle++
+    else if (c === "<") {
+      if (angle === 0) return undefined
+      angle--
+    } else if (c === ")") paren++
+    else if (c === "(") {
+      if (paren === 0) return undefined
+      paren--
+    } else if (c === "]") bracket++
+    else if (c === "[") {
+      if (bracket === 0) return undefined
+      bracket--
+    } else if (c === "}") brace++
+    else if (c === "{") {
+      if (brace === 0) return undefined
+      brace--
+    } else if (!TYPE_CHAR.test(c)) return undefined
+    i--
+  }
+  return undefined
+}
+
 /** Does the `{` at this index open a nested function body (arrow, function
  * expression, object method) rather than a plain block / object literal? */
 function opensNestedFunction(src: string, brace: number): boolean {
   let j = brace - 1
   while (j >= 0 && /\s/.test(src[j])) j--
   if (j >= 1 && src[j] === ">" && src[j - 1] === "=") return true // `=> {`
-  if (src[j] !== ")") return false // `try {`, `else {`, `do {`, an object literal…
+  if (src[j] !== ")") {
+    // `try {`, `else {`, `do {`, an object literal… — UNLESS this is a return-
+    // type-annotated declaration, `): T {`, whose own closing `)` sits further
+    // back than the single character this function otherwise looks at.
+    const closeParen = returnTypeParenBeforeBrace(src, j)
+    if (closeParen === undefined) return false
+    j = closeParen
+  }
   let paren = 1
   let k = j - 1
   while (k >= 0 && paren > 0) {
@@ -197,6 +307,19 @@ describe("hooks never follow a top-level early return (the React #310 crash clas
       ["arrow component", "const E = ({ off }: P) => {\n  if (off) return null\n  const [v] = useState(0)\n  return v\n}"],
       ["return inside try", "function F() {\n  try {\n    return read()\n  } catch {}\n  const [v] = useState(0)\n  return v\n}"],
       ["custom hook", "function useG() {\n  if (!x) {\n    return null\n  }\n  const v = useRef(0)\n  return v\n}"],
+      // THE FALSE-NEGATIVE PROOF (22 Sep 2026): a return-type-annotated nested
+      // function declaration sits BESIDE the real bug, not standing in for it —
+      // this is the shape the fix must not let hide a genuine early return. If
+      // `opensNestedFunction` ever again failed to recognise `helper` as nested,
+      // its own two `return`s would falsely trip `sawReturn` before the real
+      // `if` even runs — which happens to still leave this fixture red (the
+      // real bug is real), so the fixture below it is the one that actually
+      // catches a regression here: it proves the SAME annotated shape produces
+      // ZERO offenders when the hooks are correctly ordered.
+      [
+        "real early return beside an annotated nested function",
+        "function H() {\n  function helper(x: string): number | undefined {\n    if (x === \"\") return 1\n    return 2\n  }\n  if (!helper) return null\n  const [v] = useState(0)\n  return v\n}",
+      ],
     ]
     for (const [what, src] of shapes) expect(findOffendersIn(src, what), `blind to: ${what}`).toHaveLength(1)
   })
@@ -209,6 +332,23 @@ describe("hooks never follow a top-level early return (the React #310 crash clas
       // A hook ON the return statement runs before the function ends.
       ["hook on the return", "function C() {\n  return useMemo(() => 1, [])\n}"],
       ["hooks then return", "function D() {\n  const [v] = useState(0)\n  if (!v) return null\n  return v\n}"],
+      // THE REGRESSION LOCK FOR THE FIX ITSELF (22 Sep 2026): a nested function
+      // DECLARATION (not an arrow) carrying a return-type annotation — the
+      // exact shape `module-settings-screen.tsx`'s own `typeValueCount` is —
+      // must read as nested, so its own early `return`s never reach the
+      // component's `sawReturn` and the hook below reads as correctly ordered.
+      [
+        "annotated nested function declaration, function name(args): Type { … }",
+        "function E() {\n  function helper(x: string): number | undefined {\n    if (x === \"\") return 1\n    return 2\n  }\n  const [v] = useState(0)\n  return helper(String(v))\n}",
+      ],
+      // The same shape once more, with an ARRAY parameter and a GENERIC
+      // return type — exercising `returnTypeParenBeforeBrace`'s `[]`/`<>`
+      // balance rather than its plain-identifier fast path, so a bracket or
+      // angle-bracket in the type cannot throw the backward walk off.
+      [
+        "annotated nested function declaration with brackets and generics in its signature",
+        "function F() {\n  function pick(xs: string[]): Array<number> | undefined {\n    return xs.length ? [xs.length] : undefined\n  }\n  const [v] = useState(0)\n  return pick([String(v)])\n}",
+      ],
     ]
     for (const [what, src] of legal) expect(findOffendersIn(src, what), `false positive: ${what}`).toEqual([])
   })

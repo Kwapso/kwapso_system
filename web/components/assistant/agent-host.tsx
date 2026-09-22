@@ -106,10 +106,10 @@ export function AgentHost() {
     // (`app-shell.tsx`'s `md:hidden` row, `onClick={() => setAgentOpen(!assistantOpen)}`),
     // wired the day the docked edge handle shipped so a phone would have SOME
     // control once the launcher stopped drawing on wide screens — so two
-    // redundant mango-ish toggles sat on one narrow screen. `askAssistant()`
-    // (lib/agent-open.ts) is a third opener again, from the knowledge base's
-    // own ask box. Deleting the button outright is safe: nothing becomes
-    // unreachable.
+    // redundant mango-ish toggles sat on one narrow screen. The knowledge
+    // gallery's own "Ask" (`knowledge-screen.tsx`'s `openAskConversation`) is
+    // a third opener again, calling `setAgentOpen` directly. Deleting the
+    // button outright is safe: nothing becomes unreachable.
     //
     // BUT THE BUTTON WAS ALSO THE POPOVER'S ANCHOR, not just its trigger —
     // Radix positions `PopoverContent` against whatever DOM node this root's

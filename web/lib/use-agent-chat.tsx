@@ -50,7 +50,6 @@ import { readFileAsDataUrl } from "@shared/web/file"
 import { pickedFileId } from "@shared/web/upload-items"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
-import { clearPendingQuestion, usePendingQuestion } from "@/lib/agent-open"
 import { traceFor } from "@/lib/agent-trace"
 import { emitTrace } from "@/lib/screen-trace"
 import { AgentMarkdown } from "@/components/assistant/agent-markdown"
@@ -333,22 +332,6 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // warning about a limit that has since cleared is its own small lie.
   const failure = failureCell.useValue()
   const setFailure = failureCell.set
-
-  // A QUESTION HANDED IN FROM A SCREEN (web/lib/agent-open.ts): the knowledge
-  // base's ask box, and the same box on an account's or an app's knowledge tab.
-  // It waits for the panel to be open, for the person to be allowed to use the
-  // assistant, and for any turn already running to finish — then it is sent as
-  // an ordinary message and forgotten. Cleared BEFORE the send, so a re-render
-  // mid-request cannot ask it twice and spend the credit twice.
-  const handedIn = usePendingQuestion()
-  React.useEffect(() => {
-    if (!handedIn || !open || !canUse || busy) return
-    clearPendingQuestion()
-    void send(handedIn)
-    // `send` is remade every render and closes over the state it needs; listing
-    // it would re-fire this on every keystroke in the composer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handedIn, open, canUse, busy])
 
 
   // On open: pull the quota (cheap; not cached — it changes per turn) and, if this is

@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest"
 import ts from "typescript"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { pagedFindWiredTo } from "@shared/rules/paged-find-scan"
 import { GLOSSARY } from "@shared/glossary"
 import {
   ACCOUNT_SCOPED_MODULES,
@@ -242,7 +243,9 @@ function recordDetailComponents(): { name: string; source: string }[] {
 }
 
 /** EVERY FIND BAR IN THE APP, as source — the props of each `<PagedFind>`, from
- * the tag to 1,800 characters on.
+ * the tag to 1,800 characters on, PAIRED WITH the whole file it came from (so a
+ * caller can resolve a `listKey={name}` indirection back to that name's own
+ * `const` — see `pagedFindWiredTo`, `shared/rules/paged-find-scan.ts`).
  *
  * COMMENTS STRIPPED FIRST, and not for tidiness: this file's own header block
  * mentions `<PagedFind>` in prose, and on the raw text that sentence opened a
@@ -253,10 +256,11 @@ function recordDetailComponents(): { name: string; source: string }[] {
  * carries a generic, so a lazy match to the tag's close ends four characters in
  * and reports every screen as unwired (paged-search.test.ts and
  * paged-sort.test.ts say the same about the same tag). */
-function findBars(): string[] {
-  return componentFiles().flatMap((f) =>
-    [...stripComments(read(f)).matchAll(/<PagedFind[\s\S]{0,1800}/g)].map((m) => m[0])
-  )
+function findBars(): { file: string; window: string }[] {
+  return componentFiles().flatMap((f) => {
+    const stripped = stripComments(read(f))
+    return [...stripped.matchAll(/<PagedFind[\s\S]{0,1800}/g)].map((m) => ({ file: stripped, window: m[0] }))
+  })
 }
 
 
@@ -1275,13 +1279,15 @@ describe("RULES — the laws of the base", () => {
       // 3 + 4 — the screen wires them to THIS collection's own key, and hands the
       // whole question over. A fixed window rather than one that stops at the
       // first `>`: `<PagedFind<Account>` carries a generic (its two siblings,
-      // paged-search and paged-sort, say the same about the same tag).
-      const wired = findBars().filter((w) => w.includes(c.webKey))
+      // paged-search and paged-sort, say the same about the same tag). Wired
+      // either inline or through the one `listKey={name}` indirection
+      // `pagedFindWiredTo` resolves — see that helper's own header.
+      const wired = findBars().filter((b) => pagedFindWiredTo(b.file, b.window, c.webKey))
       expect(
         wired.length,
         `${name} has door filters but no <PagedFind> whose listKey is built from ${c.webKey}`
       ).toBeGreaterThan(0)
-      for (const w of wired) {
+      for (const { window: w } of wired) {
         expect(
           w.includes("facets="),
           `${name}'s find bar draws no filters — pass translatedFacets("${name}", t, …)`
@@ -1300,12 +1306,12 @@ describe("RULES — the laws of the base", () => {
     // a screen calls it.
     const called = new Set(
       findBars()
-        .filter((w) => Object.values(GROWING_COLLECTIONS).some((c) => w.includes(c.webKey)))
+        .filter((b) => Object.values(GROWING_COLLECTIONS).some((c) => pagedFindWiredTo(b.file, b.window, c.webKey)))
         // The method whose ARGUMENT OBJECT carries the question. Not "the object
         // that opens with it": three of these screens put the strip's own
         // narrowing first and spread the person's question over it, which is the
         // right way round and would read as unwired to a tighter pattern.
-        .flatMap((w) => [...w.matchAll(/\.(\w+)\(\{[\s\S]{0,600}?\.\.\.query/g)].map((m) => m[1]))
+        .flatMap((b) => [...b.window.matchAll(/\.(\w+)\(\{[\s\S]{0,600}?\.\.\.query/g)].map((m) => m[1]))
     )
     expect(called.size, "no paged list client methods found — the scan has gone blind").toBeGreaterThan(4)
     const apiSrc = sourceFiles(join(WEB, "lib", "api"), { extensions: [".ts"] })

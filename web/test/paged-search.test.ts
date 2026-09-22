@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { pagedFindWiredTo } from "@shared/rules/paged-find-scan"
 import { FIND_NARROWING_OK, GROWING_COLLECTIONS } from "@shared/rules/registry"
 import { BASE_RECIPES } from "../lib/screens"
 
@@ -75,10 +76,16 @@ describe("paged-search (R14, the search half): a paged list searches the whole c
       // The window starts AT the tag — `<PagedFind<Account>` carries a generic, so
       // "up to the first `>`" would stop inside the type argument. `listKey` is
       // the bar's first prop by convention, so 300 characters is the bar's own
-      // props and not the screen around it.
-      const wired = componentFiles().some((f) =>
-        [...read(f).matchAll(/<PagedFind[\s\S]{0,300}/g)].some((m) => m[0].includes(c.webKey))
-      )
+      // props and not the screen around it. Wired either inline or through the
+      // one `listKey={name}` indirection `pagedFindWiredTo` resolves against a
+      // `const name = …` elsewhere in the same file — see that helper's own
+      // header (`shared/rules/paged-find-scan.ts`) for why a fixed window alone
+      // stopped seeing `knowledge-screen.tsx` once its `listKey` was hoisted out
+      // to serve more than one `<PagedFind>` mount.
+      const wired = componentFiles().some((f) => {
+        const src = read(f)
+        return [...src.matchAll(/<PagedFind[\s\S]{0,300}/g)].some((m) => pagedFindWiredTo(src, m[0], c.webKey))
+      })
       expect(
         wired,
         `${name}'s door can be searched but no screen asks it — a <PagedFind> whose listKey is built from ${c.webKey}`

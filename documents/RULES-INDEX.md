@@ -17,8 +17,8 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R11 | enforced | `fetch-timeout` | `web/test/rules.test.ts` |
 | R12 | enforced | `cron-records` | `web/test/rules.test.ts` |
 | R13 | enforced | `catalog-coverage` | `workers/data-ops/test/catalog-coverage.test.ts` |
-| R14 | enforced | `bounded-lists` | `web-portal/test/rules.test.ts`<br>`web/test/knowledge-app-scope.test.ts`<br>`web/test/paged-search.test.ts`<br>`web/test/rules.test.ts`<br>`workers/content/test/knowledge-shape-fence.test.ts`<br>`workers/content/test/paging.test.ts`<br>`workers/content/test/stories.test.ts`<br>`workers/content/test/todos-paged.test.ts`<br>`workers/content/test/work-logs.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
-| R15 | enforced | `live-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts` |
+| R14 | enforced | `bounded-lists` | `web-portal/test/rules.test.ts`<br>`web/test/knowledge-account-scope.test.ts`<br>`web/test/knowledge-app-scope.test.ts`<br>`web/test/paged-search.test.ts`<br>`web/test/rules.test.ts`<br>`workers/content/test/knowledge-shape-fence.test.ts`<br>`workers/content/test/paging.test.ts`<br>`workers/content/test/stories.test.ts`<br>`workers/content/test/todos-paged.test.ts`<br>`workers/content/test/work-logs.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
+| R15 | enforced | `live-collections` | `web-portal/test/rules.test.ts`<br>`web/test/knowledge-account-scope.test.ts`<br>`web/test/rules.test.ts` |
 | R17 | enforced | `idempotent-transitions` | `web/test/rules.test.ts`<br>`workers/auth/test/language.test.ts`<br>`workers/content/test/google-mail-bin.test.ts`<br>`workers/content/test/meetings.test.ts`<br>`workers/content/test/stories.test.ts`<br>`workers/tenancy/test/accounts.test.ts`<br>`workers/tenancy/test/waves.test.ts` |
 | R18 | enforced | `activity-gate-coverage` | `web/test/rules.test.ts`<br>`workers/tenancy/test/activity-scope.test.ts` |
 | R20 | enforced | `validated-bodies` | `web/test/rules.test.ts`<br>`web/test/title-length.test.ts`<br>`workers/auth/test/language.test.ts`<br>`workers/content/test/meetings.test.ts` |
@@ -87,7 +87,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R78 | enforced | `no-sort-in-calendar-views` | `web/test/no-sort-in-calendar-views.test.tsx`<br>`web/test/staff-pill-row.test.ts` |
 | R79 | enforced | `staff-pill-row` | `web/test/staff-pill-row.test.ts` |
 | R80 | enforced | `rows-are-a-list` | `web/test/rows-are-a-list.test.ts` |
-| R81 | enforced | `form-carries-no-hints` | `web/test/help-form-dialog-loop-field.test.tsx`<br>`web/test/settings-appearance.test.tsx` |
+| R81 | enforced | `form-carries-no-hints` | `web/test/help-form-dialog-loop-field.test.tsx` |
 | R82 | enforced | `table-column-budget` | `web/test/table-column-budget.test.ts` |
 | R83 | enforced | `toolbar-lead-gap` | `web/test/plain-surface-scope.test.tsx`<br>`web/test/toolbar-lead-gap-card.test.tsx`<br>`web/test/toolbar-lead-gap.test.ts` |
 | R84 | enforced | `mango-in-title-only` | `web/test/mango-title-only.test.ts` |

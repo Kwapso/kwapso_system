@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed - `--shell-gutter-top` halved back to `--space-3` (12), reversing the 21 Sep ruling that raised it - v1.2.163 - 2026-09-22
+
+Aurora, verbatim, 22 Sep 2026, pointing at her own screenshot of the empty band above the workspace tab row: *"look at my screenshot. athts the spacing i want reduced."* A diagnosis lane measured it live on staging and found the whole band was one token - `DENSITY_GUTTER_TOP` (`compositions/templates/screen-shell.tsx`), consumed as `pt-[var(--shell-gutter-top)]` by the content column, both densities reading the identical `var(--space-6)` (24) since her own 21 Sep ruling that raised it from 16 asking for "more air." That lane patched the consuming app instead, redeclaring the token app-side on the kit's own `[data-slot="screen-shell-card"]` selector - a real fix, and still a kit bug: the app's standing rule is that the kit is the only UI input, so an app-side patch of a kit token is a defect here, not a legitimate override.
+
+**The fix is one number, in the one place it was declared.** `DENSITY_GUTTER_TOP` now reads `var(--space-3)` (12) at both densities - the same shape it already had, since the token has never varied by density (her ruling named one number, not a density pair, the same invariant `TRAIL_GAP` documents for itself). The token's own doc comment gets a dated addendum recording the reversal rather than leaving the 21 Sep "bring more air" reasoning standing as if it still justified the new, smaller number - it doesn't; it was superseded, not satisfied.
+
+**Every other reader of the token moves with it, in the same edit, because they all read the custom property rather than a literal.** The content column's own `pt-[var(--shell-gutter-top)]`; `ASIDE_TAB`, which pays the assistant column's own top gutter through the identical property so the two columns' tabs keep starting at the same measured y, this file's own standing invariant since 21 Sep 2026; and `check-screen-shell.mjs`'s own air/bottom-edge census, which had `--space-6` pinned literally in three places (the density-table assertion, its failure message, and the check's own success log) and is repinned to `--space-3` here so it keeps proving the number rather than a stale one.
+
+**Checks.** `check-screen-shell.mjs`'s existing air/bottom-edge suite is updated in place (no new check needed - the existing one already pins the density table's literal value and would have caught either half drifting). `npm run check` is green end to end except the one pre-existing, unrelated contrast finding (`components/image/image.tsx` under `gallery.tsx`, ratio 1.000).
+
 ### Fixed - the footer's two-column query held a var() in its own condition and was never emitted - v1.2.159 - 2026-09-22
 
 A live paint proof of the shipped build (v1.2.156, meant to fix the footer's two-column grid) found the record footer still one column at every width on a full screen record. The built stylesheet settled why: grepping it for `repeat(2,minmax(16.25rem` and for `record-detail-footer-grid` both came back empty. The rule was never emitted at all, at any width, so no element could ever have matched it - v1.2.156's own fix (a genuine second defect, the grid querying itself instead of its ancestor) stays fixed and correct, and was simply never the whole story.

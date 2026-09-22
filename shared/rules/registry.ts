@@ -2954,30 +2954,44 @@ export const PAPER_ON_PURPOSE: Record<string, string> = {
 // reason about; this lane's brief is the record-detail PANEL wrappers listed
 // in its own brief, not those five files' bodies.
 export const RECORD_DETAIL_COLLECTION_OK: Record<string, string> = {
-  // `web/components/apps/app-detail.tsx#knowledge` — the app record's
-  // Knowledge tab, `<KnowledgeScreen scope={{ kind: "app", … }} />`
+  // `web/components/apps/app-detail.tsx#knowledge` and (22 Sep 2026)
+  // `web/components/accounts/account-detail.tsx#knowledge` — a record's own
+  // Knowledge tab, `<KnowledgeScreen scope={{ kind: "app" | "account", … }} />`
   // (web/components/knowledge/knowledge-screen.tsx). A FALSE POSITIVE, not an
-  // uncontained collection: both the "app" and "team" scope branches call the
-  // SAME hoisted `renderGallery()` (the file's own header explains why it is
-  // one function, not two copies of the JSX — `web/test/knowledge-head.test.tsx`
-  // reads the source and requires `<CollectionHeading>` to precede
-  // `<PagedFind>` TEXTUALLY, which only holds if it is written once), and
-  // `renderGallery()`'s one `<PagedFind>` tree already carries
-  // `wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}` — the exact
-  // seam this census asks for, on the app scope exactly as on the team scope.
-  // The census cannot see it: `if (scope.kind === "app") return (…)` is
-  // structurally indistinguishable from a loading/error guard (an `if` with
-  // no `else`, whose `then` is a bare `return`), so `realRoots` strips it and
-  // asks only the trailing `team`-branch return whether it paints — and that
-  // return's own body calls `renderGallery()`, a plain `CallExpression` whose
-  // callee body the AST walk never inlines. Two structural blind spots
-  // (guard-return stripping + a call site standing in for its callee) meeting
-  // on one component, neither a real gap in the screen: staging shows the
-  // same nested card on the app's Knowledge tab as on the team-wide Knowledge
-  // page. Delete this line if `renderGallery()` is ever inlined into both
-  // branches (it should not be — see the file's own header for why).
+  // uncontained collection: the "app", "account" and "team" scope branches
+  // ALL call the SAME hoisted `renderGallery()` (the file's own header
+  // explains why it is one function, not three copies of the JSX —
+  // `web/test/knowledge-head.test.tsx` reads the source and requires
+  // `<CollectionHeading>` to precede `<PagedFind>` TEXTUALLY, which only holds
+  // if it is written once), and `renderGallery()`'s one `<PagedFind>` tree
+  // already carries `wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}`
+  // — the exact seam this census asks for, identically on all three scopes.
+  // The census cannot see it: `if (isRecordHost) return (…)` is structurally
+  // indistinguishable from a loading/error guard (an `if` with no `else`,
+  // whose `then` is a bare `return`), so `realRoots` strips it and asks only
+  // the trailing `team`-branch return whether it paints — and that return's
+  // own body calls `renderGallery()`, a plain `CallExpression` whose callee
+  // body the AST walk never inlines. Two structural blind spots (guard-return
+  // stripping + a call site standing in for its callee) meeting on one
+  // component, neither a real gap in the screen: staging shows the same
+  // nested card on the app's and the account's Knowledge tab as on the
+  // team-wide Knowledge page.
+  //
+  // CONSISTENT WITH R103 TOO ("an empty register draws no card", Aurora,
+  // 22 Sep 2026): `CollectionCard`'s default `surface="plain"` paints no box
+  // at all (`shared/ui/components/card/card.tsx`'s own "plain: no box at
+  // all" — no fill, no shadow, no stroke), so wrapping the gallery in it adds
+  // no paper on an empty register either; and it satisfies her OTHER ruling
+  // the same day, that a record's own knowledge should look like the main
+  // knowledge module — the identical `renderGallery()` tree, containment
+  // included, is what makes that true rather than a claim in a comment.
+  //
+  // Delete these two lines if `renderGallery()` is ever inlined into every
+  // branch (it should not be — see the file's own header for why).
   "web/components/apps/app-detail.tsx#knowledge":
     "<KnowledgeScreen scope={{ kind: \"app\" }}> already stands on the shared renderGallery()'s <PagedFind wrap={…}> → CollectionCard, identically to the team-scope Knowledge page; the census's guard-return heuristic strips the app branch and never sees the wrap because it sits behind a hoisted function call, not inline JSX.",
+  "web/components/accounts/account-detail.tsx#knowledge":
+    "<KnowledgeScreen scope={{ kind: \"account\" }}> stands on the identical shared renderGallery() the app-scope entry above does — same <PagedFind wrap={…}> → CollectionCard, same isRecordHost guard-return the census's guard-stripping heuristic cannot see through, same false positive.",
 }
 
 // ── A HAND-ROLLED STATUS DOT NEVER SHIPS ────────────────────────────────────

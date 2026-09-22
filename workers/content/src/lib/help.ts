@@ -315,7 +315,7 @@ function toMessage(r: ReplyRow, fromClient: boolean): HelpMessage {
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, raised_as_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
   account_id, app_id, module_id, raised_by_contact_id, assignee_id, assignee_name, validated_at,
-  ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
+  ref, rank, locked_at, help.archived_at AS archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, resolver_id, resolver_name, created_at, updated_at,
   (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
   -- R35: the App column's own face (client ruling 2026-09-15), off the same
@@ -507,9 +507,20 @@ function mineClause(
  * AND every write, while this decides what they are LOOKING AT and rides only the
  * list and its count. Folding it into the fence would quietly make an archived
  * ticket unreplyable and un-unarchivable — you cannot take a record out of a
- * drawer you can no longer reach into. */
+ * drawer you can no longer reach into.
+ *
+ * QUALIFIED TO `help.`, not bare — team migration 0117 gave `accounts` its own
+ * `archived_at` (a different fact: the CLIENT put away, never the ticket), and
+ * this predicate rides `ticketWhere`'s output into `countTicketFacets`'s
+ * `perAccount` read below, which LEFT JOINs `accounts`. A bare `archived_at`
+ * there is ambiguous and SQLite refuses the statement at runtime — reproduced
+ * live, `POST /api/content/help/status` (and `/update`, `/triage-read`, every
+ * door that replies through `ticketMutationReply(..., withFacets: true)`)
+ * failing with "ambiguous column name: archived_at". `help` is never aliased
+ * to anything else anywhere this clause is used, so the table name qualifies
+ * it safely whether or not the statement joins. */
 function archiveClause(view: "live" | "archived"): string {
-  return view === "archived" ? "archived_at IS NOT NULL" : "archived_at IS NULL"
+  return view === "archived" ? "help.archived_at IS NOT NULL" : "help.archived_at IS NULL"
 }
 
 /** WHAT THE SEARCH BOX ON THE TICKETS SCREEN ASKS THE SERVER. It rides the list
@@ -1012,6 +1023,16 @@ export async function countTicketFacets(
     // bare `id` was tried first and is ambiguous here, because `accounts` has
     // one too. Alias this table again and the read fails loudly on the next run
     // rather than quietly returning the wrong rows.
+    //
+    // `where.sql` CARRIES `archiveClause`'S OWN PREDICATE — the everyday-list vs.
+    // archive-drawer question, always about THIS TICKET (team migration 0043's
+    // `help.archived_at`), never about the client's own archived state (0117's
+    // `accounts.archived_at`, a different fact this JOIN also puts in scope).
+    // `archiveClause` qualifies it to `help.archived_at` for exactly this read:
+    // this is the one `ticketWhere` consumer that joins `accounts`, and a bare
+    // `archived_at` here is ambiguous the moment both tables carry the column —
+    // reproduced live as `ambiguous column name: archived_at` on every door that
+    // replies through `ticketMutationReply(..., withFacets: true)`.
     `SELECT help.account_id AS account_id, a.name AS account_name,
             SUM(CASE WHEN help.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
             COUNT(*) AS total_n

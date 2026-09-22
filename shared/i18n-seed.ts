@@ -1785,12 +1785,6 @@ export const SEED: Catalogue = {
    * place a question goes on that screen. Reworded from "Ask about this
    * record…"/"Ask the knowledge base" to say "question" plainly, so it never
    * reads as the search field it replaced. */
-  "Ask a question": { de: "Frage stellen", es: "Haz una pregunta", ca: "Fes una pregunta" },
-  "Ask a question about this record": {
-    de: "Stellen Sie eine Frage zu diesem Datensatz",
-    es: "Haz una pregunta sobre este registro",
-    ca: "Fes una pregunta sobre aquest registre",
-  },
   /* The assistant's own "+" tab and its scope picker (client ruling,
    * 15 Sep 2026 — see web/lib/agent-conversation-tabs.ts and
    * web/components/assistant/agent-scope-picker.tsx). TRANSLATION_CEILING
@@ -1835,11 +1829,6 @@ export const SEED: Catalogue = {
     de: "Erstellt {created} · Zuletzt verwendet {lastUsed}",
     es: "Creado {created} · Usado por última vez {lastUsed}",
     ca: "Creat {created} · Usat per última vegada {lastUsed}",
-  },
-  "Asking a question needs the assistant": {
-    de: "Um eine Frage zu stellen, benötigen Sie den Assistenten",
-    es: "Para hacer una pregunta necesitas el asistente",
-    ca: "Per fer una pregunta necessites l'assistent",
   },
   "Audit date moved.": {
     de: "Audit-Datum verschoben.",
@@ -2380,11 +2369,6 @@ export const SEED: Catalogue = {
     es: "El asistente no está activado aquí",
     ca: "L'assistent no està activat aquí",
   },
-  "The assistant opens with your question, answers from the knowledge base, and marks each claim with the source it came from. Press a mark's source to read the passage itself. Each question uses one of the team's assistant credits.": {
-    de: "Der Assistent öffnet mit Ihrer Frage, antwortet aus der Wissensdatenbank und markiert jede Aussage mit der Quelle, aus der sie stammt: klicken Sie auf die Quelle einer Markierung, um den jeweiligen Abschnitt zu lesen. Jede Frage verwendet einen der Assistent‑Credits Ihres Teams.",
-    es: "El asistente se abre con tu pregunta, responde desde la base de conocimiento y marca cada afirmación con la fuente de la que proviene: pulsa la fuente de una marca para leer el pasaje completo. Cada pregunta usa uno de los créditos del asistente del equipo.",
-    ca: "L'assistent s'obre amb la teva pregunta, respon des de la base de coneixement i marca cada afirmació amb la font d'on prové: prem la font d'una marca per llegir el fragment. Cada pregunta utilitza un dels crèdits de l'assistent de l'equip.",
-  },
   "The assistant stops answering from any calendar entry it has already read, and reads your calendar again from the start under the new answer. That takes a while and it costs some of the team's AI allowance.": {
     de: "Der Assistent hört auf, aus bereits gelesenen Kalendereinträgen zu antworten, und liest Ihren Kalender erneut von Anfang an unter der neuen Antwort. Das dauert eine Weile und verbraucht einen Teil des KI‑Kontingents Ihres Teams.",
     es: "El asistente deja de responder a partir de cualquier entrada de calendario que ya haya leído, y vuelve a leer tu calendario desde el principio con la nueva respuesta. Eso lleva un tiempo y consume parte del presupuesto de IA del equipo.",
@@ -2647,11 +2631,6 @@ export const SEED: Catalogue = {
     de: "Ihr Hauptkalender, schreibgeschützt. {brand} fügt nie etwas hinzu, ändert oder storniert nichts darin. Benennen Sie unten weitere Kalender, um sie ebenfalls einzubeziehen.",
     es: "Tu calendario principal, solo lectura. {brand} nunca añade, cambia o cancela nada en él. Nombra otros calendarios abajo para incluirlos también.",
     ca: "El teu calendari principal, només de lectura. {brand} mai afegeix, canvia o cancel·la res dins. Nomena altres calendaris a continuació per incloure'ls també.",
-  },
-  "Your role can read the knowledge base. Every source is here, and so is the record behind it. But asking it a question goes through the assistant, which your role can't use. A team admin can turn that on for your role.": {
-    de: "Ihre Rolle kann die Wissensdatenbank lesen, jede Quelle ist hier, ebenso der dahinterstehende Datensatz, aber das Stellen einer Frage erfolgt über den Assistenten, den Ihre Rolle nicht nutzen kann. Ein Team-Administrator kann das für Ihre Rolle aktivieren.",
-    es: "Tu rol puede leer la base de conocimiento, cada fuente está aquí, al igual que el registro detrás de ella, pero hacerle una pregunta pasa por el asistente, que tu rol no puede usar. Un administrador del equipo puede activarlo para tu rol.",
-    ca: "El teu rol pot llegir la base de coneixement, cada font és aquí, i també el registre que hi ha darrere, però fer‑li una pregunta passa per l'assistent, que el teu rol no pot utilitzar. Un administrador de l'equip pot activar‑ho per al teu rol.",
   },
   "a year": { de: "ein Jahr", es: "un año", ca: "un any" },
   "done {date}": { de: "erledigt {date}", es: "hecho {date}", ca: "fet {date}" },
@@ -4649,4 +4628,21 @@ export const SEED: Catalogue = {
    * generator so TRANSLATION_CEILING stays at 0/0/0 (R44 — the pin falls
    * and never rises). */
   "Website": { de: "Website", es: "Sitio web", ca: "Lloc web" },
+
+  /* THE ARCHIVED STATE'S OWN PAIR VERBS — an account's and a contact's
+   * overflow menu (`account-detail.tsx`, `contact-detail.tsx`) offers two
+   * independent toggles: Deactivate/Reactivate (`active`) and
+   * Archive/Unarchive (`archived`). "Deactivate"/"Archive"/"Archived" were
+   * already in the catalogue; their opposites were not, and shipped English
+   * on a German screen the moment the archived state landed. Seeded here,
+   * not left to the generator, so TRANSLATION_CEILING stays at 0/0/0 (R44).
+   * German follows the des-/de- pair the neighbouring "Deaktivieren" already
+   * sets ("Reaktivieren"); "unarchive" has no single-word German verb in
+   * common use, so it reads as the phrase mail clients already use for the
+   * identical action ("Aus dem Archiv holen"), never "Wiederherstellen" —
+   * that word is "Restore" (already seeded), a different action on a
+   * different kind of record. Spanish and Catalan mirror the des+activar/
+   * des+archivar shape "Desactivar"/"Archivo" already carry. */
+  "Reactivate": { de: "Reaktivieren", es: "Reactivar", ca: "Reactivar" },
+  "Unarchive": { de: "Aus dem Archiv holen", es: "Desarchivar", ca: "Desarxivar" },
 }

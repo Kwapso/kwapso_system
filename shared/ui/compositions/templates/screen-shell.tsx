@@ -2263,11 +2263,16 @@ const RAIL_COLUMN = cn("p-[var(--rail-inset)]");
    above states the invariant this line exists to keep: "the two columns'
    tabs start at the same measured y (both are `--shell-gutter`/
    `--aside-inset` below the row they share)". The content column's own top
-   gutter moved to `--shell-gutter-top` (24) under that day's air ruling, so
-   this one moves with it - the invariant is about the two being ONE measure,
-   not about which measure it is. `--aside-inset` keeps its own value and its
-   own job (it is still what the dock spends on the inline axis); it simply
-   stops being the thing that answers "how far down does a tab start". */
+   gutter moved to `--shell-gutter-top` under that day's air ruling (24 at the
+   time), so this one moves with it - the invariant is about the two being
+   ONE measure, not about which measure it is or what number it currently
+   reads. `--aside-inset` keeps its own value and its own job (it is still
+   what the dock spends on the inline axis); it simply stops being the thing
+   that answers "how far down does a tab start". HELD 22 SEP 2026, WHEN THE
+   NUMBER MOVED AGAIN: `--shell-gutter-top` was halved to `--space-3` (12,
+   `DENSITY_GUTTER_TOP`'s own comment has the ruling), and because this line
+   reads the token rather than a literal, the assistant's own tab moved with
+   it in the same edit, exactly as this comment predicts. */
 const ASIDE_TAB = cn("pt-[var(--shell-gutter-top)]");
 /* NO BLOCK-END HERE ANY MORE, AND THAT IS A CORRECTION OF MY OWN OVER-FIX.
    This paid `pb-[var(--aside-inset)]` for as long as the DOCK paid nothing at
@@ -2711,10 +2716,44 @@ const DENSITY_GUTTER: Record<ScreenDensity, string> = {
    THERE IS NO BOTTOM COUNTERPART, DELIBERATELY. The content column used to
    pay this measure as `py-`, top and bottom alike; the bottom half is gone
    entirely under the same day's bottom-edge ruling - see THE CONTENT COLUMN
-   in the render. */
+   in the render.
+
+   HALVED BACK DOWN TO `--space-3` (12), 22 SEP 2026 - AURORA REVERSED HER OWN
+   21 SEP RULING, NOT A NEW REQUEST WITH A NEW REASON. Verbatim, pointing at
+   her own screenshot of the empty band above the workspace tab row: "look at
+   my screenshot. athts the spacing i want reduced." The block above this one
+   is left standing because it is still the accurate record of WHY the number
+   was 24 for one day - "bring more air" - and that reason does not silently
+   keep applying to 12; it was superseded, not satisfied. A lane first patched
+   this app-side, redeclaring the token in the consuming app's own globals.css
+   scoped to this file's own `data-slot="screen-shell-card"` selector - a
+   real, working fix, and still a kit bug, because the kit is the only UI
+   input the app is allowed and an app-side patch of a kit token is a defect
+   in the kit rather than a legitimate override. Fixed here instead, and that
+   patch is deleted the same day.
+
+   BOTH DENSITIES MOVE TOGETHER, AS THEY ALWAYS HAVE. Nothing about this
+   token has ever varied by density - `comfortable` and `calm` have read the
+   identical string since the 21 Sep ruling that created it, because her
+   sentence named ONE number, not a density pair (the same shape `TRAIL_GAP`
+   documents for itself, above). A `Record<ScreenDensity, string>` rather than
+   a bare string only because `DENSITY_GUTTER_TOP[density]` sits inside the
+   same `cn(...)` call as every other density-keyed entry on the card
+   (`DENSITY_GUTTER`, `DENSITY_RAIL`, `DENSITY_ASIDE`) - the shape is for the
+   call site's convenience, not because the two densities were ever meant to
+   diverge. Halving the one number both entries read keeps that invariant
+   intact rather than inventing a divergence nobody asked for.
+
+   THE ASSISTANT'S OWN TAB MOVES WITH IT, BECAUSE IT READS THE SAME TOKEN.
+   `ASIDE_TAB` (above) pays this exact custom property for the assistant
+   column's own top gutter, stated as this file's own standing invariant:
+   "the two columns' tabs start at the same measured y." Halving
+   `--shell-gutter-top` here halves the assistant's tab inset in the same
+   edit, by construction, which is what keeps that invariant true rather than
+   splitting the two columns apart the way editing only one side would. */
 const DENSITY_GUTTER_TOP: Record<ScreenDensity, string> = {
-  comfortable: "[--shell-gutter-top:var(--space-6)]",
-  calm: "[--shell-gutter-top:var(--space-6)]",
+  comfortable: "[--shell-gutter-top:var(--space-3)]",
+  calm: "[--shell-gutter-top:var(--space-3)]",
 };
 
 /* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` above:
@@ -4752,10 +4791,12 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             ── THE BLOCK AXIS IS NO LONGER SYMMETRIC, 21 SEP 2026, AND BOTH
             HALVES MOVED FOR DIFFERENT CLIENT RULINGS ON THE SAME DAY.
 
-            THE TOP: `--shell-gutter-top` (24) instead of `--shell-gutter`
-            (16). "the same spacing thats now before the footer i want above
-            nav and on sides, bring more air." See `DENSITY_GUTTER_TOP` for
-            why that is a second token rather than a wider `--shell-gutter`.
+            THE TOP: `--shell-gutter-top` (24 that day, 12 since 22 Sep 2026 -
+            see `DENSITY_GUTTER_TOP`'s own comment for the reversal) instead
+            of `--shell-gutter` (16). "the same spacing thats now before the
+            footer i want above nav and on sides, bring more air." See
+            `DENSITY_GUTTER_TOP` for why that is a second token rather than a
+            wider `--shell-gutter`.
 
             THE BOTTOM: GONE. "also implement the to the bottom edge for main
             content and assistant like in your previous artifact." This

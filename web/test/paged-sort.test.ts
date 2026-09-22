@@ -24,6 +24,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { pagedFindWiredTo } from "@shared/rules/paged-find-scan"
 import { GROWING_COLLECTIONS } from "@shared/rules/registry"
 import { COLLECTION_SORTS } from "@/lib/collection-sorts"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
@@ -111,9 +112,11 @@ describe("a paged collection's sort names are the door's own", () => {
         // A FIXED window, never one that stops at the first `>`: `<PagedFind<Account>`
         // carries a generic, so a lazy match to the tag's close ends four
         // characters in and reports every screen as unwired. Its sibling
-        // paged-search.test.ts says the same thing about the same tag.
+        // paged-search.test.ts says the same thing about the same tag. Wired
+        // either inline or through the one `listKey={name}` indirection
+        // `pagedFindWiredTo` resolves (`shared/rules/paged-find-scan.ts`).
         return [...src.matchAll(/<PagedFind[\s\S]{0,900}/g)].some(
-          (m) => m[0].includes(c.webKey) && m[0].includes("sorts=")
+          (m) => pagedFindWiredTo(src, m[0], c.webKey) && m[0].includes("sorts=")
         )
       })
       expect(
