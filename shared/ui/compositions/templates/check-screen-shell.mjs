@@ -1875,14 +1875,26 @@ if (!/const footerHasTwoColumns = showRecordColumn && showActivityColumn;/.test(
       "not re-derived per region.",
   );
 }
-if (
-  !/const FOOTER_TWO_COLUMN_QUERY = "@min-\[calc\(16\.25rem\*2_\+_var\(--space-7\)\)\]";/.test(recordDetailSrc)
-) {
+/* THE QUERY CONDITION IS A LITERAL LENGTH, NEVER var() -- CORRECTED 22 SEP
+   2026, LATER THE SAME DAY THIS CHECK ORIGINALLY SHIPPED. This line used to
+   pin the constant to "@min-[calc(16.25rem*2_+_var(--space-7))]" -- which
+   is exactly the bug a live paint proof caught the same day: a container
+   query's CONDITION is evaluated before any declaration, so a custom
+   property inside one resolves to nothing and the whole at-rule is dropped
+   by the CSS parser, silently, at every width. The pin now checks the
+   RESOLVED literal instead, `@min-[34.5rem]` (--space-7 is 2rem, so
+   16.25rem*2 + 2rem = 34.5rem -- FOOTER_TWO_COLUMN_QUERY's own comment
+   carries the same arithmetic), and `foundations/rules/check-query-
+   condition-var.mjs` (new the same day) is what keeps a var() from
+   reappearing in ANY query condition under components/ or compositions/,
+   not only this one constant. */
+if (!/const FOOTER_TWO_COLUMN_QUERY = "@min-\[34\.5rem\]";/.test(recordDetailSrc)) {
   airFindings.push(
-    `${recordDetailRel} does not declare FOOTER_TWO_COLUMN_QUERY as the container query "@min-[calc(16.25rem*` +
-      '2_+_var(--space-7))]" - the grid\'s two-track threshold, the client\'s "Record on top" order swap and ' +
-      "the client's \"Latest activity … at the bottom\" placement must all name the exact same width or they " +
-      "can disagree about which of them is showing.",
+    `${recordDetailRel} does not declare FOOTER_TWO_COLUMN_QUERY as the container query "@min-[34.5rem]" - the ` +
+      "grid's two-track threshold, the client's \"Record on top\" order swap and the client's \"Latest activity " +
+      "… at the bottom\" placement must all name the exact same width or they can disagree about which of them " +
+      "is showing. It must be a LITERAL length, never a var() (foundations/rules/check-query-condition-var.mjs " +
+      "guards that separately, across every query condition in the kit, not just this one).",
   );
 }
 /* THE QUERY CONTAINER AND THE QUERIED GRID MUST BE TWO DIFFERENT ELEMENTS —
@@ -1919,35 +1931,56 @@ if (
       "resolve against and can never match, in a sheet or in a full-width pane alike.",
   );
 }
+/* THE THREE CLASS SITES ARE LITERAL STRINGS, NEVER
+   `${FOOTER_TWO_COLUMN_QUERY}:…` — FIXED 22 SEP 2026, A SECOND BUG FOUND
+   THE SAME DAY WHILE PROVING THE FIRST FIX (the var()-in-condition one,
+   above) ACTUALLY REACHES THE STYLESHEET. A local build with the var() fixed
+   but the interpolation left in place still emitted NOTHING for any of the
+   three sites: Tailwind's scanner reads source TEXT for a complete candidate
+   class, never JS, so a class name assembled from `${CONST}:…` is invisible
+   to it exactly the way `tabs-view.tsx`'s own `TabsCount` restatement
+   already documents. Proved by the same local build once each site was
+   spelled out as a literal `"@min-[34.5rem]:…"` string: all five classes
+   (grid-cols, both order-none, both col-start, both row-start) appeared,
+   correctly gated under `@container (width>=34.5rem)`. These three
+   assertions now read the LITERAL strings, never the constant's name — the
+   constant itself is documentation only now, not something a scanner can
+   see used this way, which is exactly why matching against ITS name here
+   would have kept this check green through the exact bug it exists to
+   catch. */
 if (
   !recordDetailSrc.includes(
-    'footerHasTwoColumns\n                    ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`\n                    : undefined,',
+    'footerHasTwoColumns\n                    ? "@min-[34.5rem]:grid-cols-[repeat(2,minmax(16.25rem,1fr))]"\n                    : undefined,',
   )
 ) {
   airFindings.push(
-    `${recordDetailRel}'s ink footer grid does not gate its explicit two-track template on footerHasTwoColumns - ` +
-      "ungated, a lone Record or a lone Activity region at a wide container would jump to an explicit column " +
-      "with nothing beside it, an empty gap nobody asked for.",
+    `${recordDetailRel}'s ink footer grid does not gate its explicit, LITERAL two-track template ` +
+      '("@min-[34.5rem]:grid-cols-[repeat(2,minmax(16.25rem,1fr))]") on footerHasTwoColumns - ungated, a lone ' +
+      "Record or a lone Activity region at a wide container would jump to an explicit column with nothing " +
+      "beside it, an empty gap nobody asked for; interpolated from the constant instead of spelled out " +
+      "literally, Tailwind's scanner cannot see it at all and it never reaches the stylesheet, at any width.",
   );
 }
 if (
-  !recordDetailSrc.includes('"order-2",\n                          `${FOOTER_TWO_COLUMN_QUERY}:order-none') ||
-  !recordDetailSrc.includes(`col-start-1 \${FOOTER_TWO_COLUMN_QUERY}:row-start-1\``)
+  !recordDetailSrc.includes('"order-2",\n                          "@min-[34.5rem]:order-none') ||
+  !recordDetailSrc.includes('col-start-1 @min-[34.5rem]:row-start-1"')
 ) {
   airFindings.push(
     `${recordDetailRel}'s footer-activity region does not read order-2 (one column: last) gated by ` +
-      "footerHasTwoColumns, with an explicit col-start-1 row-start-1 at FOOTER_TWO_COLUMN_QUERY (two columns: " +
-      'back to CH27.8\'s own left cell) - the client\'s "at the very bottom" ruling has nowhere to attach.',
+      "footerHasTwoColumns, with an explicit, LITERAL col-start-1 row-start-1 at @min-[34.5rem] (two columns: " +
+      'back to CH27.8\'s own left cell) - the client\'s "at the very bottom" ruling has nowhere to attach, or ' +
+      "the class is interpolated from the constant again and invisible to Tailwind's scanner.",
   );
 }
 if (
-  !recordDetailSrc.includes('"order-1",\n                          `${FOOTER_TWO_COLUMN_QUERY}:order-none') ||
-  !recordDetailSrc.includes(`col-start-2 \${FOOTER_TWO_COLUMN_QUERY}:row-start-1\``)
+  !recordDetailSrc.includes('"order-1",\n                          "@min-[34.5rem]:order-none') ||
+  !recordDetailSrc.includes('col-start-2 @min-[34.5rem]:row-start-1"')
 ) {
   airFindings.push(
     `${recordDetailRel}'s footer-record region does not read order-1 (one column: first) gated by ` +
-      "footerHasTwoColumns, with an explicit col-start-2 row-start-1 at FOOTER_TWO_COLUMN_QUERY (two columns: " +
-      'CH27.8\'s own right cell) - the client\'s "Record on top" ruling has nowhere to attach.',
+      "footerHasTwoColumns, with an explicit, LITERAL col-start-2 row-start-1 at @min-[34.5rem] (two columns: " +
+      'CH27.8\'s own right cell) - the client\'s "Record on top" ruling has nowhere to attach, or the class is ' +
+      "interpolated from the constant again and invisible to Tailwind's scanner.",
   );
 }
 

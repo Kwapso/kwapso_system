@@ -78,6 +78,21 @@ export function LiveStatus() {
 
   if (live || dismissed) return null
 
+  // COLOUR: Aurora's ruling, 22 Sep 2026, choosing from a page of five
+  // options, verbatim: "for live statyus i choose b. inik." Option B is
+  // the ink reading, not the warning fill this pill used to carry. A
+  // reconnect is the socket working its own backoff, not a danger, so it
+  // takes the app's neutral ink register rather than an alarm colour. That
+  // is exactly the register the record's own ink footer band and the
+  // toast already speak in, so this pill spends the SAME two tokens rather
+  // than a new pair: `bg-surface-inverse` / `text-ink-on-inverse`, the pair
+  // `--surface-record-footer` / `--ink-on-record-footer` alias and the
+  // `inverse` button variant's fill/label read off directly. The action
+  // inside stays the toast's own light wash, `color-mix` against
+  // `currentColor`, which needs no change here: it already reads off
+  // whatever ink this pill declares, charcoal on off-beige in light and
+  // off-beige on charcoal in dark, both flipped together by the same
+  // token pair.
   return (
     <div
       role="status"
@@ -107,7 +122,7 @@ export function LiveStatus() {
         "md:bottom-[calc(var(--space-7)+var(--live-status-tab-clear,0px))]"
       )}
     >
-      <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-pill bg-warning text-warning-foreground py-3 ps-[var(--space-6)] pe-[var(--space-3h)] text-caption shadow-xl">
+      <div className="pointer-events-auto flex max-w-full items-center gap-3 rounded-pill bg-surface-inverse text-ink-on-inverse py-3 ps-[var(--space-6)] pe-[var(--space-3h)] text-caption shadow-xl">
         <CloudSlash className="size-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0">{t("Not updating live right now.")}</span>
         <Button

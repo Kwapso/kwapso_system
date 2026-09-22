@@ -706,8 +706,47 @@ function RecordFooterEyebrow({ children }: { children: React.ReactNode }) {
  * container cannot be queried by a rule on the SAME element that declares
  * it — see `footer-grid`'s own comment for the full account of the bug that
  * shipped for a few hours before this split.
+ *
+ * A LITERAL LENGTH, NOT `var()` — FIXED 22 SEP 2026, LATER THE SAME DAY. This
+ * line shipped as `"@min-[calc(16.25rem*2_+_var(--space-7))]"`, which reads
+ * exactly like a declaration's `calc()` and is not one: a container query's
+ * CONDITION is held to the same rule a media query's is — `var()` is a
+ * declaration-time substitution, and a query condition is evaluated before
+ * any declaration is ever resolved, so a custom property cannot appear
+ * inside one at all, only inside what a matched rule then DECLARES. A live
+ * paint proof of the shipped build found the record footer still one column
+ * at every width, and the built stylesheet (`web/out/_next/static/css`)
+ * settled why: grepping it for `repeat(2,minmax(16.25rem` and for
+ * `record-detail-footer-grid` both returned nothing. The malformed at-rule
+ * was not mis-evaluated, it was never EMITTED — an invalid container-query
+ * prelude is dropped by the CSS parser before the browser ever sees it, so
+ * no width, no element and no @container fix on the CONSUMING side could
+ * ever have made it match.
+ *
+ * THE ARITHMETIC, RESOLVED TO A LITERAL: `--space-7` is `2rem`
+ * (`foundations/tokens/tokens.css`, "32 card inset large, page pad"), so
+ * `16.25rem * 2 + 2rem` is `32.5rem + 2rem`, which is `34.5rem`. Recompute
+ * this by hand if `--space-7` or the `16.25rem` track width ever moves —
+ * this line cannot read either token live, because a query condition still
+ * cannot hold a `var()` once one is resolved to a number here either.
+ *
+ * THIS CONSTANT IS DOCUMENTATION NOW, NOT A CLASS-STRING BUILDER — A SECOND
+ * BUG, FOUND WHILE PROVING THE FIRST FIX REACHES THE STYLESHEET. Every call
+ * site used to read `` `${FOOTER_TWO_COLUMN_QUERY}:…` ``, interpolating this
+ * constant into a template literal — invisible to Tailwind's scanner, which
+ * reads SOURCE TEXT for a candidate class and never evaluates JS, the same
+ * limitation `tabs-view.tsx`'s own `TabsCount` restatement already names
+ * ("Tailwind cannot resolve a class string assembled at runtime"). Proved
+ * by a local build: the interpolated form emitted nothing at all, the
+ * identical string spelled out literally emitted correctly. Every call site
+ * now writes `"@min-[34.5rem]:…"` directly; this constant survives as the
+ * one place the NUMBER is decided and its arithmetic explained, which every
+ * literal below must still open with, and `foundations/rules/check-screen-
+ * shell.mjs`'s own footer-grid census reads the literals themselves for
+ * exactly that agreement, not this constant, since the constant is what a
+ * scanner cannot see used the old way.
  */
-const FOOTER_TWO_COLUMN_QUERY = "@min-[calc(16.25rem*2_+_var(--space-7))]";
+const FOOTER_TWO_COLUMN_QUERY = "@min-[34.5rem]";
 
 /**
  * A record, in its four regions.
@@ -1449,8 +1488,8 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  `FOOTER_TWO_COLUMN_QUERY`'s for the full account. This node
                  carries no padding and no margin, so it introduces no width
                  of its own: its content box is `CardContent`'s content box,
-                 unchanged, which is what keeps the query's arithmetic
-                 (`calc(16.25rem*2 + var(--space-7))`) correct without
+                 unchanged, which is what keeps the query's own resolved
+                 length (`34.5rem`, `16.25rem*2 + 2rem`) correct without
                  retuning it for the extra level of nesting.
 
                  27.8's grid, verbatim except for the unit: `repeat(auto-fit,
@@ -1471,8 +1510,11 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  cannot hold both without knowing which of the two is
                  showing. So the COUNT is now the same arithmetic `auto-fit`
                  already did — two `16.25rem` tracks plus the one gap
-                 between them, `@min-[calc(16.25rem*2_+_var(--space-7))]` —
-                 spelled out as a container query rather than left implicit,
+                 between them, `@min-[34.5rem]` (`--space-7` resolved to its
+                 literal `2rem`, a query condition cannot hold a `var()` —
+                 see `FOOTER_TWO_COLUMN_QUERY`'s own comment for why and for
+                 the arithmetic) — spelled out as a container query rather
+                 than left implicit,
                  so the two columns below (`ORDER`/`PLACEMENT`, on each
                  region) can gate their own row/column on the EXACT same
                  number instead of guessing at auto-fit's own threshold. A
@@ -1484,8 +1526,27 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                 data-slot="record-detail-footer-grid"
                 className={cn(
                   "grid grid-cols-1",
+                  // LITERAL, NOT `${FOOTER_TWO_COLUMN_QUERY}:…` — FIXED 22
+                  // SEP 2026, A SECOND BUG FOUND WHILE PROVING THE FIRST FIX
+                  // REACHES THE STYLESHEET. Tailwind's scanner reads SOURCE
+                  // TEXT for a candidate class, never JS values — a class
+                  // name assembled from a template-literal interpolation of
+                  // a constant is invisible to it the same way `tabs-
+                  // view.tsx`'s own `TabsCount` restatement already
+                  // documents ("Tailwind cannot resolve a class string
+                  // assembled at runtime"). Proved by a local build: the
+                  // interpolated form emitted NOTHING (`@min-[`/`34.5rem`
+                  // absent from the built CSS), and the identical literal
+                  // string emitted correctly the moment it was spelled out.
+                  // `FOOTER_TWO_COLUMN_QUERY` stays as the ONE place the
+                  // arithmetic is decided and documented; every literal
+                  // below must still open with `@min-[34.5rem]:` (its exact
+                  // value) — a mismatch is exactly what `foundations/rules/
+                  // check-screen-shell.mjs`'s own footer-grid census now
+                  // reads for, off these literals rather than off the
+                  // constant a scanner cannot see used this way.
                   footerHasTwoColumns
-                    ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`
+                    ? "@min-[34.5rem]:grid-cols-[repeat(2,minmax(16.25rem,1fr))]"
                     : undefined,
                   "items-start",
                   /* 32 BETWEEN the columns, 14 between them once they stack.
@@ -1512,10 +1573,12 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                        misplace it into. `order-none` rides along so nothing is
                        left declaring a row preference the explicit cell no
                        longer needs. */
+                    // LITERAL, NOT interpolated — same reason as the grid's
+                    // own `grid-cols` line above; see that comment.
                     footerHasTwoColumns
                       ? [
                           "order-2",
-                          `${FOOTER_TWO_COLUMN_QUERY}:order-none ${FOOTER_TWO_COLUMN_QUERY}:col-start-1 ${FOOTER_TWO_COLUMN_QUERY}:row-start-1`,
+                          "@min-[34.5rem]:order-none @min-[34.5rem]:col-start-1 @min-[34.5rem]:row-start-1",
                         ]
                       : undefined,
                   )}
@@ -1749,10 +1812,13 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                        at once. TWO COLUMNS: `col-start-2 row-start-1`, CH27.8's
                        own Record-on-the-right, restated as an explicit cell for
                        the same reason. */
+                    // LITERAL, NOT interpolated — same reason as the grid's
+                    // own `grid-cols` line, this node's own comment a few
+                    // lines above `record-detail-footer-grid`.
                     footerHasTwoColumns
                       ? [
                           "order-1",
-                          `${FOOTER_TWO_COLUMN_QUERY}:order-none ${FOOTER_TWO_COLUMN_QUERY}:col-start-2 ${FOOTER_TWO_COLUMN_QUERY}:row-start-1`,
+                          "@min-[34.5rem]:order-none @min-[34.5rem]:col-start-2 @min-[34.5rem]:row-start-1",
                         ]
                       : undefined,
                   )}

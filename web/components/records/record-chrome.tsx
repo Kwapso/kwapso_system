@@ -1944,14 +1944,20 @@ const PANEL_BELOW_TABS =
  * `"paper"` - so every screen below sits on a plain panel, unconditionally,
  * and the escape overshot by the padding term on all of them.
  *
- * BOTH TERMS ARE FIXED, TOGETHER - they are two halves of one calculation
- * (this constant's own older comments already say so: "the room TabsContent
- * needs… is `--space-6`/`--space-7` ALONE"), and fixing one without the
- * other trades one visible bug for another: the escape and the root's own
- * `gap` are DERIVED in the doc comments beside each below, straight from the
- * box model (a flex column, a negative top margin, a painted bottom border,
- * a sibling's own flex `gap`) rather than tuned by eye, the same discipline
- * `RECORD_TABS_GEOMETRY`'s own header names for the strip's height.
+ * ONLY THE ESCAPE (`-mt`) IS FIXED HERE. A first draft also dropped the
+ * root's own base flex `gap` to `gap-0`, reasoning it was the other half of
+ * the same calculation - "the room TabsContent needs… is `--space-6`/
+ * `--space-7` ALONE" (this constant's own older comment, about a plain
+ * panel's now-zero padding). That reasoning proved TOO WIDE:
+ * `web/test/toolbar-lead-gap-card.test.tsx`'s "R83, decision B" suite caught
+ * it, because the `gap`'s base value is not a padding computation this file
+ * owns - it is Aurora's own 21 Sep 2026 ruling that a pane whose content
+ * "starts with anything else, fact rows or prose," keeps the strip's
+ * ordinary, larger gap, while ONLY a toolbar-led active pane goes flush,
+ * through `globals.css`'s own selector-keyed override (decision B, below).
+ * The base `gap` stays exactly what it was, for that override to keep
+ * beating; see the comment beside it, a few lines down, for the full
+ * reconciliation.
  *
  * WHICH SCREENS THIS REACHES: every `*-detail.tsx` that renders `<TabsView
  * className={STICKY_TABS}>` with `panelVisible` at its default (`true`, a
@@ -1974,10 +1980,13 @@ const PANEL_BELOW_TABS =
  * facts straight off disk - `RecordDetail`'s own `surface` default
  * (`shared/ui/components/record-detail/record-detail.tsx`), `CardContent`'s
  * `isPlain` branch (`shared/ui/components/card/card.tsx`), and this
- * constant's own `-mt`/`gap` utilities - and fails if the kit ever changes
- * either half of "the panel is plain and plain pays no top padding" while
- * this formula still assumes it, or if this formula ever spends a
- * `--space-6`/`--space-3`/`--space-7`-shaped padding term again. */
+ * constant's own `-mt` escape - and fails if the kit ever changes either
+ * half of "the panel is plain and plain pays no top padding" while this
+ * formula still assumes it, or if the escape ever spends a `--space-6`/
+ * `--space-3`/`--space-7`-shaped padding term again. It does NOT touch the
+ * root's own base `gap` - that value is R83 decision B's, checked by
+ * `web/test/toolbar-lead-gap-card.test.tsx` instead, and this file's own
+ * `gap` comment says why the two checks stay separate. */
 export const STICKY_TABS =
   "[&>[role=tablist]]:bg-surface-raised [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   /* NO STRIP MAY EVER SCROLL VERTICALLY — client, 17 Sep 2026: "sometimes
@@ -2022,20 +2031,35 @@ export const STICKY_TABS =
    * override existed only to track `CardContent`'s OWN `py-6 lg:py-[space-7]`
    * step, which is gone from this formula along with the rest of the term. */
   "[&>[role=tablist]]:-mt-[calc(var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  /* THE ROOT'S OWN FLEX GAP - THE OTHER HALF OF THE SAME FIX. `TabsContent`
-   * is `[role=tablist]`'s flex sibling on this same `<Tabs>` root, and this
-   * `gap` is what re-adds, for `TabsContent` alone, exactly the distance the
-   * `-mt` escape pulled OUT of normal flow - "the room `TabsContent` needs
-   * to still land at the card's ordinary inset" (this constant's own header
-   * comment, unchanged prose, now correct again): that inset is
-   * `CardContent`'s real top padding, which is zero on the plain panel every
-   * caller here sits on, so the room needed is zero too. `gap-0`, not a
-   * removed utility: the kit's own `<Tabs>` root defaults to `gap-4`
-   * (`tabs.tsx`, the only surviving variant), and leaving no gap utility
-   * here at all would let that default show through and reopen the exact
-   * "content pushed off the card's real top" failure this fix exists to
-   * close, just with a different wrong number. */
-  "gap-0 " +
+  /* THE ROOT'S OWN FLEX GAP IS LEFT ALONE BY THIS FIX, ON PURPOSE - CHECKED
+   * AGAINST R83, DECISION B (21 Sep 2026), NOT MERGED INTO IT. The base
+   * `gap-[var(--space-6)] lg:gap-[var(--space-7)]` below is a SEPARATE
+   * number from the `-mt` escape just above, and ruling THREE's own bug (the
+   * strip's own top edge cutting into the title) lived entirely in `-mt` -
+   * the gap only spaces `[role=tablist]` from its `TabsContent` sibling, it
+   * never moves the strip's own position, so fixing one says nothing about
+   * the other.
+   *
+   * THE FIRST DRAFT OF THIS FIX DROPPED THIS GAP TO `gap-0` TOO, reasoning
+   * that `CardContent`'s real top padding is zero on the plain panel every
+   * caller here sits on (the same fact the `-mt` fix relies on), so "the
+   * room TabsContent needs" should be zero everywhere. That reasoning
+   * proved TOO WIDE: `web/test/toolbar-lead-gap-card.test.tsx`'s own
+   * "R83, decision B" suite caught it, because decision B is not a blanket
+   * padding-matching rule, it is Aurora's OWN 21 Sep 2026 ruling that a
+   * TOOLBAR-LED active pane sits flush (0) while a pane that "starts with
+   * anything else, fact rows or prose," keeps the strip's ordinary, larger
+   * gap UNTOUCHED - a deliberate visual choice for the fact-rows case, not
+   * a padding computation this file can derive from `CardContent`'s own
+   * variant. `globals.css`'s own zero-gap rule (`[data-slot="tabs"]:has(>
+   * [data-tab-pane][data-state="active"] [data-slot="card"]:first-child >
+   * [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child)
+   * { gap: 0px }`, plus its `CollectionFrame`/`PagedPanelBody` twins) is
+   * what actually reaches the toolbar-led case, by selector, at higher
+   * specificity than this base utility - so the base value stays exactly
+   * what it was for decision B to override, and this file states the base
+   * case (a pane with no toolbar) rather than pre-empting the override. */
+  "gap-[var(--space-6)] lg:gap-[var(--space-7)] " +
   /* A DESKTOP SCROLL AFFORDANCE — the kit hides the tab strip's scrollbar
    * unconditionally via `[scrollbar-width:none]` + `[&::-webkit-scrollbar]:hidden`
    * (tabs.tsx), which is correct for touch (short enough to be dragged) but wrong
