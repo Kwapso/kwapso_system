@@ -5572,6 +5572,8 @@ describe("RULES — the laws of the base", () => {
       "button-sizes", // R98: web/test/button-sizes.test.ts — every <Button>/<IconButton> carrying size="sm" or a custom h-/py-/px- class, over web/ + web-portal/ + shared/web/, or named in BUTTON_SIZE_EXEMPT
       "no-close-while-timer-runs", // R99: web/test/no-close-while-timer-runs.test.ts, every exported function in workers/content/src/lib that compares a status to "done"/"resolved"/"closed"/"completed" and writes a closing column must call refuseWhileTimerRuns(, or be named in the check's own CLOSE_DOOR_EXEMPT, keyed by {file, fn}
       "head-actions-centred", // R100: web/test/head-actions-centred.test.ts — every div/section in web/components + web-portal/components + shared/web carrying a title marker AND an action marker (ModuleSettingsGear, {action}/{actions}, headActions) in one flex row must carry items-center, or be named in HEAD_ACTIONS_CENTRED_EXEMPT
+      "toolbar-search-edge", // R101: web/test/toolbar-search-edge.test.tsx, every bespoke collection-toolbar row's track carries no horizontal inset and its column paints no fill/radius of its own, plus the census that exactly the three known rows still wear the shared slot names, or a finding is named in TOOLBAR_SEARCH_EDGE_EXEMPT
+      "id-column-noun", // R102: web/test/id-column-noun.test.ts, every table column rendering a record's own reference through <RecordRef> carries w-px and a header from the record-noun list, never "ID", or is named in ID_COLUMN_NOUN_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

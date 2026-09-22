@@ -2020,27 +2020,54 @@ export function AppShell({
           )
         }
       >
-        {/* `overflow-x-clip`, NOT `overflow-x-hidden`. They look identical and
-            they are not: CSS says an element with `overflow-x: hidden` and a
-            visible other axis computes `overflow-y` to `auto`, which makes this
-            a SCROLL CONTAINER — and a `position: sticky` child then pins to a
-            box that never scrolls, so it silently does nothing, which is
-            exactly what happened to the record header and tab strip (D3) the
-            first time they were built. `clip` clips the same overflow and
-            creates no scroll container.
+        {/* NO `overflow-x-clip` HERE ANY MORE — REMOVED 22 Sep 2026. Aurora,
+         * verbatim, over the ticket footer: "on the footer, there should be
+         * no white on the sides. Make the black go side to side." A live
+         * ancestor walk on staging found THIS div as the clipper: the
+         * record footer band (`RecordFooterBand`, record-chrome.tsx) escapes
+         * its own pane padding with `-mx-[var(--pane-inset-x)]` to reach the
+         * pane's true left/right edges, and this div's own `overflow-x-clip`
+         * cut that escape off at ITS edge instead — 24px short on both
+         * sides, on every record footer in the app, not only tickets'.
          *
-         * THE BOX IT MUST NOT BECOME IS NO LONGER THE DOCUMENT, AND THE RULE
-         * IS UNCHANGED BY THAT. Since kit v1.2.28 the one scroller behind
-         * every screen is `ScreenShell`'s body pane
-         * (`[data-slot="screen-shell-body"]`), the direct parent of this div;
-         * the page itself is `h-dvh overflow-hidden` and does not move. So the
-         * sticky layers this div wraps — the record tab strip (`STICKY_TABS`,
-         * record-chrome.tsx) and the collection tab strip
-         * (`shared/web/screen-engine/tabs-view.tsx`) — now pin to the pane
-         * instead of to the window, which is what they always read as. Turning
-         * THIS div into a scroll container would put a second scroller between
-         * them and the pane and break both the same way; `clip` is still what
-         * stops that.
+         * WHY THE CLIP WAS HERE (history, kept because the invariant it
+         * guarded still matters): `overflow-x-clip`, NOT `overflow-x-hidden`.
+         * They look identical and they are not: CSS says an element with
+         * `overflow-x: hidden` and a visible other axis computes `overflow-y`
+         * to `auto`, which makes this a SCROLL CONTAINER — and a
+         * `position: sticky` child then pins to a box that never scrolls, so
+         * it silently does nothing, which is exactly what happened to the
+         * record header and tab strip (D3) the first time they were built.
+         * `clip` clipped the same overflow and created no scroll container.
+         *
+         * REMOVING IT OUTRIGHT DOES NOT REOPEN D3. The D3 fault was
+         * specifically `overflow-x: hidden` forcing the other axis into
+         * `auto` — never having ANY `overflow-x` declared here at all
+         * (today's shape: `visible`, the initial value) forces nothing and
+         * makes no scroll container either, so the sticky record tab strip
+         * (`STICKY_TABS`, record-chrome.tsx) and the collection tab strip
+         * (`shared/web/screen-engine/tabs-view.tsx`) still skip straight
+         * past this div to their real scrollport, `ScreenShell`'s body pane
+         * (`[data-slot="screen-shell-body"]`, the direct parent of this
+         * div) — unchanged by this edit, since kit v1.2.28. Do not "fix" a
+         * future sideways-bleed report here by reaching for
+         * `overflow-x-hidden` on this div: that is the one shape D3 proved
+         * breaks every sticky strip downstream of it.
+         *
+         * WHAT STILL GUARDS SIDEWAYS BLEED, NOW THAT THIS DIV DOES NOT:
+         * `html`/`body` carry their own `overflow-x: clip` at the true root
+         * (`web/app/globals.css`, "THE PAGE DOES NOT SCROLL SIDEWAYS. EVER."),
+         * which is the actual backstop against the page growing a horizontal
+         * scrollbar — this div's copy was always a second, narrower net
+         * inside that one, drawn at the pane's padded edge rather than the
+         * viewport's, which is exactly what was catching the footer band's
+         * legitimate escape. A genuinely wide table or kanban board scrolls
+         * inside its OWN `overflow-x: auto` box (R91's sanctioned scrollers),
+         * never by relying on an ancestor to clip it. No element in this
+         * file's subtree needs a local horizontal clip today — checked by
+         * `web/test/footer-on-the-edge.test.ts`'s own census, which fails
+         * the build the day one is added back between the shell body and a
+         * record body without a reason written down here first.
          *
          * THERE WERE THREE OF THEM UNTIL 2026-09-03. The condensed title bar
          * was the first, and it is gone — client: "when i scroll down, the
@@ -2279,7 +2306,7 @@ export function AppShell({
          * header carries the rest of this argument. */}
         <div
           className={cn(
-            "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip pb-24 md:pb-0",
+            "mx-auto flex w-full max-w-none min-w-0 h-full flex-col pb-24 md:pb-0",
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >

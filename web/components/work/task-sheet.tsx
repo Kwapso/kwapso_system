@@ -45,18 +45,42 @@
 // same import, never a second copy.
 //
 // THE SHEET SCROLLS AS ONE REGION (R91's own sheet exception) — chip row,
-// title, Start/Done, Assigned to, Deadline, Description, Effort and the dark
-// footer band all sit inside the one scrolling body, the same shape the
-// design proposal drew (nothing pinned inside the sheet itself, only the
-// sheet's OWN edge is fixed against the viewport). Assigned to, Details
-// (the description) and Deadline are ONE section now (Aurora, 22 Sep 2026,
-// verbatim: "merge assigned to details and deadline in the same container
-// together (in this order)"), called once rather than three times, its own
-// kit `Separator` between each of the three parts, no nested cards — and,
-// the same day, reading the artifact back, that section lost its own
-// background too ("the whole 'Assigned to', details, and deadline should not
-// have a background"): a plain `<div>`, not a `Card`. See this file's own
-// body for the account.
+// title, Start/Done, Assigned to, Deadline, Description and Effort sit
+// inside the one scrolling body, the same shape the design proposal drew
+// (nothing pinned inside the SCROLLER itself, only the sheet's OWN edge is
+// fixed against the viewport). Assigned to, Details (the description) and
+// Deadline are ONE section now (Aurora, 22 Sep 2026, verbatim: "merge
+// assigned to details and deadline in the same container together (in this
+// order)"), called once rather than three times, its own kit `Separator`
+// between each of the three parts, no nested cards — and, the same day,
+// reading the artifact back, that section lost its own background too
+// ("the whole 'Assigned to', details, and deadline should not have a
+// background"): a plain `<div>`, not a `Card`. See this file's own body for
+// the account.
+//
+// AMENDED AGAIN 22 SEP 2026, ONE LABEL STYLE, THE ASSIGNEE A CHIP. Aurora,
+// reading the merged section back, verbatim: "there are 3 stiles of titles
+// here adn that does not make sense: unify!! assigend to, details and
+// deadline the three look different! i Definitely think it makes sense thys
+// grey color, the rest you decide. also the assigned to person make it a
+// chip, like in stories and put the title above." So all three parts now
+// share the identical grey uppercase eyebrow (`text-micro text-muted-
+// foreground uppercase`, the style the Assigned to part already used, sitting
+// ABOVE its own content rather than beside or inside it), Details' bold
+// `<h3>` and Deadline's `OverviewList` dt/dd pair both retired for it; the
+// assignee renders as `help-stakeholders.tsx`'s own `StakeholderTile` chip
+// shape (`PersonCard orientation="horizontal" size="choice"`, the loop's own
+// face size), the eyebrow now a sibling above it rather than `PersonCard`'s
+// own `chip` slot. See this file's own body for the account.
+//
+// THE DARK FOOTER BAND IS NOT INSIDE THAT SCROLLER — Aurora, 22 Sep 2026,
+// round two, ruling on the sheet's own body: "the latest activity always
+// has to be at the very bottom, and also make it a stripe, not a
+// container." It is the sheet's own body's LAST CHILD, a plain sibling
+// after the scroller, full width, no padding around it and no negative
+// margin escaping one — see this file's own body, below, for why the
+// escape it used to draw broke, and `record-chrome.tsx`'s own
+// `RecordFooterBand`/`STRIPE_FOOTER_BAND` note for the rest of the account.
 //
 // EFFORT IS THE SHARED `EffortCard` NOW (web/components/work/effort-card.tsx)
 // — the same card the story page and the ticket page draw (title "Effort"
@@ -149,8 +173,26 @@ export function PriorityChip({ level, t }: { level: 1 | 2 | 3 | 4; t: (s: string
 // name that only resolves back to it through a variable reference would
 // read as clean to a check that never resolves identifiers, which is
 // exactly the kind of accidental evasion this file does not want to be an
-// example of. Everything from the chip row to the dark footer band lives
-// inside it; nothing in this sheet is pinned.
+// example of. Everything from the chip row to Effort lives inside it,
+// nothing pinned; the dark footer band does NOT — see "THE DARK FOOTER
+// BAND" below, at its own call site, for why it sits outside this scroller
+// now rather than as its last child.
+//
+// THE SHEET BODY'S OWN `data-slot="sheet-task-body"` — the wrapper div just
+// below carries this so the kit's own per-child treatment on `SheetContent`
+// (`shared/ui/components/sheet/sheet.tsx`'s `[&>*:not([data-slot^=sheet-])]
+// :min-h-0/:flex-1/:overflow-y-auto/:p-[var(--space-6)]`, read only, never
+// edited here) does not reach for it. That rule exists so a call site that
+// hands `SheetContent` a single, unstyled child still gets the drawer's own
+// 24px inset and scroll behaviour for free — exactly the wrong thing to
+// want on THIS wrapper now that it holds two independently governed
+// children (the scroller, and the footer band sitting flush outside it):
+// any padding or forced scroll the kit added here would land on both of
+// them at once, which is the inset Aurora's own 22 Sep measurement caught.
+// `sheet-task-body` is a name of this file's own choosing — the kit only
+// checks the PREFIX — and matches no existing `sheet-*` slot the kit itself
+// draws (`sheet-overlay`/`sheet-content`/`sheet-header`/`sheet-footer`/
+// `sheet-close-button`/`sheet-title`/`sheet-description`/`sheet-grabber`).
 
 export function TaskSheet({
   teamId,
@@ -285,7 +327,7 @@ export function TaskSheet({
         showClose={false}
         className="w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)] p-0"
       >
-        <div className="flex h-full flex-col overflow-hidden rounded-[var(--radius)]">
+        <div data-slot="sheet-task-body" className="flex h-full flex-col overflow-hidden rounded-[var(--radius)]">
           {loading || !task ? (
             <div data-slot="task-sheet-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
               {/* Radix wants a Title registered somewhere in the content even
@@ -295,18 +337,9 @@ export function TaskSheet({
               <Skeleton variant="list" lines={6} />
             </div>
           ) : (
-            <div data-slot="task-sheet-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
-              {/* MIN-H-FULL — the same "push the band to the bottom whatever
-                  the content height" arithmetic `FOOTER_TO_BOTTOM`
-                  (record-chrome.tsx) uses for a record's own page: this
-                  column is the scroller's one real child, so `min-h-full`
-                  floors it to at least the scroller's own visible height —
-                  short content still fills it and the footer band's
-                  `mt-auto` (`RecordFooterBand`'s `stripe` register) pushes
-                  to the true bottom; content taller than that just grows the
-                  column past it and the scroller carries the rest, same as
-                  always. */}
-              <div className="flex min-h-full flex-col gap-6">
+            <>
+              <div data-slot="task-sheet-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
+                <div className="flex flex-col gap-6">
                 {/* TITLE ROW — priority chip, never status (Aurora, 21 Sep
                     2026), on its own line; the title, the Edit pencil and
                     the "…" menu share the line below it, the pencil and menu
@@ -389,22 +422,36 @@ export function TaskSheet({
                     `PAPER_ON_PURPOSE` entry (`shared/rules/registry.ts`) goes
                     with it. */}
                 <div data-slot="task-details-card" className="flex flex-col gap-4">
-                  {/* ASSIGNED TO — read-only: editing the assignee is the
-                      form's own field now (`task-form-dialog.tsx`),
-                      reached through the pencil above. Its own eyebrow
-                      tile (the Stakeholders-style `PersonCard`,
-                      `help-stakeholders.tsx`'s `StakeholderTile`) already
-                      carries the "Assigned to" label in its own chip, so
-                      this first part draws no separate heading of its
-                      own — a second "Assigned to" above the tile would
-                      say the same word twice. */}
-                  <div data-slot="task-assignee-part">
+                  {/* ONE LABEL STYLE, ALL THREE PARTS. Aurora, 22 Sep 2026,
+                      verbatim, reading this section back: "there are 3
+                      stiles of titles here adn that does not make sense:
+                      unify!! assigend to, details and deadline the three
+                      look different! i Definitely think it makes sense thys
+                      grey color, the rest you decide. also the assigned to
+                      person make it a chip, like in stories and put the
+                      title above." So every part's own label is now the
+                      identical grey uppercase eyebrow (`text-micro
+                      text-muted-foreground uppercase`) SITTING ABOVE its
+                      content, never beside it and never folded into another
+                      component's own slot. Details used to be a plain
+                      `<h3 className="text-sm font-medium">` and Deadline used
+                      to be `OverviewList`'s own `<dt>`/`<dd>` PAIR (label
+                      BESIDE value); both are read the same way now. */}
+
+                  {/* ASSIGNED TO. The eyebrow sits OUTSIDE the person chip
+                      now (it used to be `PersonCard`'s own `chip` slot,
+                      stacked inside the tile); the chip itself is
+                      `StakeholderTile`'s own shape (`help-stakeholders.tsx`),
+                      the story page's loop-and-Raised-by chip: `PersonCard
+                      orientation="horizontal" size="choice"`, the loop's own
+                      face size, no card around it. */}
+                  <div data-slot="task-assignee-part" className="flex flex-col gap-2">
+                    <span className="text-micro text-muted-foreground uppercase">{t("Assigned to")}</span>
                     <PersonCard
                       orientation="horizontal"
-                      size="row"
+                      size="choice"
                       mark={nameInitials(assigneeName ?? "")}
                       markName={assigneeName ?? undefined}
-                      chip={<span className="text-micro text-muted-foreground uppercase">{t("Assigned to")}</span>}
                       title={
                         <CardTitle className="text-sm">
                           {assigneeName || t("Nobody yet.")}
@@ -413,40 +460,33 @@ export function TaskSheet({
                     />
                   </div>
 
-                  {/* DETAILS — the task's own description, renamed off
+                  {/* DETAILS, the task's own description, renamed off
                       "Description" now that it sits inside the merged
                       section. Absent entirely when the task carries none,
-                      same as before. */}
+                      same as before; its rich text sits under the same
+                      eyebrow now, not a bold `<h3>`. */}
                   {task.detail && (
                     <>
                       <Separator />
-                      <div data-slot="task-details-part" className="flex flex-col gap-3">
-                        <h3 className="text-sm font-medium">{t("Details")}</h3>
+                      <div data-slot="task-details-part" className="flex flex-col gap-2">
+                        <span className="text-micro text-muted-foreground uppercase">{t("Details")}</span>
                         <RichText html={task.detail} />
                       </div>
                     </>
                   )}
 
-                  {/* DEADLINE — third and last. The priority fact row it
+                  {/* DEADLINE, third and last. The priority fact row it
                       used to sit beside is GONE (the title row's own
                       priority chip already says it, Aurora: "priority is
-                      already a chip, remove it from above deadline").
-                      Drawn as the app's own fact row (R72: a heading
-                      immediately followed by a paragraph is a subtitle;
-                      `OverviewList`'s `<dt>`/`<dd>` pair, the same
-                      register the ticket side panel and the File part
-                      just below use, is not one). */}
+                      already a chip, remove it from above deadline"). No
+                      longer `OverviewList`'s own dt/dd pair (label BESIDE
+                      value); the same eyebrow, the date UNDER it. */}
                   <Separator />
-                  <div data-slot="task-deadline-part">
-                    <OverviewList
-                      items={[
-                        {
-                          id: "deadline",
-                          label: t("Deadline"),
-                          value: task.dueOn ? formatDate(task.dueOn, lang) : t("No deadline set."),
-                        },
-                      ]}
-                    />
+                  <div data-slot="task-deadline-part" className="flex flex-col gap-2">
+                    <span className="text-micro text-muted-foreground uppercase">{t("Deadline")}</span>
+                    <span className="text-sm">
+                      {task.dueOn ? formatDate(task.dueOn, lang) : t("No deadline set.")}
+                    </span>
                   </div>
                 </div>
 
@@ -481,36 +521,41 @@ export function TaskSheet({
                     hours count beside it) and its own card draw both, so
                     nothing wraps it here. */}
                 <EffortCard targetTable="tasks" targetId={task.id} canEdit={canEdit} members={membersQ.data} />
-
-                {/* THE DARK FOOTER BAND — Latest activity + Record, the same
-                    kit composition every other record's own footer draws
-                    through (`record-chrome.tsx`'s `RecordFooterBand`), the
-                    very last thing in the sheet's own scroller, and pushed
-                    to the sheet's own bottom edge as a STRIPE (Aurora, 22 Sep
-                    2026: "the latest activity always has to be at the very
-                    bottom, and also make it a stripe, not a container").
-                    `stripe` is `RecordFooterBand`'s own register for this —
-                    forwarded to the kit as `footerRegister="stripe"` since
-                    v1.2.151, so the kit itself draws no radius and orders the
-                    one column (Record, then Latest activity) this sheet's own
-                    fixed, narrow width always renders at; `mt-auto` inside the
-                    `min-h-full` column above is the one thing left for this
-                    app to do, pushing the card to the sheet's true bottom.
-                    `className="-mx-6 -mb-6"` cancels the SCROLLER's own
-                    `px-6 py-6` (this file's own R91 note, above) so the band
-                    reaches every edge of the sheet rather than sitting inset
-                    inside that padding — the call site's own job, since
-                    `RecordFooterBand` cannot know what padding it is inside. */}
-                <RecordFooterBand
-                  audit={{ createdByName: task.createdByName, createdAt: task.createdAt }}
-                  activity={activity}
-                  onAddNote={can("work", "create") ? activity.addNote : undefined}
-                  notePlaceholder={t("Add a note")}
-                  stripe
-                  className="-mx-6 -mb-6"
-                />
+                </div>
               </div>
-            </div>
+
+              {/* THE DARK FOOTER BAND — Latest activity + Record, the same
+                  kit composition every other record's own footer draws
+                  through (`record-chrome.tsx`'s `RecordFooterBand`). A
+                  SIBLING of the scroller above, not its child, and the sheet
+                  body's own last element — Aurora, 22 Sep 2026, round two,
+                  verbatim: "the latest activity always has to be at the very
+                  bottom, and also make it a stripe, not a container." It
+                  used to be the scroller's own last child instead, escaping
+                  that div's `px-6 py-6` with a matching `-mx-6 -mb-6`; that
+                  broke, because `overflow-y: auto` on the scroller computes
+                  `overflow-x` to `auto` too (a box cannot stay `visible` on
+                  one axis while scrolling the other), so the negative
+                  margin's escape was clipped back inside the very padding it
+                  was cancelling — measured live at a 24px inset on all three
+                  free edges instead of flush. Moving the band out here fixes
+                  it BY STRUCTURE: nothing pads this element (the sheet
+                  body's own `data-slot="sheet-task-body"` above keeps the
+                  kit's automatic per-child inset off it, see that note), so
+                  there is no padding to cancel and no negative margin to
+                  write. `stripe` is `RecordFooterBand`'s own register for
+                  this — forwarded to the kit as `footerRegister="stripe"`
+                  since v1.2.151, so the kit itself draws no radius and
+                  orders the one column (Record, then Latest activity) this
+                  sheet's own fixed, narrow width always renders at. */}
+              <RecordFooterBand
+                audit={{ createdByName: task.createdByName, createdAt: task.createdAt }}
+                activity={activity}
+                onAddNote={can("work", "create") ? activity.addNote : undefined}
+                notePlaceholder={t("Add a note")}
+                stripe
+              />
+            </>
           )}
         </div>
       </SheetContent>

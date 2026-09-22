@@ -1522,10 +1522,24 @@ export function RecordScreen({
  * last below it, in EITHER register), so neither the rounded-none override
  * nor the `order` swap belongs here any more. What the kit does NOT own is
  * pushing the band to the BOTTOM of the sheet's own flex column — that is
- * this wrapper's job, not the card's — and the call site's own inset
- * cancellation, since that padding is the call site's, not this component's
- * (see `task-sheet.tsx`'s own `className="-mx-6 -mb-6"`, which matches its
- * scroller's `px-6 py-6`). Both stay. */
+ * this wrapper's job, not the card's, and `mt-auto` still rides along on
+ * `stripe` for a caller whose band sits inside a scroller shorter than the
+ * sheet (a `min-h-full` column, `mt-auto` inside it).
+ *
+ * `task-sheet.tsx` stopped being that caller on 22 Sep 2026, round two, the
+ * same day: its own scroller had `overflow-y: auto`, which computes
+ * `overflow-x` to `auto` too (a box cannot stay `visible` on one axis and
+ * scroll on the other), so the band's own negative-margin escape from the
+ * SCROLLER's `px-6 py-6` was clipped right back inside the padding it was
+ * trying to cancel — Aurora's own measurement on staging found the band
+ * inset 24px on all three free edges instead of flush. Fixed by structure,
+ * not by escape: the band moved OUTSIDE the scroller entirely, a plain
+ * sibling and the sheet's own flex column's last child, so there is no
+ * padding around it to cancel and no negative margin needed at all. `mt-auto`
+ * still applies there too (harmless: the scroller ahead of it is already
+ * `flex-1`, so there is no spare space left in the column for `mt-auto` to
+ * act on) rather than being made conditional on where a caller places the
+ * band, which would be a second flag doing one class's job. */
 const STRIPE_FOOTER_BAND = "mt-auto"
 
 export function RecordFooterBand({

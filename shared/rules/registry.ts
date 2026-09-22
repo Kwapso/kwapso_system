@@ -875,6 +875,22 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "head-actions-centred",
     status: "enforced",
   },
+  {
+    id: "R101",
+    dimension: "ui",
+    law: "EVERY TOOLBAR'S SEARCH FIELD STARTS AT THE CONTENT EDGE, THE SAME SEAM ON EVERY SCREEN; NO TOOLBAR HOST ADDS ITS OWN HORIZONTAL INSET. Aurora, verbatim, 22 Sep 2026, over the Triage/Ready pair of screenshots: \"Look at the search bar in the toolbar. It has different distances from the left. Make sure that you make this exactly the same everywhere, by the way. The correct one on the screenshots is the one on status ready.\" Ready's own toolbar is `<PagedFind>` (`web/components/records/paged-find.tsx`), whose `ToolbarColumn` paints no fill, no radius and carries no inset of its own, so the search field's left edge is the plain frame's own edge. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`), which Triage and seventeen other screens draw, still carried the OLD painted-pill shape from before `CollectionCard`'s default flipped to `\"plain\"` (rulebook L43, 21 Sep 2026): `bg-surface-raised`, a conditional radius, and `py-1.5 pe-1.5 ps-4` on the track, the `ps-4` being what actually moved the search field ~16-24px right of Ready's. `<WaveFinder>` (`web/components/work/wave-finder.tsx`), the app's other hand-copy of the row, carried the identical shape under different class names (`bg-surface-panel`, same `ps-4`). CHECKED, `web/test/toolbar-search-edge.test.tsx`, over the app's three bespoke collection-toolbar rows (found by their own shared `data-slot=\"toolbar-row-track\"`/`data-slot=\"toolbar-row-column\"` slot names): the track carries no horizontal inset utility of its own (`ps-`/`pl-`/`pr-`/`pe-`/`px-`/`py-`, any nonzero value), and the column around it paints no fill and no radius of its own, or the finding is named in `TOOLBAR_SEARCH_EDGE_EXEMPT`, keyed by `{file, expression}`, rot-checked both ways. A fourth census, over the disk rather than a live render, proves exactly the three known files still wear the shared slot names and that none of the three still carries the literal old painted-pill inset anywhere in source, so a regression or a fourth hand-rolled row is never invisible to this law.",
+    why: "jsdom LAYS NOTHING OUT, so a pixel distance from the left edge is a browser measurement and stays one, and this census cannot prove the two screenshots now measure identically, only that the SOURCE draws the seam the same way on every row that wears it. What it CAN hold is the declaration itself: the track adds no inset, the column adds no paint, and nothing under `web/` quietly grows a fourth bespoke copy of either slot, which is exactly how the first two rows came to disagree with `<PagedFind>` in the first place, each one hand-copied the shape from before the frame's default surface flipped to plain, and kept painting a pill nothing else on the screen still draws.",
+    checkId: "toolbar-search-edge",
+    status: "enforced",
+  },
+  {
+    id: "R102",
+    dimension: "ui",
+    law: "A RECORD'S OWN REFERENCE COLUMN IS AS NARROW AS ITS CHIP, AND ITS HEADER IS THE RECORD'S OWN NOUN, NEVER \"ID\". Read at L43 alongside R96 and R101, from her list of minimal fixes, item 3 (\"the id column narrow and named after the record\"), 22 Sep 2026. Every table column whose cells render a record's own reference through `<RecordRef>` (R96, `shared/web/record-ref.tsx`, the black ink chip) sits at `w-px` under the table's own auto layout, as narrow as the chip inside it, never a fraction of the row's width the way an ordinary text column is, and its header is the record's own noun (Ticket, Story, Task, Wave, Phase, App, Account, Contact, Input, Meeting), read off the module the column belongs to, never the bare word \"ID\". CHECKED, `web/test/id-column-noun.test.ts`, a source census over `web/components`, `shared/web/screen-engine` and `web/lib/screens.ts`: every column config (a `field(\"ref\", …)`/`field(\"…ref…\", …)`-shaped call, or a literal column object) whose cell renders `<RecordRef` must carry `w-px` on its own width/className and a header drawn from the noun list, or be named in `ID_COLUMN_NOUN_EXEMPT`, keyed by `{file, expression}`, rot-checked both ways.",
+    why: "R96 MADE THE CHIP BLACK; IT SAID NOTHING ABOUT THE COLUMN AROUND IT. A chip that is exactly as wide as its own text, sitting inside a column stretched to a text column's usual share of the table, reads as a chip floating in a mostly-empty cell, the same shape a narrow, single-purpose column is FOR, and the shape every other narrow column in this app already takes (a status dot, a type icon). And \"ID\" is the one header this app's own glossary never uses for a record: a reader is told what KIND of thing the row is (a ticket, a task, a wave) everywhere else on the screen, so a column that reverts to the generic word right where the reference lives is the one place the record's own name goes missing.",
+    checkId: "id-column-noun",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -6176,3 +6192,35 @@ export interface HeadActionsCentredExempt {
 }
 
 export const HEAD_ACTIONS_CENTRED_EXEMPT: HeadActionsCentredExempt[] = []
+
+// ── toolbar-search-edge (R101) ──────────────────────────────────────────────
+
+/** A still-open toolbar-search-edge finding, keyed by `{file, expression}` —
+ * the file that draws the row, and the offending inset/fill/radius utility
+ * class itself (`expression`, never a line number, the same shape every other
+ * `_EXEMPT` table in this file takes). Rot-checked both ways by
+ * `web/test/toolbar-search-edge.test.tsx`. Empty on the day this law
+ * shipped: the two rows the sweep found carrying the old painted-pill inset
+ * (`screen-bits.tsx`'s `<ToolbarRow>`, `wave-finder.tsx`'s `<WaveFinder>`)
+ * were fixed, not exempted. */
+export interface ToolbarSearchEdgeExempt {
+  file: string
+  expression: string
+  why: string
+}
+
+export const TOOLBAR_SEARCH_EDGE_EXEMPT: ToolbarSearchEdgeExempt[] = []
+
+// ── id-column-noun (R102) ───────────────────────────────────────────────────
+
+/** A still-open id-column-noun finding, keyed by `{file, expression}` — the
+ * file that declares the column, and the column's own config expression
+ * (never a line number). Rot-checked both ways by
+ * `web/test/id-column-noun.test.ts`. */
+export interface IdColumnNounExempt {
+  file: string
+  expression: string
+  why: string
+}
+
+export const ID_COLUMN_NOUN_EXEMPT: IdColumnNounExempt[] = []

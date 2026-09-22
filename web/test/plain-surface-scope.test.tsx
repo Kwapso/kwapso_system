@@ -374,16 +374,22 @@ describe("CollectionEmptyState papers nothing, in any ground (rulebook L43, R62)
     ).toBeNull()
   })
 
-  it("the register's own top inset is gone — the toolbar's rhythm carries the gap now, not a second padding here", () => {
+  // AMENDED 22 SEP 2026. Aurora, reading the "no top inset" fix back on a
+  // real screen: "ok, but need a bit more spacing over it (like it was with
+  // the card)." Supersedes the "top inset is gone" shape this test used to
+  // prove: the register now carries `--space-6` (24px, the card's own inset
+  // token) above AND below its text, never `--space-7` (32px), which is what
+  // the register carried before either ruling.
+  it("the register carries the air a card used to give, space-6 (24px) above and below its text, flush left, no fill (Aurora, 22 Sep 2026)", () => {
     render(<CollectionEmptyState title="Nothing here yet." />)
     const emptyBody = document.querySelector('[data-slot="collection-empty-body"]') as HTMLElement
-    expect(emptyBody.className, "no py- (top+bottom) inset of its own any more").not.toMatch(
-      /(^|\s)py-\[var\(--space-7\)\](\s|$)/
+    expect(emptyBody.className, "space-6 above its text").toMatch(/(^|\s)pt-\[var\(--space-6\)\](\s|$)/)
+    expect(emptyBody.className, "space-6 below its text").toMatch(/(^|\s)pb-\[var\(--space-6\)\](\s|$)/)
+    expect(emptyBody.className, "never the old, larger space-7").not.toMatch(/space-7/)
+    expect(emptyBody.className, "left edge stays flush, items-start, no inset of its own").toMatch(
+      /(^|\s)items-start(\s|$)/
     )
-    expect(emptyBody.className, "and no explicit pt- either").not.toMatch(/(^|\s)pt-\[var\(--space-7\)\](\s|$)/)
-    expect(emptyBody.className, "the bottom inset is kept, for breathing room below").toMatch(
-      /(^|\s)pb-\[var\(--space-7\)\](\s|$)/
-    )
+    expect(emptyBody.className, "still no fill of its own").not.toMatch(/(^|\s)bg-(?!clip|none)[\w-]+/)
   })
 })
 

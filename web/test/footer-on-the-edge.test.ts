@@ -225,6 +225,60 @@ describe("R89 — footer-on-the-edge", () => {
     expect(tag.includes("has-[[data-slot=ticket-footer-band]]:h-[calc")).toBe(false)
   })
 
+  // "ON THE FOOTER, THERE SHOULD BE NO WHITE ON THE SIDES. MAKE THE BLACK GO
+  // SIDE TO SIDE." — Aurora's ruling, 22 Sep 2026. A live ancestor walk on
+  // staging found app-shell.tsx's own R29 page container as the clipper: the
+  // record footer band escapes its own pane padding with
+  // `-mx-[var(--pane-inset-x)]` (record-chrome.tsx's `RecordFooterBand`) to
+  // reach the pane's TRUE left/right edges, and this div's own
+  // `overflow-x-clip` cut that escape off at ITS edge instead — 24px short
+  // on both sides, on every record footer, not only tickets'. Removed from
+  // the page container's own class string; what still guards sideways
+  // bleed: `html`/`body` carry the real backstop (`overflow-x: clip`,
+  // web/app/globals.css), and a table or board that genuinely scrolls
+  // sideways owns its own `overflow-x: auto` box (R91's sanctioned
+  // scrollers) rather than depending on an ancestor to clip it.
+  it("app-shell.tsx's page container no longer carries overflow-x-clip on its own class string", () => {
+    const at = shell.indexOf("mx-auto flex w-full max-w-none")
+    expect(at, "app-shell.tsx must still draw its one R29 page container as a flex box").toBeGreaterThan(-1)
+    const classStringStart = shell.lastIndexOf('"', at)
+    const classStringEnd = shell.indexOf('"', at)
+    const classString = shell.slice(classStringStart + 1, classStringEnd)
+    expect(
+      classString.includes("overflow-x-clip"),
+      "the page container must not clip its own horizontal overflow any more — that clipped the record footer band's -mx-[var(--pane-inset-x)] escape short of the pane's true edges"
+    ).toBe(false)
+  })
+
+  it("no element between screen-shell-body and a record body in app-shell.tsx carries overflow-x-clip, overflow-x-hidden, overflow-hidden or overflow-clip", () => {
+    const openTagAt = shell.indexOf("<ScreenShell")
+    expect(openTagAt, "app-shell.tsx must still render the kit's ScreenShell").toBeGreaterThan(-1)
+    const closeAt = shell.indexOf("</ScreenShell>", openTagAt)
+    expect(closeAt, "app-shell.tsx must still close ScreenShell").toBeGreaterThan(openTagAt)
+    const childrenAt = shell.indexOf("{children}", openTagAt)
+    expect(childrenAt, "app-shell.tsx must still render {children} inside ScreenShell — the one page container every record body sits inside").toBeGreaterThan(
+      openTagAt
+    )
+    expect(childrenAt, "{children} must sit before ScreenShell's own closing tag").toBeLessThan(closeAt)
+    // THE CHILDREN REGION ONLY — from the opening tag's own closing `>`
+    // (the boundary between ScreenShell's PROPS, like header/trail/
+    // breadcrumb, which may style themselves however they like, and its
+    // CHILDREN, the one page container this app owns) through to
+    // `{children}` itself. Comments stripped first: this file's own long
+    // note on why the clip was removed names the forbidden classes in
+    // prose, which a raw substring search would otherwise catch as a false
+    // positive.
+    const propsEnd = shell.lastIndexOf(">", childrenAt)
+    expect(propsEnd, "must find ScreenShell's own opening tag's closing >").toBeGreaterThan(openTagAt)
+    const ancestry = stripComments(shell.slice(propsEnd, childrenAt), { keepLength: true })
+    for (const forbidden of ["overflow-x-clip", "overflow-x-hidden", "overflow-hidden", "overflow-clip"]) {
+      expect(
+        ancestry.includes(forbidden),
+        `no element between screen-shell-body and a record body may carry ${forbidden} — html/body's own overflow-x:clip (web/app/globals.css) is the real backstop, and a table/board that genuinely scrolls sideways owns its own overflow-x:auto box (R91) rather than depending on an ancestor to clip it; this was exactly what clipped the record footer band's -mx-[var(--pane-inset-x)] escape short of the pane's true edges`
+      ).toBe(false)
+    }
+  })
+
   it("record-chrome.tsx stops the head competing with a sibling body for the column's growth (unchanged)", () => {
     const headOnlyAt = chrome.indexOf("const HEAD_ONLY")
     expect(headOnlyAt, "record-chrome.tsx must declare a HEAD_ONLY constant for the no-panel case").toBeGreaterThan(-1)

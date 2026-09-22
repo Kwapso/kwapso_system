@@ -325,14 +325,22 @@ if (!headerSlotMatch || !/trail\s*\?\s*"pt-0"\s*:\s*undefined/.test(headerSlotMa
 }
 
 // THE SYMMETRIC CASE — a `trail` with no `band` at all, where
-// `screen-shell-body` is the thing that would double the leading gap
-// instead of the header. Matched inside the `screen-shell-body` block for
+// `screen-shell-stack` is the thing that would double the leading gap
+// instead of the header. Matched inside the `screen-shell-stack` block for
 // the same reason as the header match above.
-const BODY_SLOT_BLOCK = /data-slot="screen-shell-body"[\s\S]{0,400}?>/;
-const bodySlotMatch = src.match(BODY_SLOT_BLOCK);
-if (!bodySlotMatch || !/trail\s*&&\s*!band\s*\?\s*"pt-0 lg:pt-0"\s*:\s*undefined/.test(bodySlotMatch[0])) {
+//
+// MOVED OFF `screen-shell-body` ONTO `screen-shell-stack`, 22 SEP 2026:
+// the ink-footer fix (see the "scroller's clip box is the pane" check
+// below) moved DENSITY_BODY's own padding, and this pt-0 zeroing with it,
+// one level in, so `screen-shell-body` (the scroller) now carries neither.
+// This pattern has to be read off the element that actually carries the
+// padding it is zeroing, or a `trail && !band` screen's double gap could
+// come back with this check still green.
+const STACK_SLOT_BLOCK = /data-slot="screen-shell-stack"[\s\S]{0,400}?>/;
+const stackSlotMatch = src.match(STACK_SLOT_BLOCK);
+if (!stackSlotMatch || !/trail\s*&&\s*!band\s*\?\s*"pt-0 lg:pt-0"\s*:\s*undefined/.test(stackSlotMatch[0])) {
   trailSpacingFindings.push(
-    `The screen-shell-body slot in ${rel} does not read trail && !band ? "pt-0 lg:pt-0" : undefined — a ` +
+    `The screen-shell-stack slot in ${rel} does not read trail && !band ? "pt-0 lg:pt-0" : undefined, a ` +
       "trail with no title band would still double its own leading gap against a title-less screen's body pt.",
   );
 }
@@ -2025,6 +2033,111 @@ console.log(
     "SHELL_CONTENT_INSET_X/DENSITY_BODY spend as the pane's real horizontal inset has a matching " +
     "[--pane-inset-x:...] variant on BODY at the identical prefix, and BODY publishes no variant the real " +
     "inset does not also spend - the two cannot drift apart at any one breakpoint without this check catching it.",
+);
+
+/* ============================================================================
+   THE 22 SEP 2026 "SCROLLER'S CLIP BOX IS THE PANE" CHECK.
+
+   WHY IT EXISTS. Aurora's fourth screenshot again: "on the footer, there
+   should be no white on the sides. Make the black go side to side." But
+   the LIVE ancestor walk this fix shipped with (a ticket page, staging,
+   T0001) found the ink band's OWN rect already flush with the pane at every
+   width: `-mx-[var(--pane-inset-x,0px)]` was, and is, computing the right
+   number. What clipped the PAINT was an ancestor between the band and the
+   pane whose own computed overflow was not `visible`, whose padding box
+   started 24px inside the pane's own edge. `screen-shell-body` (this file's
+   own scroller) is not the ancestor that walk found live; it is, today,
+   ONE candidate for that role: overflow-y-auto forces its own overflow-x
+   away from `visible` too (CSS's own rule for the axis pair), so it is a
+   clip context regardless of what its className says, and the only thing
+   standing between "clip context" and "clips the band" was that this
+   element's own border-width is zero, which makes its padding box read as
+   the same rect as its border box BY COINCIDENCE OF ARITHMETIC, a fact
+   about zero, not a fact this file ever stated as a rule. A future change
+   that gave this element a border, or a future reader who moved
+   `DENSITY_BODY` back onto it because "that's simpler," would make that
+   coincidence stop holding with no other line in this file changing at
+   all.
+
+   WHAT IT DOES. Pins the shape the ink-footer fix landed instead of the
+   accident: `screen-shell-body`'s own render site takes `BODY` and nothing
+   else (no `DENSITY_BODY`, no `SHELL_CONTENT_INSET_X`, no bare padding
+   utility of its own), and `BODY`'s own literal carries no padding utility
+   either, so this element's clip box is its border box, unconditionally,
+   whatever its border-width ever becomes. The padding this element used to
+   carry is checked FOR, not just checked AWAY: `screen-shell-stack`'s own
+   render site must read `DENSITY_BODY[density]`, so the check fails loudly
+   if a future edit drops the inset entirely rather than relocating it.
+
+   WHAT IT DOES NOT PROVE. This file does not render, and cannot see, an
+   app's OWN wrapper nested inside `children`, a sticky shell, a second
+   scroller, anything a consuming app adds between this element and a
+   full-bleed part several components down. Nothing in this repository can
+   prove that ancestor's overflow from here; `verify/ink-footer/`'s own
+   clipping-scroller mock proves the narrower claim this check states: that
+   THIS element no longer contributes a clip context of its own account. */
+const scrollerClipBoxFindings = [];
+
+const bodySlotBlockMatch = /data-slot="screen-shell-body"[\s\S]{0,220}?>/.exec(src);
+if (!bodySlotBlockMatch) {
+  scrollerClipBoxFindings.push(
+    `Could not find the screen-shell-body render site in ${rel} - the extraction below is written against ` +
+      "today's exact shape and needs updating alongside it.",
+  );
+} else {
+  const bodySlot = bodySlotBlockMatch[0];
+  if (!/className=\{BODY\}/.test(bodySlot)) {
+    scrollerClipBoxFindings.push(
+      `screen-shell-body's own render site in ${rel} does not read className={BODY} alone - if it spends ` +
+        "DENSITY_BODY, SHELL_CONTENT_INSET_X or any bare padding utility on this element directly, that " +
+        "padding sits INSIDE this element's own clip box and narrows it below the pane, reopening the fourth-" +
+        "screenshot gap the moment any descendant becomes a second clip context (which overflow-y-auto's own " +
+        "axis-pairing rule can do on its own, with no className change at all).",
+    );
+  }
+  if (/\bpx-\[|py-\[|\bp-\[|\bpt-\[|\bpb-\[|\bps-\[|\bpe-\[/.test(bodySlot)) {
+    scrollerClipBoxFindings.push(
+      `screen-shell-body's own render site in ${rel} carries a padding utility directly - the scroller's clip ` +
+        "box must be the pane's own border box with nothing subtracted from it; padding belongs one level in, " +
+        "on screen-shell-stack.",
+    );
+  }
+}
+
+const bodyConstMatch = /const BODY = cn\(([\s\S]*?)\n\);/.exec(src);
+if (!bodyConstMatch) {
+  scrollerClipBoxFindings.push(
+    `Could not find the BODY constant in ${rel} - the extraction below is written against today's exact shape ` +
+      "and needs updating alongside it.",
+  );
+} else if (/\bpx-\[|py-\[|\bp-\[|\bpt-\[|\bpb-\[|\bps-\[|\bpe-\[/.test(bodyConstMatch[1])) {
+  scrollerClipBoxFindings.push(
+    `BODY in ${rel} carries a padding utility in its own literal - the scroller this constant paints must ` +
+      "carry none; DENSITY_BODY is spent on screen-shell-stack instead, one level inside this element.",
+  );
+}
+
+const stackSlotBlockMatch = /data-slot="screen-shell-stack"[\s\S]{0,400}?\n\s*>/.exec(src);
+if (!stackSlotBlockMatch || !/DENSITY_BODY\[density\]/.test(stackSlotBlockMatch[0])) {
+  scrollerClipBoxFindings.push(
+    `screen-shell-stack's own render site in ${rel} does not read DENSITY_BODY[density] - the pane's own inset ` +
+      "has to be spent SOMEWHERE, and moving it off screen-shell-body must not mean dropping it.",
+  );
+}
+
+if (scrollerClipBoxFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell scroller's-clip-box-is-the-pane check (22 Sep 2026, the ink-footer fix):\n" +
+      scrollerClipBoxFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell scroller's-clip-box-is-the-pane check: screen-shell-body's own render site reads " +
+    "className={BODY} alone, BODY's own literal carries no padding utility, and DENSITY_BODY moved one level " +
+    "in onto screen-shell-stack rather than being dropped - the scroller's clip box is the pane's border box " +
+    "unconditionally, not by the coincidence of a zero border-width.",
 );
 
 /* ============================================================================

@@ -5129,41 +5129,79 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               </div>
             ) : null}
 
-            {/* THE BODY — the card's tone, padded, and the card's scroller.
-                Every panel on it is soft paper.
+            {/* THE BODY, the card's tone, and the card's SCROLLER, and,
+                SINCE 22 SEP 2026, NOTHING ELSE. THE PANE'S CLIP BOX IS THIS
+                ELEMENT'S OWN BOX, AND THAT IS NOW A LAW, NOT AN ACCIDENT.
 
-                THE FIGURES LEAD IT AND THE FOOTER CLOSES IT, both in normal
-                flow inside this one scroller. The column is only drawn when
-                there is more than one thing in it, so a screen that passes
-                neither gets exactly the markup it got before the collapse —
-                `children` alone in the padded body.
+                Aurora's fourth screenshot, verbatim: "on the footer, there
+                should be no white on the sides. Make the black go side to
+                side." Measured live (ticket T0001, staging), the ink band's
+                OWN rect already reached the pane's edges (`-mx-
+                [var(--pane-inset-x,0px)]` was computing the right number),
+                but the PAINT still stopped 24px inside, because this element
+                used to carry `DENSITY_BODY`'s own `px`/`py` directly. Padding
+                does not move an element's own border-box, so that was never
+                what clipped the band; what clips is CSS's overflow rule, not
+                this element's padding as such, but the two are related
+                closely enough to have hidden the bug for a year. A
+                consuming app is free to nest ITS OWN wrapper, sticky
+                chrome, a second scroller, anything, anywhere between this
+                element and a full-bleed part several components down, and a
+                descendant has no way to reach past an ancestor whose own
+                computed overflow is not `visible`, margin or no margin. This
+                file cannot reach into an app's own tree to fix that ancestor;
+                see the report this fix shipped with for the live one that
+                is still there. What THIS file owns is its OWN contribution:
+                this element must not be one more link in that chain. Its
+                clip box (its padding box, which is its border box: it
+                carries no border) must equal the pane UNCONDITIONALLY, which
+                means it carries no padding of its own to make that box
+                anything less than the whole pane, not "usually doesn't,
+                because the border happens to be zero," but structurally
+                cannot.
+
+                THE PADDING MOVED ONE LEVEL IN, onto `screen-shell-stack`,
+                which is now ALWAYS drawn rather than only "when there is
+                more than one thing in it" (this comment's own older
+                wording). A screen with neither `strip` nor `footerNode`
+                still gets `children` alone at the exact same inset
+                `DENSITY_BODY` always drew: the stack is a `flex-col` with
+                one child, which paints identically to no flex context at
+                all, so nothing a caller can see moves. What moved is that a
+                full-bleed part nested inside `children` now escapes ONE
+                wrapper's padding, the stack's, to reach a scroller whose own
+                box already IS the pane, rather than however many
+                intermediate boxes happened to sit above it before.
+                `check-screen-shell.mjs`'s "scroller's clip box is the pane"
+                check pins the shape: no padding utility ever reaches this
+                element's own className again.
 
                 SAME `pt-0` RULE AS THE HEADER BAND, FOR THE SAME REASON, FOR
-                THE `!band` CASE ONLY — a screen with a `trail` but no
-                `band` (no title row at all) puts this div directly after
+                THE `!band` CASE ONLY: a screen with a `trail` but no
+                `band` (no title row at all) puts this stack directly after
                 the trail slot, so IT is the thing that would double the
                 leading gap if left alone. Gated on `!band` because when
-                `band` IS present this div follows the header band, not the
-                trail, and its own `pt` is the gap AFTER the title — untouched
-                either way, S3 named only the trail's own leading/trailing
-                air. */}
-            <div
-              data-slot="screen-shell-body"
-              data-level="body"
-              className={cn(BODY, DENSITY_BODY[density], trail && !band ? "pt-0 lg:pt-0" : undefined)}
-            >
-              {strip === undefined && footerNode === null ? (
-                children
-              ) : (
-                <div
-                  data-slot="screen-shell-stack"
-                  className={cn("flex min-w-0 flex-col", DENSITY_STACK[density])}
-                >
-                  {strip}
-                  {children}
-                  {footerNode}
-                </div>
-              )}
+                `band` IS present this stack follows the header band, not the
+                trail, and its own `pt` is the gap AFTER the title, untouched
+                either way; S3 named only the trail's own leading/trailing
+                air. Moved onto the stack alongside the padding it is
+                zeroing, for the same reason: the stack is now the thing that
+                carries `DENSITY_BODY`'s own `pt`, so it is the thing a
+                `trail && !band` screen must zero it on. */}
+            <div data-slot="screen-shell-body" data-level="body" className={BODY}>
+              <div
+                data-slot="screen-shell-stack"
+                className={cn(
+                  "flex min-w-0 flex-col",
+                  DENSITY_BODY[density],
+                  DENSITY_STACK[density],
+                  trail && !band ? "pt-0 lg:pt-0" : undefined,
+                )}
+              >
+                {strip}
+                {children}
+                {footerNode}
+              </div>
             </div>
           </main>
 

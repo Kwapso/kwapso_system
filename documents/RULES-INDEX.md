@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-100 laws, 98 resolved to at least one check file, 2 unresolved.
+102 laws, 100 resolved to at least one check file, 2 unresolved.
 
 ## Architecture (28)
 
@@ -39,7 +39,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 | R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/task-sheet.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
 
-## UI (63)
+## UI (65)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -106,6 +106,8 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R97 | enforced | `counts-beside-titles` | `web/test/counts-beside-titles.test.ts` |
 | R98 | enforced | `button-sizes` | `web/test/button-sizes.test.ts` |
 | R100 | enforced | `head-actions-centred` | `web/test/head-actions-centred.test.ts` |
+| R101 | enforced | `toolbar-search-edge` | `web/test/toolbar-search-edge.test.tsx` |
+| R102 | enforced | `id-column-noun` | `web/test/id-column-noun.test.ts` |
 
 ## Workflow (2)
 

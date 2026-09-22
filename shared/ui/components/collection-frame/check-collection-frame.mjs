@@ -16,17 +16,19 @@
    paper" as ONE rule for all three states, and this is where that rule
    split in two.
 
-   FOUR THINGS THIS CHECK PINS, each a different way the split could
+   FIVE THINGS THIS CHECK PINS, each a different way the split could
    silently collapse back into the old one-rule-for-three behaviour:
 
      1. `registerVariants` DECLARES A THIRD VARIANT, `plain`, and it paints
-        no fill, no radius and no inset of its own - `"items-start
-        text-start"` and nothing else. A `plain` that quietly grew a
-        `bg-surface-panel` or a `rounded-*` class would be `block` wearing a
-        new name, which is the exact regression this check exists to catch.
-     2. `CollectionFrame` COMPUTES TWO SEPARATE VARIANT CONSTANTS  - 
+        no fill, no radius and no horizontal inset - `items-start` and
+        `text-start` beside whatever vertical air item 5 pins, nothing
+        else. A `plain` that quietly grew a `bg-surface-panel`, a
+        `rounded-*` class or a horizontal `px-*` would be `block` wearing
+        a new name, which is the exact regression this check exists to
+        catch.
+     2. `CollectionFrame` COMPUTES TWO SEPARATE VARIANT CONSTANTS  -
         `registerVariant` (loading + error, still `block` on a plain panel)
-        and `emptyRegisterVariant` (empty only, `plain` on a plain panel)  - 
+        and `emptyRegisterVariant` (empty only, `plain` on a plain panel)  -
         rather than one shared constant. One constant driving all three
         registers is exactly how they used to draw alike; two separate
         `const` declarations is the only way the empty register can diverge
@@ -34,7 +36,7 @@
      3. THE EMPTY REGISTER READS `emptyRegisterVariant`, NOT
         `registerVariant`. A single find-and-replace slip here would put the
         card straight back.
-     4. THE LOADING AND FAILED REGISTERS STILL READ `registerVariant`  - 
+     4. THE LOADING AND FAILED REGISTERS STILL READ `registerVariant`  -
         UNCHANGED. This is the other half of the same mistake: "fixing" all
         three registers to `plain` would strip the boundary a wait or a
         failure still needs (the brief's own words: "the loading skeleton
@@ -42,8 +44,20 @@
         requires ... do not invent paper" - the paper they keep is the
         EXISTING `block`, not a new drawing, and this line is what proves
         neither of them silently moved to `plain`).
+     5. `plain` CARRIES A FLAT TOP AND BOTTOM INSET, `--space-6` (24px),
+        ADDED 22 SEP 2026 ON A SAME-DAY FOLLOW-UP RULING. Aurora, verbatim,
+        after seeing the flush register this same entry shipped a few
+        hours earlier: "ok, but need a bit more spacing over it (like it
+        was with the card)". The card she names is the `block` register
+        this variant replaced; the figure restored is not `block`'s own
+        `--space-7` panel inset, it is `CardContent`'s own default
+        vertical step before `lg:` (`py-6`, `CARD_CONTENT_INSET_Y_DEFAULT`
+        in `card.tsx`) - the ticket page's boxed metric tiles this pass is
+        modelled on. A `plain` that lost `pt-[var(--space-6)] pb-
+        [var(--space-6)]` would be the flush register this ruling
+        corrected, back again.
 
-   A fifth thing is implied rather than asserted here: `panel="paper"`
+   A sixth thing is implied rather than asserted here: `panel="paper"`
    collapses BOTH constants to `"inline"`, unchanged since ruling J2. That
    is the same ternary this check already reads in (2) - there is no
    separate branch to regress.
@@ -61,12 +75,15 @@ const rel = path.relative(process.cwd(), FILE);
 
 const findings = [];
 
-// (1) THE THIRD VARIANT - no fill, no radius, no inset of its own.
-if (!/plain:\s*"items-start text-start",/.test(src)) {
+// (1) THE THIRD VARIANT - no fill, no radius, no horizontal inset.
+if (
+  !/plain:\s*"items-start pt-\[var\(--space-6\)\] pb-\[var\(--space-6\)\] text-start",/.test(src)
+) {
   findings.push(
     `${rel} does not declare registerVariants' "plain" branch as exactly ` +
-      '"items-start text-start" - any added fill, radius or inset would put the ' +
-      "card back under a new name.",
+      '"items-start pt-[var(--space-6)] pb-[var(--space-6)] text-start" - any added fill, radius or ' +
+      "horizontal inset would put the card back under a new name, and any figure other than " +
+      "--space-6 top and bottom would drift from the 22 Sep 2026 follow-up ruling's own number.",
   );
 }
 
@@ -127,8 +144,9 @@ if (findings.length > 0) {
 }
 
 console.log(
-  "OK collection-frame check: registerVariants' \"plain\" branch paints no fill, radius or inset; " +
-    "CollectionFrame computes registerVariant and emptyRegisterVariant as two separate constants; " +
-    "the empty register reads emptyRegisterVariant; and the loading and failed registers still read " +
-    "the unchanged registerVariant, keeping their paper.",
+  "OK collection-frame check: registerVariants' \"plain\" branch paints no fill, no radius and no " +
+    "horizontal inset, and carries a flat --space-6 top and bottom air; CollectionFrame computes " +
+    "registerVariant and emptyRegisterVariant as two separate constants; the empty register reads " +
+    "emptyRegisterVariant; and the loading and failed registers still read the unchanged " +
+    "registerVariant, keeping their paper.",
 );

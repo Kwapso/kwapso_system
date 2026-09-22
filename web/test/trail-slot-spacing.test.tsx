@@ -195,10 +195,14 @@ describe("app-shell.tsx hands the trail to that slot as a bare node", () => {
     const src = readFileSync(join(WEB, "components/shell/app-shell.tsx"), "utf8")
     // The wrapper is identified positionally, the same way R20/R29 identify
     // their own targets: by the one signature of classes only this div
-    // carries (`mx-auto` + `flex` + `w-full` + `max-w-none` + `min-h-full` +
-    // `overflow-x-clip`), never by a line number, which rots the moment a
-    // comment above it grows or shrinks.
-    const marker = "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip" // R89 footer-on-the-edge, 18 Sep 2026
+    // carries (`mx-auto` + `flex` + `w-full` + `max-w-none` + `h-full`),
+    // never by a line number, which rots the moment a comment above it grows
+    // or shrinks. `overflow-x-clip` DROPPED OUT OF THE SIGNATURE 22 SEP
+    // 2026 (R89's own footer-on-the-edge.test.ts census has the account):
+    // it was clipping the record footer band's own `-mx-[var(--pane-inset-x)]`
+    // escape short of the pane's true edges, and this div carries no
+    // `overflow-x` at all any more.
+    const marker = "mx-auto flex w-full max-w-none min-w-0 h-full flex-col" // R89 footer-on-the-edge, 18 Sep 2026
     const markerAt = src.indexOf(marker)
     expect(markerAt, "app-shell.tsx must still carry the screen-shell body's own content wrapper").toBeGreaterThan(-1)
     // Bound the search at the div's own opening tag, from the `<div` before

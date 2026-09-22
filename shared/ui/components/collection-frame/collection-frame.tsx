@@ -254,8 +254,31 @@ const registerVariants = cva(["flex min-w-0 flex-col"], {
        * as a page that broke, which is exactly the read the 21 Sep entry
        * warned about - that warning still holds for those two, and only
        * for those two.
+       *
+       * TOP AND BOTTOM AIR ADDED, 22 SEP 2026 - THE SAME DAY, A FOLLOW-UP
+       * RULING. Aurora, verbatim, seeing the card-less register 10px under
+       * the toolbar: "ok, but need a bit more spacing over it (like it was
+       * with the card)". The card she is naming is the `block` register
+       * this variant replaced, whose own `p-[var(--space-7)]` used to put
+       * 32px of air over the title; the figure THIS variant restores is
+       * not that one, it is the `CardContent` inset the ticket-page tiles
+       * this pass is modelled on spend by default before `lg:` -
+       * `py-6` (`CARD_CONTENT_INSET_Y_DEFAULT`, card.tsx) - so a plain
+       * register reads the same vertical rhythm a boxed card's own body
+       * reads, at the one breakpoint-agnostic figure `--space-6` (24px),
+       * not the panel's `--space-7`. `pt` and `pb` are spent separately
+       * rather than as `py`, because the two callers of `py` elsewhere in
+       * this file (`CARD_CONTENT_INSET_Y_DEFAULT`, `block`'s own `p-*`)
+       * both step at `lg:` and this ruling asked for one flat figure top
+       * and bottom, not a ladder.
+       *
+       * LEFT EDGE STAYS FLUSH, AND STILL NO FILL - neither half of the
+       * ruling before this one is touched: no `px-*` is added, so the
+       * text keeps the page column's own left edge, and no `bg-*` is
+       * added, so the register still stands on whatever ground the panel
+       * already painted.
        */
-      plain: "items-start text-start",
+      plain: "items-start pt-[var(--space-6)] pb-[var(--space-6)] text-start",
     },
   },
   defaultVariants: { variant: "inline" },

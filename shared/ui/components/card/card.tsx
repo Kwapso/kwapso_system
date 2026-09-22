@@ -148,10 +148,17 @@ const cardVariants = cva(
     // A card holds tables, long words and truncating rows. Without this a
     // single unbreakable string makes the whole card wider than its column.
     "min-w-0",
-    // The named group `CardHeader`/`CardContent`/`CardFooter` key their own
-    // `plain` overrides off, below. Unconditional: cheap on the five
-    // variants that never read it, and the only way a part can detect its
-    // own shell without a prop every call site would have to repeat.
+    /* THE `group/card` MARKER STAYS, BUT NO LONGER FOR THIS SHELL'S OWN
+       PARTS, 22 SEP 2026: SEE `CardVariantContext` BELOW FOR WHY THEY
+       MOVED OFF IT. `kanban.tsx`'s `BoardCard` still reads this exact pair
+       (`group/card` here, `data-variant` beside it below) to detect a
+       `plain` `Card` ANCESTOR SEVERAL LEVELS UP, deliberately relying on a
+       CSS descendant match firing for any qualifying ancestor, not only the
+       nearest one, because the board's own ground is several levels above
+       `BoardCard` and nothing between them paints. That use is unaffected
+       by the change below: it is a different consumer reading the same
+       marker for a different, still-correct purpose. Removing the class
+       would break it for no reason. */
     "group/card",
   ],
   {
@@ -308,6 +315,59 @@ const cardVariants = cva(
   },
 );
 
+/* ----------------------------------------------------------------------------
+   `CardVariantContext`, HOW A PART FINDS ITS OWN SHELL'S VARIANT, FIXED
+   22 SEP 2026. AURORA'S RULING, VERBATIM, on a screenshot of the ticket
+   page's Effort section (three metric tiles, `Card variant="default"`,
+   nested inside the plain Effort `Card`): "the contact is touching the
+   border". Each tile's label and figure sat flush against the tile's own
+   left edge, with no inset at all.
+
+   THE CAUSE. `CardHeader`/`CardContent`/`CardFooter` used to detect a
+   `plain` shell with `group-data-[variant=plain]/card:px-0` (and the
+   matching vertical rules), keyed off `Card`'s own `group/card` marker.
+   Tailwind compiles a named-group modifier as an ordinary CSS descendant
+   selector, `:where(.group\/card[data-variant="plain"]) &`, which
+   matches ANY ancestor carrying that class and that attribute, not only
+   the nearest one. `kanban.tsx`'s `BoardCard` relies on exactly that
+   breadth on purpose (see the note above, on `cardVariants`' own
+   `group/card` line), but the SAME breadth is wrong for a part finding
+   its OWN shell, because every `Card`, at every variant, carries
+   `group/card`. A `default` metric tile dropped inside the plain Effort
+   card is itself wrapped in `group/card`, and its `CardHeader`/
+   `CardContent`/`CardFooter` still matched the OUTER plain shell's
+   `data-variant="plain"` through the descendant combinator, straight past
+   its own `default` shell in between, so the tile lost its insets to an
+   ancestor two levels up that was never its own parent.
+
+   THE FIX READS THE VARIANT THROUGH REACT, NOT THROUGH THE DOM. `Card`
+   provides its own resolved `variant` on this context; each part reads it
+   with `React.useContext`. React context resolution always returns the
+   NEAREST enclosing provider, never an "any ancestor" walk, so a
+   `default` `Card` nested inside a `plain` one shadows the outer
+   `plain` value with its own `default` for everything mounted inside IT,
+   and only inside it. This is also why context, and not a `[&[data-
+   variant=plain]>&]` direct-parent CSS selector, was chosen: a part is not
+   always a literal DOM child of `Card`'s own root the way it is in this
+   file's typical usage. A composition may wrap `CardContent` in a
+   fragment, a forwardRef pass-through or another layout node before it
+   reaches the DOM, and a `>` combinator breaks the moment one exists,
+   while `useContext` does not care what sits between the JSX elements in
+   the tree. It also keeps every call site untouched: no prop to add, no
+   `data-*` attribute to thread through `React.cloneElement`, which is the
+   other option this ruling considered and rejected for needing exactly
+   that plumbing.
+
+   `Card`'s OWN root still carries `group/card` and `data-variant`,
+   unchanged (see that line's own comment). This context is additional,
+   not a replacement for the DOM marker `kanban.tsx` and any future
+   ancestor-level reader still need. `check-card.mjs` proves the nesting
+   case this ruling exists for: a `default` Card inside a `plain` Card
+   keeps `CARD_CONTENT_INSET_X` on its own `CardContent` and its own
+   `CardHeader`'s inset, while the outer `plain` shell's own direct parts
+   still read zero. See CHANGELOG v1.2.154. */
+const CardVariantContext = React.createContext<NonNullable<CardProps["variant"]>>("default");
+
 export interface CardProps
   extends React.ComponentPropsWithoutRef<"div">,
     VariantProps<typeof cardVariants> {
@@ -414,6 +474,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       hairline = false,
       interactive = false,
       selected = false,
+      children,
       ...props
     },
     ref,
@@ -439,7 +500,18 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
         className,
       )}
       {...props}
-    />
+    >
+      {/* `CardVariantContext.Provider`, not a DOM node: this is how a part
+          finds its OWN shell's variant (see that context's own comment,
+          above `CardProps`) without adding a wrapper to the rendered tree
+          or a prop every call site would repeat. A nested `Card` renders
+          its own provider one level in, which shadows this one for
+          everything mounted inside IT, the fix for the 22 Sep 2026
+          nesting ruling. */}
+      <CardVariantContext.Provider value={variant ?? "default"}>
+        {children}
+      </CardVariantContext.Provider>
+    </div>
   ),
 );
 
@@ -471,29 +543,36 @@ Card.displayName = "Card";
  * with the page column instead of the card's own edge, and the bottom
  * gap to whatever follows tightens to the page mock's own 12px
  * (`--space-3`) instead of this band's usual 20. No hairline either: a
- * plain section has no box to separate FROM. Detected off the shell's own
- * `group/card` marker (`Card`'s own comment) via `group-data-*`, not a
- * prop this part would need repeating at every call site.
+ * plain section has no box to separate FROM. Detected off `CardVariantContext`
+ * (`Card`'s own comment), the NEAREST enclosing `Card`'s own variant, not
+ * any `plain` ancestor, and not a prop this part would need repeating at
+ * every call site. FIXED 22 SEP 2026: this used to key off `group-data-
+ * [variant=plain]/card:`, a CSS descendant match against ANY `plain`
+ * ancestor, which put a `default` header nested inside a `plain` card
+ * flush against that OUTER shell's edge instead of keeping its own inset.
+ * See `CardVariantContext`'s own comment for the full nesting proof.
  *
  * TEN STATES — none apply. It is a band; its children carry their own.
  * THREE BREAKPOINTS — inset 24 to `lg:`, 32 above. See `Card`.
  * RTL — safe. `px-*` is padding-inline; the hairline is on the block axis.
  */
 const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<"div">>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-slot="card-header"
-      className={cn(
-        "flex flex-col gap-[var(--space-1h)]",
-        "px-6 pt-6 pb-5",
-        "lg:px-[var(--space-7)] lg:pt-[var(--space-7)]",
-        // `plain`: horizontal inset gone at every breakpoint, and the
-        // bottom gap to the content below tightens to the page mock's
-        // 12px seam.
-        "group-data-[variant=plain]/card:px-0 group-data-[variant=plain]/card:pb-[var(--space-3)]",
-        "lg:group-data-[variant=plain]/card:px-0",
-        /* Same-tone card separation — ch02's carve-out. The artifact draws it
+  ({ className, ...props }, ref) => {
+    const isPlain = React.useContext(CardVariantContext) === "plain";
+
+    return (
+      <div
+        ref={ref}
+        data-slot="card-header"
+        className={cn(
+          "flex flex-col gap-[var(--space-1h)]",
+          "px-6 pt-6 pb-5",
+          "lg:px-[var(--space-7)] lg:pt-[var(--space-7)]",
+          // `plain`: horizontal inset gone at every breakpoint, and the
+          // bottom gap to the content below tightens to the page mock's
+          // 12px seam.
+          isPlain && "px-0 pb-[var(--space-3)] lg:px-0",
+          /* Same-tone card separation — ch02's carve-out. The artifact draws it
            as `inset 0 -1px 0 var(--hair)`, never a `border` (review 1A · fix
            2); `--hairline-under` is that string, named.
 
@@ -522,18 +601,18 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutR
 
            ON A `plain` SHELL, NEVER: a plain section has no box, so there is
            nothing to separate its own title from even when something
-           follows it. The override below matches this rule's own selector
-           shape (`group-data-[variant=plain]/card:` stacked with the same
-           `[&:not(:last-child)]` the base rule uses) so the two carry equal
-           specificity and the later one in source wins, the same guarantee
-           an ordinary `hover:` override relies on. */
-        "[&:not(:last-child)]:shadow-[var(--hairline-under)]",
-        "group-data-[variant=plain]/card:[&:not(:last-child)]:shadow-none",
-        className,
-      )}
-      {...props}
-    />
-  ),
+           follows it. `isPlain` is read once above and applied to both
+           rules in source order, so the plain override still wins the way
+           the old `group-data-*` stack did: a caller's own `className`
+           goes last via `cn` and can still beat either. */
+          "[&:not(:last-child)]:shadow-[var(--hairline-under)]",
+          isPlain && "[&:not(:last-child)]:shadow-none",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 
 CardHeader.displayName = "CardHeader";
@@ -708,8 +787,12 @@ export interface CardContentProps extends React.ComponentPropsWithoutRef<"div"> 
  * so stacking this band's own top inset on top of that would double the gap.
  * The bottom of the vertical inset is untouched: with no footer beneath
  * it, it is this section's own trailing space before the next plain
- * section starts. Detected off the shell's own `group/card` marker, not a
- * prop.
+ * section starts. Detected off `CardVariantContext`, the NEAREST
+ * enclosing `Card`'s own variant, not a prop. FIXED 22 SEP 2026: this
+ * used to key off `group-data-[variant=plain]/card:`, a CSS descendant
+ * match against ANY `plain` ancestor rather than only this part's own
+ * shell; see `CardVariantContext`'s own comment (above `CardProps`) for
+ * the nesting bug that produced and the fix that closes it.
  *
  * TEN STATES — none apply. It is an inset.
  * THREE BREAKPOINTS — horizontal is now FLAT (`CARD_CONTENT_INSET_X`, one
@@ -720,24 +803,27 @@ export interface CardContentProps extends React.ComponentPropsWithoutRef<"div"> 
  * RTL — safe. `px-*`/`py-*` are both logical.
  */
 const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
-  ({ className, inset = "default", ...props }, ref) => (
-    <div
-      ref={ref}
-      data-slot="card-content"
-      data-inset={inset}
-      className={cn(
-        "min-w-0 flex-1",
-        CARD_CONTENT_INSET_Y[inset],
-        CARD_CONTENT_INSET_X,
-        // `plain`: no horizontal inset, and no top inset (the header
-        // already supplies the 12px gap above this band).
-        "group-data-[variant=plain]/card:px-0 group-data-[variant=plain]/card:pt-0",
-        "lg:group-data-[variant=plain]/card:pt-0",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, inset = "default", ...props }, ref) => {
+    const isPlain = React.useContext(CardVariantContext) === "plain";
+
+    return (
+      <div
+        ref={ref}
+        data-slot="card-content"
+        data-inset={inset}
+        className={cn(
+          "min-w-0 flex-1",
+          CARD_CONTENT_INSET_Y[inset],
+          CARD_CONTENT_INSET_X,
+          // `plain`: no horizontal inset, and no top inset (the header
+          // already supplies the 12px gap above this band).
+          isPlain && "px-0 pt-0 lg:pt-0",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 
 CardContent.displayName = "CardContent";
@@ -757,8 +843,11 @@ CardContent.displayName = "CardContent";
  * seam either side of a plain block's content is one consistent number.
  * No hairline either: a plain section has no box to separate FROM. The
  * bottom inset is untouched, the same trailing-space reasoning as
- * `CardContent`'s own. Detected off the shell's own `group/card` marker,
- * not a prop.
+ * `CardContent`'s own. Detected off `CardVariantContext`, the NEAREST
+ * enclosing `Card`'s own variant, not a prop. FIXED 22 SEP 2026: this
+ * used to key off `group-data-[variant=plain]/card:`, matching ANY `plain`
+ * ancestor rather than only this part's own shell; see
+ * `CardVariantContext`'s own comment (above `CardProps`) for the fix.
  *
  * TEN STATES — none apply. Its children are Buttons and carry all ten.
  * THREE BREAKPOINTS — inset 24 to `lg:`, 32 above. The row WRAPS rather than
@@ -768,26 +857,29 @@ CardContent.displayName = "CardContent";
  * RTL — safe. `px-*` is padding-inline and flex order follows the document.
  */
 const CardFooter = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<"div">>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-slot="card-footer"
-      className={cn(
-        "flex flex-wrap items-center gap-3",
-        "px-6 pt-5 pb-6",
-        "lg:px-[var(--space-7)] lg:pb-[var(--space-7)]",
-        /* The shell's second hairline, drawn as the artifact draws it. */
-        "shadow-[var(--hairline-over)]",
-        // `plain`: no horizontal inset, no hairline, and the top gap
-        // tightens to the page mock's own 12px seam.
-        "group-data-[variant=plain]/card:px-0 group-data-[variant=plain]/card:pt-[var(--space-3)]",
-        "group-data-[variant=plain]/card:shadow-none",
-        "lg:group-data-[variant=plain]/card:px-0",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, ...props }, ref) => {
+    const isPlain = React.useContext(CardVariantContext) === "plain";
+
+    return (
+      <div
+        ref={ref}
+        data-slot="card-footer"
+        className={cn(
+          "flex flex-wrap items-center gap-3",
+          "px-6 pt-5 pb-6",
+          "lg:px-[var(--space-7)] lg:pb-[var(--space-7)]",
+          /* The shell's second hairline, drawn as the artifact draws it. */
+          "shadow-[var(--hairline-over)]",
+          // `plain`: no horizontal inset, no hairline, and the top gap
+          // tightens to the page mock's own 12px seam.
+          isPlain && "px-0 pt-[var(--space-3)] lg:px-0",
+          isPlain && "shadow-none",
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 
 CardFooter.displayName = "CardFooter";

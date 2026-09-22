@@ -38,6 +38,16 @@
 // call, the same constraint `plain-surface-scope.test.tsx`'s own header
 // states); the census half needs no JSX at all and does not care which
 // extension hosts it.
+//
+// REGISTERED AS R101 (`toolbar-search-edge`), 22 Sep 2026, the way R100 was:
+// RULES.md, `shared/rules/registry.ts` and CLAUDE.md's own law walk now name
+// it. Every check below stays exactly as it was, the CENSUS this law's own
+// registry text points at; the two failing assertions (i and ii) now route a
+// finding through `TOOLBAR_SEARCH_EDGE_EXEMPT`, keyed by `{file, expression}`
+// (the ROW'S OWN NAME, and the offending class string), the same reasoned,
+// rot-checked way out every other law in this file's own family takes, and
+// empty on the day this law shipped: the two rows the sweep found carrying
+// the old inset were fixed, not exempted.
 
 import { join } from "node:path"
 import { cleanup, render } from "@testing-library/react"
@@ -48,6 +58,7 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { PagedFind } from "@/components/records/paged-find"
 import { EMPTY_WAVE_QUERY, WaveFinder } from "@/components/work/wave-finder"
+import { TOOLBAR_SEARCH_EDGE_EXEMPT, type ToolbarSearchEdgeExempt } from "@shared/rules/registry"
 
 const ROOT = join(__dirname, "..", "..")
 
@@ -128,30 +139,51 @@ function renderPagedFind() {
 const renderWaveFinder = () =>
   render(<WaveFinder query={EMPTY_WAVE_QUERY} onChange={() => {}} clients={[]} />)
 
-const ROWS: { name: string; mount: () => unknown }[] = [
-  { name: "<ToolbarRow> (screen-bits.tsx) — Triage's own row", mount: renderToolbarRow },
-  { name: "<PagedFind> (paged-find.tsx) — the Ready tab's own row", mount: renderPagedFind },
-  { name: "<WaveFinder> (wave-finder.tsx)", mount: renderWaveFinder },
+const ROWS: { name: string; file: string; mount: () => unknown }[] = [
+  {
+    name: "<ToolbarRow> (screen-bits.tsx), Triage's own row",
+    file: "components/deep-link/screen-bits.tsx",
+    mount: renderToolbarRow,
+  },
+  {
+    name: "<PagedFind> (paged-find.tsx), the Ready tab's own row",
+    file: "components/records/paged-find.tsx",
+    mount: renderPagedFind,
+  },
+  {
+    name: "<WaveFinder> (wave-finder.tsx)",
+    file: "components/work/wave-finder.tsx",
+    mount: renderWaveFinder,
+  },
 ]
 
-// A HORIZONTAL INSET UTILITY, ON PURPOSE NARROW — `p-0`/`px-0` are not one (a
+// A HORIZONTAL INSET UTILITY, ON PURPOSE NARROW: `p-0`/`px-0` are not one (a
 // zero inset is the same as none), so the pattern only matches a REAL,
 // nonzero value the way `ps-4`/`py-1.5 pe-1.5` were.
 const HORIZONTAL_INSET = /\b(?:ps|pl|pr|pe|px|py)-(?!0\b)[\w.[\]/-]+/
+
+/** R101's own reasoned, rot-checked way out, keyed by `{file, expression}`
+ * (the row's own file, and the offending inset/fill/radius utility class). */
+function excused(file: string, expression: string): ToolbarSearchEdgeExempt | undefined {
+  return TOOLBAR_SEARCH_EDGE_EXEMPT.find((e) => e.file === file && expression.includes(e.expression))
+}
 
 describe("the collection toolbar's search field sits at the content edge, the same way everywhere", () => {
   // ── i · THE TRACK CARRIES NO INSET OF ITS OWN, on every row the app draws
   // this way. This is the direct census for her sentence: the search field's
   // LEFT EDGE is the track's own left edge, at rest, on all three.
-  it.each(ROWS)("$name's track carries no horizontal inset of its own", ({ mount }) => {
+  it.each(ROWS)("$name's track carries no horizontal inset of its own", ({ file, mount }) => {
     mount()
     const track = trackOf()
+    const match = track.className.match(HORIZONTAL_INSET)
+    const ok = !match || Boolean(excused(file, match[0]))
     expect(
-      track.className,
-      `the track (${track.className}) carries a horizontal padding utility. That is ` +
+      ok,
+      `the track (${track.className}) carries a horizontal padding utility (${match?.[0]}). That is ` +
         "exactly the class that put Triage's search field ~16-24px to the right of " +
-        "Ready's — the fix is dropping it, not shrinking it."
-    ).not.toMatch(HORIZONTAL_INSET)
+        "Ready's, the fix is dropping it, not shrinking it. Or name it in " +
+        "TOOLBAR_SEARCH_EDGE_EXEMPT with the reason."
+    ).toBe(true)
   })
 
   // ── ii · THE COLUMN AROUND IT PAINTS NOTHING EITHER — the same subtraction,
@@ -161,17 +193,47 @@ describe("the collection toolbar's search field sits at the content edge, the sa
   // inset but kept the old painted pill would put the field flush against a
   // rounded, filled box with nothing on the other side of it to justify the
   // shape — not what Ready draws.
-  it.each(ROWS)("$name's column paints no fill and no radius of its own", ({ mount }) => {
+  it.each(ROWS)("$name's column paints no fill and no radius of its own", ({ file, mount }) => {
     mount()
     const column = columnOf()
+    const bgMatch = column.className.match(/\bbg-(?!clip|none)[\w-]+/)
+    const bgOk = !bgMatch || Boolean(excused(file, bgMatch[0]))
     expect(
-      column.className,
-      `the column (${column.className}) still paints a background utility`
-    ).not.toMatch(/\bbg-(?!clip|none)[\w-]+/)
+      bgOk,
+      `the column (${column.className}) still paints a background utility (${bgMatch?.[0]}), or name it in ` +
+        "TOOLBAR_SEARCH_EDGE_EXEMPT with the reason"
+    ).toBe(true)
+    const roundedMatch = column.className.match(/\brounded-[\w[\]().,%/#-]+/)
+    const roundedOk = !roundedMatch || Boolean(excused(file, roundedMatch[0]))
     expect(
-      column.className,
-      `the column (${column.className}) still carries a radius utility`
-    ).not.toMatch(/\brounded-[\w[\]().,%/#-]+/)
+      roundedOk,
+      `the column (${column.className}) still carries a radius utility (${roundedMatch?.[0]}), or name it in ` +
+        "TOOLBAR_SEARCH_EDGE_EXEMPT with the reason"
+    ).toBe(true)
+  })
+
+  it("TOOLBAR_SEARCH_EDGE_EXEMPT names only real, still-open findings", () => {
+    const violations: { file: string; expression: string }[] = []
+    for (const row of ROWS) {
+      row.mount()
+      const track = trackOf()
+      const insetMatch = track.className.match(HORIZONTAL_INSET)
+      if (insetMatch) violations.push({ file: row.file, expression: insetMatch[0] })
+      const column = columnOf()
+      const bgMatch = column.className.match(/\bbg-(?!clip|none)[\w-]+/)
+      if (bgMatch) violations.push({ file: row.file, expression: bgMatch[0] })
+      const roundedMatch = column.className.match(/\brounded-[\w[\]().,%/#-]+/)
+      if (roundedMatch) violations.push({ file: row.file, expression: roundedMatch[0] })
+      cleanup()
+    }
+    const stale = TOOLBAR_SEARCH_EDGE_EXEMPT.filter(
+      (e) => !violations.some((v) => v.file === e.file && v.expression.includes(e.expression))
+    )
+    expect(
+      stale,
+      "these TOOLBAR_SEARCH_EDGE_EXEMPT entries no longer match a real finding. Fixed, or the source moved " +
+        "on, delete the entry:\n  " + stale.map((e) => `${e.file}  ${e.expression}`).join("\n  ")
+    ).toEqual([])
   })
 
   // ── iii · NOBODY WRITES A FOURTH COPY. One pair of slot names, three

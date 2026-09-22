@@ -2597,6 +2597,59 @@ card at a 768px-tall viewport (kit v1.2.129). Everything else on the sweep was c
 **Status: ruled, in build, 19 Sep 2026 (kit v1.2.129) — the two sweep findings above are open,
 not yet fixed.**
 
+**The rule (R101 `toolbar-search-edge`).** Her first item below, read on its own because it names
+a defect across the whole app rather than one screen: *"Look at the search bar in the toolbar. It
+has different distances from the left. Make sure that you make this exactly the same everywhere,
+by the way. The correct one on the screenshots is the one on status ready."* Every bespoke
+collection toolbar's search field starts at the content edge, the same seam on every screen: the
+track carries no horizontal inset utility of its own, and the column around it paints no fill and
+no radius either, the same subtraction, made the same day, for the same reason. `<PagedFind>`'s
+own row already drew it this way; `<ToolbarRow>` and `<WaveFinder>` still carried the old
+painted-pill shape from before `CollectionCard`'s default flipped to plain (this section, above),
+fixed the day this law shipped.
+
+**Law.** [R101](../RULES.md) (`toolbar-search-edge`), a source census, `web/test/toolbar-search-edge.test.tsx`,
+over the app's three bespoke collection-toolbar rows: the track carries no horizontal inset
+utility of its own and the column around it paints no fill and no radius of its own, or the
+finding is named in `TOOLBAR_SEARCH_EDGE_EXEMPT`, keyed by `{file, expression}`.
+
+**The rule (R102 `id-column-noun`).** Her third item below, read alongside R96 and R101: *"the id
+column narrow and named after the record."* Every table column whose cells render a record's own
+reference through `<RecordRef>` (R96) sits at `w-px` under the table's own auto layout, as narrow
+as the chip inside it, and its header is the record's own noun (Ticket, Story, Task, Wave, Phase,
+App, Account, Contact, Input, Meeting), never the bare word "ID". `stories-screen.tsx`'s own
+Planned/Backlog and Reviews columns already draw it this way, and `tickets-collection.tsx`'s
+hand-rolled table carries the identical shape.
+
+**Law.** [R102](../RULES.md) (`id-column-noun`), a source census, `web/test/id-column-noun.test.ts`,
+over `web/components`, `shared/web/screen-engine` and `web/lib/screens.ts`: every standalone id
+column config whose cell renders `<RecordRef` must carry `w-px` and a header from the noun list,
+or be named in `ID_COLUMN_NOUN_EXEMPT`, keyed by `{file, expression}`.
+
+**Her answers on the minimal fixes, 22 Sep 2026.** Aurora, verbatim:
+
+*"1. validated. make this a rule or law
+2. ok, but need a bit more spacing over it (like it was with the card)
+3. great. make this a rule
+4. validated
+5. look screenshot. its not correct, the contact is touching the border.
+6. there are 3 stiles of titles here adn that does not make sense: unify!! assigend to, details
+and deadline the three look different! i Definitely think it makes sense thys grey color, the
+rest you decide. also the assigned to person make it a chip, like in stories and put the title
+above."*
+
+1. Read as Law R101 (`toolbar-search-edge`): the toolbar search sits at one left edge everywhere,
+   registered in RULES.md, the registry, CLAUDE.md's own law walk sentence, and this book.
+2. Read as the empty state's own spacing: `CollectionEmptyState` carries `space-6` (24px) above
+   and below its text again, the air the card used to give, flush left, still no fill.
+3. Read as Law R102 (`id-column-noun`): the id column is `w-px`, as narrow as its chip, and its
+   header is the record's own noun, never "ID".
+4. Read as no change needed: already shipped and confirmed correct.
+5. Read as the kit lane's own item, the Effort tiles; not carried in this entry.
+6. Read as `task-sheet.tsx`'s own merged section: one grey uppercase eyebrow label above each of
+   Assigned to, Details and Deadline, and the assignee renders as the story page's own loop chip
+   (`PersonCard orientation="horizontal" size="choice"`), its eyebrow above it.
+
 ---
 
 ## 4. Collections
@@ -10274,7 +10327,8 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R94 | [L37](#l37-a-records-chips-draw-in-one-fixed-order--id-status-type-main-parent-secondary-parent) | R95 | [L38](#l38-no-em-dash-anywhere-a-person-reads) |
 | R96 | [L39](#l39-the-id-chip-is-black) | R97 | [L40](#l40-a-count-never-gets-its-own-card) |
 | R98 | [L41](#l41-every-button-is-the-kits-own-height) | R99 | [L42](#l42-no-record-closes-while-its-own-clock-is-still-running) |
-| R100 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | | |
+| R100 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R101 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
+| R102 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | | |
 
 ### The seven files that carry most of it
 

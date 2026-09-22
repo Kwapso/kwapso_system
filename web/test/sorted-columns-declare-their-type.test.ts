@@ -196,9 +196,6 @@ const DOOR_ORDERED: Record<string, string> = {
  * the file path and column key, rot-checked: an entry that has outlived its cell
  * or gained a sortType must be deleted. */
 const SHAPED_CELL_EXEMPT: Record<string, string> = {
-  "web/components/work/task-sheet.tsx|value": (
-    "a fact row in the task sheet's description list, not a sortable column, 22 Sep 2026"
-  ),
 }
 
 /** Every `key: value` line in a file where the value calls a formatter. */

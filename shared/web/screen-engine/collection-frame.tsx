@@ -339,19 +339,32 @@ export function CollectionEmptyState({
       )}
     </>
   )
-  // NO TOP INSET OF ITS OWN — 22 SEP 2026, the other half of dropping the
-  // paper. "The empty body sits on the page with the toolbar's rhythm" is
-  // the reading: whatever draws above this register (a toolbar's own
-  // `mb-[var(--toolbar-content-gap)]`, or this file's own header column's
-  // `gap-3`) already pays the exact gap a populated collection's FIRST ROW
-  // sits at — the identical distance either way, because this register and
-  // `renderItems(visible)` are the two things that can occupy the same slot
-  // below that gap. A `py-[var(--space-7)]` top inset here used to be
-  // breathing room INSIDE a paper card, on top of that gap, which is exactly
-  // how a 10px rhythm read as far more on a bare page once the card holding
-  // it went away. `pb-` alone keeps the bottom breathing room the register
-  // still wants when something follows it in flow.
-  const bodyClassName = cn("flex min-w-0 flex-col items-start gap-3 pb-[var(--space-7)]", className)
+  // THE TOP INSET IS BACK, 22 SEP 2026. Aurora, reading the item-2 fix (the
+  // "no top inset" reasoning directly below, kept for the account) back on a
+  // real screen: "ok, but need a bit more spacing over it (like it was with
+  // the card)." So the register carries the air a card used to give, on both
+  // edges, in the token that WAS the card's own inset, `--space-6` (24px,
+  // "card inset, panel inset", `shared/ui/foundations/tokens/tokens.css`),
+  // not `--space-7` (32px, "page pad"), which was always too large a number
+  // for a panel inset and only ever matched the design accidentally: `pb-`
+  // alone is what this file used to carry.
+  //
+  // THE REASONING THIS SUPERSEDES, for the account: "the empty body sits on
+  // the page with the toolbar's rhythm", meaning whatever draws above this
+  // register (a toolbar's own `mb-[var(--toolbar-content-gap)]`, or this
+  // file's own header column's `gap-3`) already pays the exact gap a
+  // populated collection's FIRST ROW sits at, so a top inset here used to be
+  // breathing room INSIDE a paper card, on top of that gap, which read as too
+  // much once the card holding it went away. Her follow-up ruling says that
+  // reading undershot: the card's own inset is missed on a bare page, and the
+  // fix is the token the card actually used, not zero.
+  //
+  // LEFT EDGE STAYS FLUSH: `items-start` draws no inset of its own on that
+  // side, unchanged; and NO FILL: this div paints no background, unchanged.
+  const bodyClassName = cn(
+    "flex min-w-0 flex-col items-start gap-3 pt-[var(--space-6)] pb-[var(--space-6)]",
+    className
+  )
   // ONE RETURN, ONE LITERAL ROOT — a plain, unpapered `<div>`.
   // `web/test/sections-stand-on-paper.test.ts`'s own root-paint census
   // (amendment 5, "a component paints if … the single element it RETURNS

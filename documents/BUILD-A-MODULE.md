@@ -1314,6 +1314,12 @@ again, which is the only property that matters here.
   reason for skipping one goes in `HEAD_ACTIONS_CENTRED_EXEMPT`
   (`shared/rules/registry.ts`), keyed by `{file, contains}`, never a line
   number.
+- **R101 `toolbar-search-edge`** — every toolbar's search field starts at the
+  content edge, the same seam on every screen; no toolbar host adds its own
+  horizontal inset. The census is `web/test/toolbar-search-edge.test.tsx`.
+- **R102 `id-column-noun`** — the record reference column is as narrow as its
+  chip, w-px, and its header is the record's own noun, never ID. The census is
+  `web/test/id-column-noun.test.ts`.
 
 **The words** (the ones that catch every new module, every time)
 

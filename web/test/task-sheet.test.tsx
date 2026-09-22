@@ -46,6 +46,26 @@
 // `task-description-card` slots are gone; the merged card is
 // `task-details-card`, with `task-assignee-part`/`task-details-part`/
 // `task-deadline-part` inside it, in that order.
+//
+// AMENDED A THIRD TIME, SAME DAY. Aurora, reading the merged section back,
+// verbatim: "there are 3 stiles of titles here adn that does not make sense:
+// unify!! assigend to, details and deadline the three look different! i
+// Definitely think it makes sense thys grey color, the rest you decide. also
+// the assigned to person make it a chip, like in stories and put the title
+// above." So:
+//
+//   · all three parts' own label is the identical grey uppercase eyebrow
+//     (`text-micro text-muted-foreground uppercase`), sitting ABOVE its own
+//     content, in DOM order, on every part;
+//   · the assignee renders as the story page's own loop/Raised-by chip
+//     (`help-stakeholders.tsx`'s `StakeholderTile` shape — `PersonCard
+//     orientation="horizontal" size="choice"`), never `PersonCard`'s own
+//     `chip` slot any more;
+//   · Details keeps its rich text under its eyebrow (no bold `<h3>` any
+//     more); Deadline shows its date under its eyebrow, never beside it
+//     (no `OverviewList` dt/dd pair on this part any more);
+//   · the two Separators between the three parts stay, and the section still
+//     carries no background.
 
 import * as React from "react"
 import { readFileSync } from "node:fs"
@@ -827,14 +847,98 @@ describe("the order of sections, top to bottom", () => {
     expect(separators.length, "one Separator between each of the three parts").toBe(2)
   })
 
-  it("the footer band is the sheet's own last element", async () => {
+  // ONE LABEL STYLE, THE ASSIGNEE A CHIP. Aurora, 22 Sep 2026, this file's
+  // own header, third amendment.
+  it("Assigned to, Details and Deadline share one eyebrow label style, each above its own content, and the assignee renders as the story page's own chip (Aurora, 22 Sep 2026)", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+
+    const assigneePartEl = document.querySelector('[data-slot="task-assignee-part"]') as HTMLElement
+    const detailsPartEl = document.querySelector('[data-slot="task-details-part"]') as HTMLElement
+    const deadlinePartEl = document.querySelector('[data-slot="task-deadline-part"]') as HTMLElement
+    for (const el of [assigneePartEl, detailsPartEl, deadlinePartEl]) {
+      expect(el, "every part must render").toBeTruthy()
+    }
+
+    // THE SAME EYEBROW CLASS, ON ALL THREE: `text-micro text-muted-
+    // foreground uppercase`, the class the Assigned to part already carried.
+    const EYEBROW_CLASS = "text-micro text-muted-foreground uppercase"
+    const eyebrowOf = (part: HTMLElement, text: string) =>
+      Array.from(part.querySelectorAll("span")).find((el) => el.textContent === text) as HTMLElement | undefined
+
+    const assigneeEyebrow = eyebrowOf(assigneePartEl, "Assigned to")
+    const detailsEyebrow = eyebrowOf(detailsPartEl, "Details")
+    const deadlineEyebrow = eyebrowOf(deadlinePartEl, "Deadline")
+    for (const [label, eyebrow] of [
+      ["Assigned to", assigneeEyebrow],
+      ["Details", detailsEyebrow],
+      ["Deadline", deadlineEyebrow],
+    ] as const) {
+      expect(eyebrow, `${label}'s own eyebrow must render as a span`).toBeTruthy()
+      expect(eyebrow!.className, `${label}'s eyebrow carries the shared style`).toBe(EYEBROW_CLASS)
+    }
+
+    // EACH LABEL SITS ABOVE ITS CONTENT, IN DOM ORDER, never beside it.
+    expect(
+      assigneeEyebrow!.compareDocumentPosition(assigneePartEl.querySelector('[aria-hidden]') as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      "the assignee's face+chip must come after its eyebrow"
+    ).toBeTruthy()
+    const richText = detailsPartEl.querySelector('[data-slot="article-body"]') as HTMLElement
+    expect(richText, "Details' own rich text must render").toBeTruthy()
+    expect(
+      detailsEyebrow!.compareDocumentPosition(richText) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "Details' own text must come after its eyebrow"
+    ).toBeTruthy()
+    const deadlineValue = Array.from(deadlinePartEl.querySelectorAll("span")).find(
+      (el) => el !== deadlineEyebrow
+    ) as HTMLElement | undefined
+    expect(deadlineValue, "the deadline's own date must render as a sibling span").toBeTruthy()
+    expect(
+      deadlineEyebrow!.compareDocumentPosition(deadlineValue as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the deadline's date must come after its eyebrow, under it, not beside it"
+    ).toBeTruthy()
+
+    // THE DEADLINE IS NO LONGER A dt/dd PAIR (OverviewList/DescriptionList):
+    // that shape reads label BESIDE value, which her ruling moved away from.
+    expect(deadlinePartEl.querySelector("dt"), "no dt/dd pair on the deadline part any more").toBeNull()
+    expect(deadlinePartEl.querySelector("dl"), "no description list on the deadline part any more").toBeNull()
+
+    // THE ASSIGNEE IS THE LOOP'S OWN CHIP SIZE, `PersonCard size="choice"`
+    // (`size-[var(--avatar-sm)]`, `RecordMark`'s own BOX table), not `row`.
+    const mark = assigneePartEl.querySelector('[aria-hidden]') as HTMLElement
+    expect(mark, "the assignee's own RecordMark must render").toBeTruthy()
+    expect(mark.className, "the loop's own face size, not the row size").toContain("size-[var(--avatar-sm)]")
+    expect(mark.className, "never the row size").not.toContain("size-9")
+  })
+
+  // THE BAND SITS OUTSIDE THE SCROLLER — Aurora, 22 Sep 2026, round two,
+  // ruling on the sheet's own body: "the latest activity always has to be
+  // at the very bottom, and also make it a stripe, not a container."
+  // Measured live: the band used to escape the scroller's own `px-6 py-6`
+  // with a matching `-mx-6 -mb-6`, and that escape was clipped — a
+  // scroller with `overflow-y: auto` computes `overflow-x` to `auto` too,
+  // which boxes a negative margin right back inside the padding it was
+  // trying to cancel (a 24px inset on all three free edges instead of
+  // flush). Fixed by structure: the band is a SIBLING of the scroller, not
+  // its descendant, and the sheet body's own last element.
+  it("the footer band is not a descendant of the scroller, and is the sheet body's own last element", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const footerBand = document.querySelector('[data-record-region="footer"]') as HTMLElement
     const scroller = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
-    const inner = scroller.firstElementChild as HTMLElement
-    expect(inner.lastElementChild?.contains(footerBand), "the footer band must be the scroller's own last child").toBe(true)
+    expect(footerBand, "the footer band must render").toBeTruthy()
+    expect(scroller.contains(footerBand), "the band must not be a descendant of task-sheet-scroll").toBe(false)
+    const sheetBody = scroller.parentElement as HTMLElement
+    expect(sheetBody.contains(scroller), "the scroller must sit inside the sheet body").toBe(true)
+    expect(
+      sheetBody.lastElementChild?.contains(footerBand),
+      "the footer band must be the sheet body's own last child"
+    ).toBe(true)
+    // The scroller keeps scrolling everything above the band, unchanged.
+    expect(scroller.className).toContain("overflow-y-auto")
   })
 
   // THE STRIPE REGISTER — Aurora, 22 Sep 2026: "the latest activity always
@@ -844,18 +948,22 @@ describe("the order of sections, top to bottom", () => {
   // `footerRegister="stripe"` to the kit instead of carrying an app-side
   // descendant selector for the radius — the kit's own footer Card draws
   // `rounded-none` itself once it is told which register it is in.
-  it("the footer band forwards the stripe register to the kit and is pushed to the bottom via mt-auto", async () => {
+  it("the footer band forwards the stripe register to the kit, with no padding to cancel and no negative margin on its wrapper", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const scroller = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
-    const inner = scroller.firstElementChild as HTMLElement
-    // The scroller's own real child is the min-h-full column this sheet
-    // pushes short content out to fill, so the band's own mt-auto has
-    // somewhere to push against.
-    expect(inner.className).toContain("min-h-full")
-    const bandWrapper = inner.lastElementChild as HTMLElement
+    const sheetBody = scroller.parentElement as HTMLElement
+    const bandWrapper = sheetBody.lastElementChild as HTMLElement
+    expect(bandWrapper).not.toBe(scroller)
+    // `RecordFooterBand`'s own `stripe` register still carries `mt-auto` —
+    // harmless here, since the scroller ahead of it is already `flex-1` and
+    // leaves no spare space in the column for it to act on.
     expect(bandWrapper.className).toContain("mt-auto")
+    // NO NEGATIVE MARGIN CLASSES REMAIN — the band sits outside the
+    // scroller's own padding entirely now, so there is nothing to cancel.
+    expect(bandWrapper.className).not.toContain("-mx-6")
+    expect(bandWrapper.className).not.toContain("-mb-6")
     // No app-side order class remains on the wrapper — the kit owns the
     // radius and the order now, not a descendant selector reaching into it.
     expect(bandWrapper.className).not.toContain("rounded-none")
@@ -868,11 +976,6 @@ describe("the order of sections, top to bottom", () => {
     expect(footerCard, "the kit's own footer card must render").toBeTruthy()
     expect(footerCard.className).toContain("rounded-none")
     expect(footerCard.className).not.toContain("-mx-[var(--pane-inset-x")
-    // The call site's own padding cancel — `-mx-6 -mb-6`, matching the
-    // scroller's own `px-6 py-6` — so the band reaches every edge of the
-    // sheet rather than sitting inset inside that padding.
-    expect(bandWrapper.className).toContain("-mx-6")
-    expect(bandWrapper.className).toContain("-mb-6")
   })
 
   // ONE COLUMN, RECORD FIRST, LATEST ACTIVITY LAST — Aurora, the same
@@ -889,8 +992,8 @@ describe("the order of sections, top to bottom", () => {
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const scroller = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
-    const inner = scroller.firstElementChild as HTMLElement
-    const bandWrapper = inner.lastElementChild as HTMLElement
+    const sheetBody = scroller.parentElement as HTMLElement
+    const bandWrapper = sheetBody.lastElementChild as HTMLElement
     expect(bandWrapper.className).not.toContain("[&_[data-record-region=footer-activity]]:order-2")
     expect(bandWrapper.className).not.toContain("[&_[data-record-region=footer-record]]:order-1")
     const activityRegion = document.querySelector('[data-record-region="footer-activity"]') as HTMLElement
