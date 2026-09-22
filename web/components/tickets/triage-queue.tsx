@@ -129,7 +129,7 @@ import { ticketTitle } from "@shared/web/ticket-chips"
 // is not any more: which order a tab opens in is a per-tab answer now
 // (`helpTabSorts`), and a screen holding both would be two places deciding one
 // thing — with the tab's answer silently losing on whichever prop forgot.
-import { AddButton, CollectionEmptyBody, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { tenancy } from "@/lib/api/tenancy"
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -764,35 +764,24 @@ export function TriageQueue({
          no action, for the reason above: a button here would be the app
          inventing a task to hand her.
 
-         WRAPPED IN `CollectionEmptyBody` (screen-bits.tsx) — the Triage facet
-         sits on `CollectionCard surface="plain"` (tickets-collection.tsx),
-         same as Ready and Waiting, and the Ready/Waiting empty body already
-         gets its own soft paper there (the PagedFind branch's own
-         `CollectionEmptyBody` wrap). This one landed bare on the plain,
-         transparent frame instead — measured live, the only one of the
-         three that did — because it is drawn by THIS component rather than
-         by the PagedFind branch that already carries the fix. A no-op on a
-         boxed frame, which is already paper.
-
-         KEPT EXPLICIT (21 Sep 2026), rather than leaning on
-         `CollectionEmptyState`'s own new generic self-wrap: R63 keeps
-         `--pinned-lead` — the exact inset this wrap matches — nameable in
-         exactly two files, and the register's own generic self-wrap reads
-         the kit's plain default padding instead, which would have been a
-         visible, unvalidated regression on this module's tuned lead. */
-      <CollectionEmptyBody>
-        <CollectionEmptyState
-          title={t("Nothing waiting.")}
-          description={
-            view.onDuty?.userName
-              ? // R54: whoever is on triage is one of ours.
-                t("No new tickets to sort. {name} is on triage this week.", {
-                  name: staffNameFromSnapshot(view.onDuty.userName),
-                })
-              : t("No new tickets to sort. Nobody is on triage this week.")
-          }
-        />
-      </CollectionEmptyBody>
+         `CollectionEmptyBody` (screen-bits.tsx) IS RETIRED, 22 Sep 2026
+         (rulebook L43, her ruling over the Accounts Inactive-tab screenshot:
+         "the empty collection now. We need to get rid of the card
+         background"). It used to wrap this in its own soft paper on the
+         plain Triage frame; `CollectionEmptyState` no longer papers itself
+         anywhere, so the wrap is gone and this sits on the page directly,
+         at the toolbar's own rhythm. */
+      <CollectionEmptyState
+        title={t("Nothing waiting.")}
+        description={
+          view.onDuty?.userName
+            ? // R54: whoever is on triage is one of ours.
+              t("No new tickets to sort. {name} is on triage this week.", {
+                name: staffNameFromSnapshot(view.onDuty.userName),
+              })
+            : t("No new tickets to sort. Nobody is on triage this week.")
+        }
+      />
     )
 
   // ── THE CARD IN HAND ────────────────────────────────────────────────────
@@ -1027,21 +1016,18 @@ export function TriageQueue({
            it names the THREE controls that can empty this list — see the note
            above on why it stopped saying "your search".
 
-           WRAPPED IN `CollectionEmptyBody` TOO, same reason as the resting
-           branch above — this is the SAME plain frame (`CollectionCard
-           surface="plain"`, tickets-collection.tsx), so a search that narrows
-           the queue to nothing must not drop the empty body back onto the
-           transparent frame the resting branch just got taken off. The
-           toolbar (`ToolbarRow`, just above) sits OUTSIDE this wrapper —
-           it is a sibling in this fragment, never nested inside it — so it
-           stays flush with the page exactly as R63/R83 already have it. */
-        <CollectionEmptyBody>
-          <CollectionEmptyState
-            filtered
-            title={t("Nothing waiting.")}
-            filteredTitle={t("Nothing in the triage queue matches what you asked for.")}
-          />
-        </CollectionEmptyBody>
+           `CollectionEmptyBody` IS RETIRED TOO, same reason as the resting
+           branch above (22 Sep 2026, rulebook L43) — `CollectionEmptyState`
+           no longer papers itself, so this sits on the page directly, the
+           same unpapered shape the resting branch now draws. The toolbar
+           (`ToolbarRow`, just above) is a sibling in this fragment, never a
+           wrapper around this position, so it stays flush with the page
+           exactly as R63/R83 already have it. */
+        <CollectionEmptyState
+          filtered
+          title={t("Nothing waiting.")}
+          filteredTitle={t("Nothing in the triage queue matches what you asked for.")}
+        />
       ) : triageView === "list" ? (
         /* ══ THE LIST — CLIENT RULING, 2026-09-06, ROUND TEN ══════════════════
            Her whole brief, verbatim: "Now let's build the list view: 1. Title.

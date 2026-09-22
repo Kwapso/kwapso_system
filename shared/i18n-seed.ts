@@ -4229,7 +4229,6 @@ export const SEED: Catalogue = {
      (Erledigt/Resuelto/Resolt) rather than a second, competing translation
      of the same status. */
   "Assigned to": { de: "Zugewiesen an", es: "Asignado a", ca: "Assignat a" },
-  "ID": { de: "ID", es: "ID", ca: "ID" },
   "Icon": { de: "Symbol", es: "Icono", ca: "Icona" },
   "Resolved by": { de: "Erledigt von", es: "Resuelto por", ca: "Resolt per" },
   "Nothing to triage.": { de: "Nichts zu sichten.", es: "Nada que priorizar.", ca: "Res a triar." },

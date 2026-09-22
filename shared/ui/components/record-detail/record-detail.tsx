@@ -596,6 +596,39 @@ export interface RecordDetailProps
    * may show neither hides the card.
    */
   footerVisible?: boolean;
+
+  /**
+   * THE FOOTER'S OUTER REGISTER — ADDED 22 SEP 2026, CLIENT RULING ON THE
+   * FOOTER BAND. Verbatim: "The latest activity always has to be at the very
+   * bottom, and also make it a stripe, not a container." Two shapes for the
+   * one card, chosen by the call site rather than guessed from where it
+   * happens to render:
+   *
+   *   "band" (the default, UNCHANGED) — CH27.8's card exactly as it already
+   *   ships: it reads `--pane-inset-x` off the pane it is standing in and
+   *   pulls itself out to the pane's own edges (`-mx-[var(--pane-inset-x,
+   *   0px)]`), and its corners follow `--radius-pane-edge`. This is the
+   *   register a RECORD PAGE wants, drawn straight in a `ScreenShell`'s
+   *   body.
+   *
+   *   "stripe" — a card drawn inside a SHEET or another narrow host that
+   *   publishes no `--pane-inset-x` at all and has no pane edges to reach
+   *   for. It pulls no margin (there is nothing to escape) and draws no
+   *   radius (`rounded-none`, not `--radius-pane-edge`'s own fallback to
+   *   `--radius`) — edge to edge of whatever box it is given, flush with
+   *   that host's own last child. THE HOST DECIDES THE FLUSH BOTTOM, not
+   *   this prop: a host whose own column ends after this card, with nothing
+   *   below it and no bottom padding of its own, is what "flush with the
+   *   host's bottom" means, the same way `CARD_FLUSH` in `screen-shell.tsx`
+   *   is the shell's own column deciding it, not the card.
+   *
+   * BOTH REGISTERS SHARE THE SAME TWO-COLUMN GRID AND THE SAME ONE-COLUMN
+   * ORDER RULE, below — the register only changes the OUTER box; see the
+   * grid's own comment, at the `CardContent`, for "Record on top, Latest
+   * activity at the bottom" whenever either register draws one column
+   * rather than two.
+   */
+  footerRegister?: "band" | "stripe";
 }
 
 /**
@@ -615,6 +648,20 @@ function RecordFooterEyebrow({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
+
+/**
+ * THE FOOTER GRID'S ONE COLUMN-COUNT QUERY, SPENT THREE TIMES AND WRITTEN
+ * ONCE — 22 SEP 2026. The `CardContent` grid below reads it to pick one
+ * track or two; the Record region and the Activity region below it each
+ * read it again to pick their own row/column, so the count and the two
+ * placements can never name three different widths for what is one
+ * question. The number is the grid's own arithmetic, not a guess: two
+ * `16.25rem` tracks plus the one `--space-7` gap between them, the exact
+ * container width `auto-fit` used to compute this same collapse from
+ * implicitly before this ruling (see the grid's own comment for why that
+ * became explicit).
+ */
+const FOOTER_TWO_COLUMN_QUERY = "@min-[calc(16.25rem*2_+_var(--space-7))]";
 
 /**
  * A record, in its four regions.
@@ -750,6 +797,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       onAddNote,
       notePlaceholder = "Add a note",
       footerVisible = true,
+      footerRegister = "band",
       ...props
     },
     ref,
@@ -785,6 +833,18 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       activityRows.length > 0 ||
       (activityVisible && (onAddNote !== undefined || activityAction !== undefined));
     const showFooter = footerVisible && (showRecordColumn || showActivityColumn);
+    /* BOTH COLUMNS, DECIDED ONCE — the container-query order/placement below
+       (`FOOTER_TWO_COLUMN_QUERY`) only means something when there are two
+       regions to place against each other. A route that shows one column
+       because the OTHER was never given data (no `audit`, say, on a portal
+       door that never draws the Record side) still wants that lone region
+       spanning the full width at every container size, exactly as `auto-fit`
+       always drew it — so the explicit two-track template and the order
+       swap are gated on this, not drawn whenever the grid merely COULD hold
+       two. Un-gated, a lone `footer-record` at a wide container would have
+       jumped to an explicit `col-start-2` with nothing in column 1, an empty
+       leading gap nobody asked for. */
+    const footerHasTwoColumns = showRecordColumn && showActivityColumn;
 
     if (process.env.NODE_ENV !== "production" && auditRows.length > 4) {
       // CH27.8: "two to four key/value rows". Warned, never truncated — a
@@ -1165,9 +1225,23 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  THE 24 ABOVE IT IS UNTOUCHED, and so is the flush bottom
                  edge: both were already right and the 21 Sep page says so in
                  as many words. This changes the inline axis and the corners,
-                 nothing else. */
-              "-mx-[var(--pane-inset-x,0px)]",
-              "rounded-[var(--radius-pane-edge)]",
+                 nothing else.
+
+                 GATED ON `footerRegister === "band"`, 22 SEP 2026. Both of
+                 these lines are the PANE's own mechanism — a margin that
+                 escapes `--pane-inset-x` and a radius that follows
+                 `--radius-pane-edge` — and `footerRegister`'s own comment
+                 states why a "stripe" wants neither: it has no pane to
+                 escape and no fourth radius to draw. The fallback (`0px`,
+                 unconditionally 0 for the stripe's own radius) is what
+                 already made this band safe to drop into a paneless host;
+                 the stripe register spends that same safety explicitly
+                 instead of relying on an absent custom property to fall
+                 back to it, so a reader can see the rule without having to
+                 know what `--pane-inset-x` resolves to. */
+              footerRegister === "band"
+                ? ["-mx-[var(--pane-inset-x,0px)]", "rounded-[var(--radius-pane-edge)]"]
+                : "rounded-none",
             )}
           >
             <CardContent
@@ -1191,8 +1265,38 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                    minmax(260px, 1fr))`. auto-fit is what makes "one column at
                    380" a property of the box rather than a breakpoint someone
                    has to remember — at 380 the card's content box is ~340 and
-                   a second 16.25rem track cannot land. */
-                "grid grid-cols-[repeat(auto-fit,minmax(16.25rem,1fr))] items-start",
+                   a second 16.25rem track cannot land.
+
+                   REPLACED WITH AN EXPLICIT CONTAINER QUERY, 22 SEP 2026 —
+                   CLIENT RULING: "whenever the footer displays only one
+                   column instead of two, put the record on top and the
+                   latest activity on the bottom." `auto-fit` alone answers
+                   "how many columns" but leaves both columns in DOM order
+                   however many it draws, which is right for the two-column
+                   case (CH27.8's Activity-left/Record-right) and wrong for
+                   the one-column case (this ruling's Record-top/Activity-
+                   bottom) — one grid, two different orders, and `order` alone
+                   cannot hold both without knowing which of the two is
+                   showing. So the COUNT is now the same arithmetic `auto-fit`
+                   already did — two `16.25rem` tracks plus the one gap
+                   between them, `@min-[calc(16.25rem*2_+_var(--space-7))]` —
+                   spelled out as a container query rather than left implicit,
+                   so the two columns below (`ORDER`/`PLACEMENT`, on each
+                   region) can gate their own row/column on the EXACT same
+                   number instead of guessing at auto-fit's own threshold.
+                   `@container` is this element's own — CardContent both
+                   establishes the query container and is queried by its own
+                   two children, the same shape `toolbar-row.tsx`'s root
+                   already uses ("the kit's first" container query; this is
+                   its second). A CONTAINER query, not a viewport one, for the
+                   identical reason toolbar-row.tsx gives: a `stripe` register
+                   can stand in a sheet narrower than the viewport, and the
+                   column count has to answer to the box it is actually in. */
+                "@container grid grid-cols-1",
+                footerHasTwoColumns
+                  ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`
+                  : undefined,
+                "items-start",
                 /* 32 BETWEEN the columns, 14 between them once they stack.
                    The chapter's two specimens, in one declaration. */
                 "gap-x-[var(--space-7)] gap-y-[var(--space-3h)]",
@@ -1272,7 +1376,31 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
             >
               {/* ---- Left · Latest activity ---------------------------- */}
               {showActivityColumn ? (
-                <div data-record-region="footer-activity" className="min-w-0">
+                <div
+                  data-record-region="footer-activity"
+                  className={cn(
+                    "min-w-0",
+                    /* ONE COLUMN: LAST, NOT FIRST — CLIENT RULING, 22 SEP
+                       2026, VERBATIM: "the latest activity always has to be
+                       at the very bottom … put the record on top and the
+                       latest activity on the bottom." `order-2` is the whole
+                       rule at one track: this region reads second regardless
+                       of where it sits in the DOM (below, still first — CH27.8's
+                       own reading order, untouched). TWO COLUMNS: BACK TO ITS
+                       OWN NAMED CELL, `col-start-1 row-start-1`, so an EXPLICIT
+                       position — not `order-none` alone — takes it out of
+                       auto-placement the moment there is a second track to
+                       misplace it into. `order-none` rides along so nothing is
+                       left declaring a row preference the explicit cell no
+                       longer needs. */
+                    footerHasTwoColumns
+                      ? [
+                          "order-2",
+                          `${FOOTER_TWO_COLUMN_QUERY}:order-none ${FOOTER_TWO_COLUMN_QUERY}:col-start-1 ${FOOTER_TWO_COLUMN_QUERY}:row-start-1`,
+                        ]
+                      : undefined,
+                  )}
+                >
                   {/* ---- THE EYEBROW'S ROW — CLIENT, 2026-09-07 -----------
                       "implemet 'A · in the eyebrow row' across the app."
 
@@ -1492,7 +1620,24 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
 
               {/* ---- Right · Record ------------------------------------ */}
               {showRecordColumn ? (
-                <div data-record-region="footer-record" className="min-w-0">
+                <div
+                  data-record-region="footer-record"
+                  className={cn(
+                    "min-w-0",
+                    /* ONE COLUMN: FIRST — the other half of the ruling on
+                       `footer-activity`, above; that region's own comment
+                       carries the client's words and the reasoning for both
+                       at once. TWO COLUMNS: `col-start-2 row-start-1`, CH27.8's
+                       own Record-on-the-right, restated as an explicit cell for
+                       the same reason. */
+                    footerHasTwoColumns
+                      ? [
+                          "order-1",
+                          `${FOOTER_TWO_COLUMN_QUERY}:order-none ${FOOTER_TWO_COLUMN_QUERY}:col-start-2 ${FOOTER_TWO_COLUMN_QUERY}:row-start-1`,
+                        ]
+                      : undefined,
+                  )}
+                >
                   <RecordFooterEyebrow>{auditLabel}</RecordFooterEyebrow>
                   <div className="mt-3 flex min-w-0 flex-col">
                     {auditRows.map((entry, index) => (

@@ -1,4 +1,5 @@
-// WAVEFINDER'S OWN TRACK GETS THE SAME "ONE CONTAINER" FIX `ToolbarRow` DOES.
+// WAVEFINDER'S OWN TRACK GETS THE SAME "ONE CONTAINER" FIX `ToolbarRow` DOES,
+// AND THEN THE SAME PILL RETIREMENT ONE PASS LATER.
 //
 // See `web/test/paged-find-toolbar-is-one-container.test.tsx`'s own header for
 // the client ruling (2026-09-03, verbatim: "merge this with the main toolbar
@@ -11,6 +12,16 @@
 // sibling of the same tone. Waves is the one screen whose toolbar is this
 // component rather than `ToolbarRow` or the frame's own, so nothing else
 // caught it.
+//
+// RETIRED AGAIN, 22 SEP 2026 — her ruling over the Triage/Ready pair ("make
+// sure that you make this exactly the same everywhere"). `<PagedFind>`'s own
+// column had already dropped its fill and radius on 21 Sep 2026 (rulebook
+// L43, `CollectionCard`'s default flipping to `"plain"`); `WaveFinder` and
+// `<ToolbarRow>` still carried the merged-container's OWN fill/radius (this
+// file's earlier ruling, above) a day after that default changed, which is
+// exactly the gap her screenshots caught. So the column now paints nothing
+// at all, same as `<PagedFind>`'s — see `web/test/toolbar-search-edge.test.tsx`
+// for the census that holds all three rows to the same, now-flush shape.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import * as React from "react"
@@ -80,7 +91,7 @@ function HarnessWithActions() {
 const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
 
 describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () => {
-  it("the track never moves, the panel paints no surface, and one container switches radius", async () => {
+  it("the track never moves, and neither the track nor the column paints a surface any more", async () => {
     render(<Harness />)
 
     const column = document.querySelector('[data-slot="toolbar-row-column"]')
@@ -90,17 +101,19 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
     expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
 
     expect(document.querySelector('[data-slot="filter-bar-row"]'), "nothing is open yet").toBeNull()
-    expect(column!.className).toContain("bg-surface-panel")
-    expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
-      "rounded-pill"
+    // 22 SEP 2026 — NO FILL, NO RADIUS, NEITHER OPEN NOR CLOSED (this file's
+    // header has the ruling). The column used to switch between `rounded-pill`
+    // and `rounded-[var(--radius)]` off whether the panel was open; both are
+    // gone now, so there is nothing left to switch.
+    expect(column!.className, "the column paints no background of its own").not.toMatch(
+      /\bbg-(?!clip|none)[\w-]+/
+    )
+    expect(column!.className, "the column carries no radius of its own").not.toMatch(
+      /\brounded-[\w[\]().,%/#-]+/
     )
     expect(
-      column!.className,
-      "the two radii never both apply — collapsed is pill-only"
-    ).not.toContain("rounded-[var(--radius)]")
-    expect(
       track.className,
-      "the track paints no fill or shape of its own — the merged container does"
+      "the track paints no fill or shape of its own either"
     ).not.toMatch(/rounded-pill|bg-background|bg-surface-panel/)
     const closedTrack = trackShape(track)
 
@@ -129,25 +142,20 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
       "the open panel must not round its own corners — the merged container does"
     ).not.toMatch(/rounded-\[var\(--radius\)\]/)
 
-    expect(column!.className, "the container still owns the single background").toContain(
-      "bg-surface-panel"
+    // STILL NOTHING PAINTED WITH THE PANEL OPEN — the column used to switch
+    // to the box radius here; now it stays exactly as it was closed.
+    expect(column!.className, "the container still owns no background, panel open or not").not.toMatch(
+      /\bbg-(?!clip|none)[\w-]+/
     )
-    expect(
-      column!.className,
-      "a panel is open — the container must switch to the box radius"
-    ).toContain("rounded-[var(--radius)]")
-    expect(
-      column!.className,
-      "the two radii never both apply — expanded drops the pill"
-    ).not.toMatch(/(?:^|\s)rounded-pill(?:\s|$)/)
+    expect(column!.className, "and no radius, panel open or not").not.toMatch(
+      /\brounded-[\w[\]().,%/#-]+/
+    )
 
     openPanel()
     await waitFor(() =>
       expect(document.querySelector('[data-slot="filter-bar-row"]')).toBeNull()
     )
     expect(trackShape(track)).toBe(closedTrack)
-    expect(column!.className).toContain("rounded-pill")
-    expect(column!.className).not.toContain("rounded-[var(--radius)]")
   })
 })
 

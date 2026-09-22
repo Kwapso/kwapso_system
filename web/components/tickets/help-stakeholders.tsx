@@ -135,7 +135,7 @@
 // offered at all, once assigned, a ticket or story keeps a person.
 import * as React from "react"
 
-import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { CardTitle } from "@shared/ui/components/card/card"
 import type { HelpStakeholder } from "@shared/types"
 import { nameInitials } from "@/lib/identity"
 import { PersonCard } from "@shared/web/person-card"
@@ -164,10 +164,9 @@ export type AssignableMember = { id: string; name: string; photo?: string | null
  * like)" and "same with assigned to (chiplike)." RETIRES the paragraph this
  * one replaces (a `Card variant="raised"` tile, `PersonCard
  * orientation="horizontal" size="row"`, the chip drawn INSIDE the
- * `PersonCard` as its own overline): the loop is the reference and does not
- * change (its own `data-slot="loop-card"` `Card variant="raised"` stays
- * exactly as it is, below), and Raised by / Assigned to now draw the same
- * shape the loop draws each person with — `PersonCard orientation="horizontal"
+ * `PersonCard` as its own overline): the loop was the reference this
+ * paragraph pointed to, and Raised by / Assigned to drew the same shape the
+ * loop drew each person with — `PersonCard orientation="horizontal"
  * size="choice"`, the loop's own face size, no raised tile standing around
  * it. The eyebrow ("Raised by" / "Assigned to" / "From the app") sits where
  * the loop keeps its own "On the loop" label: a plain line ABOVE the chip
@@ -175,7 +174,19 @@ export type AssignableMember = { id: string; name: string; photo?: string | null
  * position, read outside the card instead of stacked inside it. `action` is
  * kept, unused today by either caller (the pen was retired 20/21 Sep 2026),
  * as the one trailing-control seam a future caller can still reach without a
- * second tile. */
+ * second tile.
+ *
+ * AND, 22 SEP 2026, THE LOOP LOSES ITS OWN CARD TOO — Aurora's ruling,
+ * verbatim: "On the loop still has a background. Remove that in tickets."
+ * The loop's `data-slot="loop-card"` `Card variant="default"` (below) is now
+ * a plain `<div>`: the eyebrow, then the chip row, directly on the page —
+ * the exact shape Raised by and Assigned to already draw through this same
+ * `StakeholderTile`. The loop was the one holdout still wrapped, kept that
+ * way on purpose while it was "the reference" the other two were built to
+ * match; now that all three read alike, keeping the wrapper on the loop
+ * alone would have been the one section still standing on paper for no
+ * reason a reader could see. Its `PAPER_ON_PURPOSE` entry
+ * (`shared/rules/registry.ts`) is deleted with it. */
 function StakeholderTile({
   dataSlot,
   picture,
@@ -282,34 +293,32 @@ export function HelpStakeholders({
               18 Sep 2026: "who to keep in the loop should be horizontal"). No
               "×" — see this file's header on why the loop stays read-only. */}
           {loop.length > 0 && (
-            /* SOFT PAPER, NOT OFF-BEIGE — rulebook L43 going app wide, 21 Sep 2026.
-               `raised` is `--card`, which IS the page's own colour in light (#FFFEF9),
-               so on the plain ground this card now stands on it would measure 1.000 and
-               be held up by its shadow alone. `default` is soft paper, 1.103, the tone
-               every other object on this ground reads at. The Minimal Kit page named
-               this sweep: "check that nobody passed `raised` explicitly for a tile row
-               that used to sit on a panel". */
-            <Card data-slot="loop-card" variant="default">
-              <CardContent className="flex flex-col gap-2 p-4">
-                <p className="text-micro text-muted-foreground uppercase">{t("On the loop")}</p>
-                <div className="flex flex-wrap gap-3">
-                  {loop.map((s) => {
-                    const name = staffNameFromSnapshot(s.name) || s.email
-                    return (
-                      <PersonCard
-                        key={s.userId}
-                        orientation="horizontal"
-                        size="choice"
-                        picture={s.imageUrl}
-                        mark={nameInitials(s.name)}
-                        markName={name}
-                        title={<span className="text-sm">{name}</span>}
-                      />
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            /* NO CARD ANY MORE — Aurora, 22 Sep 2026: "On the loop still has
+               a background. Remove that in tickets." Plain now: the eyebrow,
+               then the chip row, directly on the page — the same shape
+               Raised by and Assigned to already draw (`StakeholderTile`,
+               above). `data-slot="loop-card"` stays on this wrapper (a
+               plain `<div>` now, not a kit `Card`) so nothing reaching for
+               that slot has to change what it asks for. */
+            <div data-slot="loop-card" className="flex flex-col gap-2">
+              <p className="text-micro text-muted-foreground uppercase">{t("On the loop")}</p>
+              <div className="flex flex-wrap gap-3">
+                {loop.map((s) => {
+                  const name = staffNameFromSnapshot(s.name) || s.email
+                  return (
+                    <PersonCard
+                      key={s.userId}
+                      orientation="horizontal"
+                      size="choice"
+                      picture={s.imageUrl}
+                      mark={nameInitials(s.name)}
+                      markName={name}
+                      title={<span className="text-sm">{name}</span>}
+                    />
+                  )
+                })}
+              </div>
+            </div>
           )}
         </>
       )}

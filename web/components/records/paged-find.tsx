@@ -208,9 +208,8 @@ export function invalidateFindsOf(listKey: string): void {
  * the next reader about whether anything was painted.
  *
  * IT STAYS ITS OWN COMPONENT even though it no longer reads context, because
- * `wrap` (below) receives an already-built element tree — the identical
- * reason `CollectionEmptyBody` is its own component — and because the filter
- * panel's open state is the one thing this box still branches on. */
+ * `wrap` (below) receives an already-built element tree, and because the
+ * filter panel's open state is the one thing this box still branches on. */
 function ToolbarColumn({
   filterPanel,
   children,

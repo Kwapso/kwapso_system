@@ -46,6 +46,15 @@
 // `one-black-chip.test.ts`, including its ambiguity guard: an exemption whose
 // `contains` matches more than one line in its file excuses a site nobody
 // reviewed and is refused.
+//
+// CLAUSE 2'S OWN LABEL WORD IS GONE, 22 SEP 2026 — her ruling the same
+// session: "reduce the space for the ID column everywhere... if it's ID for
+// ticket, call it ticket. If it's ID for story, call it story." The column
+// this clause hunts is no longer ever labelled "ID" anywhere in the app —
+// `stories-screen.tsx`'s own two sites read `field("ref", "Story")` now, and
+// `tickets-collection.tsx`'s hand-rolled table reads "Ticket" — so
+// `ID_COLUMN_FIELD` (below) matches the COLUMN (`"ref"`) regardless of its
+// label, which is what the finding was actually ever about.
 
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -124,11 +133,18 @@ function toneFindings(): Finding[] {
   return out
 }
 
-/** `field("ref", "ID")` (any case on the label): a standalone id COLUMN,
- * which `RecordTable`'s generic cell renderer draws as bare text, never a
- * chip, unless the row itself already hands over a `RecordRef` node (nothing
- * in this app does today, see the file header). */
-const ID_COLUMN_FIELD = /field\(\s*"ref"\s*,\s*"[Ii][Dd]"\s*\)/
+/** `field("ref", <any label>)`: a standalone id COLUMN, which `RecordTable`'s
+ * generic cell renderer draws as bare text, never a chip, unless the row
+ * itself already hands over a `RecordRef` node. WIDENED, 22 Sep 2026 — the
+ * label used to be hardcoded to `"ID"` (any case), which is exactly what her
+ * same-day ruling retired ("if it's ID for ticket, call it ticket; if it's
+ * ID for story, call it story"): `stories-screen.tsx`'s own two standalone
+ * id columns now read `field("ref", "Ticket"|"Story"|…)`, not `"ID"`, so a
+ * census still keyed to that one word would have gone blind on the exact
+ * rename its own law caused. The real signal was never the label — it is
+ * the COLUMN, `"ref"`, the one field `RecordTable` never wraps in
+ * `RecordRef` on its own — so the label is no longer part of the match. */
+const ID_COLUMN_FIELD = /field\(\s*"ref"\s*,\s*"[^"]+"\s*\)/
 
 /** THE WAY OUT THAT IS NOT AN EXEMPTION: a standalone `ref` column is not a
  * finding when the SAME FILE wires its own cell through `<RecordRef>` via
@@ -271,6 +287,11 @@ describe("R96, the id chip is black", () => {
   it("catches a synthetic standalone ID column with no RecordRef", () => {
     const synthetic = 'const COLUMNS = [field("ref", "ID"), field("name", "Story")]'
     expect(ID_COLUMN_FIELD.test(synthetic)).toBe(true)
+  })
+
+  it("catches the same standalone column under its post-22-Sep-2026 label too, ID or not", () => {
+    expect(ID_COLUMN_FIELD.test('const COLUMNS = [field("ref", "Ticket"), field("name", "Title")]')).toBe(true)
+    expect(ID_COLUMN_FIELD.test('const COLUMNS = [field("ref", "Story"), field("name", "Title")]')).toBe(true)
   })
 
   it("does not re-flag a standalone ID column once its cell is wired through RecordRef's render slot", () => {

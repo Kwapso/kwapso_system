@@ -8,7 +8,7 @@
 // a value is a real small number and "Not started"/"No time log" words where
 // the door has nothing to report (`cycleTimeSeconds`/`flowEfficiency` null).
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { clearCache } from "@shared/web/store"
@@ -259,5 +259,121 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     await waitFor(() => {
       expect(onEmptyChange).toHaveBeenCalledWith(false)
     })
+  })
+})
+
+// THE VALIDATED ARTIFACT'S OWN EFFORT MOCK — Aurora, 22 Sep 2026, verbatim:
+// "Fifth screenshot. That's definitely not what you showed me on the
+// artifact... What's wrong is the alignment and margin in the metrics cards,
+// and that the rows below should not have a background." Read against
+// `${SCRATCH}/no-containers-exploration.html`'s own `.mk-stats`/`.mk-tile`
+// (a full-width, 16px-gapped row of three tiles) and `.mk-row` (no fill,
+// padding:6px 0, flush left).
+describe("the tile grid and the log rows match the validated artifact", () => {
+  it("spans the section's full width, three columns, gap-4 (16px, the mock's own figure)", async () => {
+    api.workLogs = [SHORT_LOG]
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+      />
+    )
+    const cycleLabel = await screen.findByText("Cycle time")
+    const grid = cycleLabel.closest(".grid") as HTMLElement
+    expect(grid, "the three tiles sit in one grid").toBeTruthy()
+    expect(grid.className).toContain("sm:grid-cols-3")
+    expect(grid.className).toContain("gap-[var(--space-4)]")
+    // No leading/trailing margin of the grid's own — its left edge is
+    // whatever the section's own (unpadded) flow gives it, the same edge
+    // the "Effort" title stands on.
+    expect(grid.className).not.toMatch(/\bm[lxt]?-/)
+  })
+
+  it("draws the three tiles' own paper (Card default) — only the log rows below lose their fill", async () => {
+    api.workLogs = [SHORT_LOG]
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+      />
+    )
+    const cycleLabel = await screen.findByText("Cycle time")
+    const tile = cycleLabel.closest('[data-slot="card"]') as HTMLElement
+    expect(tile, "the tile keeps its own kit Card").toBeTruthy()
+    expect(tile.getAttribute("data-variant")).toBe("default")
+  })
+
+  it("draws the log rows with no fill and no rounded/divide-y border utility — a plain list", async () => {
+    api.workLogs = [SHORT_LOG]
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+      />
+    )
+    const list = await screen.findByRole("list", { name: "Effort" })
+    expect(list.getAttribute("data-slot")).toBe("effort-log-rows")
+    expect(list.className).not.toContain("bg-surface-panel")
+    expect(list.className).not.toContain("rounded")
+    expect(list.className).not.toContain("divide-y")
+    expect(list.className).not.toContain("divide-border")
+    const row = within(list).getByRole("listitem")
+    const rowContent = row.firstElementChild as HTMLElement
+    expect(rowContent, "the row's own interactive/plain wrapper").toBeTruthy()
+    // No fill — the specific background the old list drew is gone, and
+    // nothing has replaced it.
+    expect(rowContent.className).not.toContain("bg-surface-panel")
+    // No horizontal inset either — the same left edge as the title and the
+    // tiles above it, the mock's own alignment. `py-2` (vertical rhythm)
+    // stays; only the `px-3` this row used to carry is gone.
+    expect(rowContent.className).not.toMatch(/\bpx-3\b/)
+    expect(rowContent.className).toContain("py-2")
+  })
+
+  it("separates rows with exactly one kit Separator between them, never above the first or below the last", async () => {
+    const SECOND_LOG: WorkLog = { ...SHORT_LOG, id: "wl-second", userId: "u2", userName: "Deniz" }
+    api.workLogs = [SHORT_LOG, SECOND_LOG]
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+      />
+    )
+    const list = await screen.findByRole("list", { name: "Effort" })
+    const children = Array.from(list.children)
+    expect(children.map((c) => c.getAttribute("data-slot") === "separator" || c.getAttribute("role") === "separator")).toEqual([
+      false,
+      true,
+      false,
+    ])
+    const rows = within(list).getAllByRole("listitem")
+    expect(rows.length).toBe(2)
+  })
+
+  it("a single row draws no Separator at all", async () => {
+    api.workLogs = [SHORT_LOG]
+    render(
+      <EffortCard
+        targetTable="stories"
+        targetId="s1"
+        canEdit={false}
+        members={[]}
+        metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
+      />
+    )
+    const list = await screen.findByRole("list", { name: "Effort" })
+    expect(list.querySelector('[data-slot="separator"]')).toBeNull()
   })
 })

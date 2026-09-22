@@ -826,9 +826,9 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     const { container } = openStory()
     await screen.findByText("Cycle time")
 
-    const list = container.querySelector('ul[class*="divide-y"]')
+    const list = container.querySelector('[data-slot="effort-log-rows"]')
     expect(list, "the row list is drawn").toBeTruthy()
-    const row = list!.querySelector("li")
+    const row = list!.querySelector('[role="listitem"]')
     expect(row).toBeTruthy()
     // The name (first name only, R54/staff naming), the date, and the
     // duration (1800s = 30m).
@@ -848,7 +848,7 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     api.members = []
     const { container } = openStory()
     await screen.findByText("Cycle time")
-    const row = container.querySelector('ul[class*="divide-y"] li')
+    const row = container.querySelector('[data-slot="effort-log-rows"] [role="listitem"]')
     expect(row).toBeTruthy()
     expect(row!.querySelector("img")).toBeNull()
     // The fallback is the name's own first letter (`RecordMarkGlyph`).
@@ -873,7 +873,7 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     expect(screen.queryByRole("heading", { name: /^Effort/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
     // No Effort card at all on the page — not even an empty shell.
-    expect(container.querySelector('ul[class*="divide-y"]')).toBeNull()
+    expect(container.querySelector('[data-slot="effort-log-rows"]')).toBeNull()
   })
 
   // AURORA, THE SAME ROUND: "in effort card inside stories or tickets,
@@ -897,7 +897,7 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     api.metrics = FIXTURE_METRICS
     const { container } = openStory()
     await screen.findByText("Cycle time")
-    const row = container.querySelector('ul[class*="divide-y"] li button')
+    const row = container.querySelector('[data-slot="effort-log-rows"] [role="listitem"] button')
     expect(row, "the row itself is a button now, not a pencil beside it").toBeTruthy()
     fireEvent.click(row!)
     const dialog = await screen.findByRole("dialog")

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.150",
-  "sha": "b68c7deab8696f725b36057c1f8b350d6f181606",
-  "syncedAt": "2026-09-21"
+  "tag": "v1.2.151",
+  "sha": "f11eb02934e4eaf79dfbab7eb0e02c1154067d43",
+  "syncedAt": "2026-09-22"
  },
- "generatedAt": "2026-09-21T20:40:40.070Z",
+ "generatedAt": "2026-09-22T06:53:51.151Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -14,7 +14,7 @@
   "cvaSites": 54,
   "variantGroups": 82,
   "variantOptions": 273,
-  "typedEnumProps": 52,
+  "typedEnumProps": 53,
   "typedBooleanProps": 319,
   "compositions": 47,
   "icons": 1514,
@@ -6060,6 +6060,16 @@
        "optional": true,
        "kind": "boolean",
        "note": "The reader may not see the footer AT ALL. Distinct from `auditVisible`, which hides only the Record column: a route that shows a client their own record hides the internal log with `activityVisible`, and a route that may show neither hides the card."
+      },
+      {
+       "name": "footerRegister",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "band",
+        "stripe"
+       ],
+       "note": "THE FOOTER'S OUTER REGISTER — ADDED 22 SEP 2026, CLIENT RULING ON THE FOOTER BAND. Verbatim: \"The latest activity always has to be at the very bottom, and also make it a stripe, not a container.\" Two shapes for the one card, chosen by the call site rather than guessed from where it happens to render: \"band\" (the default, UNCHANGED) — CH27.8's card exactly as it already ships: it reads `--pane-inset-x` off the pane it is standing in and pulls itself out to the pane's own edges (`-mx-[var(--pane-inset-x, 0px)]`), and its corners follow `--radius-pane-edge`. This is the register a RECORD PAGE wants, drawn straight in a `ScreenShell`'s body. \"stripe\" — a card drawn inside a SHEET or another narrow host that publishes no `--pane-inset-x` at all and has no pane edges to reach for. It pulls no margin (there is nothing to escape) and draws no radius (`rounded-none`, not `--radius-pane-edge`'s own fallback to `--radius`) — edge to edge of whatever box it is given, flush with that host's own last child. THE HOST DECIDES THE FLUSH BOTTOM, not this prop: a host whose own column ends after this card, with nothing below it and no bottom padding of its own, is what \"flush with the host's bottom\" means, the same way `CARD_FLUSH` in `screen-shell.tsx` is the shell's own column deciding it, not the card. BOTH REGISTERS SHARE THE SAME TWO-COLUMN GRID AND THE SAME ONE-COLUMN ORDER RULE, below — the register only changes the OUTER box; see the grid's own comment, at the `CardContent`, for \"Record on top, Latest activity at the bottom\" whenever either register draws one column rather than two."
       }
      ]
     },

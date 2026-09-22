@@ -47,7 +47,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { PAPER_ON_PURPOSE } from "@shared/rules/registry"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
-import { CollectionCard, CollectionEmptyBody, EmptyGatedPanel } from "@/components/deep-link/screen-bits"
+import { CollectionCard, EmptyGatedPanel } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TicketSidePanel } from "@/components/tickets/ticket-detail-body"
 import { Panel } from "@/components/tickets/tickets-dashboard"
@@ -311,85 +311,25 @@ describe("the two record-page shells default to plain (rulebook L43, app wide)",
   })
 })
 
-// THE EMPTY BODY'S OWN PAPER, ON A PLAIN FRAME. A `CollectionCard` drops its
-// Card to a transparent `variant="plain"`, no inner padding, so the toolbar
-// and the table line up with the pane's own edge — but a facet with zero rows
-// has no table, only the empty body, which then landed bare on the white page
-// (measured live: fill `rgba(0, 0, 0, 0)`). `CollectionEmptyBody` gives it
-// back real soft paper, through context published by `CollectionCard` rather
-// than a DOM lookup — so it works this far from the frame's own JSX, past
-// whatever a caller nests in between.
-function EmptyBodyStandIn() {
-  return <div data-slot="collection-empty-body">nothing here yet</div>
-}
-
-function RowsStandIn() {
-  return <div data-slot="rows-stand-in">a row</div>
-}
-
-describe("CollectionEmptyBody (rulebook L43, the empty body's own paper on a plain frame)", () => {
-  it('a CollectionCard whose body is the empty state renders the empty body inside a data-variant="default" card', () => {
-    render(
-      <CollectionCard>
-        <CollectionEmptyBody>
-          <EmptyBodyStandIn />
-        </CollectionEmptyBody>
-      </CollectionCard>
-    )
-    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
-    expect(emptyBody, "the empty body itself must still render").toBeTruthy()
-    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
-    expect(paper, "the empty body must sit inside its own default-variant Card").toBeTruthy()
-    const paperContent = paper!.querySelector(':scope > [data-slot="card-content"]')
-    expect(paperContent!.className, "the paper card keeps the frame's own px-4").toMatch(/(^|\s)px-4(\s|$)/)
-    expect(paperContent!.className, "the paper card keeps the frame's own pb-4").toMatch(/(^|\s)pb-4(\s|$)/)
-    const outer = document.querySelector('[data-surface="plain"]')
-    expect(outer, "the frame itself is still the plain, transparent Card").toBeTruthy()
-    expect(outer!.getAttribute("data-variant")).toBe("plain")
-  })
-
-  it("a CollectionCard with rows renders no default card", () => {
-    render(
-      <CollectionCard>
-        <RowsStandIn />
-      </CollectionCard>
-    )
-    expect(document.querySelector('[data-slot="rows-stand-in"]'), "the rows still render").toBeTruthy()
-    expect(
-      document.querySelector('[data-slot="card"][data-variant="default"]'),
-      "no default-variant paper card appears around ordinary rows"
-    ).toBeNull()
-  })
-
-  it('on a surface="boxed" CollectionCard, CollectionEmptyBody renders its children untouched (that frame is already the paper)', () => {
-    render(
-      <CollectionCard surface="boxed">
-        <CollectionEmptyBody>
-          <EmptyBodyStandIn />
-        </CollectionEmptyBody>
-      </CollectionCard>
-    )
-    expect(document.querySelector('[data-slot="collection-empty-body"]'), "the empty body still renders").toBeTruthy()
-    expect(document.querySelectorAll('[data-slot="card"]').length, "no second, nested Card").toBe(1)
-  })
-})
+// `CollectionEmptyBody` IS RETIRED, 22 SEP 2026 (rulebook L43, her ruling
+// over the Accounts Inactive-tab screenshot: "the empty collection now. We
+// need to get rid of the card background"). It used to give a plain
+// `CollectionCard`'s empty state real soft paper, through context published
+// by `CollectionCard`; `CollectionEmptyState` no longer papers itself in any
+// ground, so the wrap has nothing left to do and its three tests are
+// replaced by the describe block below, which proves the OPPOSITE now holds.
 
 // `CollectionEmptyState` (shared/web/screen-engine/collection-frame.tsx) — the
-// R62 register itself — PAPERS ITSELF NOW, reading the identical
-// `CollectionCardSurfaceContext` `CollectionEmptyBody` reads, rather than
-// leaning on a `CollectionEmptyBody` wrap a call site has to remember. Fixed
-// after a live audit found bare empty states on /meetings and /inputs
-// Overdue (both `CollectionEmptyState` called directly inside a plain
-// `CollectionCard`, with no wrap at all) and, on a second pass, on /waves and
-// the brand library — bare with no `CollectionCard`/kit `CollectionFrame`
-// provider above them at all. The validated design keeps EVERY collection
-// empty state on soft paper, so `"plain"` is the context's own default:
-// a genuine plain frame wraps, a call site with no known frame above it AT
-// ALL reads the identical default and wraps too, and a double wrap stays
-// single — the boxed-frame case (the one way out) is already covered above
-// (the same context, the same component wrapping this one).
-describe("CollectionEmptyState papers itself on a plain frame (rulebook L43, R62)", () => {
-  it('a bare CollectionEmptyState inside a plain CollectionCard renders inside one data-variant="default" card', () => {
+// R62 register itself — PAPERS NOTHING NOW, 22 Sep 2026, superseding the 21
+// Sep self-paper this same describe block used to prove. Her ruling, over the
+// Accounts Inactive tab: "the empty collection now. We need to get rid of the
+// card background." No ground papers it any more — not a plain
+// `CollectionCard`, not a boxed one, not a bare render with no provider above
+// it at all (`/waves` and the brand library's own shape) — because the one
+// context that used to carry that decision (`CollectionCardSurfaceContext`)
+// is retired along with `CollectionEmptyBody`, its other reader.
+describe("CollectionEmptyState papers nothing, in any ground (rulebook L43, R62)", () => {
+  it('a bare CollectionEmptyState inside a plain CollectionCard renders with no default-variant Card around it', () => {
     render(
       <CollectionCard>
         <CollectionEmptyState title="Nothing here yet." />
@@ -397,44 +337,52 @@ describe("CollectionEmptyState papers itself on a plain frame (rulebook L43, R62
     )
     const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
     expect(emptyBody, "the register itself must still render").toBeTruthy()
-    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
-    expect(paper, "the register must sit inside its own default-variant Card").toBeTruthy()
+    expect(
+      emptyBody!.closest('[data-slot="card"][data-variant="default"]'),
+      "the register must not sit inside a paper card any more"
+    ).toBeNull()
     expect(
       document.querySelectorAll('[data-slot="card"][data-variant="default"]').length,
-      "exactly one paper card"
-    ).toBe(1)
+      "no paper card anywhere in the tree"
+    ).toBe(0)
     const outer = document.querySelector('[data-surface="plain"]')
     expect(outer, "the frame itself is still the plain, transparent Card").toBeTruthy()
     expect(outer!.getAttribute("data-variant")).toBe("plain")
   })
 
-  it("a CollectionEmptyState already wrapped in CollectionEmptyBody still renders exactly one paper card", () => {
+  it('a CollectionEmptyState inside a surface="boxed" CollectionCard still renders with no SECOND, nested paper card', () => {
     render(
-      <CollectionCard>
-        <CollectionEmptyBody>
-          <CollectionEmptyState title="Nothing here yet." />
-        </CollectionEmptyBody>
+      <CollectionCard surface="boxed">
+        <CollectionEmptyState title="Nothing here yet." />
       </CollectionCard>
     )
     const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
     expect(emptyBody, "the register still renders").toBeTruthy()
     expect(
       document.querySelectorAll('[data-slot="card"][data-variant="default"]').length,
-      "the outer CollectionEmptyBody wrap and the register's own self-wrap must not stack into two cards"
+      "exactly the boxed frame's own one Card, never a second one nested around the register"
     ).toBe(1)
   })
 
-  it('a CollectionEmptyState rendered outside any CollectionCard/CollectionFrame — no provider at all, /waves and the brand library\'s own shape — still renders inside one data-variant="default" card', () => {
+  it('a CollectionEmptyState rendered outside any CollectionCard/CollectionFrame — no provider at all, /waves and the brand library\'s own shape — still renders with no paper card', () => {
     render(<CollectionEmptyState title="Nothing here yet." />)
     const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
     expect(emptyBody, "the register still renders").toBeTruthy()
-    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
     expect(
-      paper,
-      "no provider above it reads the same as `\"plain\"` — the context's own default — so the register still papers itself"
-    ).toBeTruthy()
-    expect(document.querySelectorAll('[data-slot="card"][data-variant="default"]').length, "exactly one paper card").toBe(
-      1
+      emptyBody!.closest('[data-slot="card"][data-variant="default"]'),
+      "no provider above it, and no self-paper either — the register stands bare"
+    ).toBeNull()
+  })
+
+  it("the register's own top inset is gone — the toolbar's rhythm carries the gap now, not a second padding here", () => {
+    render(<CollectionEmptyState title="Nothing here yet." />)
+    const emptyBody = document.querySelector('[data-slot="collection-empty-body"]') as HTMLElement
+    expect(emptyBody.className, "no py- (top+bottom) inset of its own any more").not.toMatch(
+      /(^|\s)py-\[var\(--space-7\)\](\s|$)/
+    )
+    expect(emptyBody.className, "and no explicit pt- either").not.toMatch(/(^|\s)pt-\[var\(--space-7\)\](\s|$)/)
+    expect(emptyBody.className, "the bottom inset is kept, for breathing room below").toMatch(
+      /(^|\s)pb-\[var\(--space-7\)\](\s|$)/
     )
   })
 })
@@ -468,7 +416,7 @@ describe("TriageQueue's own empty branch, on the plain Triage frame (rulebook L4
     onOpen: () => {},
   }
 
-  it('a zero-waiting queue renders "Nothing waiting." inside a data-variant="default" card, nested inside the data-variant="plain" frame', async () => {
+  it('a zero-waiting queue renders "Nothing waiting." with no paper card, on the plain data-variant="plain" frame (22 Sep 2026, no CollectionEmptyBody wrap left)', async () => {
     render(
       <CollectionCard>
         <TriageQueue {...PROPS} />
@@ -477,11 +425,13 @@ describe("TriageQueue's own empty branch, on the plain Triage frame (rulebook L4
     await screen.findByText("Nothing waiting.")
     const emptyBody = document.querySelector('[data-slot="collection-empty-body"]')
     expect(emptyBody, "the empty body itself must render").toBeTruthy()
-    const paper = emptyBody!.closest('[data-slot="card"][data-variant="default"]')
-    expect(paper, "the empty body must sit inside its own default-variant Card").toBeTruthy()
+    expect(
+      emptyBody!.closest('[data-slot="card"][data-variant="default"]'),
+      "no default-variant paper card wraps the empty body any more"
+    ).toBeNull()
     const plainFrame = document.querySelector('[data-slot="card"][data-surface="plain"][data-variant="plain"]')
     expect(plainFrame, "the outer CollectionCard stays the plain, transparent frame").toBeTruthy()
-    expect(plainFrame!.contains(paper), "the paper card is nested inside the plain frame").toBe(true)
+    expect(plainFrame!.contains(emptyBody), "the empty body is nested inside the plain frame").toBe(true)
   })
 })
 

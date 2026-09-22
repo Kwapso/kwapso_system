@@ -1502,13 +1502,39 @@ export function RecordScreen({
  * hand-edited) — so the crop happens from OUTSIDE it instead: this
  * wrapper is `overflow-hidden rounded-t-[var(--radius)]` with no bottom
  * radius of its own, which clips the card's own bottom corners square
- * without a single line inside `shared/ui/` changing. */
+ * without a single line inside `shared/ui/` changing.
+ *
+ * THE STRIPE REGISTER, 22 SEP 2026 — Aurora, verbatim, over the task sheet's
+ * own footer: "the latest activity always has to be at the very bottom, and
+ * also make it a stripe, not a container." And, the same ruling, over what a
+ * ONE-COLUMN footer orders: "in any kind of screen that requires that the
+ * footer displays only one column instead of two, put the record on top and
+ * the latest activity on the bottom."
+ *
+ * `stripe` is OPT-IN (default `false`, every existing caller unchanged) and,
+ * since kit v1.2.151, is `RecordDetail`'s OWN `footerRegister` prop, not an
+ * app-side class list: `stripe` here forwards `footerRegister="stripe"`,
+ * `false` forwards `"band"` (the kit's own default, byte-identical to every
+ * pre-v1.2.151 caller). `record-detail.tsx`'s `"stripe"` register already
+ * draws no radius and no margin of its own — "edge to edge of whatever box
+ * it is given" — and the kit's `CardContent` grid now carries the one-column
+ * reorder itself (`FOOTER_TWO_COLUMN_QUERY`, Record first, Latest activity
+ * last below it, in EITHER register), so neither the rounded-none override
+ * nor the `order` swap belongs here any more. What the kit does NOT own is
+ * pushing the band to the BOTTOM of the sheet's own flex column — that is
+ * this wrapper's job, not the card's — and the call site's own inset
+ * cancellation, since that padding is the call site's, not this component's
+ * (see `task-sheet.tsx`'s own `className="-mx-6 -mb-6"`, which matches its
+ * scroller's `px-6 py-6`). Both stay. */
+const STRIPE_FOOTER_BAND = "mt-auto"
+
 export function RecordFooterBand({
   audit,
   activity,
   onAddNote,
   notePlaceholder,
   activityHead,
+  stripe = false,
   className,
 }: {
   audit?: RecordAudit
@@ -1516,6 +1542,11 @@ export function RecordFooterBand({
   onAddNote?: (value: string) => void
   notePlaceholder?: string
   activityHead?: React.ReactNode
+  /** See "THE STRIPE REGISTER" above — no radius, pushed to the bottom of a
+   * flex column via `margin-top: auto`, Record before Latest activity once
+   * the footer's own grid is down to one column. Default `false`: every
+   * caller that predates this stays the boxed band it always was. */
+  stripe?: boolean
   className?: string
 }) {
   const { t, lang } = useLanguage()
@@ -1537,8 +1568,10 @@ export function RecordFooterBand({
        element immediately around it clips exactly that escape, so the band
        would have gone on reading as a 24px-inset slab on every record page
        while the source said otherwise. `min-w-0` stays: it is a flex/grid
-       sizing floor, not paint. */
-    <div className={cn("min-w-0", className)}>
+       sizing floor, not paint. `STRIPE_FOOTER_BAND` layers on top of all of
+       that when `stripe` is asked for — see this component's own "THE STRIPE
+       REGISTER" note above. */
+    <div className={cn("min-w-0", stripe && STRIPE_FOOTER_BAND, className)}>
       {/* R52's own census matches every `<RecordDetail>` call site in the
           app and requires `RECORD_TITLE_TREATMENT` on all of them, so the
           two paths' title sizing cannot drift apart again — it does not
@@ -1551,6 +1584,7 @@ export function RecordFooterBand({
       <RecordDetail
         className={RECORD_TITLE_TREATMENT}
         panelVisible={false}
+        footerRegister={stripe ? "stripe" : "band"}
         audit={audit ? recordAuditEntries(audit, t, lang) : undefined}
         activity={activity ? footerActivityItems(activity.items) : undefined}
         activityLabel={t("Latest activity")}

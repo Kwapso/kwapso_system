@@ -138,7 +138,7 @@ import { PagedFind } from "@/components/records/paged-find"
 // thing — with the tab's answer silently losing on whichever prop forgot.
 import { translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
-import { AddButton, CollectionCard, CollectionEmptyBody, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TriageStrip } from "@/components/tickets/triage-strip"
 import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
@@ -1662,26 +1662,23 @@ export function TicketsCollection({
                          directly above this, which is where the client ruled it
                          belongs ("that button belongs in the right of the
                          toolbar, part of the toolbar"). */
-                      /* CollectionEmptyBody (screen-bits.tsx) gives this its
-                         own paper on the plain frame this PagedFind's `wrap`
-                         draws above (line ~1604) — a no-op on any boxed
-                         CollectionCard, which is already paper. The toolbar
-                         above is OUTSIDE this wrapper, so it stays flush on
-                         the page either way. Kept explicit here (rather than
-                         leaning on `CollectionEmptyState`'s own generic
-                         self-wrap, added 21 Sep 2026) because R63 keeps
-                         `--pinned-lead` — the exact inset this wrap matches —
-                         nameable in exactly two files, `pinned-chrome.ts` and
-                         `screen-bits.tsx`; the register's own generic
-                         self-wrap reads the kit's plain default padding
-                         instead, and would have been a visible, unvalidated
-                         regression on this module's own tuned lead. */
-                      <CollectionEmptyBody>
-                        <CollectionEmptyState
-                          filtered={found.active}
-                          title={t("No tickets here yet.")}
-                        />
-                      </CollectionEmptyBody>
+                      /* CollectionEmptyBody (screen-bits.tsx) is RETIRED,
+                         22 Sep 2026 (rulebook L43, her ruling over the
+                         Accounts Inactive-tab screenshot: "the empty
+                         collection now. We need to get rid of the card
+                         background"). It used to give this its own paper on
+                         the plain frame this PagedFind's `wrap` draws above
+                         (line ~1604); `CollectionEmptyState` no longer papers
+                         itself in any ground, so the wrap bought nothing and
+                         is gone with it. The toolbar above is OUTSIDE this
+                         position either way, so it stays flush on the page
+                         exactly as before — what changes is that the empty
+                         body itself now sits on the page too, at the
+                         toolbar's own rhythm. */
+                      <CollectionEmptyState
+                        filtered={found.active}
+                        title={t("No tickets here yet.")}
+                      />
                     ) : facet === OPEN && openView === "board" ? (
                       <OpenBoard
                         teamId={teamId}
@@ -2013,10 +2010,11 @@ export function TicketRowsTable<T extends TicketFace>({
   /** WHAT EACH COLUMN IS CALLED. One map rather than a header spelled at the
    * point it is drawn, so a tab that shows three of these and a tab that shows
    * four cannot end up calling one fact two things. "Raised" rather than "Date"
-   * for the created column is the client's own pick ("i choose raised"); the ID
-   * column's word is the one she used in the ruling that created it. */
+   * for the created column is the client's own pick ("i choose raised"); the id
+   * column reads "Ticket" now, not "ID" — her ruling, 22 Sep 2026: "if it's ID
+   * for ticket, call it ticket." */
   const HEADING: Record<TicketColumn, string> = {
-    id: t("ID"),
+    id: t("Ticket"),
     title: t("Title"),
     type: t("Type"),
     app: t("App"),
@@ -2085,7 +2083,17 @@ export function TicketRowsTable<T extends TicketFace>({
               SET the caller passes and never a sequence: two places cannot
               disagree about the order because only one of them decides it. */}
           {TICKET_COLUMN_ORDER.filter((c) => columns.includes(c)).map((c) => (
-            <TableHead key={c}>{HEADING[c]}</TableHead>
+            // THE ID COLUMN SHRINKS TO ITS OWN CHIP — her ruling, 22 Sep
+            // 2026: "reduce the space for the ID column everywhere. It's too
+            // much." `w-px`, the same shrink-to-content class
+            // `RecordTable`'s own `TableColumn.width` now carries
+            // (record-table.tsx): under this table's auto layout a `1px`
+            // request cannot shrink the column below the chip's own
+            // min-content width, so the browser gives it exactly that
+            // instead of a share of the row's remaining width.
+            <TableHead key={c} className={c === "id" ? "w-px" : undefined}>
+              {HEADING[c]}
+            </TableHead>
           ))}
           {decide && (
             // NO HEADER OVER THE ACTIONS when the caller passes none — client,
@@ -2123,9 +2131,16 @@ export function TicketRowsTable<T extends TicketFace>({
                   own later, more specific ruling over this table — as a
                   header rather than a fold back into the name. `shrink-0` is
                   kept: a long id should never lose its tail to the column's
-                  own width. */}
+                  own width.
+
+                  RENAMED AND NARROWED, 22 Sep 2026 — her ruling: "reduce the
+                  space for the ID column everywhere... if it's ID for
+                  ticket, call it ticket." The header now reads "Ticket"
+                  (`HEADING.id`, above), and the cell carries `w-px` so the
+                  column shrinks to the chip's own content width instead of
+                  taking a share of the row's remaining space. */}
               {columns.includes("id") && (
-                <TableCell>
+                <TableCell className="w-px">
                   <RecordRef value={w.ref} />
                 </TableCell>
               )}

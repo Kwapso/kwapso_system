@@ -277,7 +277,7 @@ describe("HelpStakeholders — On the loop, one horizontal row", () => {
     expect(screen.getAllByText("On the loop").length).toBe(1)
   })
 
-  it("draws the loop members in ONE card, side by side, wrapping — not a grid of tiles", () => {
+  it("draws the loop members in ONE group, side by side, wrapping — not a grid of tiles", () => {
     const { container } = render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
     const loopCard = container.querySelector('[data-slot="loop-card"]') as HTMLElement
     expect(loopCard).toBeTruthy()
@@ -286,6 +286,23 @@ describe("HelpStakeholders — On the loop, one horizontal row", () => {
     expect(loopCard.innerHTML).not.toContain("grid-cols-3")
     const row = loopCard.querySelector(".flex-wrap") as HTMLElement
     expect(row).toBeTruthy()
+  })
+
+  // NO BACKGROUND — Aurora, 22 Sep 2026, verbatim: "On the loop still has a
+  // background. Remove that in tickets." The loop's own `data-slot=
+  // "loop-card"` wrapper is a plain `<div>` now, the same shape Raised by and
+  // Assigned to already draw (no kit `Card` around either — see this file's
+  // own "draws the tile as a face+name chip" test above, over Raised by).
+  it("draws no Card around the loop — a plain div, eyebrow then chip row directly on the page", () => {
+    const { container } = render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    const loopCard = container.querySelector('[data-slot="loop-card"]') as HTMLElement
+    expect(loopCard).toBeTruthy()
+    expect(loopCard.tagName).toBe("DIV")
+    expect(loopCard.getAttribute("data-variant")).toBeNull()
+    expect(loopCard.querySelector('[data-slot="card"]')).toBeNull()
+    // The eyebrow sits directly inside the plain wrapper, above the chip row.
+    const eyebrow = within(loopCard).getByText("On the loop")
+    expect(loopCard.contains(eyebrow)).toBe(true)
   })
 
   it("names a colleague by their first name (staffNameFromSnapshot), never their raw origin word", () => {

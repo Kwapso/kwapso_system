@@ -485,22 +485,30 @@ export function shapeStories(
  * the same fact down every row of the tab it sits on is furniture. Now,
  * Planned and Backlog are all "mine" and status-mixed, so Status stays; it is
  * dropped on Completed (every row already `done`) and Assignee only appears
- * on All, the one tab that is not already narrowed to the caller. */
+ * on All, the one tab that is not already narrowed to the caller.
+ *
+ * THE NAME COLUMN IS "Title", NOT "Story" — 22 Sep 2026. It read "Story"
+ * until the standalone id column beside it (below) was renamed from "ID" to
+ * "Story" too (her ruling: "if it's ID for story, call it story"), which
+ * would have put two columns reading "Story" on the same row, on the exact
+ * tabs (Planned, Backlog, Reviews) that carry both. Renamed here, on every
+ * tab, for the same reason `TicketRowsTable`'s own two columns are "Ticket"
+ * (id) and "Title" (name) rather than "Ticket" twice. */
 const MINE_COLUMNS = [
-  field("name", "Story"),
+  field("name", "Title"),
   field("type", "Type"),
   field("category", "Category"),
   field("status", "Status"),
   field("sprint", "Phase"),
 ]
 const COMPLETED_COLUMNS = [
-  field("name", "Story"),
+  field("name", "Title"),
   field("type", "Type"),
   field("category", "Category"),
   field("sprint", "Phase"),
 ]
 const EVERYONE_COLUMNS = [
-  field("name", "Story"),
+  field("name", "Title"),
   field("type", "Type"),
   field("assignee", "Who has it"),
   field("category", "Category"),
@@ -513,13 +521,13 @@ const EVERYONE_COLUMNS = [
  * ceiling, exactly met rather than exceeded, which is why MoSCoW (below)
  * is drawn as a CARD tag and a toolbar filter/sort rather than a seventh
  * table column here. */
-const PLANNED_BACKLOG_COLUMNS = [field("ref", "ID"), ...MINE_COLUMNS]
+const PLANNED_BACKLOG_COLUMNS = [field("ref", "Story"), ...MINE_COLUMNS]
 /** THE REVIEWS TAB'S OWN LIST — Aurora's ruling, 20 Sep 2026, verbatim:
  * "add a tab for reviews, views Queue and List. Columns: id, name, type,
  * app, who did it, date marked as done." */
 const REVIEWS_LIST_COLUMNS = [
-  field("ref", "ID"),
-  field("name", "Story"),
+  field("ref", "Story"),
+  field("name", "Title"),
   field("type", "Type"),
   field("app", "App"),
   field("assignee", "Who did it"),
@@ -993,13 +1001,20 @@ export function StoriesScreen({
     if ((f as any).sortType) col.sortType = (f as any).sortType
     if ((f as any).sortKey) col.sortKey = (f as any).sortKey
     // R96: THE STANDALONE ID COLUMN (Planned/Backlog's and Reviews' own
-    // `field("ref", "ID")`) draws through the same black chip register every
-    // other reference in this app does — `TableColumn`'s own `render` slot
-    // (record-table.tsx), the seam this table already offers rather than a
-    // second row shape. The row itself still hands over the RAW string
-    // (`shapeStories()`'s `ref: s.ref || ""`, unchanged), so search and sort
-    // over the shaped rows keep comparing the value, never a rendered node.
-    if (f.column === "ref") col.render = (value) => <RecordRef value={value as string | null | undefined} />
+    // `field("ref", "Story")`) draws through the same black chip register
+    // every other reference in this app does — `TableColumn`'s own `render`
+    // slot (record-table.tsx), the seam this table already offers rather
+    // than a second row shape. The row itself still hands over the RAW
+    // string (`shapeStories()`'s `ref: s.ref || ""`, unchanged), so search
+    // and sort over the shaped rows keep comparing the value, never a
+    // rendered node. `width: "w-px"`, 22 Sep 2026 — her ruling, "reduce the
+    // space for the ID column everywhere" — shrinks the column to the
+    // chip's own content width under the table's auto layout, same as
+    // `TicketRowsTable`'s own id column (tickets-collection.tsx).
+    if (f.column === "ref") {
+      col.render = (value) => <RecordRef value={value as string | null | undefined} />
+      col.width = "w-px"
+    }
     return col
   })
 

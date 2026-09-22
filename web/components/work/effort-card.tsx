@@ -40,6 +40,24 @@
 // round, from the task review: "if no time logged yet, hide that component.
 // when time logged, as i said before, i want to see the avatar in each row."
 //
+// A SIXTH CHANGE, THE SAME DAY, OVER THE VALIDATED ARTIFACT — Aurora,
+// verbatim: "Fifth screenshot. That's definitely not what you showed me on
+// the artifact. Make sure that you review your artifact, and please correct
+// that. What's wrong is the alignment and margin in the metrics cards, and
+// that the rows below should not have a background." Read against
+// `${SCRATCH}/no-containers-exploration.html`'s own Effort mock
+// (`.mk-stats`/`.mk-tile`, three figure tiles, then `.mk-row` log lines): the
+// tiles are a `display:flex; gap:16px` row, no inset of its own beyond the
+// section's, and the log rows carry no fill at all, `padding:6px 0`, flush
+// with the same left edge. Two fixes: the tile grid's own gap moves from
+// `--space-3h` (14px) to `--space-4` (16px), the mock's own figure, and the
+// per-log `<ul>` loses its `bg-surface-panel`/`rounded`/`divide-y` (a border
+// utility) — the kit `Separator` sits between rows instead, and each row
+// drops its own horizontal inset so it lands on the section's left edge, the
+// same edge the title and the tiles already stand on. The three tiles keep
+// their own paper (`PAPER_ON_PURPOSE`, `shared/rules/registry.ts` — "this is
+// a metric, like in kit"); only the log rows below them go plain.
+//
 // FOUR CHANGES, THIS ROUND:
 //
 //   1. THE TITLE'S OWN COUNT IS A RECORD COUNT NOW, not an hour total — "6",
@@ -105,6 +123,7 @@ import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Separator } from "@shared/ui/components/separator/separator"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -292,7 +311,7 @@ export function EffortCard({
                 hand keeps it off that census instead of fighting it with an
                 exemption the census has no slot for. */}
             {metrics && (
-              <div className="grid grid-cols-1 gap-[var(--space-3h)] sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-[var(--space-4)] sm:grid-cols-3">
                 <Card variant="default">
                   <CardContent>
                     <StatGrid
@@ -359,9 +378,22 @@ export function EffortCard({
                 stays a plain, non-interactive row — a still-running or
                 already-discarded entry was never offered for correction
                 before, and a reader without `work:update` still cannot open
-                one now. */}
-            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-              {rows.map((l) => {
+                one now.
+
+                NO BACKGROUND, NO BORDER UTILITY (Aurora, 22 Sep 2026, over
+                the validated artifact's own `.mk-row`: plain lines, no fill).
+                The old `bg-surface-panel`/`rounded`/`divide-y` list is gone —
+                `divide-y` draws a border between rows, which the ruling
+                refuses as plainly as a fill — and the kit `Separator` sits
+                between rows instead, never above the first or below the
+                last. Each row drops its own horizontal inset (`px-3`) so its
+                content starts at the same left edge as the title and the
+                tiles above it, the mock's own alignment. `role="list"`/
+                `"listitem"` keep the list semantics a plain `<div>` would
+                otherwise drop, since a `Separator` between `<li>` siblings is
+                not valid inside a `<ul>`. */}
+            <div role="list" aria-label={t("Effort")} data-slot="effort-log-rows" className="flex flex-col">
+              {rows.map((l, index) => {
                 const name = staffNameFromSnapshot(l.userName) || t("Someone who has left")
                 const editable = canEdit && !!l.endedAt && !l.discarded
                 const rowContent = (
@@ -386,22 +418,25 @@ export function EffortCard({
                   </>
                 )
                 return (
-                  <li key={l.id} className={l.discarded ? "opacity-60" : ""}>
-                    {editable ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditingLog(l)}
-                        className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-start hover:bg-accent"
-                      >
-                        {rowContent}
-                      </button>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2 px-3 py-2">{rowContent}</div>
-                    )}
-                  </li>
+                  <React.Fragment key={l.id}>
+                    {index > 0 && <Separator />}
+                    <div role="listitem" className={l.discarded ? "opacity-60" : undefined}>
+                      {editable ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditingLog(l)}
+                          className="flex w-full flex-wrap items-center gap-2 py-2 text-start hover:bg-accent"
+                        >
+                          {rowContent}
+                        </button>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2 py-2">{rowContent}</div>
+                      )}
+                    </div>
+                  </React.Fragment>
                 )
               })}
-            </ul>
+            </div>
 
             {/* R14 — the list is PAGED; a load-more door reaches the rest. */}
             <LoadMore

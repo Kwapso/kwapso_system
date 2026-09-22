@@ -58,7 +58,7 @@ import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning 
 import { Headline } from "@shared/ui/components/typography/typography"
 import { SortControl, type SortOption } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
-import { CollectionCardSurfaceContext, CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import { PINNED_INSET_MARK, PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
@@ -283,53 +283,25 @@ export function LoadError({ what }: { what: string }) {
 // direct child) can ask "am I sitting on a plain, transparent frame?" without
 // a runtime DOM lookup.
 //
-// MOVED TO `shared/web/screen-engine/collection-frame.tsx`, 21 Sep 2026 —
-// imported here rather than declared here. `CollectionEmptyState` (that
-// file) needed to read the identical answer, from dozens of call sites this
-// file has never heard of, so the context now lives beside the register that
-// reads it most widely and `CollectionCard` below is one of two publishers
-// (the other is that file's own `useKitPanel` branch). See its own doc
-// comment there for the full account.
-//
-// THE DEFAULT IS STILL `"plain"`, AND STAYS THAT WAY ON PURPOSE — a second
-// audit found `/waves` and the brand library rendering their empty states
-// bare with no `CollectionCard` provider above them anywhere, and the
-// validated design keeps EVERY collection empty state on soft paper, not
-// only the ones a provider can prove sit inside a `CollectionCard`. So "no
-// provider above me" reads the same as `"plain"`, for `CollectionEmptyBody`
-// below exactly as it always has, and now for `CollectionEmptyState`'s own
-// dozens of call sites app wide too. `"boxed"` is the one way out, published
-// only where a real `Card` is genuinely already the ground.
-//
-// THE HOOK THAT READ THIS CONTEXT IS GONE, AND THE CONTEXT IS NOT.
-// `useCollectionCardSurface()` was exported here so `paged-find.tsx`'s own
-// hand-rolled toolbar pill could key its painted register off the frame it
-// stood in. That pill has no painted register any more (rulebook L43 went app
-// wide on 21 Sep 2026 and every frame is plain), so the hook had no caller and
-// was deleted rather than kept as a door nothing opens. The Provider stays,
-// because `CollectionEmptyBody` below still reads it, and now so does every
-// `CollectionEmptyState` call site app wide.
+// THE `CollectionCardSurfaceContext` PROVIDER WRAP IS RETIRED HERE, 22 SEP
+// 2026 — its only two readers (`CollectionEmptyState`, shared/web/screen-
+// engine/collection-frame.tsx, and this file's own now-deleted
+// `CollectionEmptyBody`) are both gone: her ruling over the Accounts
+// Inactive-tab screenshot, "the empty collection now. We need to get rid of
+// the card background," means neither register papers itself on a plain
+// frame any more, so there is nothing left that needed to know which ground
+// `CollectionCard` was standing on. See that file's own header for the full
+// account of the context's retirement.
 
 export function CollectionCard({ children, surface = "plain" }: { children: React.ReactNode; surface?: "boxed" | "plain" }) {
   if (surface === "plain") {
     return (
-      <CollectionCardSurfaceContext.Provider value="plain">
-        <Card variant="plain" data-surface="plain" className="[--pinned-lead:var(--toolbar-lead-gap)]">
-          <CardContent>{children}</CardContent>
-        </Card>
-      </CollectionCardSurfaceContext.Provider>
+      <Card variant="plain" data-surface="plain" className="[--pinned-lead:var(--toolbar-lead-gap)]">
+        <CardContent>{children}</CardContent>
+      </Card>
     )
   }
-  // THE BOXED BRANCH PUBLISHES ITS OWN ANSWER TOO, since the context's default
-  // flipped to `"plain"` on 21 Sep 2026. While `"boxed"` WAS the default, a
-  // boxed frame could rely on the Provider being absent and still be read
-  // correctly; now an absent Provider says "plain", so a boxed frame that
-  // published nothing would tell `CollectionEmptyBody` to wrap its zero state
-  // in a SECOND paper card nested inside this one — the card-inside-a-card
-  // CLAUDE.md's own `useKitPanel` note forbids. Caught by this file's own
-  // census test rather than found on a screen.
   return (
-    <CollectionCardSurfaceContext.Provider value="boxed">
     <Card
       className={
         `${PINNED_INSET_MARK} ` +
@@ -381,58 +353,28 @@ export function CollectionCard({ children, surface = "plain" }: { children: Reac
           second number. */}
       <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">{children}</CardContent>
     </Card>
-    </CollectionCardSurfaceContext.Provider>
   )
 }
 
-/** THE EMPTY BODY'S OWN PAPER, ON A PLAIN FRAME (the tickets-main experiment,
- * `CollectionCard`'s own plain default, rulebook L43). A boxed `CollectionCard`
- * is already a `Card`, so its empty state (`CollectionEmptyState`,
- * shared/web/screen-engine/collection-frame.tsx, `data-slot=
- * "collection-empty-body"`) sits on real paper for free. `surface="plain"`
- * The plain default drops that Card to `variant="plain"` (transparent, no padding of its own)
- * so the toolbar and the table line up with the page's own edge — but a
- * facet with zero rows has no table, only the empty body, and that body
- * landed bare on the white page (measured live: fill `rgba(0, 0, 0, 0)`).
- * The validated design keeps the empty state on its own soft paper
- * regardless of which frame it is in, so this wraps it in the SAME default
- * `Card` variant the boxed frame draws, with the frame's own inner padding —
- * `px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]`, the
- * identical class string `CollectionCard`'s own boxed branch reads, spelled
- * by hand a second time rather than shared through a JS constant: a shared
- * identifier would stop reading as a literal class list to whatever source
- * census goes looking for one (`web/test/toolbar-lead-gap-card.test.tsx`'s
- * own R83 self-check does exactly that to `CollectionCard`'s copy) — while
- * the toolbar above stays flush, because this component wraps only what the
- * call site puts INSIDE it, never the toolbar beside it.
- *
- * READS THE SURFACE FROM CONTEXT, NOT A DOM LOOKUP — `CollectionCard`
- * publishes it (above), so this works however deep the call site nests it
- * (past a render-prop callback, in `tickets-collection.tsx`'s case) and
- * inside a bare test render with no real page around it. On a boxed frame
- * (the opposite decision, spelled at a call site and named in
- * `PAPER_ON_PURPOSE`) it renders `children` untouched: the
- * boxed `CollectionCard` is already the paper, and a second `Card` nested
- * inside it would be the card-inside-a-card CLAUDE.md's `useKitPanel` note
- * already forbids. */
-export function CollectionEmptyBody({ children }: { children: React.ReactNode }) {
-  const surface = React.useContext(CollectionCardSurfaceContext)
-  if (surface !== "plain") return <>{children}</>
-  return (
-    <Card variant="default">
-      <CardContent className="px-4 pb-4 pt-[var(--pinned-lead)] lg:pt-[var(--pinned-lead)]">
-        {/* IDEMPOTENT ON PURPOSE — a `CollectionEmptyState` nested inside this
-            wrap (or a second `CollectionEmptyBody`) must not get papered
-            again. The ground for whatever is now INSIDE this real `Card` is
-            genuinely `"boxed"`, so publishing that answer downward is not a
-            special-cased guard flag, it is just the true fact — the same
-            reading `CollectionCard`'s own boxed branch already gives its
-            children. */}
-        <CollectionCardSurfaceContext.Provider value="boxed">{children}</CollectionCardSurfaceContext.Provider>
-      </CardContent>
-    </Card>
-  )
-}
+// `CollectionEmptyBody` LIVED HERE AND IS RETIRED, 22 SEP 2026 (rulebook
+// L43, her ruling over the Accounts Inactive-tab screenshot: "the empty
+// collection now. We need to get rid of the card background").
+//
+// It gave a plain `CollectionCard`'s empty state real soft paper — the same
+// `Card variant="default"` shape this file's own boxed branch (above)
+// draws, wrapped around whatever a call site nested inside it — because the
+// validated design at the time kept EVERY collection empty state on soft
+// paper regardless of the frame around it. That design is overturned: the
+// register itself (`CollectionEmptyState`, shared/web/screen-engine/
+// collection-frame.tsx) no longer papers itself in any ground, so a second
+// component whose only job was giving it paper back has nothing left to do.
+//
+// ITS TWO CALL SITES (`tickets-collection.tsx`, `triage-queue.tsx`) now
+// render their children directly — see each file's own note at the former
+// wrap site. The empty body sits on the page with the toolbar's own
+// rhythm now, the same `mb-[var(--toolbar-content-gap)]` gap a populated
+// collection's first row already sits at, rather than a second, hand-typed
+// inset re-deriving the same distance inside a card that no longer exists.
 
 /** THE ADD BUTTON, wherever one appears (UI-RULEBOOK B3 / D9, CHECKLIST 11.7).
  *
@@ -1151,47 +1093,25 @@ export function ToolbarRow({
   if (empty) return heading
   if (!search && !filters && !sort && !view && !actions) return heading
 
-  // ── ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, SUPERSEDING THE
-  // "COLUMN" SHAPE ABOVE. Verbatim: "what this is doing is creating a new
-  // card underneath... it kind of creates a second toolbar. This is not the
-  // behaviour I want. I want it to look together, so merge this with the
-  // main toolbar so that it's one single background or container, more like
-  // expand behaviour rather than open-a-new-one behaviour."
-  //
-  // The column above got the OVERLAY question right (the panel is in normal
-  // flow, pushes the collection down, never floats) and got THIS question
-  // wrong: the track and the panel were two `bg-background` boxes with a
-  // `gap-2` between them — same tone, same fill, visibly separate, which
-  // reads as exactly the "second card" she is describing. Two boxes of the
-  // identical colour with air between them is not "one piece of furniture"
-  // no matter what either one is filled with.
-  //
-  // THE FIX IS THE SAME SHAPE THE HISTORY ABOVE ALREADY WARNS AGAINST
-  // REPEATING, READ THE OTHER WAY ROUND. Pass one's bug was letting the
-  // panel's own height feed the TRACK's `rounded-pill` — a shape computed
-  // FROM content, which stretched into an oval the moment the content grew
-  // tall. The fix here is NOT "put the panel back inside the pill" (that is
-  // pass one); it is "give the pill's own fill and radius to the OUTER
-  // column instead of the inner row, and pick the radius EXPLICITLY off
-  // whether a panel is open — never off how tall anything measures." A
-  // radius chosen by `Boolean(toolbarPanel)` cannot stretch: it is one of
-  // exactly two fixed values (R31), swapped by a boolean, not computed from
-  // a box's own height the way a browser's own `rounded-pill` corner radius
-  // is. `rounded-pill` (999px) collapsed, `rounded-[var(--radius)]` (24px,
-  // the OTHER of the two radii this codebase allows) expanded — never a
-  // third number, and never the two at once.
-  //
-  // WHAT MOVED: `bg-background` and the radius left the inner row (the
-  // "track") and now sit on THIS outer div — the only element that paints a
-  // fill at all. The track keeps its own padding/gap so its controls still
-  // sit where they did; the panel (`filter-bar.tsx`'s own div) lost its
-  // OWN `bg-background`/`rounded-[var(--radius)]` for the identical reason —
-  // a filled, rounded box nested one level inside another filled, rounded
-  // box of the same colour is the double-box shape CLAUDE.md's own
-  // `useKitPanel` note calls "the broken combination". One fill, one shape,
-  // for both rows — no gap between them either, because a gap is the seam
-  // she is naming.
-  const expanded = Boolean(toolbarPanel)
+  // ── THE PILL IS RETIRED HERE TOO, 22 SEP 2026 — the same subtraction
+  // `ToolbarColumn` (paged-find.tsx) already made on 21 Sep 2026 (rulebook
+  // L43, "go an implement this appwide"), missed on this row that day. Her
+  // ruling, 22 Sep 2026, over the Triage/Ready pair: "the search bar in the
+  // toolbar... has different distances from the left... the correct one on
+  // the screenshots is the one on status ready." Ready's own toolbar is
+  // `<PagedFind>`'s (paged-find.tsx), whose track paints nothing and carries
+  // no inset of its own — "the plain frame's own `CardContent` carries zero
+  // padding, so this row's edge IS the pane's edge." This row (`ToolbarRow`,
+  // the OTHER of the app's two toolbars, `TOOLBAR_CONTROL_OWNERS`) still
+  // carried the OLD painted-pill shape (`bg-surface-raised`, a radius chosen
+  // by `Boolean(toolbarPanel)`, and `py-1.5 pe-1.5 ps-4` on the track) from
+  // before `CollectionCard`'s default flipped to `"plain"` — which is
+  // exactly why Triage (this row) sat ~16px further right than Ready
+  // (that one): the pill's own `ps-4` inset, with nothing left standing on
+  // the other side of it to justify it. Dropped for the identical reason
+  // `ToolbarColumn`'s own doc gives: no fill, no radius, no inset — the
+  // track's edge is the plain frame's edge, the same edge `<PagedFind>`
+  // already sits flush against.
   // R78 — CALENDAR VIEWS CARRY NO SORT ("never put the sort in calendar
   // components... makes no sense", client ruling 2026-09-15). Computed once,
   // off the ACTIVE view value only — not off the list of bodies a screen
@@ -1203,18 +1123,16 @@ export function ToolbarRow({
     // ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also want
     // the toolbar to be on top all time visible. everywhere."
     //
-    // A SECOND BOX, AND EACH OF THE TWO DOES A JOB THE OTHER CANNOT. The pill
-    // below is the toolbar: one fill, one radius, chosen by whether a facet
-    // panel is open, and its shape is the whole of the 2026-09-03 ruling above.
-    // A pinned bar has to OCCLUDE the rows sliding under it, which means
-    // painting a band the full height of what it displaces — the pill, plus
-    // R49's `--toolbar-content-gap` beneath it. Putting that padding inside the
-    // pill would make the pill taller and change the shape she approved; a
-    // margin below the pill would paint nothing at all, which is the exact bug
-    // `STICKY_FOLDER_TABS` was fixed out of ("a margin between two siblings is
-    // never painted", tabs-view.tsx). So the pin is its own box: a flex COLUMN,
-    // which is what keeps the pill's trailing margin INSIDE it and painted, on
-    // the same `--surface-raised` the pill and the card behind it both wear —
+    // A SECOND BOX, AND EACH OF THE TWO DOES A JOB THE OTHER CANNOT. The row
+    // below is the toolbar; a pinned bar has to OCCLUDE the rows sliding
+    // under it, which means painting a band the full height of what it
+    // displaces — the row, plus R49's `--toolbar-content-gap` beneath it.
+    // Putting that padding inside the row would change its own resting
+    // height; a margin below the row would paint nothing at all, which is
+    // the exact bug `STICKY_FOLDER_TABS` was fixed out of ("a margin between
+    // two siblings is never painted", tabs-view.tsx). So the pin is its own
+    // box: a flex COLUMN, which is what keeps the row's trailing margin
+    // INSIDE it and painted, on the same ground the card behind it wears —
     // invisible at rest, and the thing rows disappear behind on scroll.
     //
     // R49 IS UNTOUCHED. The number, its token and its owner are exactly where
@@ -1227,7 +1145,7 @@ export function ToolbarRow({
     // See shared/web/pinned-chrome.ts.
     <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
       {/* THE TITLE IS THE BAND'S FIRST CHILD — R63 part 3's own `band`, filled
-          for the first time. It sits INSIDE the pinned box (above the pill,
+          for the first time. It sits INSIDE the pinned box (above the row,
           below the `pt-[var(--pinned-lead)]` the box already pays), so three
           things stay exactly as they were and one changes:
             · `--pinned-lead` is untouched — still the container's own top inset
@@ -1237,7 +1155,7 @@ export function ToolbarRow({
               is actually looking at rather than cutting two notches into the
               card's sides halfway down;
             · `--pinned-inset-x` and `--pinned-behind` are untouched with it.
-          What changes is the pill's resting position: it moves down by this
+          What changes is the row's resting position: it moves down by this
           heading plus the gap below it, which is the design she asked for
           ("ticket types should be on top of the searchbar inside the
           container"), and the title now pins with the toolbar it titles.
@@ -1247,39 +1165,13 @@ export function ToolbarRow({
       <div
         data-slot="toolbar-row-column"
         className={cn(
-          // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND (client,
-          // dark mode, Apps screen: "the background of tabs is wrong. should be
-          // same as background of content body"). `bg-background` and
-          // `bg-[var(--surface-raised)]` happen to be the same colour in LIGHT
-          // mode, which is how this shipped looking right — dark mode split
-          // them apart (`--background` → `--kw-unlit-page` #141310,
-          // `--surface-raised`/`--card` → `--kw-unlit-raised` #26241F, two
-          // genuinely different near-black tones), and this row's card-toned
-          // surroundings suddenly sat on the wrong one of the two.
-          // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
-          // reason the toolbar's buttons had no background. The kit rebinds
-          // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
-          // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
-          // secondary button is always the other tone from whatever it stands on
-          // and no component needs a prop. `bg-[var(--surface-raised)]` paints
-          // the identical colour but is a DIFFERENT CLASS, so no selector in that
-          // list matched, the rebind never fired, and the token stayed at its
-          // base `var(--card)` — the same #FFFEF9 this container is painted with.
-          // Beige on beige: the client, twice, "the buttons in the toolbar are
-          // missing the background". `bg-surface-raised` is a real generated
-          // utility (tokens.css bridges `--color-surface-raised` precisely so it
-          // exists), paints the same colour, and IS in the list — so every
-          // secondary control inside now resolves to `--surface-panel` #F7F2EB.
-          //
-          // THE RULE, not the patch: an element that paints a GROUND uses the
-          // named utility. The `bg-[var(--token)]` escape hatch silently freezes
-          // every ground-aware token beneath it.
-          "flex min-w-0 flex-col bg-surface-raised",
-          // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
-          // reads as the same stadium pill every other toolbar control in this
-          // app wears; expanded switches to the box radius so a tall facet
-          // panel never has to fit inside a 999px curve.
-          expanded ? "rounded-[var(--radius)]" : "rounded-pill",
+          // NO FILL, NO RADIUS, NO INSET OF ITS OWN — same subtraction as
+          // `ToolbarColumn` (paged-find.tsx), 21 Sep 2026, one day late here
+          // (see this function's own header comment, above `sortHiddenByView`,
+          // for the ruling that caught the miss). The plain frame's own
+          // `CardContent` carries zero padding, so this row's edge is the
+          // pane's edge, the same edge the table below it sits flush against.
+          "flex min-w-0 flex-col",
           // THE GAP TO WHATEVER COMES NEXT — R49, `--toolbar-content-gap`
           // (web/app/globals.css). Baked into the row's OWN root rather than
           // left for a call site to add, exactly as `--tab-content-gap` is
@@ -1292,19 +1184,7 @@ export function ToolbarRow({
           "mb-[var(--toolbar-content-gap)]"
         )}
       >
-        <div
-          data-slot="toolbar-row-track"
-          className={cn(
-            // THE TRACK — client, 1 Sep 2026, pointing at her own reference
-            // artifact: every control sits in one visibly distinct row; the
-            // inline-start padding is slightly deeper than the others so the
-            // search icon doesn't sit flush on the seam. No fill and no radius
-            // of its own any more — both now belong to the merged container
-            // above, which is the whole point of this pass.
-            "flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4",
-            className
-          )}
-        >
+        <div data-slot="toolbar-row-track" className={cn("flex flex-wrap items-center gap-2", className)}>
           {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
               like in your atifact": her reference artifact's search element is
               `flex: 1 1 auto`, not a fixed width, so it is what pushes

@@ -550,9 +550,9 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const panel = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]') as HTMLElement
-    const list = panel.querySelector('ul[class*="divide-y"]')
+    const list = panel.querySelector('[data-slot="effort-log-rows"]')
     expect(list, "the row list is drawn").toBeTruthy()
-    const row = list!.querySelector("li") as HTMLElement
+    const row = list!.querySelector('[role="listitem"]') as HTMLElement
     expect(row).toBeTruthy()
     expect(row.textContent).toContain("Aurora")
     expect(row.textContent).toContain("2026-08-18")
@@ -593,7 +593,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const panel = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]') as HTMLElement
-    const row = panel.querySelector('ul[class*="divide-y"] li button') as HTMLElement
+    const row = panel.querySelector('[data-slot="effort-log-rows"] [role="listitem"] button') as HTMLElement
     expect(row, "the row itself is a button now, not a pencil beside it").toBeTruthy()
     fireEvent.click(row)
     const dialog = await screen.findByRole("dialog")

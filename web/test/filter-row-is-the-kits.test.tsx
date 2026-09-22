@@ -499,6 +499,13 @@ describe("the app's filter row is the design kit's", () => {
     // its own AT ALL — the single merged container does, and its shape is
     // read off `Boolean(toolbarPanel)` rather than off anything's measured
     // height, so it cannot repeat pass one's mistake by a different route.
+    //
+    // PASS SIX, 22 SEP 2026 — the merged container's own fill and radius are
+    // retired too (rulebook L43, her ruling over the Triage/Ready pair: "make
+    // sure that you make this exactly the same everywhere"), matching
+    // `<PagedFind>`'s own column, which dropped the identical pair a day
+    // earlier. The assertions below now hold the column to painting NOTHING,
+    // open or closed, rather than switching between two shapes.
     render(<ToolbarRowHarness />)
 
     const column = document.querySelector('[data-slot="toolbar-row-column"]')
@@ -507,29 +514,23 @@ describe("the app's filter row is the design kit's", () => {
     expect(track, "the track is a named child of the merged container").toBeTruthy()
     expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
 
-    // i · CLOSED: ONE CONTAINER, PILL-SHAPED, ONE FILL — and the track itself
-    // carries neither, so there is nothing left inside it to stretch.
+    // i · CLOSED: NO FILL, NO RADIUS, ANYWHERE — 22 Sep 2026, superseding the
+    // painted-pill shape this test used to hold the column to (her ruling
+    // over the Triage/Ready pair: "make sure that you make this exactly the
+    // same everywhere"). The column used to switch between `bg-surface-raised`
+    // + `rounded-pill` (collapsed) and `rounded-[var(--radius)]` (expanded);
+    // both are retired now, so there is nothing left to switch, and the track
+    // still paints nothing of its own either.
     expect(panelNode(), "nothing is open yet").toBeNull()
-    // R50-adjacent fix (dark mode, client: "the background of tabs is wrong,
-    // should be same as background of content body"): the container's fill
-    // matches the CARD it sits in (`--surface-raised`), not the page ground
-    // (`bg-background`) — the two coincide in light mode only.
-    // THE NAMED CLASS, not `bg-[var(--surface-raised)]`: same colour, but only
-    // the named one is in the kit's `--btn-secondary-fill` rebind list, and the
-    // arbitrary form left every control inside this container invisible against
-    // it (see web/test/ground-classes-are-named.test.ts).
-    expect(column!.className).toContain("bg-surface-raised")
-    expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
-      "rounded-pill"
+    expect(column!.className, "the column paints no background of its own").not.toMatch(
+      /\bbg-(?!clip|none)[\w-]+/
+    )
+    expect(column!.className, "the column carries no radius of its own").not.toMatch(
+      /\brounded-[\w[\]().,%/#-]+/
     )
     expect(
-      column!.className,
-      "the two radii never both apply — collapsed is pill-only"
-    ).not.toContain("rounded-[var(--radius)]")
-    expect(
       track.className,
-      "the track paints no fill or shape of its own any more — the merged " +
-        "container does, which is the whole point of this pass"
+      "the track paints no fill or shape of its own either"
     ).not.toMatch(/rounded-pill|bg-background|bg-\[var\(--surface-raised\)\]/)
     const closedTrack = trackShape(track)
 
@@ -576,29 +577,21 @@ describe("the app's filter row is the design kit's", () => {
       "the open panel must not round its own corners — the merged container does"
     ).not.toMatch(/rounded-\[var\(--radius\)\]/)
 
-    // v · OPEN: THE SAME CONTAINER SWITCHES SHAPE, NEVER BOTH AT ONCE. This is
-    // the one property that is NEW to this pass and did not exist under
-    // pass three/four at all — a growth cue chosen by state, never by a box's
-    // own measured height (R31: two radii, no third, never mixed).
+    // v · OPEN: STILL NOTHING PAINTED. 22 Sep 2026 — the container used to
+    // switch to the box radius here; now it stays exactly as it was closed,
+    // since there is no fill or radius left to switch between.
     expect(
       column!.className,
-      "the merged container still owns the single background in the open state"
-    ).toContain("bg-surface-raised")
-    expect(
-      column!.className,
-      "a panel is open — the container must switch to the box radius"
-    ).toContain("rounded-[var(--radius)]")
-    expect(
-      column!.className,
-      "the two radii never both apply — expanded drops the pill"
-    ).not.toMatch(/(?:^|\s)rounded-pill(?:\s|$)/)
+      "the container still owns no background, panel open or not"
+    ).not.toMatch(/\bbg-(?!clip|none)[\w-]+/)
+    expect(column!.className, "and no radius, panel open or not").not.toMatch(
+      /\brounded-[\w[\]().,%/#-]+/
+    )
 
-    // vi · AND IT CLOSES BACK TO EXACTLY THE SAME PILL.
+    // vi · AND IT CLOSES BACK TO EXACTLY THE SAME, STILL-UNPAINTED SHAPE.
     openPanel()
     await waitFor(() => expect(panelNode()).toBeNull())
     expect(trackShape(track)).toBe(closedTrack)
-    expect(column!.className).toContain("rounded-pill")
-    expect(column!.className).not.toContain("rounded-[var(--radius)]")
   })
 
   it("EVERY `useFilterBar` CALL RENDERS BOTH ITS PILL AND ITS PANEL", () => {

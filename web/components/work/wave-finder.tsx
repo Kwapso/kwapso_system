@@ -351,20 +351,19 @@ export function WaveFinder({
   // collection-frame/collection-frame.tsx`). What is NOT in the row is its
   // open panel, and that is a different question with a different answer —
   // see the column below.
-  // ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, MIRRORING THE FIX
-  // `ToolbarRow` (screen-bits.tsx) ALREADY CARRIES. Verbatim: "what this is
-  // doing is creating a new card underneath... it kind of creates a second
-  // toolbar... merge this with the main toolbar so that it's one single
-  // background or container, more like expand behaviour rather than
-  // open-a-new-one behaviour." This track used to carry its own
-  // `rounded-pill bg-background` unconditionally, with the panel one `gap-2`
-  // below it as a second sibling — two same-toned boxes with air between
-  // them, exactly the "second toolbar" she is naming. The fix is the same one
-  // `ToolbarRow` carries: the fill and the radius move to the OUTER column,
-  // chosen by `Boolean(filterPanel)` (R31 — two radii, never a third, never
-  // both at once), and the track keeps only its own padding/gap. No gap
-  // between the track and the panel either.
-  const filterPanelOpen = Boolean(filterPanel)
+  // THE PILL IS RETIRED HERE TOO, 22 SEP 2026 — the identical subtraction
+  // `<ToolbarRow>` (screen-bits.tsx) just made, one audit pass along
+  // (rulebook L43, her 22 Sep ruling over the Triage/Ready pair: "make sure
+  // that you make this exactly the same everywhere"). This track used to
+  // carry `bg-surface-panel`/`rounded-pill` on the column and
+  // `py-1.5 pe-1.5 ps-4` on the track — the same painted-pill shape
+  // `<ToolbarRow>` carried before `CollectionCard`'s default flipped to
+  // `"plain"` (21 Sep 2026), left un-fixed here because this file is a
+  // hand-copy (`TOOLBAR_CONTROL_OWNERS`) rather than the row itself. Waves'
+  // own single call site (waves-screen.tsx) always draws this inside a
+  // `<CollectionCard>`, exactly like every other toolbar host now, so the
+  // same argument applies: no fill, no radius, no inset — the track's edge
+  // is the plain frame's edge.
   return (
     // ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also want
     // the toolbar to be on top all time visible. everywhere." The identical
@@ -373,12 +372,11 @@ export function WaveFinder({
     // words), so it takes the change at the same time rather than being the
     // one collection screen in the app whose toolbar still scrolls away.
     //
-    // `bg-surface-panel`, NOT `--surface-raised`: this row's own fill, three
-    // lines below, and for the reason written there — its single call site
-    // always draws it inside a `<CollectionCard>`. The band this box paints has
-    // to be the tone the rows behind it stand on or it reads as a hole.
-    // The pill's trailing `--toolbar-content-gap` (R49) sits INSIDE this flex
-    // column and is therefore painted; nothing about R49 moved.
+    // NO FILL EITHER, since 22 Sep 2026 — the column three lines below paints
+    // nothing now, same as `<ToolbarRow>`'s own. The row's trailing
+    // `--toolbar-content-gap` (R49) still sits INSIDE this flex column and is
+    // therefore painted on whatever the pin band itself stands on; nothing
+    // about R49 moved.
     //
     // NO `"w-full"` HERE — client, 17 Sep 2026, over a screenshot of Waves:
     // "the container or the toolbar container inside of Waves, it's broken…
@@ -407,18 +405,12 @@ export function WaveFinder({
       <div
         data-slot="toolbar-row-column"
         className={cn(
-          // THE FILL MATCHES THE CARD IT SITS IN — the same latent mismatch
-          // `ToolbarRow` (screen-bits.tsx) carried and was fixed out of
-          // (client, dark mode, Apps screen: "should be same as background of
-          // content body"). This component's own single call site
-          // (waves-screen.tsx) always draws it inside `<CollectionCard>`,
-          // which paints `bg-surface-panel` — not `bg-background` (the page
-          // ground, coincidentally the same colour as a CARD only in light
-          // mode) and not `--surface-raised` either (`ToolbarRow`'s own fix,
-          // right for a row sitting directly on `ScreenShell`'s pane, which
-          // this row never does).
-          "flex w-full min-w-0 flex-col bg-surface-panel",
-          filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill",
+          // NO FILL, NO RADIUS, NO INSET OF ITS OWN — see this function's own
+          // header comment for the 22 Sep 2026 retirement. Waves' own single
+          // call site (waves-screen.tsx) always draws this inside a plain
+          // `<CollectionCard>`, whose `CardContent` carries zero padding, so
+          // this row's edge is the pane's edge same as every other toolbar.
+          "flex w-full min-w-0 flex-col",
           // THE GAP TO WHATEVER COMES NEXT — R49's `--toolbar-content-gap`
           // (web/app/globals.css), the same token `<ToolbarRow>`
           // (screen-bits.tsx) pays as its own trailing margin. This component
@@ -438,16 +430,10 @@ export function WaveFinder({
           data-slot="toolbar-row-track"
           // ONE ROW, ALWAYS — FOR REAL THIS TIME (client, 16 Sep 2026, over a
           // screenshot: "the container looks broken", the "+" and the view
-          // switch spilling out past the pill's own right edge). The comment
+          // switch spilling out past the row's own right edge). The comment
           // above already claimed "one row, always"; the class here did not
           // keep the promise — `flex-wrap` let the trailing controls drop to
-          // a second line the moment the lane ran out of room, and this
-          // column's radius is `rounded-pill` when collapsed (below), a
-          // capsule computed off the box's own HEIGHT. A one-line box reads
-          // as a normal pill; a two-line one reads as a much MORE rounded
-          // pill wrapped around a taller box, and the wrapped second line
-          // sat close enough to that exaggerated curve to look clipped by
-          // it — exactly the "broken rounded box" in her screenshot.
+          // a second line the moment the lane ran out of room.
           //
           // THE FIX IS THE KIT'S OWN SHAPE (`ToolbarRow`,
           // shared/ui/components/toolbar-row/toolbar-row.tsx): `flex-nowrap`
@@ -456,11 +442,9 @@ export function WaveFinder({
           // without it the lane cannot shrink below its content and the
           // PAGE scrolls sideways instead), and the action group pinned
           // OUTSIDE the lane with `ms-auto shrink-0` so the "+" is never the
-          // thing that gives. Nothing wraps, so the pill's radius is always
-          // computed against a single-line height, at every width — the kit
-          // draws the exact same lane for the identical reason
-          // (toolbar-row.tsx's own "ONE ROW AT EVERY WIDTH").
-          className="flex w-full flex-nowrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+          // thing that gives — the kit draws the exact same lane for the
+          // identical reason (toolbar-row.tsx's own "ONE ROW AT EVERY WIDTH").
+          className="flex w-full flex-nowrap items-center gap-2"
         >
           <div
             data-slot="toolbar-row-lane"

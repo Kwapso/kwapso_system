@@ -1397,8 +1397,14 @@ function helpTabPinnedStatus(facet: HelpFacet): HelpStatus | null {
  * carries — the black `RecordRef` chip has led the title since 6 Sep 2026 and
  * still does — it is that the chip now sits in a header OF ITS OWN rather than
  * sharing the "Title" header with the name beside it, so a reader scanning the
- * header row sees "ID" over the column that answers "which ticket", the same
- * way every other fact here has its own label. */
+ * header row sees a column of its own over the column that answers "which
+ * ticket", the same way every other fact here has its own label.
+ *
+ * THE HEADER'S OWN WORD CHANGED AGAIN, 22 SEP 2026 — her ruling: "reduce the
+ * space for the ID column everywhere... if it's ID for ticket, call it
+ * ticket." `HEADING.id` (tickets-collection.tsx) now reads "Ticket", not
+ * "ID", and the cell carries `w-px` so the column no longer takes a share of
+ * the row's remaining width — narrowed to the chip's own content. */
 /** `"raisedBy"` JOINED THE VOCABULARY 18 SEP 2026 — the client's ruling,
  * verbatim: "raised separate by and date! not in one together." Every ticket
  * list used to fold "who" and "when" into one `created` cell (a face+name

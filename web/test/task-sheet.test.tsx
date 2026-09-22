@@ -653,7 +653,7 @@ describe("the sheet reacts to a start/stop/done mutation in the same page load, 
       // (b)'s count/row half, which the proof found correct.
       const heading = await within(sheet).findByText("Effort")
       await waitFor(() => expect(heading.closest("h3")?.textContent).toBe("Effort1"))
-      const list = document.querySelector('ul[class*="divide-y"]') as HTMLElement
+      const list = document.querySelector('[data-slot="effort-log-rows"]') as HTMLElement
       expect(list, "the row list is drawn").toBeTruthy()
       expect(within(list).getByText(/Ana/)).toBeTruthy()
 
@@ -787,18 +787,21 @@ describe("the order of sections, top to bottom", () => {
     expect(within(sheet).queryByText("Priority")).toBeNull()
   })
 
-  it("Assigned to, Details and Deadline merge into ONE card, in that order, no nested cards (Aurora, 22 Sep 2026)", async () => {
+  it("Assigned to, Details and Deadline merge into ONE section, in that order, no card at all (Aurora, 22 Sep 2026)", async () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
 
     const detailsCard = document.querySelector('[data-slot="task-details-card"]') as HTMLElement
-    expect(detailsCard, "the merged card must render").toBeTruthy()
+    expect(detailsCard, "the merged section must render").toBeTruthy()
 
-    // Exactly ONE kit Card inside the merged wrapper — the three parts sit
-    // inside it, never each in their own.
+    // NO CARD AT ALL — Aurora, 22 Sep 2026, reading the artifact back: "On
+    // this screen, the whole 'Assigned to', details, and deadline should not
+    // have a background." Supersedes the "one Card only" shape this test
+    // used to prove the same day, before that second ruling landed.
+    expect(detailsCard.getAttribute("data-variant")).toBeNull()
     const cards = detailsCard.querySelectorAll('[data-slot="card"]')
-    expect(cards.length, "no nested cards — one Card only").toBe(1)
+    expect(cards.length, "no card anywhere inside the merged section").toBe(0)
 
     const assigneePartEl = document.querySelector('[data-slot="task-assignee-part"]') as HTMLElement
     const detailsPartEl = document.querySelector('[data-slot="task-details-part"]') as HTMLElement
@@ -832,6 +835,78 @@ describe("the order of sections, top to bottom", () => {
     const scroller = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
     const inner = scroller.firstElementChild as HTMLElement
     expect(inner.lastElementChild?.contains(footerBand), "the footer band must be the scroller's own last child").toBe(true)
+  })
+
+  // THE STRIPE REGISTER — Aurora, 22 Sep 2026: "the latest activity always
+  // has to be at the very bottom, and also make it a stripe, not a
+  // container." Kit v1.2.151 landed `RecordDetail`'s own `footerRegister`
+  // prop, so `RecordFooterBand`'s `stripe` (record-chrome.tsx) now forwards
+  // `footerRegister="stripe"` to the kit instead of carrying an app-side
+  // descendant selector for the radius — the kit's own footer Card draws
+  // `rounded-none` itself once it is told which register it is in.
+  it("the footer band forwards the stripe register to the kit and is pushed to the bottom via mt-auto", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    const scroller = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
+    const inner = scroller.firstElementChild as HTMLElement
+    // The scroller's own real child is the min-h-full column this sheet
+    // pushes short content out to fill, so the band's own mt-auto has
+    // somewhere to push against.
+    expect(inner.className).toContain("min-h-full")
+    const bandWrapper = inner.lastElementChild as HTMLElement
+    expect(bandWrapper.className).toContain("mt-auto")
+    // No app-side order class remains on the wrapper — the kit owns the
+    // radius and the order now, not a descendant selector reaching into it.
+    expect(bandWrapper.className).not.toContain("rounded-none")
+    expect(bandWrapper.className).not.toContain("order-1")
+    expect(bandWrapper.className).not.toContain("order-2")
+    // The kit's own footer Card carries `rounded-none` directly — proof
+    // `footerRegister="stripe"` reached `RecordDetail`, not a class this
+    // wrapper reaches in from outside.
+    const footerCard = document.querySelector('[data-record-region="footer"]') as HTMLElement
+    expect(footerCard, "the kit's own footer card must render").toBeTruthy()
+    expect(footerCard.className).toContain("rounded-none")
+    expect(footerCard.className).not.toContain("-mx-[var(--pane-inset-x")
+    // The call site's own padding cancel — `-mx-6 -mb-6`, matching the
+    // scroller's own `px-6 py-6` — so the band reaches every edge of the
+    // sheet rather than sitting inset inside that padding.
+    expect(bandWrapper.className).toContain("-mx-6")
+    expect(bandWrapper.className).toContain("-mb-6")
+  })
+
+  // ONE COLUMN, RECORD FIRST, LATEST ACTIVITY LAST — Aurora, the same
+  // ruling: "in any kind of screen that requires that the footer displays
+  // only one column instead of two, put the record on top and the latest
+  // activity on the bottom." The kit's own DOM order is still Latest
+  // activity, then Record (`record-detail.tsx`'s own reading order); since
+  // v1.2.151 the kit itself reorders visually via CSS `order` on each
+  // region once it is told `footerRegister="stripe"` — there is no
+  // app-side order class left to assert on the wrapper, so this proves the
+  // order classes straight on the kit's own region elements.
+  it("the kit orders Record before Latest activity, with no app-side order class and the kit's own DOM order unchanged", async () => {
+    const teamId = warmTeam([TASK])
+    render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
+    await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
+    const scroller = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
+    const inner = scroller.firstElementChild as HTMLElement
+    const bandWrapper = inner.lastElementChild as HTMLElement
+    expect(bandWrapper.className).not.toContain("[&_[data-record-region=footer-activity]]:order-2")
+    expect(bandWrapper.className).not.toContain("[&_[data-record-region=footer-record]]:order-1")
+    const activityRegion = document.querySelector('[data-record-region="footer-activity"]') as HTMLElement
+    const recordRegion = document.querySelector('[data-record-region="footer-record"]') as HTMLElement
+    expect(activityRegion, "the kit still renders its Latest activity column").toBeTruthy()
+    expect(recordRegion, "the kit still renders its Record column").toBeTruthy()
+    // The order classes now sit directly on the kit's own region elements.
+    expect(activityRegion.className).toContain("order-2")
+    expect(recordRegion.className).toContain("order-1")
+    // The kit's own DOM order is untouched — Latest activity's region still
+    // precedes Record's in the document, exactly as `record-detail.tsx`
+    // renders it; only the CSS `order` (asserted above) reads the other way.
+    expect(
+      activityRegion.compareDocumentPosition(recordRegion) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "DOM order is unchanged — the kit renders activity before record"
+    ).toBeTruthy()
   })
 })
 
@@ -872,9 +947,9 @@ describe("the Effort section draws the shared EffortCard", () => {
     // Scoped off `document`, not the render `container` — the sheet's
     // content renders through a Radix portal (`ticket-detail-no-tabs.test.tsx`
     // and this file's own "order of sections" test do the same).
-    const list = document.querySelector('ul[class*="divide-y"]')
+    const list = document.querySelector('[data-slot="effort-log-rows"]')
     expect(list, "the row list is drawn").toBeTruthy()
-    const row = list!.querySelector("li")
+    const row = list!.querySelector('[role="listitem"]')
     expect(row).toBeTruthy()
     expect(row!.textContent).toContain("Ana")
     expect(row!.textContent).toContain("2026-09-20")

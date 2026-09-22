@@ -28,7 +28,6 @@ import { type CollectionConfig } from "./config"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 import { Button } from "@shared/ui/components/button/button"
-import { Card, CardContent } from "@shared/ui/components/card/card"
 import { useFilterBar } from "./filter-bar"
 import {
   Pagination,
@@ -195,41 +194,20 @@ export function CollectionCreateActionProvider({
  * halves are fixed by the words living here, in an app file the walk reaches,
  * inside `t(...)`. */
 
-/** WHICH GROUND THIS EMPTY REGISTER IS STANDING ON — the register-level twin
- * of the kit's own `CollectionFrame`, which since 21 Sep 2026 reads its own
- * `panelSurface` to decide `registerVariant = panelSurface === "plain" ?
- * "block" : "inline"` (`shared/ui/components/collection-frame/collection-
- * frame.tsx`): "the register keeps its paper on a plain frame". This is that
- * same answer, published for `CollectionEmptyState` below rather than baked
- * into one call site, because unlike the kit's own frame this component is
- * rendered from dozens of call sites, some nested past a render-prop
- * callback (`PagedFind`'s `wrap`) or another component entirely
- * (`TriageQueue`, rendered inside `tickets-collection.tsx`'s own
- * `CollectionCard`), and some with no `CollectionCard`/kit `CollectionFrame`
- * ancestor at all.
- *
- * `"plain"` IS THE DEFAULT — the SAME default `CollectionCard` itself takes,
- * and the same one `CollectionEmptyBody` (`web/components/deep-link/
- * screen-bits.tsx`) has read since 21 Sep 2026. The validated design keeps
- * EVERY collection empty state on soft paper, full stop — not only the ones
- * sitting inside a `CollectionCard` this register can prove is there. A
- * second audit found `/waves` and the brand library rendering bare with no
- * `CollectionCard` provider anywhere above them, which settled it: "no known
- * frame above me" reads the same as "plain", never as "leave it bare". So
- * this register self-papers UNLESS something above it says otherwise.
- *
- * `"boxed"` IS THE ONLY WAY OUT, and it always means one thing: a real Card
- * is already the ground here, so a second one would be the card-inside-a-
- * card CLAUDE.md's `useKitPanel` note forbids. Two publishers say so —
- * `CollectionCard surface="boxed"` (a section that genuinely stands on
- * off-beige, spelled at the call site) and `CollectionEmptyBody` once IT has
- * wrapped (the ground for whatever is now inside its own `Card` is
- * genuinely boxed) — which is also how the two mechanisms stay idempotent
- * together: a call site that still wraps explicitly (kept in the tickets
- * module for the `--pinned-lead` reason on `CollectionEmptyState`'s own
- * self-wrap below) tells a nested register to stand down rather than
- * nesting a second card. */
-export const CollectionCardSurfaceContext = React.createContext<"boxed" | "plain">("plain")
+// `CollectionCardSurfaceContext` — WHICH GROUND A COLLECTION FRAME WAS
+// STANDING ON — IS RETIRED, 22 SEP 2026, HERE AND AT ITS OWN PUBLISHER
+// (`CollectionCard`, web/components/deep-link/screen-bits.tsx). `Collection-
+// EmptyState` below used to self-paper on a `"plain"` frame (and everywhere
+// else, by the SAME default) by reading this context; the now-retired
+// `CollectionEmptyBody` was its only other reader. Her ruling over the
+// Accounts Inactive-tab screenshot — "the empty collection now. We need to
+// get rid of the card background" — means `CollectionEmptyState` no longer
+// papers itself in any ground, so the one question this context existed to
+// answer has no reader left. Deleted rather than kept inert: a Provider
+// with nobody reading it is invisible plumbing the next person has to trace
+// out before they can trust it does nothing, and `CollectionCard`'s own
+// `surface` prop (unrelated, untouched) still decides whether THAT
+// component paints, independent of whatever this context used to carry.
 
 export function CollectionEmptyState({
   title,
@@ -299,26 +277,15 @@ export function CollectionEmptyState({
   const create = filtered ? undefined : onCreate
   const importer = filtered ? undefined : onImport
   const clear = filtered ? onClearFilters : undefined
-  // THE REGISTER KEEPS ITS PAPER, EVERYWHERE, EXCEPT ON A REAL CARD — 21 SEP
-  // 2026, the same ruling the kit's own `CollectionFrame` answers for its
-  // internal loading/error/empty registers (see `CollectionCardSurfaceContext`'s
-  // own doc above this function). `"plain"` is the context's default, so a
-  // call site with NO `CollectionCard`/kit `CollectionFrame` ancestor at all
-  // reads the same answer as one sitting on an actual plain frame — proved
-  // live on `/waves` and the brand library, both bare with no provider above
-  // them at all. Only `"boxed"` renders bare, because that is the one
-  // signal that a real `Card` is already the ground here — published by
-  // `CollectionCard surface="boxed"` or by `CollectionEmptyBody` once IT has
-  // wrapped, precisely so this self-wrap stands down rather than nesting a
-  // second card where a call site still wraps explicitly (kept at three
-  // call sites in the tickets module for the `--pinned-lead` reason below).
-  const surface = React.useContext(CollectionCardSurfaceContext)
-  // THE CONTENT, SHARED BY BOTH RETURN SHAPES BELOW — read on. It is a plain
-  // variable, not itself a component's `return`, so `web/test/sections-
-  // stand-on-paper.test.ts`'s own root-paint census (amendment 5, "a
-  // component paints if … the single element it RETURNS paints") never
-  // resolves it as this component's own root; only the two JSX elements
-  // spelled out literally in the ternary below are that.
+  // NO PAPER, ANYWHERE, PERIOD — 22 SEP 2026, HER RULING SUPERSEDING THE ONE
+  // BELOW. Over the Accounts Inactive-tab screenshot, verbatim: "the empty
+  // collection now. We need to get rid of the card background." Until today
+  // this register self-papered on a `"plain"` frame — everywhere, by that
+  // frame's own default — through `CollectionCardSurfaceContext`
+  // (now-retired, see this file's own header above `CollectionEmptyState`).
+  // There is no ground left that papers this register: it renders the bare
+  // register at every call site, the same unpapered shape the register used
+  // to draw only on a real `Card` (`"boxed"`).
   const content = (
     <>
       <Headline as="h3" size="h3">
@@ -372,32 +339,27 @@ export function CollectionEmptyState({
       )}
     </>
   )
-  const bodyClassName = cn("flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]", className)
-  // ONE RETURN, A TERNARY BETWEEN TWO LITERAL ROOTS — never a `const body = (…)`
-  // returned by identifier. `web/test/sections-stand-on-paper.test.ts`'s own
-  // `rootElements` only counts a JSX element written AT the return site
-  // (unwrapped through parens and through a ternary's own two arms); an
-  // identifier contributes nothing. `CollectionEmptyState` MUST NOT count as
-  // self-painting through its own root (its own tripwire, in as many words:
-  // "an uncontained zero register … turned every uncontained zero register in
-  // the app green") — so both arms have to be real, and the plain `<div>` arm
-  // is what keeps `roots.every(paints)` false overall.
-  //
-  // NO `--pinned-lead` HERE, ON PURPOSE — R63 keeps that custom property
-  // nameable in exactly two files (`shared/web/pinned-chrome.ts` and
-  // `web/components/deep-link/screen-bits.tsx`); this file is neither. The
-  // kit's own `Card`/`CardContent` default padding is what a generic paper
-  // wrap reads instead — a `CollectionEmptyBody` call site (screen-bits.tsx)
-  // is still how a host matches its own toolbar's exact lead pixel for pixel.
-  return surface === "plain" ? (
-    <Card variant="default">
-      <CardContent>
-        <div data-slot="collection-empty-body" className={bodyClassName}>
-          {content}
-        </div>
-      </CardContent>
-    </Card>
-  ) : (
+  // NO TOP INSET OF ITS OWN — 22 SEP 2026, the other half of dropping the
+  // paper. "The empty body sits on the page with the toolbar's rhythm" is
+  // the reading: whatever draws above this register (a toolbar's own
+  // `mb-[var(--toolbar-content-gap)]`, or this file's own header column's
+  // `gap-3`) already pays the exact gap a populated collection's FIRST ROW
+  // sits at — the identical distance either way, because this register and
+  // `renderItems(visible)` are the two things that can occupy the same slot
+  // below that gap. A `py-[var(--space-7)]` top inset here used to be
+  // breathing room INSIDE a paper card, on top of that gap, which is exactly
+  // how a 10px rhythm read as far more on a bare page once the card holding
+  // it went away. `pb-` alone keeps the bottom breathing room the register
+  // still wants when something follows it in flow.
+  const bodyClassName = cn("flex min-w-0 flex-col items-start gap-3 pb-[var(--space-7)]", className)
+  // ONE RETURN, ONE LITERAL ROOT — a plain, unpapered `<div>`.
+  // `web/test/sections-stand-on-paper.test.ts`'s own root-paint census
+  // (amendment 5, "a component paints if … the single element it RETURNS
+  // paints") reads this straight off the return site now that there is no
+  // ternary between a papered and an unpapered arm — `CollectionEmptyState`
+  // never counts as self-painting through its own root any more, in every
+  // ground.
+  return (
     <div data-slot="collection-empty-body" className={bodyClassName}>
       {content}
     </div>
@@ -882,32 +844,21 @@ function CollectionFrame<T>({
           // reset the remembered `query` would claim the box was cleared while
           // the reader's letters stayed on screen.
           //
-          // THE PROVIDER, SPELLED OUT RATHER THAN LEFT TO THE CONTEXT'S OWN
-          // `"plain"` DEFAULT — belt and braces: this `KitCollectionFrame`
-          // carries no `panel` prop of its own, so it resolves to the kit's
-          // own default, `"plain"`, the exact ground its internal
-          // loading/error registers already self-paper against
-          // (`registerVariant` in the kit's own file); asserting it here
-          // means this branch's true ground is never accidentally inherited
-          // from an ancestor `CollectionCard surface="boxed"` a future caller
-          // might wrap it in.
-          <CollectionCardSurfaceContext.Provider value="plain">
-            <CollectionEmptyState
-              filtered={narrowed}
-              title={copy?.emptyTitle ?? t(config.emptyText)}
-              description={
-                copy?.emptyDescription ??
-                (config.emptyDescription ? t(config.emptyDescription) : undefined)
-              }
-              onCreate={createAction?.onCreate}
-              onImport={createAction?.secondary?.onClick}
-              onClearFilters={
-                Object.keys(facetValues).length > 0
-                  ? () => remember((q) => ({ ...q, facetValues: {} }))
-                  : undefined
-              }
-            />
-          </CollectionCardSurfaceContext.Provider>
+          <CollectionEmptyState
+            filtered={narrowed}
+            title={copy?.emptyTitle ?? t(config.emptyText)}
+            description={
+              copy?.emptyDescription ??
+              (config.emptyDescription ? t(config.emptyDescription) : undefined)
+            }
+            onCreate={createAction?.onCreate}
+            onImport={createAction?.secondary?.onClick}
+            onClearFilters={
+              Object.keys(facetValues).length > 0
+                ? () => remember((q) => ({ ...q, facetValues: {} }))
+                : undefined
+            }
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {renderItems(visible)}

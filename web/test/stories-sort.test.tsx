@@ -109,12 +109,13 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
   }
 }
 
-/** Every List row's own Story cell text, in the order they are painted.
+/** Every List row's own Title cell text, in the order they are painted.
  *
  * THE SECOND `<td>`, NOT THE FIRST — Aurora's ruling, 20 Sep 2026: "On
  * stories 'Planned,' add id as the first column. Same on the 'Backlog'
- * tab." Backlog's own column order is now [ID, Story, Type, Category,
- * Status, Sprint], so the title cell moved one column to the right. */
+ * tab." Backlog's own column order is [Story, Title, Type, Category,
+ * Status, Phase] (the first two words swapped 22 Sep 2026 — see the header
+ * census below), so the title cell sits one column in from the edge. */
 const rowOrder = () =>
   Array.from(document.querySelectorAll("tbody tr")).map(
     (tr) => tr.querySelectorAll("td")[1]?.textContent ?? ""
@@ -173,7 +174,7 @@ describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)
     expect(headerButtons.length).toBe(0)
   })
 
-  it("draws an ID, Story, Type, Category, Status and Sprint column, in that order — never a priority column", async () => {
+  it("draws a Story, Title, Type, Category, Status and Phase column, in that order — never a priority column", async () => {
     const rows = [story({ id: "s1", title: "Columns", rank: "a0" })]
     renderBacklog(rows)
     await screen.findByText(/Columns/)
@@ -185,7 +186,14 @@ describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)
     // tab") — `PLANNED_BACKLOG_COLUMNS`. MoSCoW is deliberately NOT a
     // seventh column here (R82's six-column ceiling) — it is a card tag and
     // a toolbar filter/sort instead (`MOSCOW_DOT_TONE`/facet, same file).
-    expect(headers).toEqual(["ID", "Story", "Type", "Category", "Status", "Phase"])
+    //
+    // "ID" AND "STORY" SWAPPED WORDS, 22 SEP 2026 — her ruling: "reduce the
+    // space for the ID column everywhere... if it's ID for story, call it
+    // story." The id column now reads "Story" (`PLANNED_BACKLOG_COLUMNS`'
+    // own `field("ref", "Story")`), which collided with the NAME column's
+    // own header, "Story" too — so the name column is "Title" now, on every
+    // tab, the same Ticket/Title split `TicketRowsTable` already draws.
+    expect(headers).toEqual(["Story", "Title", "Type", "Category", "Status", "Phase"])
   })
 })
 

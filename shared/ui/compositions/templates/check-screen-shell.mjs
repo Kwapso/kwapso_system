@@ -1791,11 +1791,112 @@ if (
       "27.8's 20/32 stay as the fallbacks so a band outside a pane is drawn as the chapter draws it.",
   );
 }
-if (!/"rounded-\[var\(--radius-pane-edge\)\]",/.test(recordDetailSrc)) {
+if (!/"rounded-\[var\(--radius-pane-edge\)\]"/.test(recordDetailSrc)) {
   airFindings.push(
     `${recordDetailRel}'s ink footer does not read rounded-[var(--radius-pane-edge)] - a rounded band under a ` +
       "squared pane reads as a rendering mistake, and the token's own root value is --radius so nothing changes " +
       "anywhere else.",
+  );
+}
+
+/* 7b · THE 22 SEP 2026 "stripe" REGISTER GATES BOTH PANE LINES TOGETHER,
+   NEVER ONE ALONE. Client, verbatim, on the record footer's fourth
+   screenshot: "make it a stripe, not a container" for "any kind of screen
+   that requires that the footer displays only one column instead of two" —
+   a sheet or another narrow host that publishes no --pane-inset-x at all.
+   A stripe that still read -mx-[var(--pane-inset-x,0px)] would pull a
+   phantom 0 margin (harmless) but a stripe that still read
+   rounded-[var(--radius-pane-edge)] would draw --radius's own corners in a
+   host that asked for none - so this pins the whole ternary, not each half
+   separately, the same shape 7's own two lines are pinned together for. */
+if (
+  !/footerRegister === "band"\s*\n\s*\?\s*\[\s*"-mx-\[var\(--pane-inset-x,0px\)\]",\s*"rounded-\[var\(--radius-pane-edge\)\]",?\s*\]\s*\n\s*:\s*"rounded-none",/.test(
+    recordDetailSrc,
+  )
+) {
+  airFindings.push(
+    `${recordDetailRel}'s ink footer does not gate -mx-[var(--pane-inset-x,0px)] and rounded-[var(--radius-` +
+      'pane-edge)] together on footerRegister === "band", falling back to a flat rounded-none for "stripe" - a ' +
+      "stripe register has no pane to escape and draws no radius at all, not --radius-pane-edge's own fallback " +
+      "to --radius.",
+  );
+}
+if (!/footerRegister\?: "band" \| "stripe";/.test(recordDetailSrc)) {
+  airFindings.push(
+    `${recordDetailRel} does not declare footerRegister?: "band" | "stripe" on RecordDetailProps - the call ` +
+      "site has no way to ask for the sheet-safe stripe without it.",
+  );
+}
+if (!/footerRegister = "band",/.test(recordDetailSrc)) {
+  airFindings.push(
+    `${recordDetailRel} does not default footerRegister to "band" - every existing call site must keep drawing ` +
+      "the pane-escaping card it always has, unchanged, without passing the new prop.",
+  );
+}
+
+/* 7c · ONE COLUMN, EITHER REGISTER: RECORD ON TOP, LATEST ACTIVITY LAST.
+   Client, verbatim, same ruling: "The latest activity always has to be at
+   the very bottom … put the record on top and the latest activity on the
+   bottom" whenever the band shows one column rather than two - the stripe
+   register (which is typically narrow) or the two-column band once ITS
+   host narrows under its own breakpoint. `footerHasTwoColumns` is the one
+   place that question is answered, and the grid's column count and both
+   regions' own order/placement all have to read it, or a lone Activity
+   swapped to Record when a call site's audit rows change shape without a
+   Record column to place beside. */
+if (!/const footerHasTwoColumns = showRecordColumn && showActivityColumn;/.test(recordDetailSrc)) {
+  airFindings.push(
+    `${recordDetailRel} does not declare footerHasTwoColumns = showRecordColumn && showActivityColumn - the ` +
+      "one-column order swap and the explicit two-track grid both need this exact question answered once, " +
+      "not re-derived per region.",
+  );
+}
+if (
+  !/const FOOTER_TWO_COLUMN_QUERY = "@min-\[calc\(16\.25rem\*2_\+_var\(--space-7\)\)\]";/.test(recordDetailSrc)
+) {
+  airFindings.push(
+    `${recordDetailRel} does not declare FOOTER_TWO_COLUMN_QUERY as the container query "@min-[calc(16.25rem*` +
+      '2_+_var(--space-7))]" - the grid\'s two-track threshold, the client\'s "Record on top" order swap and ' +
+      "the client's \"Latest activity … at the bottom\" placement must all name the exact same width or they " +
+      "can disagree about which of them is showing.",
+  );
+}
+if (!/"@container grid grid-cols-1",/.test(recordDetailSrc)) {
+  airFindings.push(
+    `${recordDetailRel}'s ink footer grid does not establish its own container query with "@container grid ` +
+      "grid-cols-1\" - a stripe standing in a sheet narrower than the viewport needs the grid answering to its " +
+      "own box, not the window (the same convention toolbar-row.tsx's root already uses).",
+  );
+}
+if (
+  !recordDetailSrc.includes(
+    'footerHasTwoColumns\n                  ? `${FOOTER_TWO_COLUMN_QUERY}:grid-cols-[repeat(2,minmax(16.25rem,1fr))]`\n                  : undefined,',
+  )
+) {
+  airFindings.push(
+    `${recordDetailRel}'s ink footer grid does not gate its explicit two-track template on footerHasTwoColumns - ` +
+      "ungated, a lone Record or a lone Activity region at a wide container would jump to an explicit column " +
+      "with nothing beside it, an empty gap nobody asked for.",
+  );
+}
+if (
+  !recordDetailSrc.includes('"order-2",\n                          `${FOOTER_TWO_COLUMN_QUERY}:order-none') ||
+  !recordDetailSrc.includes(`col-start-1 \${FOOTER_TWO_COLUMN_QUERY}:row-start-1\``)
+) {
+  airFindings.push(
+    `${recordDetailRel}'s footer-activity region does not read order-2 (one column: last) gated by ` +
+      "footerHasTwoColumns, with an explicit col-start-1 row-start-1 at FOOTER_TWO_COLUMN_QUERY (two columns: " +
+      'back to CH27.8\'s own left cell) - the client\'s "at the very bottom" ruling has nowhere to attach.',
+  );
+}
+if (
+  !recordDetailSrc.includes('"order-1",\n                          `${FOOTER_TWO_COLUMN_QUERY}:order-none') ||
+  !recordDetailSrc.includes(`col-start-2 \${FOOTER_TWO_COLUMN_QUERY}:row-start-1\``)
+) {
+  airFindings.push(
+    `${recordDetailRel}'s footer-record region does not read order-1 (one column: first) gated by ` +
+      "footerHasTwoColumns, with an explicit col-start-2 row-start-1 at FOOTER_TWO_COLUMN_QUERY (two columns: " +
+      'CH27.8\'s own right cell) - the client\'s "Record on top" ruling has nowhere to attach.',
   );
 }
 
@@ -1814,6 +1915,116 @@ console.log(
     "ASIDE_TAB reads the same top token, so the two columns' tabs still start at one y; CARD_FLUSH squares the " +
     "card's foot unconditionally; and the pane publishes --pane-inset-x and --radius-pane-edge, which " +
     "record-detail.tsx's ink band reads in both directions so it spans the pane while its text stays under the h1.",
+);
+
+/* ============================================================================
+   THE 22 SEP 2026 --pane-inset-x PUBLISHER-PARITY CHECK.
+
+   WHY IT EXISTS. Aurora's fourth screenshot (a ticket page, rail expanded,
+   wide window) showed the ink band's leading edge sitting ~29px inside the
+   pane's own left edge — white where the client asked for "no white on the
+   sides… make the black go side to side." Measured live (verify/shell-gutter
+   pattern, screen-shell-content vs. the ink band, at 760/1280/1440/1800/1991
+   and both rail states) the CURRENT source draws a 0px gap at every one of
+   those — BODY publishes `--pane-inset-x` as the flat `var(--space-6)`, and
+   `SHELL_CONTENT_INSET_X`/`DENSITY_BODY` spend the identical flat
+   `px-[var(--space-6)]`, so the two cannot disagree today. The screenshot's
+   own gap is therefore a defect of an OLDER kit tag (this fix's own
+   --pane-inset-x mechanism did not exist before 21 Sep 2026, v1.2.149) —
+   staging is pinned to a tag that predates it — not of what is in this file
+   now. Restated as a check anyway, not just a paragraph, because "the two
+   read the same literal today" is not "the two CANNOT drift apart": a
+   future breakpoint added to one side alone (an `lg:px-[var(--space-7)]`
+   dropped into `SHELL_CONTENT_INSET_X` without a matching `lg:[--pane-
+   inset-x:...]` on `BODY`, say — exactly the shape of the stale `lg:p-
+   [var(--space-7)]` this file's own drag-handle comment still quotes from
+   an EARLIER draft of this same air ruling) would reopen the screenshot's
+   exact defect at that one breakpoint while every check above kept passing,
+   because none of them compares the two sides' sets of breakpoints against
+   each other.
+
+   WHAT IT DOES. Pulls every `(breakpoint:)?px-[...]` variant out of
+   `SHELL_CONTENT_INSET_X`'s own literal and out of `DENSITY_BODY`'s two
+   entries (the pane's REAL horizontal inset, wherever it is spent), and
+   every `(breakpoint:)?[--pane-inset-x:...]` variant out of `BODY` (what
+   the pane PUBLISHES). The two breakpoint sets must be identical — not the
+   two values, the two SETS OF PREFIXES an inset is declared at — so a
+   variant added to one side and not the other fails loudly instead of
+   shipping a gap at whichever width nobody happened to screenshot. */
+const paneInsetXFindings = [];
+
+const bodyBlockMatch = /const BODY = cn\(([\s\S]*?)\n\);/.exec(src);
+const shellContentInsetXMatch = /const SHELL_CONTENT_INSET_X = "([^"]+)";/.exec(src);
+const densityBodyBlockMatch =
+  /const DENSITY_BODY: Record<ScreenDensity, string> = \{([\s\S]*?)\n\};/.exec(src);
+
+if (bodyBlockMatch === null || shellContentInsetXMatch === null || densityBodyBlockMatch === null) {
+  paneInsetXFindings.push(
+    "could not find BODY, SHELL_CONTENT_INSET_X or DENSITY_BODY as literal source blocks to compare - the " +
+      "extraction regexes below are written against today's exact shape and need updating alongside it.",
+  );
+} else {
+  // A Tailwind utility variant: an optional "breakpoint:" immediately
+  // followed by "px-[…]" — "lg:px-[var(--space-7)]", or a bare
+  // "px-[var(--space-6)]" for the base (unprefixed) case.
+  const extractUtilityPrefixes = (text) => {
+    const re = /(?:^|[\s"])([\w-]*:)?px-\[[^\]]+\]/g;
+    const prefixes = new Set();
+    let match;
+    while ((match = re.exec(text)) !== null) prefixes.add(match[1] ?? "");
+    return prefixes;
+  };
+  // A raw arbitrary-property variant: an optional "breakpoint:" immediately
+  // followed by the WHOLE bracket, opening straight on "--pane-inset-x:" —
+  // "[--pane-inset-x:var(--space-6)]" has no utility name in front of the
+  // bracket for a breakpoint to attach after, so the prefix (if any) comes
+  // before the bracket itself: "lg:[--pane-inset-x:var(--space-7)]".
+  const extractPropertyPrefixes = (text) => {
+    const re = /(?:^|[\s"])([\w-]*:)?\[--pane-inset-x:[^\]]+\]/g;
+    const prefixes = new Set();
+    let match;
+    while ((match = re.exec(text)) !== null) prefixes.add(match[1] ?? "");
+    return prefixes;
+  };
+
+  const realInsetPrefixes = new Set([
+    ...extractUtilityPrefixes(shellContentInsetXMatch[1]),
+    ...extractUtilityPrefixes(densityBodyBlockMatch[1]),
+  ]);
+  const publishedInsetPrefixes = extractPropertyPrefixes(bodyBlockMatch[1]);
+
+  const missingPublisher = [...realInsetPrefixes].filter((p) => !publishedInsetPrefixes.has(p));
+  const missingRealVariant = [...publishedInsetPrefixes].filter((p) => !realInsetPrefixes.has(p));
+
+  if (missingPublisher.length > 0) {
+    paneInsetXFindings.push(
+      `SHELL_CONTENT_INSET_X/DENSITY_BODY spend px- at ${missingPublisher.map((p) => `"${p || "(base)"}"`).join(", ")} ` +
+        "that BODY's [--pane-inset-x:...] publisher has no matching variant for - a part that reads --pane-inset-x " +
+        "at that breakpoint would escape by the WRONG number, reopening the fourth-screenshot gap at that one width.",
+    );
+  }
+  if (missingRealVariant.length > 0) {
+    paneInsetXFindings.push(
+      `BODY publishes [--pane-inset-x:...] at ${missingRealVariant.map((p) => `"${p || "(base)"}"`).join(", ")} ` +
+        "that SHELL_CONTENT_INSET_X/DENSITY_BODY never spend as real px- padding at - the pane would escape to a " +
+        "number nothing on the pane's own edge is actually paying.",
+    );
+  }
+}
+
+if (paneInsetXFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell pane-inset-x publisher-parity check:\n" +
+      paneInsetXFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell pane-inset-x publisher-parity check: every breakpoint-prefixed px- variant " +
+    "SHELL_CONTENT_INSET_X/DENSITY_BODY spend as the pane's real horizontal inset has a matching " +
+    "[--pane-inset-x:...] variant on BODY at the identical prefix, and BODY publishes no variant the real " +
+    "inset does not also spend - the two cannot drift apart at any one breakpoint without this check catching it.",
 );
 
 /* ============================================================================

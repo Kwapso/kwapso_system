@@ -426,8 +426,10 @@ function TallyBar({
  * the panels apart now that neither paints a border of its own — no
  * `<Separator>` added inside the grid, which would be a second, competing
  * answer to the same question. The dashboard's own error/empty-state
- * `<Card>`s (see the bottom of this file) are NOT this component and stay
- * boxed. */
+ * `<Card>`s (see the bottom of this file) are NOT this component, and since
+ * 22 Sep 2026 they draw the identical `variant="plain"` shape rather than a
+ * separate boxed decision — the whole dashboard is plain now, panels and
+ * the two zeros alike. */
 // EXPORTED FOR ITS OWN TEST ONLY (`web/test/plain-surface-scope.test.tsx`),
 // same reasoning `dead-exports.test.ts`'s own header gives for a registry
 // read only by the law that enforces it: a test IS a user. Every OTHER call
@@ -1784,10 +1786,18 @@ export function TicketsDashboard({
     return orderTicketTypes(out)
   }, [data, helpTypeOptions])
 
+  // NO PAPER, 22 SEP 2026 — her ruling over the Accounts empty-state
+  // screenshot ("the empty collection now. We need to get rid of the card
+  // background"), which reaches the dashboard's own error and zero cards
+  // too: the same subtraction `CollectionEmptyState` (collection-frame.tsx)
+  // just took, made here rather than left as the one register that still
+  // disagreed. `variant="plain"` and no padding class of its own — the exact
+  // shape `Panel` above already draws for the six chart frames, so the whole
+  // dashboard now agrees with itself.
   if (dashQ.error)
     return (
-      <Card>
-        <CardContent className="p-4">
+      <Card variant="plain" data-surface="plain">
+        <CardContent>
           <ShapeStateBody
             shape="collectionScreen"
             state="error"
@@ -1809,8 +1819,8 @@ export function TicketsDashboard({
   // and nothing else.
   if (ticketTotal === 0)
     return (
-      <Card>
-        <CardContent className="p-4">
+      <Card variant="plain" data-surface="plain">
+        <CardContent>
           <ShapeStateBody
             shape="collectionScreen"
             state="empty"

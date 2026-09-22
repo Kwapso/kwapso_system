@@ -1789,6 +1789,30 @@ reaches [R67](../RULES.md) (`sections-stand-on-paper`), whose first sentence was
 panel stands on paper" and whose surviving clause is now "a section paints the page or the
 kit's paper, never a stroke, never a hex".
 
+**Her review of the minimal app, 22 Sep 2026.** Aurora, verbatim:
+
+*"* screenshots: Look at the search bar in the toolbar. It has different distances from the left. Make sure that you make this exactly the same everywhere, by the way. The correct one on the screenshots is the one on status ready.
+* Third screenshot: The empty collection now. We need to get rid of the card background.
+* Reduce the space for the ID column everywhere. It's too much. And also rename it. I don't want it to be called ID. If it's ID for ticket, call it ticket. If it's ID for story, call it story.
+* In the fourth screenshot, on the footer, there should be no white on the sides. Make the black go side to side.
+* On the loop still has a background. Remove that in tickets. And everywhere where there is this error
+* Fifth screenshot. That's definitely not what you showed me on the artifact. Make sure that you review your artifact, and please correct that. What's wrong is the alignment and margin in the metrics cards, and that the rows below should not have a background.
+* 6th screenshot: The latest activity always has to be at the very bottom, and also make it a stripe, not a container. On the other hand, in any kind of screen that requires that the footer displays only one column instead of two, put the record on top and the latest activity on the bottom. On this screen, the whole "Assigned to", details, and deadline should not have a background."*
+
+Reading, item one: the toolbar search field sits at the same left edge everywhere, matched to the status Ready construction (tickets_collection.tsx through paged_find.tsx), never a per screen inset.
+
+Reading, item two: a collection's own empty state stops papering itself, in every ground it can land on, matching the plain page it sits on.
+
+Reading, item three: every table's id column narrows to its own chip width and reads the record's own noun (Ticket, Story, and the rest), never the bare word "ID".
+
+Reading, item four: the record footer's dark band (Latest activity, Record) fills the pane edge to edge, no page gutter left showing white on either side.
+
+Reading, item five: the "On the loop" state and the matching error state drop their paper background in tickets, and on every surface that draws the same shape.
+
+Reading, item six: the metrics cards on the story page take the alignment and margin her artifact showed, and the rows under them stand on no background at all.
+
+Reading, item seven: Latest activity pins as a stripe at the very bottom of the record footer, never inside a container; a footer that must show one column instead of two stacks the record above it and Latest activity below it, and on that one column layout Assigned to, the details, and the deadline stand on no background either.
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order

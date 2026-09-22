@@ -2751,10 +2751,6 @@ export const PAPER_ON_PURPOSE: Record<string, string> = {
   // ── web/ ────────────────────────────────────────────────────────────────
   "web/components/tickets/ticket-detail-body.tsx":
     "two cards, and both are the ruling's own exceptions. `TicketConversationPanel` is the conversation card: Aurora, 21 Sep 2026, on what the plain pass may not take — \"the conversation card stays a card\". And `TicketSidePanel`'s own `surface=\"boxed\"` branch is the OPPOSITE decision the shell still offers, kept reachable rather than deleted so a future section that genuinely stands on off-beige has somewhere to say so; its default is `\"plain\"`.",
-  "web/components/tickets/help-stakeholders.tsx":
-    "the On the loop tile (`data-slot=\"loop-card\"`) — a person, drawn as a pickable object inside the Stakeholders section, not a region of the page. Aurora's own register for it: \"stakeholders raised by design like in the loop (chip like)\". It is soft paper rather than off-beige since 21 Sep 2026, because its ground is the plain page now and `--card` IS the page's own colour in light.",
-  "web/components/tickets/tickets-dashboard.tsx":
-    "the Overview tab's error card and its zero card. The validated page keeps a zero on paper: \"a boundary around nothing with no boundary is just nothing\", and a failure reads the same way. The six chart frames in the same file are `Panel`, which is plain unconditionally.",
   "web/components/records/gallery-card.tsx":
     "the app's one gallery card — a per-record card in a grid, the object a reader picks up. Soft paper since 21 Sep 2026: its ground is the plain page now, and `raised` there would have measured 1.000.",
   "web/components/records/record-week.tsx":
@@ -2769,12 +2765,10 @@ export const PAPER_ON_PURPOSE: Record<string, string> = {
     "the Members wall's per-person card — a per-record card in a grid, and the one Aurora asked for a pointer state on (\"we are missing a hover state for the cards\").",
   "web/components/knowledge/knowledge-source-card.tsx":
     "the knowledge source / glossary word card — a per-record card in a grid, pressable.",
-  "web/components/work/task-sheet.tsx":
-    "the task sheet's own section card. A sheet body is not a page section: the sheet is already its own surface and this card is the object inside it, which is why the footer band in the same file keeps the kit's boxed fallbacks too.",
   "web/components/work/effort-card.tsx":
     "the three Effort tiles (Cycle time, Effort, Flow efficiency). Aurora, 21 Sep 2026: \"this is a metric, like in kit\" — and the kit's own `StatGrid` tile is exactly this card. The PANEL around them is plain; only the tiles keep paper.",
   "web/components/deep-link/screen-bits.tsx":
-    "two shells' own paper branches. `CollectionEmptyBody` gives a plain frame's zero state the paper the validated page insists it keeps; `EmptyGatedPanel`'s `surface=\"boxed\"` branch is the opposite decision the shell still offers, default `\"plain\"`.",
+    "two shells' own `surface=\"boxed\"` branches — `CollectionCard` and `EmptyGatedPanel` — the opposite decision each shell still offers, default `\"plain\"`, kept reachable for a section that genuinely stands on off-beige. `CollectionEmptyBody`, this file's third paper branch, is retired (22 Sep 2026, her ruling over the Accounts Inactive-tab screenshot, \"the empty collection now. We need to get rid of the card background\") — the empty register it used to paper no longer papers itself in any ground.",
   // ── web-portal/ ─────────────────────────────────────────────────────────
   "web-portal/components/ticket-screen.tsx":
     "two cards, neither a grouping section. The first is the REQUEST itself - the reference, the state and what the client wrote - a per-record card standing for the one record the page is about. The second is the composer, the portal's own half of \"the conversation card stays a card\".",
@@ -2963,7 +2957,7 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
   "shared/web/screen-engine/collection-frame.tsx":
     "THE RECIPE ENGINE'S OWN FRAME, and the one path that already got this right: its sort control is DERIVED (`frameSortOptions`, web/lib/screens.ts) from the recipe's own columns rather than passed in, and it stands itself down for a paged collection, for a table whose headers already order it, and for a list with fewer than two orderable columns. A screen drawn this way cannot forget a sort control, because it never had to ask for one — which is the shape R53 is copying onto the bespoke row.",
   "web/components/work/wave-finder.tsx":
-    "A SECOND HAND-WRITTEN COPY OF `<ToolbarRow>`, and the honest name for it. It repeats the row's own `data-slot=\"toolbar-row-column\"`/`\"toolbar-row-track\"`, its fill, its two-radius rule and its `--toolbar-content-gap` margin, and then adds a sixth slot `<ToolbarRow>` has no name for (`period`, the waves timeline's own date-range control) and puts `view` AFTER it rather than before `actions`. FOLDING IT IN IS OPEN WORK, not a decision this law makes: it needs a `period` slot on the shared row and a ruling on which fill a toolbar wears inside a `<CollectionCard>` (this one paints `bg-surface-panel`, `<ToolbarRow>` paints `--surface-raised`, and Dropdown values draws a `<ToolbarRow>` inside a `CollectionCard` today — so the two disagree and neither is obviously wrong). Pinned here so the divergence is a line somebody can read rather than a file the toolbar censuses cannot see.",
+    "A SECOND HAND-WRITTEN COPY OF `<ToolbarRow>`, and the honest name for it. It repeats the row's own `data-slot=\"toolbar-row-column\"`/`\"toolbar-row-track\"` and its `--toolbar-content-gap` margin, and then adds a sixth slot `<ToolbarRow>` has no name for (`period`, the waves timeline's own date-range control) and puts `view` AFTER it rather than before `actions`. AS OF 22 SEP 2026 BOTH PAINT NOTHING (her ruling, \"make sure that you make this exactly the same everywhere\"): neither carries a fill, a radius or a track inset any more, so the fill disagreement this entry used to name is closed. FOLDING IT IN IS STILL OPEN WORK, not a decision this law makes: it needs a `period` slot on the shared row. Pinned here so the divergence is a line somebody can read rather than a file the toolbar censuses cannot see.",
 }
 
 /** R53, clause (iii) — COLLECTIONS WITH NO ORDER TO OFFER, each with the real

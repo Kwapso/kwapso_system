@@ -138,6 +138,16 @@ export type TableColumn = {
    * `undefined` to render the value as-is. Useful for showing a placeholder
    * when the value is empty (null/"-"). */
   render?: (value: unknown) => React.ReactNode | undefined
+  /** SHRINK THIS COLUMN TO ITS OWN CONTENT — her ruling, 22 Sep 2026: "Reduce
+   * the space for the ID column everywhere. It's too much." A Tailwind width
+   * utility applied to both `TableHead` and `TableCell`, `"w-px"` for every
+   * id/reference column today: under the table's own auto layout (no
+   * `table-layout: fixed` anywhere in this file), a `1px` request cannot
+   * shrink the column below its own content's min-content width, so the
+   * browser gives it exactly that — the `RecordRef` chip plus the cell's own
+   * inset, never a share of the row's remaining width the way an unset
+   * column gets. Every other column keeps `undefined`, unchanged. */
+  width?: string
 }
 
 /** ── WHY A COLUMN HAS TO SAY WHAT IT IS ───────────────────────────────────────
@@ -466,6 +476,7 @@ export function RecordTable<T extends TableRowData>({
                   return (
                     <TableHead
                       key={c.key}
+                      className={c.width}
                       // The standard way a table says which column it is in
                       // order by — so a screen reader hears it without the
                       // arrow needing a sentence of its own to explain it.
@@ -547,7 +558,7 @@ export function RecordTable<T extends TableRowData>({
                     // renderer uses, whether or not a leading `RecordRef`
                     // chip is drawn beside it.
                     return (
-                      <TableCell key={c.key}>
+                      <TableCell key={c.key} className={c.width}>
                         {c === columns[0] ? (
                           refColumn ? (
                             <span className={REF_LEADS_NAME}>
