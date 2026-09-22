@@ -77,17 +77,26 @@
 //                      her word exactly.
 //   off (Inactive)  → `archived` — grey (`--dot-archived`,
 //                      `--ink-disabled`), her word exactly.
-//   protected       → `building` — charcoal (`--dot-building`,
-//                      `--foreground`). SHE DID NOT NAME THIS ONE: the
-//                      ruling above gives Active and Inactive their colours
-//                      and says nothing about Protected. `building` is this
-//                      change's own suggestion — the same tone the ticket/
-//                      story status maps already use for "in build, no
-//                      colour of its own" — chosen because it is the one
-//                      lifecycle tone left that is neither green nor grey
-//                      and reads as neutral-strong rather than a fourth
-//                      invented hue (R32, the closed palette). Flag this for
-//                      her the next time status colours come up.
+//   protected       → `review` — blue (`--dot-review`, `--info`, the kit's
+//                      one informational tone, `--kw-sky`). CHANGED 22 Sep
+//                      2026, Aurora, verbatim: "protected status make it
+//                      color blue instead of black" — the flag this file's
+//                      own header asked to leave her, the day it landed.
+//                      Was `building` (charcoal, `--dot-building`), this
+//                      change's own suggestion at the time and never her
+//                      word; `review` is not invented for this either — it
+//                      is the SAME dot tone `shared/status-tones.ts` already
+//                      spends for "in review" elsewhere in the app
+//                      (`in_review: "review"`), so Protected now reads with
+//                      the one blue the kit already calls informational
+//                      rather than a second hue this file would have to
+//                      admit on its own (R32, the closed palette). The
+//                      LABEL stays `--foreground` either way — CH11's own
+//                      law (tokens.css, "Neutral pill, charcoal label,
+//                      coloured dot") is that the dot alone carries the
+//                      state and the pill's own label never repaints, so
+//                      "blue instead of black" lands on the one part of
+//                      this chip that is allowed to change colour.
 //
 // `AUTOMATION_STATUS_VARIANT` IS DELETED, 17 SEP 2026 — it used to keep two
 // readers outside this change's own 16 Sep scope ("worth its own pass, not
@@ -160,11 +169,13 @@ import {
 
 /** THE DOT DERIVATION — the client's ruling, 16 Sep 2026: "let's change the
  * full color pill to also be a dot. Inactive gets gray, and active gets
- * green." See this file's own header for the full account, including that
- * she did not name Protected's tone (`building` is this change's own
- * suggestion). `ModuleAutomations`' own table column imports this rather
- * than keeping a second copy, so the list row and this panel's own detail
- * head can never disagree about which dot a status wears.
+ * green." See this file's own header for the full account, including
+ * Protected's tone, `review` (blue) since her 22 Sep 2026 ruling ("protected
+ * status make it color blue instead of black"), over the earlier `building`
+ * (charcoal) guess she never named herself. `ModuleAutomations`' own table
+ * column imports this rather than keeping a second copy, so the list row
+ * and this panel's own detail head can never disagree about which dot a
+ * status wears.
  *
  * THE ONLY DERIVATION NOW, 17 SEP 2026 — the client's ruling on the Choices
  * tables' status column, *"Dots like everywhere else,"* moved
@@ -174,7 +185,7 @@ import {
  * every reader of an automation/choice/meeting-type status now reads this
  * one `Record`, never a second copy or a second palette. */
 export const AUTOMATION_STATUS_DOT: Record<AutomationStatus, DotTone> = {
-  protected: "building",
+  protected: "review",
   on: "shipped",
   off: "archived",
 }

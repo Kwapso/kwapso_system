@@ -41,7 +41,7 @@ import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { content, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import { auditFields } from "@/lib/audit-overview"
 import { accountKey, appsKey, knowledgeKey, listFetch, recordMapKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
@@ -296,7 +296,30 @@ export function KnowledgeDetailScreen({
         ]
       : []),
     { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt, lang) : "" },
-    ...auditItems(
+    // CREATED BY / CREATED / LAST EDITED BY / LAST EDITED ARE GONE FROM HERE,
+    // 22 Sep 2026 — the same shape the ticket page already carries
+    // (help-detail.tsx, its own `audit` prop comment: "who made it and who
+    // last touched it, now the kit's own ink footer's Record column rather
+    // than five rows in the middle of Overview") and Aurora's 22 Sep 2026
+    // ruling, over a section that repeated its own title: where two things
+    // say the same thing, the duplicate goes. The footer band below
+    // (`<RecordFooterBand audit={…}>`) now carries all four, wired the same
+    // day this file's header describes.
+    //
+    // `.status` — BY NAME, NEVER BY POSITION. `auditFields` (audit-overview.ts)
+    // hands back the same five facts as a NAMED object (`createdBy` / `created`
+    // / `editedBy` / `edited` / `status`), and this screen keeps only the one
+    // it still owns. The first cut of this change read `auditItems(...)[4]`, a
+    // positional index into a plain array — correct only because the helper's
+    // OWN doc comment happened to promise a fixed order, the same class of
+    // mistake this repo already forbids for an exemption table, and just as
+    // silent: insert a row above `status` or make one conditional and the
+    // index quietly starts returning a DIFFERENT fact, every check still
+    // green. `auditFields` is the fix, not a workaround at this call site —
+    // the helper itself still has no other caller today, so nothing loses a
+    // row by this edit, and `web/test/audit-fields-by-name.test.ts` is the
+    // census that now refuses a positional read of either export.
+    auditFields(
       {
         createdByName: item.creatorName,
         createdAt: item.createdAt,
@@ -306,7 +329,7 @@ export function KnowledgeDetailScreen({
       },
       t,
       lang
-    ),
+    ).status,
   ]
 
   const link = safeHref(item.sourceUrl)
@@ -593,10 +616,37 @@ export function KnowledgeDetailScreen({
           body's padded stack. It was `<RecordDetailBody>`'s own `footer`
           prop, whose `mt-auto` reached only that component's own bottom
           edge, which is where this page measured between 62 and 198px of
-          paper under the band. No `audit`: a knowledge source has no
-          creator/editor (unchanged; see the comment this replaced for why). */}
+          paper under the band.
+
+          `audit` IS PASSED NOW — the comment this replaced said "a knowledge
+          source has no creator/editor", and that was never true: `item.creatorName`
+          / `item.createdAt` / `item.editorName` / `item.updatedAt` are read off
+          this very row a few hundred lines up (`overviewItems`'s own `auditFields`
+          call), off `DETAIL_COLS` (workers/content/src/lib/knowledge.ts), which
+          rides `creator_name`/`editor_name`/`updated_at` for every kind, list and
+          detail alike. A typed note, an uploaded file and a glossary word stamp
+          the actor who wrote them; a MIRRORED source (a ticket, an account, a
+          task, a Drive file, and the rest of the 13 ingested kinds) stamps the
+          brand's own name on `creator_name` at ingest instead of a person's — see
+          `knowledge-ingest.ts`'s upsert, `${sqlString(brand.name)}` — because
+          nobody typed it, the sweep did; `editor_name` on a mirrored source stays
+          null until somebody actually edits its filing (`updateSource`'s mirrored
+          branch), at which point it is a real person. So the footer's Record
+          column is honest either way: "Created by {the app's own name}" for
+          material the sweep brought in, "Created by {person}" for a note, a file
+          or a glossary word, "Last edited by {person}" only once somebody has.
+          Built the same shape `story-detail.tsx` passes (the record family this
+          footer's `RecordAudit` type says covers a source too — see that type's
+          own `createdByIsClient`/`editedByIsClient` doc comment): no client flags,
+          because nothing here can be created or edited by a client login. */}
       <ScreenFooterSlot>
         <RecordFooterBand
+          audit={{
+            createdByName: item.creatorName,
+            createdAt: item.createdAt,
+            editedByName: item.editorName,
+            updatedAt: item.updatedAt,
+          }}
           activity={activity}
           onAddNote={can("knowledge", "create") ? activity.addNote : undefined}
           notePlaceholder={t("Add a note")}

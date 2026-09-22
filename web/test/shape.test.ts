@@ -392,8 +392,8 @@ describe("shapeAccountsList", () => {
     // Client ruling 2026-09-15: name is a React element with logo and text
     expect(rows?.[0].nameText).toBe("Bergman S.A.")
     expect(React.isValidElement(rows?.[0].name)).toBe(true)
-    // NO STATUS (0042). Whether an account is live is the archive flag, and the
-    // NAME carries that as "(archived)" — so a live account says nothing about
+    // NO STATUS (0042). Whether an account is live is the archive flag, which is
+    // shown separately in the status column — so a live account says nothing about
     // its state, which is the honest thing for a fact true of almost every row.
     expect(rows?.[0].detail).toBe("Company")
     // …AND NOTHING ELSE THE SCREEN DOES NOT DRAW. The row used to carry `type` /
@@ -468,11 +468,12 @@ describe("shapeAccountsList", () => {
 
   it("keeps an archived account visible, and flags it (archive-never-delete)", () => {
     const rows = shapeAccountsList([account({ id: "a1", name: "Old Co", active: false })]).rows
-    // The row SAYS so in its name — which is what a person reads. "Only the
-    // archived ones" is a question for the door (`archived=yes`), asked from the
-    // find bar, and web/test/facets-ask-the-door.test.tsx is where that lives.
-    // Client ruling 2026-09-15: name is a React element with logo and text
-    expect(rows?.[0].nameText).toBe("Old Co (archived)")
+    // The row is shown with the plain name only. The archive status is shown
+    // separately in the status column. "Only the archived ones" is a question for
+    // the door (`archived=yes`), asked from the find bar, and web/test/facets-ask-the-door.test.tsx
+    // is where that lives. Client ruling 2026-09-15: name is a React element with
+    // logo and text. Aurora's ruling 2026-09-22: show only the name, remove the suffix.
+    expect(rows?.[0].nameText).toBe("Old Co")
     expect(React.isValidElement(rows?.[0].name)).toBe(true)
   })
 })
@@ -704,10 +705,13 @@ describe("shapeChoicesTable", () => {
   // accounting for why Details is the fold that moved instead). Read
   // alongside D17's tone table (`shared/status-tones.ts`'s own palette,
   // applied here through `AUTOMATION_STATUS_DOT`): Active → shipped (green),
-  // Protected → building (charcoal), Retired/Inactive → archived (grey).
-  // Protected OUTRANKS active/inactive (this function's own header, "PROTECTED
+  // Protected → review (blue), Retired/Inactive → archived (grey). Protected
+  // was `building` (charcoal) until Aurora's own ruling, 22 Sep 2026,
+  // verbatim: "protected status make it color blue instead of black" — see
+  // `automation-edit-sheet.tsx`'s own header for the full account. Protected
+  // OUTRANKS active/inactive (this function's own header, "PROTECTED
   // OUTRANKS ACTIVE/INACTIVE"), so a row with both `isDefault: true` and
-  // `active: true` still reads Protected/building, never Active/shipped — the
+  // `active: true` still reads Protected/review, never Active/shipped — the
   // second case below is exactly that row. Each case also asserts the chip is
   // `variant="status"` rather than the retired filled pill (`inverse` /
   // `success` / `secondary`), so a regression back to `AUTOMATION_STATUS_VARIANT`
@@ -716,11 +720,11 @@ describe("shapeChoicesTable", () => {
   it("draws a status dot with the D17 tone per state, in its own status cell, never a filled pill", () => {
     const cases: Array<{
       over: Partial<SelectableValue> & { id: string; type: string; value: string }
-      tone: "shipped" | "building" | "archived"
+      tone: "shipped" | "review" | "archived"
       word: string
     }> = [
       { over: { id: "s1", type: "Industry", value: "Active row", active: true, isDefault: false }, tone: "shipped", word: "Active" },
-      { over: { id: "s2", type: "Industry", value: "Protected row", active: true, isDefault: true }, tone: "building", word: "Protected" },
+      { over: { id: "s2", type: "Industry", value: "Protected row", active: true, isDefault: true }, tone: "review", word: "Protected" },
       { over: { id: "s3", type: "Industry", value: "Inactive row", active: false, isDefault: false }, tone: "archived", word: "Inactive" },
     ]
     for (const { over, tone, word } of cases) {

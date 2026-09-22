@@ -222,12 +222,14 @@ export function ModuleAutomations({ teamId, scope }: { teamId: string; scope: Au
       // (automation-edit-sheet.tsx, which this sheet's own detail head
       // imports the same constant from) is the one derivation: `shipped`
       // (green) for Active, `archived` (grey) for Inactive — both her exact
-      // words — and `building` (charcoal) for Protected, which she did not
-      // name; that file's own header says so and flags it for her next
-      // pass. NOT the Choices table's own badge (deep-link/shape.tsx, still
-      // a filled `variant="secondary"`/`"success"`/`"inverse"` pill through
-      // the untouched `AUTOMATION_STATUS_VARIANT`) — that screen is out of
-      // this ruling's scope, same as before.
+      // words — and, since 22 Sep 2026, `review` (blue, `--info`) for
+      // Protected, her own ruling that day ("protected status make it color
+      // blue instead of black") over the earlier `building` (charcoal)
+      // guess; that file's own header carries the full account. The Choices
+      // table's own badge (deep-link/shape.tsx) reads this SAME map now too
+      // (17 Sep 2026, "Dots like everywhere else" retired the older, separate
+      // `AUTOMATION_STATUS_VARIANT` filled pill there), so all three readers
+      // — this list, the detail sheet, and Choices — agree automatically.
       status: <Badge variant="status" dot={AUTOMATION_STATUS_DOT[status]}>{statusWord}</Badge>,
       statusText: statusWord,
       statusState: status,

@@ -614,8 +614,7 @@ export function shapeAccountsList(
    * 2026), the view this field was declared ahead of. */
   members: PickablePerson[] = [],
   /** THE WORDS ON THIS ROW — "Active"/"Archived" below, and nothing else
-   * today (the parent's own `(archived)` suffix on `name` stays untranslated,
-   * a pre-existing gap this pass did not touch). No hook to call
+   * today. No hook to call
    * `useLanguage()` with (a pure shaper, no React tree), so `t` is built the
    * same way `shapeActivity` above builds it. */
   lang: Language = "en"
@@ -668,12 +667,12 @@ export function shapeAccountsList(
                 fix this ruling makes at every table-row face cell in this
                 file, tickets-collection.tsx and work-panels.tsx. */}
             <RecordMark picture={a.logoUrl} name={a.name} size="choice" />
-            <span>{a.active ? a.name : `${a.name} (archived)`}</span>
+            <span>{a.name}</span>
           </span>
         ),
         // Keep the plain text for search and sort. The table's own column
         // definition will use `searchKey` to find this field for filtering.
-        nameText: a.active ? a.name : `${a.name} (archived)`,
+        nameText: a.name,
         // K1: what it is, and where it sits in the tree. The CODE left the line
         // — it is a lookup key, not something anybody scans a list for, and it
         // leads the eyebrow on the record's own screen. The parent stayed,
@@ -681,11 +680,11 @@ export function shapeAccountsList(
         // row carries.
         //
         // AND THE STATUS LEFT IT TOO (0042). Whether an account is live is the
-        // archive flag, which the NAME already carries as "(archived)" one line
-        // up — so a live account says nothing about its state, which is the
-        // honest thing for a fact that is true of almost every row. It had been
-        // a free-text column that drifted into four spellings of two ideas, and
-        // every one of 106 contacts read "Active".
+        // archive flag, which is shown separately in the status column — so a
+        // live account says nothing about its state, which is the honest thing
+        // for a fact that is true of almost every row. It had been a free-text
+        // column that drifted into four spellings of two ideas, and every one
+        // of 106 contacts read "Active".
         detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "",
         // 0091 — the account manager's face (R35), or null for nobody
         // assigned yet. `a.accountManagerId` is `null` for a client login
@@ -826,7 +825,7 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
         <span className={REF_LEADS_NAME}>
           <RecordMark picture={a.logoUrl} name={a.name} size="choice" />
           <span className="min-w-0 truncate">
-            {a.active ? a.name : `${a.name} (archived)`}
+            {a.name}
           </span>
         </span>
       ),
@@ -835,7 +834,7 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
       // the row's values as text (`searchKeys`), so without this the frame
       // would be searching `[object Object]`. It is also what a browser-side
       // sort would compare if this column ever gained one.
-      name: a.active ? a.name : `${a.name} (archived)`,
+      name: a.name,
       account: a.companyName ?? "",
       // THE ACCOUNT, WEARING ITS OWN FACE (R35, client ruling 2026-09-15:
       // "add the logos to account and app … identify everywhere else where
@@ -871,10 +870,7 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
       // THE STATUS COLUMN, 17 Sep 2026 — her ruling that session: "contact
       // live green." A live/archived dot, the same `variant="status"` +
       // `shipped`/`archived` pair the Portal column right below already
-      // draws for its own two states, never a filled pill (the `name`
-      // column's own "(archived)" suffix a few lines up stays exactly as it
-      // was — a second, plain-text answer to the same question costs
-      // nothing and this column is not replacing it).
+      // draws for its own two states, never a filled pill.
       status: (
         <Badge variant="status" dot={a.active ? "shipped" : "archived"}>
           {a.active ? t("Live") : t("Archived")}
@@ -926,21 +922,22 @@ export function shapeInviteDetail(
 }
 
 /* ------------------- the agency's own housekeeping ------------------------ */
-// Two modules, one shaping pattern, and one thing to keep in view while reading
-// them: an ARCHIVED row stays in the list. That is deactivate-not-delete showing
+// An ARCHIVED row stays in the list. That is deactivate-not-delete showing
 // through to the screen — the row is retired, not removed, so it is still there
-// to restore — and the `(archived)` suffix plus the `state` facet are how a
-// person tells the two apart at a glance. Roles have said "(inactive)" for the
-// same reason since the base's first commit; these say "(archived)" because that
-// is the word this app's glossary uses for putting a record away without losing
-// it.
+// to restore. The `state` facet shows the archive status on cards and tables.
+// Aurora's ruling, 22 Sep 2026, verbatim: "if status archive i dont need it
+// shoing here!!!! rmeove that, show only the name" — the "(archived)" suffix
+// has been removed from all account, contact, brand asset and meeting purpose
+// names everywhere they are displayed or used for search/sort.
+// Roles have said "(inactive)" for the same reason since the base's first
+// commit; these names no longer carry a status suffix.
 
 export function shapeBrandList(items: BrandAsset[]): ScreenData {
   return {
     rows: items.map((a) => ({
       id: a.id,
       mark: <RecordMark picture={a.fileUrl} name={a.name} />,
-      name: a.active ? a.name : `${a.name} (archived)`,
+      name: a.name,
       // A COLOUR SAYS ITS VALUE. Twelve rows named "1".."12" read as twelve
       // identical lines saying "Color" until 0043 gave them the hex they had
       // always carried inside a URL. The WORD is still worth having — a hex is a
@@ -987,7 +984,7 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
     rows: items.map((p) => ({
       id: p.id,
       mark: <RecordMark name={p.name} />,
-      name: p.active ? p.name : `${p.name} (archived)`,
+      name: p.name,
       detail: p.department || p.description || "",
       department: p.department || "",
       state: p.active ? "Live" : "Archived",

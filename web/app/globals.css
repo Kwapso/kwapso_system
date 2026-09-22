@@ -239,6 +239,12 @@
    fourteen to the smaller figure the other four already prove reads
    correctly.
 
+   ROUND TWO, Aurora, verbatim, 22 Sep 2026: "i dont see it, and if its there
+   make it even less." `--space-4` was still too much. Dropped one rung on
+   the app's own scale (tokens.css) to `--space-3` (12px) - not a bare
+   number, so a future rescale of the ladder carries this seam with it - and
+   not zero: the strip still has to read as separate from the head above it.
+
    ONE TOKEN, EVERY CALL SITE READS IT, the same shape `--tab-content-gap`/
    `--toolbar-lead-gap` above already are for the strip's OWN internal
    spacing - so this cannot drift screen by screen again the way the 16-vs-24
@@ -251,7 +257,7 @@
    that exact seam.
    ========================================================================= */
 :root {
-  --heading-strip-gap: var(--space-4);
+  --heading-strip-gap: var(--space-3);
 }
 
 /* ============================================================================

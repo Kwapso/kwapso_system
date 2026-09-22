@@ -1961,26 +1961,77 @@ if (
       "literally, Tailwind's scanner cannot see it at all and it never reaches the stylesheet, at any width.",
   );
 }
+/* THE COLUMN ASSIGNMENT ITSELF, PER REGION — EXTENDED 22 SEP 2026, LATER THE
+   SAME DAY, AGAINST A SEPARATE CLIENT RULING FROM THE ONE-COLUMN ORDER ABOVE.
+   Verbatim: "on footers when full screen (no slide-in) bring back the 2
+   columsn design. keep the 1 cokumn when screen opens in slide in (like f.e.
+   tasks) but f.e. in tickets needs to be the 2columns. everywhere 1st
+   column: record, 2nd column alast activity." The one-column order (Record
+   on top, Activity on the bottom - checked above) was already right; the
+   TWO-column cell assignment was not. A live paint proof on staging (a
+   ticket, a story and an account; 1440x842, 1280x800 and 760x900, rail
+   collapsed) measured the grid genuinely resolving to two equal tracks and
+   the band flush on all three edges, but Latest activity painting in the
+   FIRST column and the record's own facts in the SECOND - CH27.8's original
+   Activity-left/Record-right cell, never swapped when the column-count query
+   went explicit on 22 Sep 2026 (both regions kept the chapter's own
+   col-start, only gaining order-none beside it).
+
+   EACH ASSERTION IS SCOPED TO ITS OWN REGION, NOT TO THE WHOLE FILE - fixed
+   in the SAME edit that corrects the values, because the two checks this
+   replaces could not have caught the fault they were meant to guard: each
+   ran `recordDetailSrc.includes(literal)` against the ENTIRE file, with no
+   check that the literal sat inside the region it named. Swap the two
+   col-start values between footer-activity and footer-record - exactly the
+   live fault - and both literals still exist SOMEWHERE in the file, just on
+   the other element, so both `.includes()` calls kept returning true. Proof
+   is at the foot of this file's own record (see the kit commit message this
+   check ships beside): reverting the fix while leaving the OLD form of this
+   check in place left the suite green. The fix here is by construction, not
+   by tuning the strings: each assertion reads the SLICE of source between
+   one region's own `data-record-region` marker and the next sibling's (or,
+   for footer-record, a fixed window past its own marker, since it is the
+   last of the two), so a swap back to CH27.8's order fails on the region it
+   actually happened in, every time. */
+const footerActivityAt = recordDetailSrc.indexOf('data-record-region="footer-activity"');
+const footerRecordAt = recordDetailSrc.indexOf('data-record-region="footer-record"');
+const footerActivityBlock =
+  footerActivityAt === -1
+    ? ""
+    : recordDetailSrc.slice(
+        footerActivityAt,
+        footerRecordAt === -1 ? footerActivityAt + 2000 : footerRecordAt,
+      );
+const footerRecordBlock =
+  footerRecordAt === -1 ? "" : recordDetailSrc.slice(footerRecordAt, footerRecordAt + 2000);
+
 if (
-  !recordDetailSrc.includes('"order-2",\n                          "@min-[34.5rem]:order-none') ||
-  !recordDetailSrc.includes('col-start-1 @min-[34.5rem]:row-start-1"')
+  footerActivityAt === -1 ||
+  !footerActivityBlock.includes('"order-2",\n                          "@min-[34.5rem]:order-none') ||
+  !footerActivityBlock.includes('col-start-2 @min-[34.5rem]:row-start-1"')
 ) {
   airFindings.push(
     `${recordDetailRel}'s footer-activity region does not read order-2 (one column: last) gated by ` +
-      "footerHasTwoColumns, with an explicit, LITERAL col-start-1 row-start-1 at @min-[34.5rem] (two columns: " +
-      'back to CH27.8\'s own left cell) - the client\'s "at the very bottom" ruling has nowhere to attach, or ' +
-      "the class is interpolated from the constant again and invisible to Tailwind's scanner.",
+      "footerHasTwoColumns, with an explicit, LITERAL col-start-2 row-start-1 at @min-[34.5rem] - the SECOND " +
+      'column, per aurora\'s 22 Sep 2026 ruling ("everywhere 1st column: record, 2nd column latest activity") - ' +
+      'the client\'s "at the very bottom" one-column ruling has nowhere to attach, the class is interpolated ' +
+      "from the constant again and invisible to Tailwind's scanner, or the two-column cell has drifted back to " +
+      "CH27.8's own Activity-left order, the exact fault a live paint proof measured on staging 22 Sep 2026 " +
+      "(Latest activity painting at x=187.95 on a 1440-wide ticket, where the record's own facts belong).",
   );
 }
 if (
-  !recordDetailSrc.includes('"order-1",\n                          "@min-[34.5rem]:order-none') ||
-  !recordDetailSrc.includes('col-start-2 @min-[34.5rem]:row-start-1"')
+  footerRecordAt === -1 ||
+  !footerRecordBlock.includes('"order-1",\n                          "@min-[34.5rem]:order-none') ||
+  !footerRecordBlock.includes('col-start-1 @min-[34.5rem]:row-start-1"')
 ) {
   airFindings.push(
     `${recordDetailRel}'s footer-record region does not read order-1 (one column: first) gated by ` +
-      "footerHasTwoColumns, with an explicit, LITERAL col-start-2 row-start-1 at @min-[34.5rem] (two columns: " +
-      'CH27.8\'s own right cell) - the client\'s "Record on top" ruling has nowhere to attach, or the class is ' +
-      "interpolated from the constant again and invisible to Tailwind's scanner.",
+      "footerHasTwoColumns, with an explicit, LITERAL col-start-1 row-start-1 at @min-[34.5rem] - the FIRST " +
+      "column, per aurora's 22 Sep 2026 ruling - the client's \"Record on top\" one-column ruling has nowhere to " +
+      "attach, the class is interpolated from the constant again and invisible to Tailwind's scanner, or the " +
+      "two-column cell has drifted back to CH27.8's own Record-right order, the exact fault a live paint proof " +
+      "measured on staging 22 Sep 2026.",
   );
 }
 

@@ -927,9 +927,12 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
        spanning the full width at every container size, exactly as `auto-fit`
        always drew it — so the explicit two-track template and the order
        swap are gated on this, not drawn whenever the grid merely COULD hold
-       two. Un-gated, a lone `footer-record` at a wide container would have
+       two. Un-gated, a lone `footer-activity` at a wide container would have
        jumped to an explicit `col-start-2` with nothing in column 1, an empty
-       leading gap nobody asked for. */
+       leading gap nobody asked for — RENAMED FROM `footer-record` 22 SEP
+       2026, LATER THE SAME DAY: the region sitting at `col-start-2` is now
+       Activity, not Record, per the column swap below (`footer-activity`'s
+       own comment has the full account). */
     const footerHasTwoColumns = showRecordColumn && showActivityColumn;
 
     if (process.env.NODE_ENV !== "production" && auditRows.length > 4) {
@@ -1503,12 +1506,22 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                  column instead of two, put the record on top and the
                  latest activity on the bottom." `auto-fit` alone answers
                  "how many columns" but leaves both columns in DOM order
-                 however many it draws, which is right for the two-column
-                 case (CH27.8's Activity-left/Record-right) and wrong for
-                 the one-column case (this ruling's Record-top/Activity-
-                 bottom) — one grid, two different orders, and `order` alone
-                 cannot hold both without knowing which of the two is
-                 showing. So the COUNT is now the same arithmetic `auto-fit`
+                 however many it draws, which was right for the two-column
+                 case AS FIRST BUILT (CH27.8's Activity-left/Record-right,
+                 which is also DOM order — `footer-activity` is emitted
+                 before `footer-record`, below) and wrong for the one-column
+                 case (this ruling's Record-top/Activity-bottom) — one grid,
+                 two different orders, and `order` alone cannot hold both
+                 without knowing which of the two is showing. THE TWO-COLUMN
+                 HALF OF THAT IS NO LONGER CH27.8'S ORDER, as of the SAME
+                 client's later ruling the same day — "everywhere 1st column:
+                 record, 2nd column latest activity" — so each region's own
+                 explicit two-column cell (not DOM order, which stays
+                 Activity-then-Record and no longer matters once both cells
+                 are named) now places Record first and Activity second; see
+                 `footer-activity`'s own comment, below, for the fix and the
+                 proof that found it swapped. So the COUNT is now the same
+                 arithmetic `auto-fit`
                  already did — two `16.25rem` tracks plus the one gap
                  between them, `@min-[34.5rem]` (`--space-7` resolved to its
                  literal `2rem`, a query condition cannot hold a `var()` —
@@ -1554,7 +1567,10 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                   "gap-x-[var(--space-7)] gap-y-[var(--space-3h)]",
                 )}
               >
-              {/* ---- Left · Latest activity ---------------------------- */}
+              {/* ---- Right · Latest activity -----------------------------
+                 CORRECTED 22 SEP 2026, LATER THE SAME DAY — was "Left ·
+                 Latest activity" until the column swap; see this region's
+                 own placement comment, below. */}
               {showActivityColumn ? (
                 <div
                   data-record-region="footer-activity"
@@ -1566,19 +1582,33 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                        latest activity on the bottom." `order-2` is the whole
                        rule at one track: this region reads second regardless
                        of where it sits in the DOM (below, still first — CH27.8's
-                       own reading order, untouched). TWO COLUMNS: BACK TO ITS
-                       OWN NAMED CELL, `col-start-1 row-start-1`, so an EXPLICIT
-                       position — not `order-none` alone — takes it out of
-                       auto-placement the moment there is a second track to
-                       misplace it into. `order-none` rides along so nothing is
-                       left declaring a row preference the explicit cell no
-                       longer needs. */
+                       own reading order, untouched). TWO COLUMNS: SECOND
+                       COLUMN, `col-start-2 row-start-1` — CORRECTED 22 SEP
+                       2026, LATER THE SAME DAY, against the SAME ruling that
+                       set the one-column order above it. Her verbatim ruling
+                       goes on past the one-column case, and its two-column
+                       half is the part this literal had not yet caught up
+                       with: "everywhere 1st column: record, 2nd column
+                       latest activity." This region had kept CH27.8's own
+                       cell, `col-start-1` — Activity-left/Record-right, the
+                       chapter's original reading order — which is exactly the
+                       order she is overriding. A live paint proof on staging
+                       (ticket, story, account; 1440/1280/760; rail collapsed)
+                       measured Latest activity painting on the LEFT at every
+                       width, which is this literal read correctly and
+                       enforced. It moves to `col-start-2`, the record's own
+                       cell moves to `col-start-1` (below), and neither
+                       region's `order-1`/`order-2` for the one-column case
+                       changes — that ruling was already satisfied and is a
+                       different mechanism from this one. `order-none` rides
+                       along so nothing is left declaring a row preference the
+                       explicit cell no longer needs. */
                     // LITERAL, NOT interpolated — same reason as the grid's
                     // own `grid-cols` line above; see that comment.
                     footerHasTwoColumns
                       ? [
                           "order-2",
-                          "@min-[34.5rem]:order-none @min-[34.5rem]:col-start-1 @min-[34.5rem]:row-start-1",
+                          "@min-[34.5rem]:order-none @min-[34.5rem]:col-start-2 @min-[34.5rem]:row-start-1",
                         ]
                       : undefined,
                   )}
@@ -1800,7 +1830,9 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                 </div>
               ) : null}
 
-              {/* ---- Right · Record ------------------------------------ */}
+              {/* ---- Left · Record --------------------------------------
+                 CORRECTED 22 SEP 2026, LATER THE SAME DAY — was "Right ·
+                 Record" until the same fix as `footer-activity`, above. */}
               {showRecordColumn ? (
                 <div
                   data-record-region="footer-record"
@@ -1809,16 +1841,24 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                     /* ONE COLUMN: FIRST — the other half of the ruling on
                        `footer-activity`, above; that region's own comment
                        carries the client's words and the reasoning for both
-                       at once. TWO COLUMNS: `col-start-2 row-start-1`, CH27.8's
-                       own Record-on-the-right, restated as an explicit cell for
-                       the same reason. */
+                       at once. TWO COLUMNS: FIRST COLUMN, `col-start-1
+                       row-start-1` — CORRECTED 22 SEP 2026, against CH27.8's
+                       own Record-on-the-right, which this cell used to
+                       restate verbatim (`col-start-2`). Her 22 Sep ruling
+                       overrides the chapter for this app: "everywhere 1st
+                       column: record, 2nd column latest activity." See
+                       `footer-activity`'s own comment, above, for the full
+                       account and the live paint proof that found the two
+                       regions swapped. The one-column `order-1` below is
+                       untouched — it already put Record first, on top, which
+                       is the correct, separate ruling. */
                     // LITERAL, NOT interpolated — same reason as the grid's
                     // own `grid-cols` line, this node's own comment a few
                     // lines above `record-detail-footer-grid`.
                     footerHasTwoColumns
                       ? [
                           "order-1",
-                          "@min-[34.5rem]:order-none @min-[34.5rem]:col-start-2 @min-[34.5rem]:row-start-1",
+                          "@min-[34.5rem]:order-none @min-[34.5rem]:col-start-1 @min-[34.5rem]:row-start-1",
                         ]
                       : undefined,
                   )}
