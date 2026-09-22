@@ -2031,13 +2031,13 @@ through `renderDetail` (`shared/web/screen-engine/screen-renderer.tsx`) — and 
 that exact constant and import it from that file. No call site passes a `titleSize` of its
 own.
 
-**AMENDED 2026-09-22 — the title's SIZE stopped living here, kit v1.2.150.** Until this date
+**AMENDED 2026-09-22: the title's SIZE stopped living here, kit v1.2.150.** Until this date
 `RECORD_TITLE_TREATMENT` also carried `RECORD_TITLE_SIZE`, a descendant selector forcing the
 h1/44 step from outside, because the kit's `Title` primitive had no h1 rung for
 `RecordDetail`'s `titleSize` to ask for directly. The client's later, standing typography
 ruling caps every screen and record title at 32px, and the kit moved `RecordDetail`'s own
 `titleSize` default from h1 to h2 (32px) at the source, so the override's one reason to exist
-— reaching a step the kit's default could not reach — was gone; keeping it would have been a
+: reaching a step the kit's default could not reach: was gone; keeping it would have been a
 second, competing answer to a question the kit now answers correctly. `RECORD_TITLE_SIZE` is
 removed, and `RECORD_TITLE_TREATMENT` carries only the split and the container query below.
 
@@ -2103,11 +2103,11 @@ is what draws it, through `RecordMark`/`AppMark` exactly as every list row and t
 does (G3).
 
 **Title height is unchanged, by construction, not by eye.** The mark's own box is sized to
-the title's line box — `calc(var(--text-3xl) * var(--text-3xl--line-height))`, the h2 step's
+the title's line box: `calc(var(--text-3xl) * var(--text-3xl--line-height))`, the h2 step's
 own two tokens, the step the kit's `RecordDetail` renders a record's title at by default
 since kit v1.2.150 (2026-09-22; this box tracked `--text-4xl`, the h1 step, until then, back
 when the app forced h1/44 from outside through the app-side `RECORD_TITLE_SIZE` override,
-since removed — [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant)'s
+since removed: [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant)'s
 own section has the account) — never a pixel figure picked to look right on one screen. The
 row is `items-center gap-3` (the kit's `--space-3`),
 so the row's own height is the title's line-box height and nothing taller sits beside it to
@@ -2124,7 +2124,7 @@ only draws when a caller hands it a real node, never a string — the discrimina
 
 Evidence: the artifact's own Reference section, built when the title still sat at h1/44,
 computed the title's line-box height as the sum of the kit's stack (breadcrumb, band inset,
-pill row, gap, `--text-4xl` line box) and checked every B1 frame against that same line — the
+pill row, gap, `--text-4xl` line box) and checked every B1 frame against that same line: the
 account, the app and the team-member mocks all landed on it. That arithmetic is history now
 that the title itself sits at h2/32 (see the amendment above); the live construction is
 identical, only the two tokens it reaches for moved with the title.
