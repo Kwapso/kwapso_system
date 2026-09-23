@@ -2342,8 +2342,23 @@ export function HelpDetailScreen({
       {/* NEW WORK ON THIS REQUEST. The ticket rides in as `fixedTicket`: the
           request behind the work is a fact about where you are standing, not a
           question, so it is shown rather than offered and cannot be mistyped.
-          The app is left as a question, because a request about one system is
-          often answered by work on another.
+
+          THE APP RIDES IN TOO, AS `fixedApp` (T3843/T3842, regressions of
+          T3821/T3822) — read straight off `ticket.appId`/`ticket.appName`,
+          the record this screen already holds, rather than left for the
+          dialog to guess by searching `fixedTicket.id` inside `tickets`
+          (`options.tickets`, `useStoryFormOptions`). That list is PAGED (R14,
+          `listFetch.help`, page one only) — once a team has enough tickets
+          that this one has scrolled off page one, the lookup missed, the
+          dialog's own `derivedApp` came back undefined, and the story saved
+          with NO app at all (never showing on the app's Stories tab, no
+          cache key could fix that) while the process picker fell back to
+          the whole team's unfiltered list (`onThisApp` only narrows when
+          `appId` is truthy). Every other call site (`app-detail.tsx`,
+          `sprint-detail.tsx`) already hands the dialog `fixedApp` straight
+          off a record it holds; this one now matches, and the search-based
+          derivation in `story-form-dialog.tsx` becomes this call's
+          fallback rather than its only path.
 
           The story arrives ALREADY RELATED — that relation is the entire point,
           and it is what makes the list behind this dialog move. `createStoryFrom`
@@ -2357,6 +2372,7 @@ export function HelpDetailScreen({
         onOpenChange={setStoryOpen}
         sprints={options.sprints}
         apps={options.apps}
+        fixedApp={ticket.appId ? { id: ticket.appId, name: ticket.appName ?? "" } : undefined}
         fixedTicket={{
           // The same words the picker on this form would have shown, through the
           // same plain-text seam the header uses — a request written in rich text
@@ -2381,9 +2397,9 @@ export function HelpDetailScreen({
           // T3654 — the resting key alone is not what this panel reads from;
           // see invalidateFindsOf's own header (paged-find.tsx).
           invalidateFindsOf(sliceKey("stories-ticket", helpId))
-          // T3652 — the story is also filed against whichever app the form's
-          // own (editable, since there is no `fixedApp` here) App field named.
-          // Nothing else in this dialog's cache touches that app's own Stories
+          // T3652 — the story is also filed against `ticket.appId`, now handed
+          // to the dialog directly as `fixedApp` (T3843) rather than left for
+          // it to derive. Nothing else in this dialog's cache touches that app's own Stories
           // tab, so a story raised from here sat correctly in the door and
           // never patched the one screen a person would check it against.
           if (v.appId) {
