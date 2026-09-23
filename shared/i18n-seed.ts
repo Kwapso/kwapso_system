@@ -1288,7 +1288,6 @@ export const SEED: Catalogue = {
   "Reopen this ticket?": { de: "Dieses Ticket wieder öffnen?", es: "¿Reabrir este ticket?", ca: "Vols reobrir aquest tiquet?"},
   "It goes back to In progress.": { de: "Es geht zurück zu Läuft.", es: "Vuelve a En progreso.", ca: "Torna a En curs."},
   "Reopened.": { de: "Wieder geöffnet.", es: "Reabierto.", ca: "Reabert."},
-  "Already reopened.": { de: "Bereits wieder geöffnet.", es: "Ya reabierto.", ca: "Ja reabert."},
   "Team switched": { de: "Team gewechselt", es: "Equipo cambiado", ca: "Equip canviat"},
   "The agency": { de: "Die Agentur", es: "La agencia", ca: "L'agència"},
   "The assistant can use this again.": { de: "Der Assistent kann dies wieder verwenden.", es: "El asistente puede volver a usar esto.", ca: "L'assistent pot tornar a fer servir això."},
