@@ -138,7 +138,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
       />
     )
     expect(await screen.findByText("Cycle time")).toBeTruthy()
-    expect(await screen.findByText("Effort hours")).toBeTruthy()
+    expect(await screen.findByText("Hours logged")).toBeTruthy()
     expect(await screen.findByText("Flow efficiency")).toBeTruthy()
     // The rounded-to-zero figures — "0h" on both the Cycle time and the
     // Effort hours tiles (3 seconds rounds to 0 hours either way), not a
@@ -174,7 +174,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     // No tile grid at all for a task — no metrics concept, documented in
     // this file's own header (unchanged by this fix) — but the row itself,
     // and the record it belongs to, are never hidden.
-    expect(await screen.findByText("Effort")).toBeTruthy()
+    expect(await screen.findByText("Time log")).toBeTruthy()
     expect(screen.queryByText("Cycle time")).toBeNull()
     expect(screen.getByText("0m")).toBeTruthy()
   })
@@ -192,7 +192,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     )
     // Give the list read a turn to settle before asserting absence.
     await waitFor(() => {
-      expect(screen.queryByText("Effort")).toBeNull()
+      expect(screen.queryByText("Time log")).toBeNull()
       expect(screen.queryByText("Cycle time")).toBeNull()
     })
   })
@@ -215,7 +215,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const card = (await screen.findByText("Effort")).closest('[data-slot="card"]') as HTMLElement
+    const card = (await screen.findByText("Time log")).closest('[data-slot="card"]') as HTMLElement
     expect(card.getAttribute("data-variant")).toBe("plain")
     expect(card.getAttribute("data-surface")).toBe("plain")
   })
@@ -240,7 +240,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     await waitFor(() => {
       expect(onEmptyChange).toHaveBeenCalledWith(true)
     })
-    expect(screen.queryByText("Effort")).toBeNull()
+    expect(screen.queryByText("Time log")).toBeNull()
   })
 
   it("calls onEmptyChange(false) once a record exists", async () => {
@@ -288,7 +288,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
     expect(grid.className).toContain("gap-[var(--space-4)]")
     // No leading/trailing margin of the grid's own — its left edge is
     // whatever the section's own (unpadded) flow gives it, the same edge
-    // the "Effort" title stands on.
+    // the "Time log" title stands on.
     expect(grid.className).not.toMatch(/\bm[lxt]?-/)
   })
 
@@ -320,7 +320,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const list = await screen.findByRole("list", { name: "Effort" })
+    const list = await screen.findByRole("list", { name: "Time log" })
     expect(list.getAttribute("data-slot")).toBe("effort-log-rows")
     expect(list.className).not.toContain("bg-surface-panel")
     expect(list.className).not.toContain("rounded")
@@ -351,7 +351,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const list = await screen.findByRole("list", { name: "Effort" })
+    const list = await screen.findByRole("list", { name: "Time log" })
     const children = Array.from(list.children)
     expect(children.map((c) => c.getAttribute("data-slot") === "separator" || c.getAttribute("role") === "separator")).toEqual([
       false,
@@ -373,7 +373,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const list = await screen.findByRole("list", { name: "Effort" })
+    const list = await screen.findByRole("list", { name: "Time log" })
     expect(list.querySelector('[data-slot="separator"]')).toBeNull()
   })
 })

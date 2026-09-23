@@ -298,6 +298,40 @@ describe("Tasks — the Planned tab's Calendar view on a team with nothing dated
   })
 })
 
+// T3845 — "I tried to change the list view to calendar view... my screen is
+// just stuck... There should be a way to go back to the list view if
+// calendar view is not available." The case above (`[]`) is genuinely empty
+// (R50) and is right to hide the toolbar entirely. This is the DIFFERENT
+// case the bug report actually was: the Planned tab has real tasks, none of
+// them dated — Calendar's own narrower "nothing to draw" used to collapse
+// the WHOLE toolbar, view switch included, leaving no way back to Table.
+describe("Tasks — Planned has undated tasks, Calendar draws nothing to show, but the way back stays (T3845)", () => {
+  const UNDATED_TASK = { ...ONE_DATED_TASK, id: "t2", title: "Sort the archive", dueOn: null } as Task
+
+  it("shows the narrower empty message with no add button, and keeps the view switch reachable", async () => {
+    renderTasksCalendar([UNDATED_TASK])
+    expect(await screen.findByText("No tasks with a deadline yet.")).toBeTruthy()
+    // NOT the genuinely-empty register's own button — this collection is not
+    // empty, only this VIEW of it is (R62's `filtered` shape).
+    expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
+    // THE WHOLE POINT — the view switch must still be on the page, so
+    // Calendar is not a one-way door. `ViewSwitch` (the kit control this
+    // row's own `view` slot builds, `screen-bits.tsx`) marks its own trigger
+    // `data-slot="view-switch"`.
+    expect(document.querySelector('[data-slot="view-switch"]')).toBeTruthy()
+  })
+
+  it("switching the remembered choice back to Table shows the task again", async () => {
+    // The same "prime the remembered choice directly" move this file's own
+    // header uses to reach Calendar without driving the Radix Select — proof
+    // that Table is still a real, working destination once reached, not
+    // just that a control for it renders.
+    renderTasksCalendar([UNDATED_TASK], "table")
+    expect(await screen.findByText("Sort the archive")).toBeTruthy()
+    expect(screen.queryByText("No tasks with a deadline yet.")).toBeNull()
+  })
+})
+
 /* ---------------------------------- meetings ------------------------------- */
 
 const ONE_MEETING = {
@@ -537,12 +571,13 @@ describe("Stories — the tab strip on a team with nothing in it, and the canary
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
   })
 
-  it("draws Now · Planned · Review · Completed · Backlog, and no All tab without the right", async () => {
+  it("draws Now · Planned · Review · Done · Backlog, and no All tab without the right", async () => {
     renderStories([])
     expect(await screen.findByRole("tab", { name: /Now/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Planned/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Review/ })).toBeTruthy()
-    expect(screen.getByRole("tab", { name: /Completed/ })).toBeTruthy()
+    // B0382 — "Completed" -> "Done" (the internal view key stays `completed`).
+    expect(screen.getByRole("tab", { name: /Done/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Backlog/ })).toBeTruthy()
     expect(screen.queryByRole("tab", { name: /^All$/ })).toBeNull()
   })

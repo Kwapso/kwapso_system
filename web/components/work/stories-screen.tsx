@@ -575,7 +575,8 @@ const STORY_TABS: { value: StoryView; label: string; icon: string }[] = [
   // caller's own name for a reader who lacks that right, the identical
   // `all`/All fallback (`STORY_VIEWS`, shared/types.ts).
   { value: "reviews", label: "Review", icon: "check-circle" },
-  { value: "completed", label: "Completed", icon: "check" },
+  // B0382 — "Completed" -> "Done" (the internal view key stays `completed`).
+  { value: "completed", label: "Done", icon: "check" },
   // "Backlog", NOT "All" — the client's own correction over the design
   // proposal's recommendation, 15 Sep 2026 (documents/UI-RULEBOOK.md K entry).
   { value: "backlog", label: "Backlog", icon: "stack" },
@@ -673,11 +674,12 @@ function ReviewsQueue({
           <span className="text-muted-foreground text-sm">{richTextPlain(s.detail)}</span>
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <span>
-              {t("Completed by")}: {staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")}
+              {/* B0382 — "Completed" -> "Done" */}
+              {t("Done by")}: {staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")}
             </span>
             {s.closedAt && (
               <span>
-                {t("Completed on")}: {formatDate(s.closedAt, lang)}
+                {t("Done on")}: {formatDate(s.closedAt, lang)}
               </span>
             )}
           </div>

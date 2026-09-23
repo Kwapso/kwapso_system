@@ -442,7 +442,9 @@ export function AppDetailScreen({
       },
       {
         value: "stories",
-        label: t("Stories"),
+        // B0385 — "Stories" -> "Backlog", matching web/lib/pages.ts's own
+        // nav entry (`{ key: "stories", title: "Backlog", ... }`).
+        label: t("Backlog"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,

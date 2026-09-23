@@ -2488,7 +2488,8 @@ export function ticketStatusColumnTitles(t: (s: string, vars?: Vars) => string):
   return {
     new: { title: t("New") },
     triaged: { title: t("Triaged") },
-    scheduled: { title: t("Scheduled") },
+    // B0383 — "Scheduled" -> "To Do" (the stored value stays `scheduled`).
+    scheduled: { title: t("To Do") },
     in_progress: { title: t("In progress") },
     ready: { title: t("Ready") },
     resolved: { title: t("Resolved") },

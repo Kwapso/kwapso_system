@@ -108,7 +108,9 @@ export const GLOSSARY = {
   // not have that" — the same ruling, which is why neither entry below is a
   // priority wearing a different name.
   storyTypeData: { term: "Data", def: "A story type: changing values inside records, not the software around them." },
-  storyTypeTech: { term: "Tech", def: "A story type: work under the hood, invisible to the people using the system." },
+  // B0376/B0377 — "Tech" -> "Chore" (team migration 0106; the record column
+  // and the `selectable_data` group's own values moved with it).
+  storyTypeTech: { term: "Chore", def: "A story type: work under the hood, invisible to the people using the system." },
   storyTypeBug: { term: "Bug", def: "A story type: something that should work is broken, missing or wrong." },
   storyTypeFeature: { term: "Feature", def: "A story type: a brand-new capability that did not exist before." },
   storyTypeChange: { term: "Change", def: "A story type, and the default: modifying something that already works, copy and email wording included." },
@@ -120,7 +122,9 @@ export const GLOSSARY = {
   // carry ("work Kwapso started on its own, not asked for by a client") said
   // the same thing in different words than every other file that quotes her
   // ruling verbatim.
-  storyCategoryInternal: { term: "Internal", def: "A story's category: Kwapso-initiated upkeep, not asked for by a client." },
+  // B0378 — "Internal" -> "Enabler" (team migration 0106; the record column
+  // and the `selectable_data` group's own values moved with it).
+  storyCategoryInternal: { term: "Enabler", def: "A story's category: Kwapso-initiated upkeep, not asked for by a client." },
   todo: { term: "Input", def: "Something we need from a client. It sits in their portal with a due date." },
   task: { term: "Task", def: "Our own internal admin, something for us, not for an account's delivery." },
   // "Sprint" -> "Phase", Aurora's ruling, 20 Sep 2026, verbatim: "Rename

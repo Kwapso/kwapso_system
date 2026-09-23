@@ -43,3 +43,13 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
 if (typeof Element !== "undefined" && typeof Element.prototype.scrollIntoView !== "function") {
   Element.prototype.scrollIntoView = () => {}
 }
+// SAME GAP, A DIFFERENT METHOD — met by T3841's fix (`shared/web/follow-
+// newest.ts`'s `threadBox()`), which now scrolls the ticket thread's own
+// bounded pane (`[data-thread-scroll]`, `ticket-detail-body.tsx`) instead of
+// the whole page. jsdom implements `window.scrollTo` but not
+// `Element.prototype.scrollTo`, so any suite that mounts the real thread
+// panel threw the moment a reply landed, no assertion of a scroll position
+// involved.
+if (typeof Element !== "undefined" && typeof Element.prototype.scrollTo !== "function") {
+  Element.prototype.scrollTo = () => {}
+}

@@ -68,7 +68,12 @@ export const SEED: Catalogue = {
   // Only the STORY and TICKET record's own panel/tab say this; task and
   // meeting detail keep "Work logs" above; the rail entry stays "Hours".
   // See documents/UI-RULEBOOK.md row B27 item 12.
-  Effort: { de: "Aufwand", es: "Esfuerzo", ca: "Esforç" },
+  //
+  // SUPERSEDED AGAIN, 22 Sep 2026 (B0386, the owner's approved rename): the
+  // per-record card's own title (`web/components/work/effort-card.tsx`,
+  // "Effort") moves to "Time log" — see that string's own seed entry below.
+  // This nav-level "Work logs" destination (the team-wide list, `/time`) is
+  // a different screen and is untouched.
   Hours: { de: "Stunden", es: "Horas", ca: "Hores" },
   // RENAMED FROM "Knowledge base" — R85, the same ruling: "'Knowledge Base':
   // reduce it to 'Knowledge'." The route (/knowledge) and every identifier
@@ -97,7 +102,6 @@ export const SEED: Catalogue = {
   /* ── Statuses ────────────────────────────────────────────────────────────── */
   Open: { de: "Offen", es: "Abierto", ca: "Obert" },
   Triage: { de: "Sichtung", es: "Clasificación", ca: "Classificació" },
-  Scheduled: { de: "Geplant", es: "Programado", ca: "Programat" },
   "In progress": { de: "In Arbeit", es: "En curso", ca: "En curs" },
   /* THE CONTACTS SCREEN'S SECOND TAB (client, 2026-09-09: "also tabs here: All,
    * In portal") — the contacts who can sign in to the client portal. Filed
@@ -4385,8 +4389,11 @@ export const SEED: Catalogue = {
      criteria" and its placeholder sentence "What has to be true for this to
      count as done." are the new story field, same design as "Detail". */
   "Closed by": { de: "Abgeschlossen von", es: "Cerrado por", ca: "Tancat per" },
-  "Completed by": { de: "Abgeschlossen von", es: "Completado por", ca: "Completat per" },
-  "Completed on": { de: "Abgeschlossen am", es: "Completado el", ca: "Completat el" },
+  // B0382, 22 Sep 2026 (the owner's approved rename): "Completed by" ->
+  // "Done by", the same "von"/"por"/"per" attribution register "Raised
+  // by"/"Resolved by"/"Closed by" already carry, on the word "Done on"
+  // already seeds two lines below.
+  "Done by": { de: "Erledigt von", es: "Hecho por", ca: "Fet per" },
   "Done on": { de: "Erledigt am", es: "Hecho el", ca: "Fet el" },
   "Who did it": { de: "Wer es gemacht hat", es: "Quién lo hizo", ca: "Qui ho va fer" },
   "Acceptance criteria": { de: "Abnahmekriterien", es: "Criterios de aceptación", ca: "Criteris d'acceptació" },
@@ -4581,8 +4588,13 @@ export const SEED: Catalogue = {
   // AMENDED, 22 Sep 2026, B44 amended a third time — the middle stat tile's
   // own label, distinct from the title's own "Effort" now that the title
   // carries the record count instead of the hour total.
-  "Effort hours": { de: "Aufwandsstunden", es: "Horas de esfuerzo", ca: "Hores d'esforç" },
   "Flow efficiency": { de: "Flusseffizienz", es: "Eficiencia de flujo", ca: "Eficiència de flux" },
+  // B0386, 22 Sep 2026 (the owner's approved rename): the card's own title
+  // moves from "Effort" to "Time log" (`Zeiterfassung`/`registro de tiempo`/
+  // `registre de temps`, the same root "No time log" below already seeds).
+  // The middle tile's own word, "Hours logged" (replacing "Effort hours"),
+  // is already seeded above — see that entry's own header.
+  "Time log": { de: "Zeiterfassung", es: "Registro de tiempo", ca: "Registre de temps" },
   "No time log": { de: "Keine Zeiterfassung", es: "Sin registro de tiempo", ca: "Sense registre de temps" },
   // THE EFFORT CARD'S OWN EMPTY STATE (Aurora's ruling, 21 Sep 2026, B44
   // amended) — no door, words only.

@@ -32,7 +32,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Prohibit, CaretRight, ListBullets, Kanban as KanbanGlyph, Cards } from "@shared/ui/foundations/icons"
+import { Prohibit, CaretRight, ListBullets, Kanban as KanbanGlyph, Cards, Plus } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 /* THE APP RECORD'S OWN BOARD AND QUEUE — client, 17 Sep 2026: "In Tickets
    inside the app, I want a board view by status" and "I also want the queue
@@ -637,7 +637,16 @@ export function SprintsPanel({
   const rows = q.data.map((s) => ({ ...s, wrapped: s.completedAt || !s.active ? "yes" : "no" }))
 
   return (
-    <CollectionCreateActionProvider action={onNew ? { label: t("Start a phase"), onCreate: onNew } : null}>
+    <CollectionCreateActionProvider
+      // T3848 — this action drew as a blank black circle. `createActionButton`
+      // (collection-frame.tsx) renders `{action.icon}` and nothing else inside
+      // the button; every OTHER call site of this provider reaches it through
+      // `SectionWithCreate`, which always supplies one (`icon="plus"` →
+      // `<Icon className="size-4" />`, screen-bits.tsx). This panel calls the
+      // provider directly and had never passed one — R98/UI-CONVENTIONS §4's
+      // own "create = Plus" mapping.
+      action={onNew ? { label: t("Start a phase"), icon: <Plus className="size-4" />, onCreate: onNew } : null}
+    >
       <CollectionFrame
         useKitPanel
         config={{
@@ -645,6 +654,15 @@ export function SprintsPanel({
           searchPlaceholder: t("Search phases…"),
           emptyText: emptyText,
           userFilter: true,
+          // T3848 — the sort chip's own field read blank ("Sort by" with an
+          // empty pill beside it): `sortBy` was never set, so it defaulted to
+          // `defaultCollectionConfig`'s `""`, a key none of `sortOptions`
+          // below carries, and `SortControl`'s `SelectValue` shows nothing for
+          // a value with no matching option. Every other sortable config in
+          // this codebase sets a real starting key (waves-screen.tsx,
+          // record-table.tsx, paged-find.tsx) — A→Z (R75), same as this
+          // panel's own `sortOptions` order.
+          sortBy: "name",
           filterFacets: [
             // WHICHEVER OF THE TWO ISN'T ALREADY FIXED by hanging here — an
             // account's Sprints tab still spans several apps; an app's

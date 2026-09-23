@@ -164,7 +164,8 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
   // is not drawn: a link to a 403 is worse than no link.
   const LINKS = [
     { need: "help", title: t("Tickets"), desc: t("What clients have asked us for"), icon: Tray, href: "/tickets" },
-    { need: "work", title: t("Stories"), desc: t("The work in hand"), icon: PuzzlePiece, href: "/stories" },
+    // B0385 — "Stories" -> "Backlog", matching web/lib/pages.ts's own nav entry.
+    { need: "work", title: t("Backlog"), desc: t("The work in hand"), icon: PuzzlePiece, href: "/stories" },
     { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: ChecksRegular, href: "/tasks" },
     { need: "work", title: t("Work logs"), desc: t("Time logged, and the timers running"), icon: Timer, href: "/time" },
     { need: "meetings", title: t("Meetings"), desc: t("The meetings list"), icon: Chat, href: "/meetings" },

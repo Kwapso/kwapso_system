@@ -561,7 +561,8 @@ function compareTasks(a: Task, b: Task, field: "priority" | "deadline", dir: "as
 const TASK_TABS: { value: TaskView; label: string; icon: string }[] = [
   { value: "overdue", label: "Overdue", icon: "warning" },
   { value: "planned", label: "Planned", icon: "clipboard-text" },
-  { value: "completed", label: "Completed", icon: "check" },
+  // B0382 — "Completed" -> "Done" (the internal view key stays `completed`).
+  { value: "completed", label: "Done", icon: "check" },
 ]
 
 /** THE FOURTH TAB — the door's status-agnostic `all` view, LAST in the strip
@@ -1131,18 +1132,34 @@ export function TasksScreen({
             }
           : { views: [tableViewOption], value: "table", onValueChange: () => {} }
 
-  // THIS TAB'S OWN "GENUINELY EMPTY" (R50) — the calendar AND week sub-views
-  // both ask a narrower question (has anything here got a date at all) than
-  // the other two (does this pile hold any row at all): a task with no
-  // deadline cannot fall into any day's column, calendar or week alike.
-  const rawEmpty = subView === "calendar" || subView === "week" ? !hasDueDated : rawRows.length === 0
-  const toolbarEmpty = !tasksLoading && rawEmpty
+  // THE TAB'S TRUE EMPTINESS (R50) — does this pile hold any row at all.
+  // This is the ONLY thing allowed to collapse the whole toolbar (search,
+  // filters, sort, view and actions together): the VIEW SWITCH is how a
+  // reader gets back to a body that has something else to show, so it must
+  // never go down with a narrower, view-specific "nothing to draw" (T3845).
+  const trueEmpty = rawRows.length === 0
+  const toolbarEmpty = !tasksLoading && trueEmpty
+
+  // THE BODY'S OWN NARROWER "NOTHING TO DRAW" (T3845, R50) — Calendar and
+  // Week ask a narrower question than the tab's own emptiness (has anything
+  // here got a date at all): a task with no deadline cannot fall into any
+  // day's column, calendar or week alike. THIS USED TO BE THE SAME FLAG THE
+  // TOOLBAR READ (`rawEmpty`, folded into `toolbarEmpty` above) — Ishita, "I
+  // tried to change the list view to calendar view... my screen is just
+  // stuck... There should be a way to go back to the list view if calendar
+  // view is not available." A tab full of undated tasks made THIS narrower
+  // question collapse the ENTIRE toolbar, view switch included, so Calendar
+  // could open and never close. Kept as its own flag, body-only now: the
+  // body still shows the identical "No tasks with a deadline yet." message,
+  // just with the toolbar (and the way back to Table/Board) still standing.
+  const dateEmpty = (subView === "calendar" || subView === "week") && !hasDueDated
+  const rawEmpty = trueEmpty || dateEmpty
 
   const toolbar = (
     <ToolbarRow
       empty={toolbarEmpty}
       search={
-        (tasksLoading || !rawEmpty) && (
+        (tasksLoading || !trueEmpty) && (
           <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -1152,16 +1169,18 @@ export function TasksScreen({
           />
         )
       }
-      filters={(tasksLoading || !rawEmpty) && filterPill}
-      toolbarPanel={(tasksLoading || !rawEmpty) && filterPanel}
+      filters={(tasksLoading || !trueEmpty) && filterPill}
+      toolbarPanel={(tasksLoading || !trueEmpty) && filterPanel}
       // R53's SORT DEFAULT — "add sort by task priority and deadline. That's
       // it." Picking the OTHER field lands on that field's own default
       // direction (`taskSortOptions`' `defaultDir`), not whatever direction
       // the previous field happened to be showing — the same "a fresh field
       // is a fresh question" shape `contact-panels.tsx`'s own multi-option
-      // sort already answers its `onValueChange` with.
+      // sort already answers its `onValueChange` with. (R78 suppresses this
+      // control itself, centrally, the instant `viewSlot`'s own active value
+      // is "calendar"/"week" — nothing here has to ask.)
       sort={
-        (tasksLoading || !rawEmpty) && {
+        (tasksLoading || !trueEmpty) && {
           options: taskSortOptions(t),
           value: sortField,
           onValueChange: (v) => {
@@ -1173,7 +1192,7 @@ export function TasksScreen({
           onDirectionChange: setSortDir,
         }
       }
-      view={(tasksLoading || !rawEmpty) && viewSlot}
+      view={(tasksLoading || !trueEmpty) && viewSlot}
       actions={canCreate && <AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />}
     />
   )
@@ -1181,12 +1200,11 @@ export function TasksScreen({
   const body = tasksLoading ? (
     // ROWS ONLY — the toolbar above is already real.
     <Skeleton variant="list" lines={4} />
-  ) : rawEmpty ? (
-    // GENUINELY EMPTY — the collection empty title is the same one for every
-    // tab and sub-view on purpose: "nothing on our own list" is true whether
-    // the pile in question is overdue, planned or completed, and three tabs
-    // sharing one honest sentence beats three invented ones that each need
-    // their own translation.
+  ) : trueEmpty ? (
+    // GENUINELY EMPTY — Calendar/Week still ask their own narrower question
+    // even when the tab holds nothing at all, so they keep their own honest
+    // title (unchanged from before this fix); the other sub-views share one
+    // sentence rather than each inventing its own translation.
     <CollectionEmptyState
       title={
         subView === "calendar" || subView === "week"
@@ -1194,6 +1212,20 @@ export function TasksScreen({
           : t("Nothing on our own list.")
       }
       onCreate={canCreate ? () => setTaskOpen(true) : undefined}
+    />
+  ) : dateEmpty ? (
+    // NARROWED TO NOTHING, THE CALENDAR/WEEK WAY (T3845, R62) — the tab
+    // itself is not empty (`trueEmpty` is false here), so this is `filtered`,
+    // same register the search/facet narrowing below uses, and `filtered`
+    // withdraws the create button itself (`collection-frame.tsx`) — the
+    // toolbar's own AddButton is the one door now that the toolbar no longer
+    // disappears for this case (R88). `filtered` also swaps which title prop
+    // the register reads (`filteredTitle`, never `title`), so both carry the
+    // same sentence rather than falling back to the generic "Nothing matched."
+    <CollectionEmptyState
+      filtered
+      title={t("No tasks with a deadline yet.")}
+      filteredTitle={t("No tasks with a deadline yet.")}
     />
   ) : filteredRows.length === 0 ? (
     // NARROWED TO NOTHING (R62) — same register, minus the button.

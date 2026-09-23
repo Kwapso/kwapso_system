@@ -229,17 +229,32 @@ export function TaskSheet({
   }, [taskId])
   const id = taskId ?? lastId
 
-  // THE "ALL" TASKS LIST — the same cache key `use-screen-data.ts`'s own
-  // `tasksAllQ` already reads whenever a task record id is in the URL, so
+  // THE "ALL" TASKS LIST, PAGE ONE — the same cache key `use-screen-data.ts`'s
+  // own `tasksAllQ` already reads whenever a task record id is in the URL, so
   // this is a second CALLER of that key, never a second door (the store
   // dedupes by key, CACHING.md). Reading it here (rather than threading a
   // `tasksAllQ` prop down through `TasksScreen`) keeps this file self-
-  // contained: a task can be opened by id from a row that is only in the
-  // CURRENTLY selected view's own loaded page, and this list carries every
-  // task regardless of which tab the list is showing.
+  // contained, and paints with no round trip for the common case: a task
+  // that IS on page one (CACHING.md is cache-first).
+  //
+  // BY ID, THE FALLBACK (T3844, R38) — this used to be the WHOLE read: `find`
+  // over this same "all" page and nothing else. "all" is a CAPPED,
+  // newest-first read (R14, `taskPage` in workers/content/src/routes/todos.ts),
+  // not the whole table, so any task outside page one — an older completed
+  // one being the reported case — was never in `tasksAllQ.data` and `task`
+  // stayed `null` forever with `loading` already `false`: the sheet's own
+  // skeleton branch never clears, because the ONLY condition it hands out is
+  // "did page one answer", never "did we ever find the task". The same shape
+  // `help-detail.tsx`'s `oneQ`/`inPage` pair fixed for tickets on 19 Aug —
+  // read the by-id door (`taskOne`, already the live registry's own
+  // `fetchOne` for `tasks`, `web/lib/live-resources.ts`) once page one comes
+  // back without the row, and `task:one:<id>` is in that registry's `deps` so
+  // a later edit still patches this exact fallback cache, not just page one.
   const tasksAllQ = useCached<Task[]>(id ? tasksKey(teamId, "all") : null, () => listFetch.tasks(teamId, "all"))
-  const task = (tasksAllQ.data ?? []).find((r) => r.id === id) ?? null
-  const loading = !!id && tasksAllQ.data === undefined
+  const inPage = tasksAllQ.data?.find((r) => r.id === id) ?? null
+  const oneQ = useCached<Task | null>(id && !inPage ? `task:one:${id}` : null, () => content.taskOne(id as string))
+  const task = inPage ?? oneQ.data ?? null
+  const loading = !!id && (tasksAllQ.data === undefined || (!inPage && oneQ.data === undefined))
 
   const runningTimersQ = useCached<RunningTimer[]>(id ? runningTimersKey(teamId) : null, () =>
     content.runningTimers().then((r) => r.timers)

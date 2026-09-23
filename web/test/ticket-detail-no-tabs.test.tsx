@@ -429,8 +429,8 @@ describe("the two-column body renders all four panels", () => {
     expect(screen.getByText("Related stories")).toBeTruthy()
 
     // EFFORT, the panel's own title — a heading, disambiguated from the
-    // metrics grid's own "Effort" line inside the same card.
-    expect(screen.getByRole("heading", { name: /^Effort/ })).toBeTruthy()
+    // metrics grid's own "Time log" line inside the same card.
+    expect(screen.getByRole("heading", { name: /^Time log/ })).toBeTruthy()
 
     // STAKEHOLDERS — the panel's own title, and the people pill inside it.
     expect(screen.getByText("Stakeholders")).toBeTruthy()
@@ -443,7 +443,7 @@ describe("the two-column body renders all four panels", () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
-    const time = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]')
+    const time = screen.getByRole("heading", { name: /^Time log/ }).closest('[data-slot="card"]')
     const stakeholders = screen.getByText("Stakeholders").closest('[data-slot="card"]')
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
@@ -493,21 +493,21 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   it("carries the record count beside the Effort title", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const heading = await screen.findByRole("heading", { name: /^Effort/ })
+    const heading = await screen.findByRole("heading", { name: /^Time log/ })
     // One WORK_LOG_ROW fixture.
-    expect(heading.textContent).toBe("Effort1")
+    expect(heading.textContent).toBe("Time log1")
   })
 
   // AMENDED, 22 Sep 2026 — Aurora, verbatim: "make the metrics cards inside
   // the container, like in the metrics artifact you did for me!" Real
-  // `<StatGrid>` tiles now; the middle one reads "Effort hours" since the
-  // title's own count already answers "Effort".
+  // `<StatGrid>` tiles now; the middle one reads "Hours logged" since the
+  // title's own count already answers "Time log".
   it("renders the door's own cycle time, effort hours and flow efficiency as stat tiles", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     // 90000s = 25h = 1d 1h; 5400s = 1.5h; 6%.
     expect(await screen.findByText("1d 1h")).toBeTruthy()
-    expect(await screen.findByText("Effort hours")).toBeTruthy()
+    expect(await screen.findByText("Hours logged")).toBeTruthy()
     expect(await screen.findByText("6%")).toBeTruthy()
     // "1.5h" appears once now — the tile's own figure, not repeated by the
     // title, which carries the record count instead.
@@ -543,8 +543,8 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     expect(await screen.findByText("No time log")).toBeTruthy()
     // The one WORK_LOG_ROW fixture is still logged even though the metrics
     // door has nothing to say yet.
-    const heading = await screen.findByRole("heading", { name: /^Effort/ })
-    expect(heading.textContent).toBe("Effort1")
+    const heading = await screen.findByRole("heading", { name: /^Time log/ })
+    expect(heading.textContent).toBe("Time log1")
   })
 
   // DEFECT (live proof, 21 Sep 2026): the Effort card's own stat tiles
@@ -580,7 +580,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   it("draws the individual time log rows with a face, name, date and duration", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const panel = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]') as HTMLElement
+    const panel = screen.getByRole("heading", { name: /^Time log/ }).closest('[data-slot="card"]') as HTMLElement
     const list = panel.querySelector('[data-slot="effort-log-rows"]')
     expect(list, "the row list is drawn").toBeTruthy()
     const row = list!.querySelector('[role="listitem"]') as HTMLElement
@@ -605,7 +605,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     // The rest of the page still settles.
     await screen.findByText("Stakeholders")
     expect(screen.queryByText("No time logged yet.")).toBeNull()
-    expect(screen.queryByRole("heading", { name: /^Effort/ })).toBeNull()
+    expect(screen.queryByRole("heading", { name: /^Time log/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
   })
 
@@ -623,7 +623,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   it("draws no pencil — clicking a row opens the slide-in sheet, and Save corrects it through the same update door", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const panel = screen.getByRole("heading", { name: /^Effort/ }).closest('[data-slot="card"]') as HTMLElement
+    const panel = screen.getByRole("heading", { name: /^Time log/ }).closest('[data-slot="card"]') as HTMLElement
     const row = panel.querySelector('[data-slot="effort-log-rows"] [role="listitem"] button') as HTMLElement
     expect(row, "the row itself is a button now, not a pencil beside it").toBeTruthy()
     fireEvent.click(row)

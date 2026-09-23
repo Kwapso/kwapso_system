@@ -39,26 +39,31 @@ export function shouldFollow(o: { first: boolean; mine: boolean; nearBottom: boo
 /** WHICH BOX THE THREAD IS IN — and it is no longer the same answer on both
  * doors, which is why this is a function and not two lines inlined twice.
  *
- * THE AGENCY DOOR STOPPED SCROLLING THE DOCUMENT ON 2026-09-02. `ScreenShell`
- * (kit v1.2.28) draws the window `h-dvh overflow-hidden` and gives the card's
- * body its own scroller, published as `[data-slot="screen-shell-body"]`. So on
- * that door the thread is the PANE, and `window.scrollY` is permanently 0 —
- * every reply would have been read as "the reader is at the top, busy", and
- * nothing would ever have followed again. Silent: no error, no yank, just a
- * conversation that stopped moving.
+ * THE AGENCY DOOR'S THREAD IS A BOUNDED PANE, `TicketConversationPanel`'s own
+ * `CardContent` (`web/components/tickets/ticket-detail-body.tsx`), marked
+ * `[data-thread-scroll]`. It used to be `[data-slot="screen-shell-body"]`
+ * instead — right while that element WAS the thread's own scroller (kit
+ * v1.2.28, `ScreenShell` drew the window `h-dvh overflow-hidden`), wrong from
+ * R89 round 28 on: `screen-shell-body` became the WHOLE ticket page's one
+ * scroll region, so landing on the newest reply on open scrolled the entire
+ * page to the bottom — composer visible, title and stages gone (T3841, 21 Sep
+ * 2026). `[data-thread-scroll]` names the actual bounded box (R91's own
+ * "chat thread" exception) so this only ever moves the transcript, never the
+ * page around it.
  *
  * THE PORTAL DOOR STILL SCROLLS THE DOCUMENT. `portal-shell.tsx` lays out with
- * `min-h-[100svh]` and lets the page scroll, exactly as the sentence this
- * comment replaces described, and the reasoning it gave is still true THERE:
- * the thread IS the page, a nested scroller would trap a thumb on a phone, and
- * scrolling the document to its end puts the sticky bottom nav back in its
- * natural place under the composer.
+ * `min-h-[100svh]` and lets the page scroll, and the reasoning is still true
+ * there: the thread IS the page, a nested scroller would trap a thumb on a
+ * phone, and scrolling the document to its end puts the sticky bottom nav
+ * back in its natural place under the composer. It carries no
+ * `[data-thread-scroll]` of its own, so the query below finds nothing and
+ * every caller below falls to the `document` branch, unchanged.
  *
  * So the box is asked for rather than assumed, and both doors get the same
  * behaviour out of whichever one they have. `null` means the document, which is
  * also what the login screen, onboarding and the error boundary have. */
 function threadBox(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[data-slot="screen-shell-body"]')
+  return document.querySelector<HTMLElement>('[data-thread-scroll]')
 }
 
 /** Is the reader already at the end of the thread's own scroller? */

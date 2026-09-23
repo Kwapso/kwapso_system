@@ -50,7 +50,8 @@ function renderLadder(status: HelpStatus, h: TicketStageHistory, createdAt = "20
 
 // The live ladder, in state-machine order — the same order `buildRungs`
 // draws an ordinary (never-reopened) ticket's rungs in.
-const LIVE_NAMES = ["New", "Triaged", "Scheduled", "In progress", "Ready", "Resolved"]
+// B0383 — "Scheduled" -> "To Do" (the stored value stays `scheduled`).
+const LIVE_NAMES = ["New", "Triaged", "To Do", "In progress", "Ready", "Resolved"]
 
 describe("the stage name, restored 19 Sep 2026 above the date on every rung", () => {
   it("draws every live stage's name, even with no history recorded at all", async () => {
@@ -96,7 +97,7 @@ describe("the stage name, restored 19 Sep 2026 above the date on every rung", ()
     // REACHED, BUT NO RECORD OF THE MOVE — name only, the gap said by the
     // date's absence rather than by a sentence (this file's own header,
     // carried over from ticket-stages.tsx's own).
-    expect(within(scheduledItem).getByText("Scheduled")).toBeTruthy()
+    expect(within(scheduledItem).getByText("To Do")).toBeTruthy()
     expect(within(scheduledItem).queryByText(/\d{2}h/)).toBeNull()
 
     // CURRENT, WITH AN OPEN (still-recording) SPAN — name + date.
