@@ -41,6 +41,10 @@
 //   POST /api/tenancy/apps                 -> record an app (agency only)
 //   POST /api/tenancy/apps/update          -> edit an app (agency only)
 //   POST /api/tenancy/apps/active          -> archive / restore an app
+//   GET  /api/tenancy/apps/attachments     -> the files and links on an app (?id=), fenced not refused
+//   POST /api/tenancy/apps/attachments     -> attach a file or a link (agency only)
+//   POST /api/tenancy/apps/attachments/update -> rename, or swap a file's bytes / a link's address (agency only)
+//   POST /api/tenancy/apps/attachments/remove -> take one off (agency only)
 //   GET  /api/tenancy/app-modules          -> the sections of an app (?appId= &archived=)
 //   POST /api/tenancy/app-modules          -> add a section to an app (agency only)
 //   POST /api/tenancy/app-modules/update   -> rename / re-describe a section
@@ -240,6 +244,12 @@ import {
   postAppModuleActive,
 } from "./routes/processes"
 import {
+  getAppAttachments,
+  postAppAttachment,
+  postAppAttachmentRemove,
+  postAppAttachmentUpdate,
+} from "./routes/app-attachments"
+import {
   getDepartments,
   getClientRoles,
   getToolPrices,
@@ -365,6 +375,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/apps": { handler: postCreateApp, kind: "mutation" },
   "POST /api/tenancy/apps/update": { handler: postUpdateApp, kind: "mutation" },
   "POST /api/tenancy/apps/active": { handler: postAppActive, kind: "mutation" },
+  "GET /api/tenancy/apps/attachments": { handler: getAppAttachments, kind: "read" },
+  "POST /api/tenancy/apps/attachments": { handler: postAppAttachment, kind: "mutation" },
+  "POST /api/tenancy/apps/attachments/update": { handler: postAppAttachmentUpdate, kind: "mutation" },
+  "POST /api/tenancy/apps/attachments/remove": { handler: postAppAttachmentRemove, kind: "mutation" },
   "GET /api/tenancy/app-modules": { handler: getAppModules, kind: "read" },
   "POST /api/tenancy/app-modules": { handler: postCreateAppModule, kind: "mutation" },
   "POST /api/tenancy/app-modules/update": { handler: postUpdateAppModule, kind: "mutation" },

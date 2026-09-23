@@ -99,6 +99,7 @@ import {
   Translate,
   CheckCircle,
   PencilSimple,
+  ArrowCounterClockwise,
 } from "@shared/ui/foundations/icons"
 
 /** WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
@@ -537,6 +538,9 @@ export function HelpDetailScreen({
   // Edit carries no confirm: the sheet's own Cancel (below) is already the
   // way out.
   const { ask: askDeleteReply, run: runDeleteReply, dialog: deleteReplyDialog } = useConfirm()
+  // REOPEN IS A SEPARATE, INDEPENDENT CONFIRM DIALOG (the hook is
+  // "one per screen serves all of them", not "one per screen, full stop").
+  const { ask: askReopen, run: runReopen, dialog: reopenDialog } = useConfirm()
   // THE REPLY BEING EDITED, OR NONE. Aurora's 20 Sep 2026 follow-up ruling
   // ("open the edit as slide in. can edit text and date and attachments").
   // The kit's own inline textarea can hold only the body, so Edit now opens
@@ -690,7 +694,7 @@ export function HelpDetailScreen({
    * A ticket already answered comes back `alreadyResolved` and emails nobody —
    * R17 is the send guard, so a second press is not a second answer. */
   async function resolve(values: ResolveFormValues) {
-    const r = await content.resolveHelp(helpId, values.resolution)
+    const r = await content.resolveHelp(helpId, values.resolution, values.attachmentIds)
     invalidate(`help:${teamId}`)
     invalidate(`help-thread:${helpId}`)
     invalidate(recordActivityKey("help", helpId))
@@ -954,6 +958,13 @@ export function HelpDetailScreen({
     } finally {
       setStatusBusy(false)
     }
+  }
+
+  async function reopenTicket() {
+    await content.setHelpStatus(helpId, "in_progress")
+    invalidate(`help:${teamId}`)
+    invalidate(`help:one:${helpId}`)
+    invalidate(recordActivityKey("help", helpId))
   }
 
   /** THE TRIAGE QUEUE'S OWN DECISION, MADE FROM THE HEAD — Aurora's ruling,
@@ -1367,6 +1378,29 @@ export function HelpDetailScreen({
                 destructive: true,
                 onSelect: archiveTicket,
               },
+        ]
+      : []),
+    // REOPEN. Available only when the ticket is resolved. Let anyone with
+    // the edit right move it back to In progress.
+    ...(canEdit && ticket.status === "resolved"
+      ? [
+          {
+            key: "reopen",
+            label: t("Reopen"),
+            icon: <ArrowCounterClockwise className="size-3.5" />,
+            disabled: statusBusy,
+            onSelect: () => askReopen({
+              title: t("Reopen this ticket?"),
+              body: t("It goes back to In progress."),
+              action: t("Reopen"),
+              run: () =>
+                runReopen(
+                  () => reopenTicket(),
+                  t("Reopened."),
+                  t("Couldn't reopen that ticket.")
+                ),
+            }),
+          },
         ]
       : []),
   ]
@@ -2417,6 +2451,8 @@ export function HelpDetailScreen({
         draft={ticket.draftResolution}
         draftKey={`help:resolve:${helpId}`}
         onSubmit={resolve}
+        uploadFile={uploadReplyFile}
+        removeUploadedFile={removeReplyFile}
       />
 
       <HelpFormDialog
@@ -2460,6 +2496,7 @@ export function HelpDetailScreen({
 
       {archiveDialog}
       {deleteReplyDialog}
+      {reopenDialog}
       <ReplyEditSheet
         open={editingReplyId !== null}
         onOpenChange={(o) => { if (!o) setEditingReplyId(null) }}

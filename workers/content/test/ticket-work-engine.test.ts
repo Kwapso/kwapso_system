@@ -20,7 +20,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
-import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { buildSpineDb, IDS, makeEnv, seedImageAttachment } from "../../tenancy/test/spine-harness"
 
 const db = () => holder.db as DatabaseSync
 
@@ -123,7 +123,12 @@ describe("the seven states", () => {
       await call(IDS.staffUser, "POST /api/content/help", { description: "Idempotent resolve" })
     ))[0]
     const answer = { id, resolution: "Fixed, and here is what changed." }
-    await call(IDS.staffUser, "POST /api/content/help/resolve", answer)
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      ...answer,
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
+    // R17's own no-op path — no attachment needed, since an already-resolved
+    // ticket short-circuits before the screenshot rule is even asked.
     await call(IDS.staffUser, "POST /api/content/help/resolve", answer)
     expect(historyFor(id).filter((h) => h.type === "Ticket resolved")).toHaveLength(1)
   })
@@ -537,6 +542,7 @@ describe("R99: neither close door closes a ticket its own clock is still running
     const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
       id,
       resolution: "Fixed, and here is what changed.",
+      attachmentIds: [seedImageAttachment(db(), id)],
     })
     expect(res.status).toBe(409)
     expect((await res.json()) as { error: string }).toMatchObject({ error: "timer_running" })
@@ -550,6 +556,7 @@ describe("R99: neither close door closes a ticket its own clock is still running
     const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
       id,
       resolution: "Fixed, and here is what changed.",
+      attachmentIds: [seedImageAttachment(db(), id)],
     })
     expect(res.status).toBe(200)
     expect(row(id).status).toBe("resolved")

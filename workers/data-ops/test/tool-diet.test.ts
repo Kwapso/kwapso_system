@@ -603,7 +603,15 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // `update_wave_phase_day_defaults` (the team's own wave-phase-day
     // defaults, one level up from `update_wave_phase_days`) both shipped
     // with a `detail` from the start, same shape as their sibling.
-    const DETAILED_TOOLS = 130
+    // 130 → 134 on 23 Sep 2026 (T3850): `list_app_attachments`,
+    // `add_app_link`, `update_app_attachment` and `remove_app_attachment`
+    // (what an app shows for itself, the Files tab) all shipped with a
+    // `detail` from the start, the same shape as their story siblings.
+    // 134 → 135 on 23 Sep 2026: `add_help_attachment` (T3658/B0295's own
+    // gap — an agent could not PUT bytes on a ticket, only link one)
+    // shipped with a `detail` from the start, same shape as its
+    // `add_help_link` sibling.
+    const DETAILED_TOOLS = 135
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

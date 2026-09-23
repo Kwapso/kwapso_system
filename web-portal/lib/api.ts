@@ -17,6 +17,7 @@
 
 import type {
   AccountDetail,
+  AppAttachment,
   AppModule,
   ClientDeliverable,
   HelpAttachment,
@@ -129,6 +130,18 @@ export const impact = {
  * we built them, they do not author it. */
 export const appModules = {
   list: () => api<{ modules: AppModule[]; total: number }>("/api/tenancy/app-modules"),
+}
+
+/** IMPORTANT MATERIAL ABOUT ONE OF THEIR SYSTEMS (T3850) — files and links, on
+ * the impact screen's own accordion for that app (impact-screen.tsx). Fenced
+ * to their own account by the door, exactly as every read above is; no add
+ * door on this surface — see this file's own header on what "the client can
+ * see it" did and did not ask for. */
+export const appFiles = {
+  list: (appId: string) =>
+    api<{ attachments: AppAttachment[]; total: number }>(
+      `/api/tenancy/apps/attachments?id=${enc(appId)}`
+    ),
 }
 
 export const support = {

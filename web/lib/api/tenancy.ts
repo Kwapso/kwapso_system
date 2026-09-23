@@ -17,6 +17,7 @@ import type {
   ClientRole,
   ClientTool,
   ClientToolPrice,
+  AppAttachment,
   AppModule,
   Account,
   AccountDetail,
@@ -623,6 +624,40 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/apps/update", post(input)),
   setAppActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/apps/active", post({ id, active })),
+
+  /* -------------------- what an app shows for itself (T3850) ---------------- */
+  /** The files and links on an app — the Files tab. */
+  appAttachments: (id: string) =>
+    api<{ attachments: AppAttachment[]; total: number }>(
+      `/api/tenancy/apps/attachments?id=${enc(id)}`
+    ),
+  addAppAttachment: (input: {
+    id: string
+    kind: "file" | "link"
+    label: string
+    url?: string
+    fileDataUrl?: string
+  }) => api<{ attachments: AppAttachment[]; total: number }>("/api/tenancy/apps/attachments", post(input)),
+  /** Fix one that is already on the app. THREE ACTS AT ONE ADDRESS, because
+   * they are one act to the person doing them: a `label` on its own renames it,
+   * a `fileDataUrl` swaps a file's bytes, a `url` swaps a link's address. Send
+   * a `label` beside a replacement to do both in one press. */
+  updateAppAttachment: (input: {
+    id: string
+    attachmentId: string
+    label?: string
+    url?: string
+    fileDataUrl?: string
+  }) =>
+    api<{ attachments: AppAttachment[]; total: number }>(
+      "/api/tenancy/apps/attachments/update",
+      post(input)
+    ),
+  removeAppAttachment: (id: string, attachmentId: string) =>
+    api<{ attachments: AppAttachment[]; total: number }>(
+      "/api/tenancy/apps/attachments/remove",
+      post({ id, attachmentId })
+    ),
 
   /** WHAT ONE APP GIVES BACK (8.13) — the hours, and those hours priced by the
    * client's own role rates frozen onto each step. Agency-only: the client's own

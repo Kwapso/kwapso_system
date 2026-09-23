@@ -176,6 +176,7 @@ export function traceFor(
     // Attaching or taking off a file or a link lands on the ticket too — its
     // Files and links tab is where the change is.
     case "add_help_link":
+    case "add_help_attachment":
     case "remove_help_attachment":
     // Answering lands on the ticket, where the words that were sent are now the
     // last thing in the conversation.
@@ -250,6 +251,12 @@ export function traceFor(
       return { path: seg(teamId, "apps"), highlight: "main" }
     case "update_app":
     case "set_app_active":
+    // WHAT THE APP SHOWS FOR ITSELF (T3850) — attaching or taking off a file or
+    // a link lands on the app too, the same way it does on a ticket: its own
+    // Files tab is where the change is.
+    case "add_app_link":
+    case "update_app_attachment":
+    case "remove_app_attachment":
       return { path: `${seg(teamId, "apps")}/${str(input, "id")}`, highlight: "main" }
     // Create → the maps list, where the new map appears live. Everything else →
     // that map's own detail, because its steps, its versions and its

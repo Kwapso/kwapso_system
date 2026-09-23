@@ -163,6 +163,10 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     // RECORD_TAB_COUNT_EXCEPTIONS line ("retrieval, not a collection") left the
     // registry the same day this landed.
     { key: "knowledge-app", module: "knowledge", resource: "knowledge", door: "content" },
+    // WHAT THE APP SHOWS FOR ITSELF (T3850) — the files and links on its own
+    // Files tab. Same module as the app record itself: whoever may read the
+    // system may read what was filed against it.
+    { key: "files-app", module: "processes", resource: "app_attachments", door: "tenancy" },
   ],
   help: [
     // The work answering this request. One story may answer many tickets and one

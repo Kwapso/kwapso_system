@@ -35,7 +35,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
-import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { buildSpineDb, IDS, makeEnv, seedImageAttachment } from "../../tenancy/test/spine-harness"
 
 const ROOT = join(__dirname, "..", "..", "..")
 const db = () => holder.db as DatabaseSync
@@ -85,6 +85,7 @@ async function answered(): Promise<string> {
   const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
     id,
     resolution: "Fixed and deployed this morning.",
+    attachmentIds: [seedImageAttachment(db(), id)],
   })
   expect(res.status, await res.clone().text()).toBe(200)
   return id

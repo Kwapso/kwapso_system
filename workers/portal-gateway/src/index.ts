@@ -223,6 +223,14 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // built them, they do not author it, exactly as they do not author the app.
   "GET /api/tenancy/app-modules": "TENANCY",
 
+  // ── files and links on one of their systems (T3850) ───────────────────────
+  // The owner's ask, read for the client's own side: they can see what is
+  // filed against their app — a screenshot, a document — the same way they
+  // read everything else on this surface, their own account fence. Adding
+  // to it is absent, and refuses a portal caller at the door besides: an app
+  // is the agency's own record of what we built them, not theirs to author.
+  "GET /api/tenancy/apps/attachments": "TENANCY",
+
   "GET /api/tenancy/impact": "TENANCY",
   "GET /api/tenancy/processes/comments": "TENANCY",
   "POST /api/tenancy/processes/comments": "TENANCY",

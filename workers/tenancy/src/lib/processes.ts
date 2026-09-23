@@ -2964,8 +2964,10 @@ export async function appMoneyBack(
 
 // ── shared internals ─────────────────────────────────────────────────────────
 
-/** One app inside the fence, or a clean 404 (identical to a made-up id). */
-async function appOrThrow(
+/** One app inside the fence, or a clean 404 (identical to a made-up id).
+ * EXPORTED (T3850) so `app-attachments.ts` can resolve the app its write
+ * doors are agency-only about, rather than a second copy of this read. */
+export async function appOrThrow(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,

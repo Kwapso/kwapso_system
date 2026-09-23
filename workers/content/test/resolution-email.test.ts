@@ -35,7 +35,7 @@ vi.mock("@shared/workers/notify", async (importOriginal) => {
 })
 
 import worker from "../src/index"
-import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { buildSpineDb, IDS, makeEnv, seedImageAttachment } from "../../tenancy/test/spine-harness"
 
 const db = () => holder.db as DatabaseSync
 
@@ -99,6 +99,7 @@ describe("answering a ticket", () => {
     const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
       id,
       resolution: "The board refreshes on its own again — it was a stuck retry loop.",
+      attachmentIds: [seedImageAttachment(db(), id)],
     })
     expect(res.status).toBe(200)
     expect((await res.json()) as { sent: boolean }).toMatchObject({ sent: true })
@@ -122,8 +123,15 @@ describe("answering a ticket", () => {
 
   it("R17 — answering an answered ticket sends nothing and appends nothing", async () => {
     const id = await clientTicket("Asked once")
-    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Here is the answer." })
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Here is the answer.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
     const firstCount = sent.emails.length
+    // R17's OWN no-op branch: an already-resolved ticket short-circuits before
+    // the screenshot rule is even asked, so a second call with NO attachment
+    // still answers cleanly rather than 400ing.
     const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
       id,
       resolution: "Here is the answer again.",
@@ -145,7 +153,11 @@ describe("answering a ticket", () => {
     const id = (
       db().prepare(`SELECT id FROM help WHERE description = 'Ours to sort out'`).get() as { id: string }
     ).id
-    const res = await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Sorted." })
+    const res = await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Sorted.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
     expect(res.status).toBe(200)
     expect(ticketRow(id).status).toBe("resolved")
     expect(sent.emails).toHaveLength(0)
@@ -199,7 +211,11 @@ describe("nothing else reaches a client's inbox", () => {
     )
     const id = await clientTicket("Two people should hear about this", IDS.clientPerson)
     sent.emails = []
-    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Done." })
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Done.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
     const to = sent.emails.map((e) => e.to).sort()
     expect(to.length, "the answer reached nobody").toBeGreaterThan(0)
     expect(to, "a colleague who is neither the raiser nor the main stakeholder was copied in").not.toContain(

@@ -120,6 +120,9 @@ export const TOOL_GATES: Record<string, string> = {
   // Showing somebody what you mean is the same bar as saying it — a person who
   // can see a ticket can attach to it, exactly as they can reply to it.
   add_help_link: "help:read",
+  // Same door, same gate (`postHelpAttachment`'s own `kind: "image"` branch) —
+  // an agent's own picture is no different from a person's.
+  add_help_attachment: "help:read",
   list_story_attachments: "work:read",
   add_story_link: "work:update",
   update_story_attachment: "work:update",
@@ -220,6 +223,14 @@ export const TOOL_GATES: Record<string, string> = {
   create_app: "processes:create",
   update_app: "processes:update",
   set_app_active: "processes:delete",
+  // WHAT AN APP SHOWS FOR ITSELF (T3850) — same explicit-hint shape as
+  // `list_story_attachments`/`list_help_attachments`: an attachments list's
+  // module ("processes") is not the word in its own URL ("apps"), so it
+  // gets a line here rather than leaning on inference.
+  list_app_attachments: "processes:read",
+  add_app_link: "processes:update",
+  update_app_attachment: "processes:update",
+  remove_app_attachment: "processes:update",
   // A MODULE IS PART OF THE APP RECORD, so it gates on `processes` like the app
   // itself does — the same right that lets somebody record a system lets them
   // say what sections it has. Switching one off takes `delete`, because it

@@ -8261,6 +8261,60 @@ ALTER TABLE accounts ADD COLUMN archiver_name TEXT;
 `,
   },
   {
+    // AN APP GETS A FILES TAB (T3850) — the owner's ask: "I don't see any tab
+    // where I can store important files related to an app, sent by the
+    // client, a screenshot from a meeting, or a document of different
+    // logics, inside the app details screen." The client's own decision: a
+    // Files tab on every app, holding files AND links, visible to the
+    // client in their portal.
+    //
+    // `story_attachments` (migration 0045) ONE TABLE ALONG, and copied
+    // deliberately rather than reused: an attachment belongs to exactly one
+    // parent record, and a shared table would need a polymorphic
+    // (parent_table, parent_id) pair no fence in this base is shaped to
+    // clause over. Same columns, same shape, same reasons — see that
+    // table's own header for `kind` deciding only how `url` is read, and
+    // deactivate-never-delete keeping the audit block.
+    //
+    // NO PORTAL WRITE DOOR. The client's ask says the client can SEE this;
+    // it does not say the client attaches to it the way they attach to a
+    // ticket. Reads are fenced through the app's own account (and app)
+    // scope so a client sees their own apps' files in the portal's Impact
+    // accordion; every write refuses a portal caller at the door (R21),
+    // same shape `story_attachments` already has for the identical reason
+    // (an app is the agency's own record of what we built, not a client's
+    // to author).
+    //
+    // NUMBERED 0118, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0117 is the highest version on both the
+    // local tree and `origin/main` as of 23 Sep 2026, so 0118 is the next
+    // free number.
+    version: "0118_an_app_gets_a_files_tab",
+    sql: `
+CREATE TABLE IF NOT EXISTS app_attachments (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  kind TEXT NOT NULL CHECK (kind IN ('file', 'link')),
+  label TEXT NOT NULL,
+  url TEXT NOT NULL,
+  content_type TEXT,
+  size_bytes INTEGER,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_app_attachments_app ON app_attachments (app_id);
+`,
+  },
+  {
+    // RENUMBERED FROM 0118 TO 0119 ON MERGE, 23 Sep 2026. Two lines mint
+    // migrations against one shared staging estate, and both took 0118 the
+    // same afternoon: the other line for an app's files tab, this one for an
+    // account's position. The ROBOT MATCHES BY NAME, so a duplicate number is
+    // not caught by it and the two would have raced. The other line's 0118 was
+    // already deployed and applied to the team databases; this one had never
+    // run anywhere, so THIS is the one that moves. Renaming a migration that
+    // has already run would make the robot believe it is new and run it again.
     // AN ACCOUNT GETS A POSITION. Aurora's ruling, 23 Sep 2026, over the map
     // view she asked for the same day and got the same day: "build with the
     // google maps api", and the moment it drew every pin at its COUNTRY'S
@@ -8314,7 +8368,7 @@ ALTER TABLE accounts ADD COLUMN archiver_name TEXT;
     // glide-accounts-sync.mjs`, `glide/` and the contacts split, which holds
     // this same number on its own side of a two-line estate (CLAUDE.md,
     // "team migration numbers are read, never recalled").
-    version: "0118_an_account_gets_a_position",
+    version: "0119_an_account_gets_a_position",
     sql: `
 ALTER TABLE accounts ADD COLUMN lat REAL;
 ALTER TABLE accounts ADD COLUMN lng REAL;

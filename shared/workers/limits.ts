@@ -489,6 +489,12 @@ export const TICKET_RATING_CAP = 50
  * this the door refuses in words rather than truncating a list. */
 export const STORY_ATTACHMENT_CAP = 20
 
+/** WHAT AN APP MAY SHOW FOR ITSELF (T3850). Same number and the same reasoning
+ * as a story's own cap, immediately above: a handful of files and links say
+ * "here is what this system is", not a shared drive. Past this the door
+ * refuses in words rather than truncating a list. */
+export const APP_ATTACHMENT_CAP = 20
+
 /** Rows the work-log summary's two grouped reads may return (R14) — time BY
  * PERSON and time BY KIND OF WORK, on one record. Both group over sets that
  * cannot run away: the people are the team's members and the kinds are the

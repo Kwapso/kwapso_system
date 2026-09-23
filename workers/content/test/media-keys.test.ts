@@ -327,6 +327,7 @@ describe("every object prefix a tenant's files live under is written down", () =
     'teamId, "logo"': "the team's own logo (workers/tenancy/src/lib/teams.ts)",
     'guard.teamId, "ticket"': "a ticket's attachments (workers/content/src/routes/help.ts)",
     'guard.teamId, "story"': "a story's attachments (workers/content/src/routes/stories.ts)",
+    'guard.teamId, "app"': "an app's own files and links (T3850), the Files tab — its own prefix, distinct from `\"apps\"` below (the LOGO), because attachments are never reclaimed and a logo is (workers/tenancy/src/routes/app-attachments.ts)",
     'guard.teamId, "todo"': "the file a CLIENT sends back through the portal to close a to-do (workers/content/src/routes/todos.ts)",
     'guard.teamId, "accounts"': "a client's logo and cover (workers/tenancy/src/routes/accounts.ts)",
     'guard.teamId, "apps"': "an app's logo (workers/tenancy/src/routes/processes.ts)",

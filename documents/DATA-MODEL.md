@@ -32,7 +32,7 @@ resumable ledger, and the size + rate watch) ·
 | The assistant | `agent_threads` + `agent_messages` |
 | The customer spine | `accounts` + `account_links` + `portal_users` (+ `current_account_id`) |
 | The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
-| Process maps + the money | `apps` (+ `app_staff` + `app_stakeholders` + `app_modules`) + `processes` + `process_versions` + `process_steps` (+ `process_step_tools` + `process_step_revisions`) + `process_comments` · `process_links` · `process_drafts`. All three rate-card tables were removed on 10 Sep 2026: `internal_rates` was removed, `internal_role_rates` was removed, `account_rates` was removed |
+| Process maps + the money | `apps` (+ `app_staff` + `app_stakeholders` + `app_modules` + `app_attachments`) + `processes` + `process_versions` + `process_steps` (+ `process_step_tools` + `process_step_revisions`) + `process_comments` · `process_links` · `process_drafts`. All three rate-card tables were removed on 10 Sep 2026: `internal_rates` was removed, `internal_role_rates` was removed, `account_rates` was removed |
 | The client's own organisation | `client_departments` · `client_roles` (+ `client_role_departments` + `client_role_people`) · `client_tools` + `client_tool_prices` |
 | What we hand over | `deliverables` |
 | The work engine | `stories` (+ `story_attachments` + `story_processes`) + `sprints` · `waves` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
@@ -1767,6 +1767,19 @@ pointing at the person's own `accounts` row (a stakeholder is a contact you
 already have, never a new record) plus `is_main`, the one whose confirmation a
 ticket's retired `awaiting_validation` stage used to wait on. Both carry the full audit block
 and deactivate rather than delete, so "who USED to run this" stays answerable.
+
+### app_attachments. KEEP (BUILT 2026-09-23, team migration `0118_an_app_gets_a_files_tab`, T3850). WHAT AN APP SHOWS FOR ITSELF
+
+The Files tab. `story_attachments` one table along, and the same shape for the
+same reasons — `kind` is `file` or `link`, with a `label`, the `url`, and
+`content_type` + `size_bytes` when there are bytes behind it. Deactivated,
+never deleted. The one real difference from its story twin: this table's own
+READ is fenced rather than refused (`workers/tenancy/src/lib/
+app-attachments.ts`'s `appAttachmentFence`, the same two clauses `appsWhere`
+gives the apps list — the account fence, and the app restriction beside it) —
+a client reads their own apps' files in the portal's Impact accordion. Every
+WRITE still refuses a portal caller outright: an app is the agency's own
+record of what we built, not a client's to author.
 
 ### app_modules. KEEP (BUILT 2026-08-20, team migration `0048_app_modules`). THE SECTIONS OF A BUILT SYSTEM
 

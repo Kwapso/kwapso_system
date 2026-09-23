@@ -655,6 +655,11 @@ export const SEED: Catalogue = {
     
     
   },
+  "Added {date}": {
+    de: "Hinzugefügt {date}",
+    es: "Añadido {date}",
+    ca: "Afegit {date}",
+  },
   "Last edited {when}": {
     de: "Zuletzt bearbeitet {when}",
     es: "Última edición {when}",
@@ -1086,6 +1091,7 @@ export const SEED: Catalogue = {
   "Couldn't read the transcript.": { de: "Das Transkript konnte nicht gelesen werden.", es: "No se pudo leer la transcripción.", ca: "No s'ha pogut llegir la transcripció."},
   "Couldn't read your Google material just now.": { de: "Ihre Google-Materialien konnten gerade nicht gelesen werden.", es: "No se pudo leer tu material de Google en este momento.", ca: "Ara mateix no s'ha pogut llegir el teu material de Google."},
   "Couldn't record that.": { de: "Das konnte nicht erfasst werden.", es: "No se pudo registrar eso.", ca: "No s'ha pogut registrar."},
+  "Couldn't reopen that ticket.": { de: "Das Ticket konnte nicht wieder geöffnet werden.", es: "No se pudo reabrir ese ticket.", ca: "No s'ha pogut reobrir aquest tiquet."},
   "Couldn't revoke the token.": { de: "Das Token konnte nicht widerrufen werden.", es: "No se pudo revocar el token.", ca: "No s'ha pogut revocar el token."},
   "Couldn't save access rights.": { de: "Die Zugriffsrechte konnten nicht gespeichert werden.", es: "No se pudieron guardar los permisos de acceso.", ca: "No s'han pogut desar els drets d'accés."},
   "Couldn't save that correction.": { de: "Die Korrektur konnte nicht gespeichert werden.", es: "No se pudo guardar esa corrección.", ca: "No s'ha pogut desar aquesta correcció."},
@@ -1139,6 +1145,7 @@ export const SEED: Catalogue = {
   "Do it now": { de: "Sofort erledigen", es: "Hazlo ya", ca: "Fes-ho ja"},
   "Edit app": { de: "App bearbeiten", es: "Editar app", ca: "Editar app"},
   "Edit process": { de: "Prozess bearbeiten", es: "Editar proceso", ca: "Editar procés"},
+  "Edit stakeholders": { de: "Stakeholder bearbeiten", es: "Editar partes interesadas", ca: "Editar grups interessats"},
   "Edit step": { de: "Schritt bearbeiten", es: "Editar paso", ca: "Editar pas"},
   "Edit story": { de: "Aufgabe bearbeiten", es: "Editar historia", ca: "Editar història"},
   "Edit this account": { de: "Diesen Kunden bearbeiten", es: "Editar esta cuenta", ca: "Editar aquest compte"},
@@ -1151,6 +1158,10 @@ export const SEED: Catalogue = {
   "Every ticket a client raises shows here while it is being worked on.": { de: "Jedes Ticket, das ein Kunde stellt, wird hier angezeigt, während es bearbeitet wird.", es: "Cada ticket que un cliente plantea aparece aquí mientras se está trabajando en él.", ca: "Tot ticket que presenta un client es mostra aquí mentre s'hi està treballant."},
   "Expand": { de: "Ausklappen", es: "Expandir", ca: "Expandir"},
   "Filed.": { de: "Abgelegt.", es: "Registrado.", ca: "Registrat."},
+  "Files": { de: "Dateien", es: "Archivos", ca: "Arxius"},
+  "Nothing attached to this app yet.": { de: "Diesem System ist noch nichts angehängt.", es: "Todavía no se ha adjuntado nada a esta app.", ca: "Encara no s'ha adjuntat res a aquesta app."},
+  "Nothing filed against this app yet.": { de: "Für dieses System ist noch nichts abgelegt.", es: "Todavía no hay nada archivado en esta app.", ca: "Encara no hi ha res arxivat en aquesta app."},
+  "Take {label} off this app?": { de: "„{label}“ von diesem System entfernen?", es: "¿Quitar «{label}» de esta app?", ca: "Vols treure «{label}» d'aquesta app?"},
   "Fix what was written down. The change is kept in the record's history, with your name on it.": { de: "Korrigieren Sie, was festgehalten wurde. Die Änderung bleibt im Verlauf des Datensatzes stehen, mit Ihrem Namen daran.", es: "Corrige lo que se anotó. El cambio queda en el historial del registro, con tu nombre.", ca: "Corregeix el que es va anotar. El canvi queda a l'historial del registre, amb el teu nom."},
   "For work already finished. Say when it started and when it stopped, we work out the rest.": { de: "Für Arbeit, die bereits erledigt ist. Sagen Sie, wann sie begann und wann sie endete, den Rest rechnen wir aus.", es: "Para trabajo ya terminado. Di cuándo empezó y cuándo terminó, del resto nos encargamos.", ca: "Per a feina ja acabada. Digues quan va començar i quan va acabar, la resta la calculem nosaltres."},
   "Hours by kind of work": { de: "Stunden nach Art der Arbeit", es: "Horas por tipo de trabajo", ca: "Hores per tipus de feina"},
@@ -1274,6 +1285,10 @@ export const SEED: Catalogue = {
   "Still reading your older meetings, press again to go further back.": { de: "Ihre älteren Termine werden noch gelesen, drücken Sie erneut, um weiter zurückzugehen.", es: "Todavía estamos leyendo tus reuniones más antiguas; pulsa otra vez para ir más atrás.", ca: "Encara estem llegint les teves reunions més antigues; prem un altre cop per anar més enrere."},
   "Stopped, kept in full.": { de: "Gestoppt, vollständig behalten.", es: "Detenido, se ha guardado completo.", ca: "Aturat, s'ha desat sencer."},
   "Taken back out.": { de: "Wieder herausgenommen.", es: "Se ha vuelto a sacar.", ca: "S'ha tornat a treure."},
+  "Reopen": { de: "Wieder öffnen", es: "Reabierto", ca: "Reobrir"},
+  "Reopen this ticket?": { de: "Dieses Ticket wieder öffnen?", es: "¿Reabrir este ticket?", ca: "Vols reobrir aquest tiquet?"},
+  "It goes back to In progress.": { de: "Es geht zurück zu Läuft.", es: "Vuelve a En progreso.", ca: "Torna a En curs."},
+  "Reopened.": { de: "Wieder geöffnet.", es: "Reabierto.", ca: "Reabert."},
   "Team switched": { de: "Team gewechselt", es: "Equipo cambiado", ca: "Equip canviat"},
   "The agency": { de: "Die Agentur", es: "La agencia", ca: "L'agència"},
   "The assistant can use this again.": { de: "Der Assistent kann dies wieder verwenden.", es: "El asistente puede volver a usar esto.", ca: "L'assistent pot tornar a fer servir això."},
@@ -1469,6 +1484,7 @@ export const SEED: Catalogue = {
   "Nothing attached yet.": { de: "Noch nichts angehängt.", es: "Aún no hay nada adjunto.", ca: "Encara no hi ha res adjunt."},
   "Nothing shared yet: {scope}": { de: "Noch nichts freigegeben, {scope}", es: "Aún no se ha compartido nada, {scope}", ca: "Encara no s'ha compartit res, {scope}"},
   "Nothing: just show this one": { de: "Nichts: nur diese anzeigen", es: "Nada, solo mostrar esta", ca: "Res, mostra només aquesta"},
+  "Only images are accepted.": { de: "Nur Bilder werden akzeptiert.", es: "Solo se aceptan imágenes.", ca: "Només s'accepten imatges."},
   "Only the ones you pick. Nothing else in the folder they sit in.": { de: "Nur die von Ihnen ausgewählten. Nichts anderes aus dem Ordner, in dem sie liegen.", es: "Solo los que elijas. Nada más de la carpeta en la que están.", ca: "Només els que triïs. Res més de la carpeta on són."},
   "Only you, and the assistant when it is answering you.": { de: "Nur Sie: und der Assistent, wenn er Ihnen antwortet.", es: "Solo tú, y el asistente cuando te responde.", ca: "Només tu, i l'assistent quan et respon."},
   "Or paste a link": { de: "Oder Link einfügen", es: "O pega un enlace", ca: "O enganxa un enllaç"},
@@ -1696,6 +1712,7 @@ export const SEED: Catalogue = {
     es: "Una parte de su empresa, como Operaciones o Finanzas.",
     ca: "Una part de la seva empresa, com Operacions o Finances.",
   },
+  "A phase": { de: "Eine Phase", es: "Una fase", ca: "Una fase" },
   "A price needs a number.": {
     de: "Ein Preis benötigt eine Zahl.",
     es: "Un precio necesita un número.",
@@ -1723,6 +1740,8 @@ export const SEED: Catalogue = {
     ca: "Afegeix un departament",
   },
   "Add a role": { de: "Rolle hinzufügen", es: "Añade un rol", ca: "Afegeix un rol" },
+  "Add a screenshot": { de: "Screenshot hinzufügen", es: "Añade una captura de pantalla", ca: "Afegeix una captura de pantalla" },
+  "Screenshot": { de: "Screenshot", es: "Captura de pantalla", ca: "Captura de pantalla" },
   "Add a tool": { de: "Werkzeug hinzufügen", es: "Añade una herramienta", ca: "Afegeix una eina" },
   "Add department": {
     de: "Abteilung hinzufügen",
@@ -3355,6 +3374,7 @@ export const SEED: Catalogue = {
    * "unzufrieden / neutral / zufrieden", which is a survey talking, and this is
    * one question at the bottom of a request somebody raised. */
   "Stages": { de: "Phasen", es: "Etapas", ca: "Etapes"},
+  "Stakeholders updated.": { de: "Stakeholder aktualisiert.", es: "Partes interesadas actualizadas.", ca: "Grups interessats actualitzats."},
   "Reopened": { de: "Wieder geöffnet", es: "Reabierto", ca: "Reobert"},
   "New": { de: "Neu", es: "Nuevo", ca: "Nou"},
   /* The compact day count on a stage row. A letter rather than the word, so a
@@ -3907,6 +3927,7 @@ export const SEED: Catalogue = {
    * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
    * falls and never rises). */
   "Story types": { de: "Aufgaben-Typen", es: "Tipos de historia", ca: "Tipus d'història" },
+  "Story type": { de: "Aufgaben-Typ", es: "Tipo de historia", ca: "Tipus d'història" },
   "Stages and deliverable kinds": { de: "Phasen und Ergebnisarten", es: "Etapas y tipos de entregable", ca: "Etapes i tipus de lliurable" },
   "Industries and countries": { de: "Branchen und Länder", es: "Sectores y países", ca: "Sectors i països" },
   "Asset categories": { de: "Asset-Kategorien", es: "Categorías de activos", ca: "Categories de recursos" },

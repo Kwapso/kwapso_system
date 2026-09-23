@@ -82,6 +82,10 @@ export const IDS = {
    * list of a client's app is the shape of the software we built them, and a
    * burglar who can read it knows what that business runs on. */
   victimModule: "AM_VICTIM",
+  /** A FILE ON THE VICTIM'S APP (T3850) — a real row so the update/remove
+   * burglaries have something to attack honestly (see `victimProcessTwo`'s
+   * own comment on why a door that takes a record id needs a real record). */
+  victimAppAttachment: "PA_VICTIM",
   victimProcess: "PR_VICTIM",
   /** A SECOND map of the victim's, so a burglar has something to CONNECT the
    * first one to. A door that takes two record ids needs two real records to be
@@ -125,6 +129,7 @@ export const VICTIM_IDS = [
   IDS.victimTicket,
   IDS.victimApp,
   IDS.victimModule,
+  IDS.victimAppAttachment,
   IDS.victimProcess,
   IDS.victimProcessTwo,
   IDS.victimDepartment,
@@ -322,6 +327,8 @@ export function buildSpineDb(): DatabaseSync {
       VALUES ('${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch', 'https://dispatch.example', 'Build', 42000, '2026-02-01', '${IDS.staffUser}');
     INSERT INTO app_modules (id, app_id, account_id, name, mark, description, created_at, creator_id)
       VALUES ('${IDS.victimModule}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch board', '🚚', 'Where their drivers are assigned', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO app_attachments (id, app_id, kind, label, url, created_at, creator_id, creator_email, creator_name)
+      VALUES ('${IDS.victimAppAttachment}', '${IDS.victimApp}', 'link', 'Bergman floor plan', 'https://bergman.example/floor-plan', '2026-02-01', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');
     INSERT INTO processes (id, app_id, account_id, name, description, created_at, creator_id)
       VALUES ('${IDS.victimProcess}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman invoice approval', 'How Bergman approves a supplier invoice', '2026-02-01', '${IDS.staffUser}');
     INSERT INTO process_versions (id, process_id, account_id, version_no, label, created_at, creator_id)
@@ -412,6 +419,23 @@ export function makeEnv(get: () => DatabaseSync, userId: string): never {
     },
     REALTIME: { fetch: async () => new Response("{}") },
   } as never
+}
+
+/** T3658/B0295 — `postResolveHelp` refuses (400 `screenshot_required`) unless
+ * the ticket carries at least one IMAGE attachment. Every content-worker
+ * suite that resolves a ticket through the real door needs one on the fixture
+ * first; this is the one place that INSERT is written; a raw row rather than
+ * a call through `POST /api/content/help/attachments`, because the fixture is
+ * the SETUP for a test about a different door, not itself under test (the
+ * upload door has its own suite). Returns the new row's id, to hand straight
+ * to `attachmentIds` on the resolve call. */
+export function seedImageAttachment(db: DatabaseSync, ticketId: string): string {
+  const id = `att_${Math.random().toString(36).slice(2)}`
+  db.exec(
+    `INSERT INTO help_attachments (id, help_id, kind, label, url, content_type, size_bytes, created_at, creator_id, creator_email, creator_name)
+     VALUES ('${id}', '${ticketId}', 'file', 'screenshot.png', '/media/test/screenshot.png', 'image/png', 1024, '2026-02-01T00:00:00.000Z', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
+  )
+  return id
 }
 
 /** A JSON request at a route — the same shape the gateway forwards. */

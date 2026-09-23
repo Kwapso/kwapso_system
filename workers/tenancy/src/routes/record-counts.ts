@@ -39,6 +39,7 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { queryText } from "@shared/workers/validate"
 import { answerRecordCounts, type RecordCounter } from "@shared/workers/record-counts"
 import { countApps, countAppModules, countProcesses } from "../lib/processes"
+import { countAppAttachments } from "../lib/app-attachments"
 import { countWaves } from "../lib/waves"
 import type { Env } from "../env"
 
@@ -57,6 +58,8 @@ const COUNTERS: Record<string, RecordCounter> = {
   // counter answers `null` and reads exactly like a missing permission.
   "processes-app": (cfg, guard, scope, id) => countProcesses(cfg, guard, scope, { appId: id }),
   "modules-app": (cfg, guard, scope, id) => countAppModules(cfg, guard, scope, { appId: id }),
+  // WHAT THE APP SHOWS FOR ITSELF (T3850) — the Files tab's own badge.
+  "files-app": (cfg, guard, scope, id) => countAppAttachments(cfg, guard, scope, id),
 }
 
 /** GET /api/tenancy/record-counts?table=&id= — the child totals this worker owes
