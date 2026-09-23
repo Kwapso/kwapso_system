@@ -748,7 +748,16 @@ export function TicketConversationPanel({
         fill === "absolute" ? "absolute inset-0 flex min-h-0 flex-col" : "flex h-full min-h-0 flex-col"
       }
     >
-      <CardContent className="min-h-0 flex-1 overflow-y-auto p-4">{thread}</CardContent>
+      {/* `data-thread-scroll` — the ONE bounded box `useFollowNewest`
+          (`shared/web/follow-newest.ts`) is allowed to move on open/new-reply
+          (T3841, 21 Sep 2026): the thread's OWN scroller, never the page's.
+          `screen-shell-body` stopped being that box at R89 round 28, when it
+          became the whole page's one scroll region — landing on it here
+          dragged the ENTIRE ticket page to the bottom on open, hiding the
+          title and stages a reader lands on first. */}
+      <CardContent data-thread-scroll="true" className="min-h-0 flex-1 overflow-y-auto p-4">
+        {thread}
+      </CardContent>
       <CardFooter className="shrink-0 w-full p-4">{composer}</CardFooter>
     </Card>
   )

@@ -1256,14 +1256,15 @@ export function HelpFormDialog({
         // a client with no contacts on file) and false on a ticket that predates
         // the rule, so it never makes an existing ticket unsaveable. Client and
         // App remain unasked for.
-        // SIX TERMS NOW. `!isEdit &&` joined the description clause 20 Sep
-        // 2026 — the editor it used to gate no longer renders on an edit (see
-        // the field's own comment below), so refusing Submit over a value
-        // nobody can change any more would make an old, description-less
-        // import permanently unsaveable from this form. On a raise the clause
-        // is exactly what it always was.
+        // SIX TERMS. The description clause dropped its `!isEdit &&` guard
+        // (T3847, 21 Sep 2026): the editor renders on an edit again (see the
+        // field's own comment below), so a blank value is refused there too —
+        // matching what the door already required on every edit call
+        // (`requireText` on `description`, `updateTicket`,
+        // workers/content/src/lib/help.ts) whether or not this form let
+        // anybody see it was blank.
         disabled:
-          (!isEdit && !richTextValue(values.description)) ||
+          !richTextValue(values.description) ||
           titleMissing ||
           typeMissing ||
           moduleMissing ||
@@ -1628,46 +1629,43 @@ export function HelpFormDialog({
           disabled={busy}
         />
       </Field>
-      {/* THE FIRST MESSAGE — RAISE ONLY, NOT AN EDIT FIELD ANY MORE. Aurora,
-          20 Sep 2026, verbatim: "we can't edit the first message — it's not a
-          description (that was the old model), so rather multiple messages
-          under the same ticket." A ticket's opening text is message ONE of
-          its own thread (`help-detail.tsx`'s `TicketThread` already renders
-          it as the first "theirs" bubble, ahead of every reply — confirmed
-          reading that call site, unchanged here), not a field a later edit
-          rewrites in place; rewriting it after the fact would silently edit
-          history a colleague may already have replied to. So this editor
-          renders on a RAISE (`!isEdit`) only — the opening message is still
-          written here, once, when there is no ticket yet to reply on.
+      {/* THE FIRST MESSAGE — EDITABLE AGAIN (T3847, 21 Sep 2026). Aurora's
+          20 Sep 2026 ruling took this editor off an edit ("we can't edit the
+          first message — it's not a description ... rather multiple messages
+          under the same ticket") on the reasoning that rewriting it in place
+          would silently edit history a colleague may already have replied
+          to. Ishita's report the next day is the correction: an edit screen
+          with no way to fix a typo or add detail to the opening message —
+          the door still requires `description` non-empty on every edit
+          (`updateTicket`, workers/content/src/lib/help.ts) — left nothing to
+          fix it with except re-raising the ticket. So the editor renders on
+          BOTH a raise and an edit again; the door's own required-field
+          contract never changed (`onSubmit`'s type below and `editTicket` in
+          help-detail.tsx still declare it required), only this form's own
+          gate on drawing the control did.
 
-          THE DOOR STILL ACCEPTS `description` ON AN EDIT (`onSubmit`'s own
-          type below, and `editTicket` in help-detail.tsx, both still declare
-          it required) — loosening either to optional is a change to a file
-          outside this one, so it is not made here. What IS this form's own
-          to fix: `values.description` cannot change during an edit any more
-          (this is its only editor, and it is gone), so `submit()`'s existing
-          `description: richTextValue(values.description)` already sends back
-          exactly the ticket's own untouched value on an edit — never a typed
-          change, because there is no longer anywhere to type one. */}
-      {!isEdit && (
-        <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
-          <Notes
-            key={open ? "open" : "shut"}
-            // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
-            // the editable node itself, because the kit Field clones it onto its
-            // single child — and this is the label that id could never carry, since
-            // a label element's `for` attribute binds only to a labelable control
-            // and the editable node here is a plain div. Same words as the visible
-            // label, taken from the same config, so the two can never drift apart.
-            aria-label={t(descField.label)}
-            disabled={busy}
-            defaultValue={values.description}
-            onChange={(html) => setValues((v) => ({ ...v, description: html }))}
-            placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
-            className="min-h-32"
-          />
-        </Field>
-      )}
+          `help-detail.tsx`'s `TicketThread` reads the ticket's own
+          `description` column to draw the first "theirs" bubble, ahead of
+          every reply — the same field this editor writes, not a separate
+          copy, so an edit here is exactly the correction a person expects,
+          visible in the thread the moment the dialog closes. */}
+      <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
+        <Notes
+          key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(descField.label)}
+          disabled={busy}
+          defaultValue={values.description}
+          onChange={(html) => setValues((v) => ({ ...v, description: html }))}
+          placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
+          className="min-h-32"
+        />
+      </Field>
       {/* WHO ASKED (CHECKLIST 5.9), AS CHIPS (client, 2026-09-07: "the raise by,
           no dropdown but visible all chips"), and PLACED HERE ON PURPOSE. Her
           list of seven does not mention this field at all, so it keeps the slot

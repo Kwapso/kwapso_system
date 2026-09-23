@@ -2031,6 +2031,12 @@ export const TEAM_RESOURCES: Record<
       ...TASK_VIEWS.filter((v) => v !== "open").map((v) => tasksKey(t, v)),
       `activity:record:tasks:${id}`,
       insightsKey(t),
+      // AND THE TASK'S OWN SHEET FALLBACK (T3844) — `task-sheet.tsx` reads
+      // page one of "all" and falls back to `task:one:<id>` for a task past
+      // that page (a completed one being the reported case), the same fault
+      // `help:one:` was added for on 19 Aug. Without this the fallback cache
+      // would go stale the moment the task's own row changed elsewhere.
+      `task:one:${id}`,
     ],
     // …and the relationship map's picture of anything standing beside this
     // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.

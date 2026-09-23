@@ -87,6 +87,9 @@ describe("R15 · a record's own cache key is reached by the ping about that reco
     // record up in page one of a paged list (R38) and now reads it by id.
     // `sprint:one:` joined 21 Sep 2026 — the story detail page's own "Phase
     // and wave" panel reads the phase it belongs to the same way.
-    ).toEqual(["help:one:", "knowledge:one:", "meeting:one:", "sprint:one:", "story:one:"])
+    // `task:one:` joined 21 Sep 2026 (T3844) — the task sheet stopped
+    // scanning the capped "all" page for a task past its cursor (a completed
+    // one, the reported case) and now reads it by id the same way.
+    ).toEqual(["help:one:", "knowledge:one:", "meeting:one:", "sprint:one:", "story:one:", "task:one:"])
   })
 })

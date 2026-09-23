@@ -120,6 +120,10 @@ const door = vi.hoisted(() => ({
   // the identical card.
   workLogs: [] as unknown[],
   members: [] as unknown[],
+  // T3844 (R38) — a task past the capped "all" page's own cursor, findable
+  // only by `taskOne`, never by a `find` over `door.tasks`. `null` in every
+  // other test, so `taskOne` mirrors the real door's "no such row" answer.
+  offPageTask: null as (Task & { status: string }) | null,
 }))
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -141,6 +145,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
         dueTodayDone: 0,
       }),
       todos: async () => ({ todos: [], total: 0 }),
+      // T3844 (R38) — the sheet's own by-id fallback, read only when the
+      // task is not on "all" page one (`door.tasks`).
+      taskOne: async (id: string) => (door.offPageTask?.id === id ? door.offPageTask : null),
       runningTimers: async () => ({ timers: door.timers }),
       workLogs: async () => ({
         logs: door.workLogs,
@@ -465,6 +472,39 @@ describe("the task slide-in opens", () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     expect(await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })).toBeTruthy()
+  })
+})
+
+// T3844 — "when I try to open a detail screen of any completed task, the
+// detail screen keeps loading and loading but never opens." `task-sheet.tsx`
+// used to `find` the task over `tasksAllQ`'s own cached "all" page ONLY — a
+// capped, newest-first read (R14) — so a task outside that page (an older
+// completed one, the reported case) was never found and `loading` stayed
+// `false` with `task` stuck `null` forever: the skeleton branch never
+// cleared. The fix reads the by-id door (`taskOne`) once page one comes back
+// without the row, the same `inPage`/`oneQ` shape `help-detail.tsx` already
+// uses for tickets (R38).
+describe("a task past page one still opens (T3844, R38)", () => {
+  afterEach(() => {
+    door.offPageTask = null
+  })
+
+  it("reads the task by id instead of hanging forever when it is not on the cached 'all' page", async () => {
+    const completed = task({
+      id: "t-old",
+      title: "Reconcile last year's VAT filing",
+      priority: 1,
+      status: "done",
+    })
+    door.offPageTask = completed
+    // "all" page one comes back WITHOUT this task — door.tasks is empty, the
+    // exact capped-list shape that hid an older completed task from the old
+    // `find`-over-the-page read.
+    const teamId = warmTeam([])
+    render(<Harness teamId={teamId} tasks={[]} initialOpenTaskId="t-old" />)
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Reconcile last year's VAT filing" })
+    ).toBeTruthy()
   })
 })
 

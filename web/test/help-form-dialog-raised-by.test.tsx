@@ -151,12 +151,14 @@ describe("Raised by — a dropdown, sourced from the client's own contacts", () 
   })
 })
 
-// Aurora, 20 Sep 2026, verbatim: "we can't edit the first message — it's not
-// a description (that was the old model), so rather multiple messages under
-// the same ticket." The raise form keeps writing the opening message; the
-// edit form no longer shows or edits it at all.
-describe("The first message — raise only, not an edit field (Aurora, 20 Sep 2026)", () => {
-  it("does not render the description editor on an EDIT", async () => {
+// T3847, 21 Sep 2026 — Ishita: "When I open the edit screen of any ticket and
+// try to edit the description, I see that there is no description component
+// that I can edit." Aurora's 20 Sep 2026 ruling had taken the editor off an
+// edit; this reverses that (see help-form-dialog.tsx's own comment at the
+// field's call site for the full account) — the editor renders, and is
+// editable, on BOTH a raise and an edit now.
+describe("The first message — editable on a raise and an edit alike (T3847)", () => {
+  it("renders the description editor on an EDIT, seeded with the ticket's own text", async () => {
     render(
       <HelpFormDialog
         open
@@ -171,18 +173,31 @@ describe("The first message — raise only, not an edit field (Aurora, 20 Sep 20
     // Wait for the form to settle exactly as the tests above do, so this one
     // is not racing the same account-contacts fetch.
     await screen.findByText(/Marta Nilsson/)
-    expect(screen.queryByText("Description")).toBeNull()
+    expect(screen.getByText("Description")).toBeTruthy()
     // `Notes` (shared/web/notes-editor/notes-editor.tsx) is a contentEditable
-    // rich-text field, not an `<input>`/`<textarea>` — its placeholder is a
-    // `data-placeholder` attribute read by a CSS `content: attr(...)` rule,
-    // invisible to both `getByPlaceholderText` (real `placeholder` attribute
-    // only) and `getByText` (rendered text nodes only, and jsdom does not
-    // paint CSS generated content at all). Queried by its own `aria-label`
-    // (the same words as the field's label, one config) rather than a bare
-    // `[data-placeholder]` selector — Radix's own `SelectTrigger` (the
-    // "Raised by" contact combobox, right below this field) sets that exact
-    // attribute too, as its "no value chosen" state marker, and matched it.
-    expect(document.querySelector('[aria-label="Description"]')).toBeNull()
+    // rich-text field, not an `<input>`/`<textarea>` — queried by its own
+    // `aria-label` (the same words as the field's label, one config), same as
+    // the RAISE case below.
+    const editor = document.querySelector('[aria-label="Description"]')
+    expect(editor).toBeTruthy()
+    expect(editor?.innerHTML).toContain("None of my drivers can see today's routes.")
+  })
+
+  it("lets the description be typed into on an EDIT", async () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={vi.fn(async () => {})}
+        helpTypeOptions={["Bug"]}
+        teamId="team-1"
+        initial={EDIT_INITIAL}
+        helpId="help-1"
+      />
+    )
+    await screen.findByText(/Marta Nilsson/)
+    const editor = document.querySelector('[aria-label="Description"][contenteditable="true"]')
+    expect(editor).toBeTruthy()
   })
 
   it("still renders the description editor on a RAISE", () => {
