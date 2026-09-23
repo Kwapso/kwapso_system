@@ -307,7 +307,12 @@ if (!/faceSize = "sm",/.test(src)) {
   findings.push(`${rel} does not default faceSize to "sm" — every existing caller that never passed faceSize ` +
     "would silently render a different face size than before this prop existed.");
 }
-if (!/<Avatar size=\{faceSize === "md" \? "control" : "sm"\} className="flex-none">/.test(src)) {
+/* The size expression and the `flex-none` are what this clause is about; any
+   OTHER prop between them is not its business. Widened 23 Sep 2026 when the
+   avatar grew `external` (Aurora: "external photos (from contacts) gray
+   scale. keep staff nirmal") and this literal, pinned end to end, went red
+   over a prop it has no opinion about. `[^>]*` keeps it inside the one tag. */
+if (!/<Avatar size=\{faceSize === "md" \? "control" : "sm"\}[^>]*className="flex-none"/.test(src)) {
   findings.push(
     `${rel}'s message avatar does not read size={faceSize === "md" ? "control" : "sm"} — the per-message face ` +
       "would not follow the faceSize prop.",

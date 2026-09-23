@@ -18,6 +18,7 @@ import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { nameInitials, personName } from "@/lib/identity"
 import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
+import { PeopleFaces } from "@shared/web/people-faces"
 import { safeSrc } from "@shared/web/rich-text"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
@@ -143,7 +144,17 @@ export function shapeMembersList(members: TeamMember[], lang: Language): ScreenD
       // A PERSON'S FACE (R35). `imageUrl` arrived on every one of these rows and
       // was drawn on the profile menu, the staff panel and a ticket's
       // stakeholders — and not on the list of the team itself.
-      mark: <RecordMark picture={m.imageUrl} name={personName(m)} shape="round" />,
+      //
+      // AND GREY IF THEY ARE NOT OURS — Aurora, 23 Sep 2026: "external photos
+      // (from contacts) gray scale. keep staff nirmal." This is the ADMIN list
+      // of the team, and it is the one list in the app that deliberately shows
+      // both populations: a client-portal login is an ordinary team member
+      // (`web/lib/members.ts`'s own header), so it sits here beside our own
+      // staff with nothing on the row to tell them apart — which is the exact
+      // complaint that made `isClient` exist in the first place ("the owner
+      // found it by opening one of them and reading his clients' names back").
+      // The fact is already on the row; now the face says it too.
+      mark: <RecordMark picture={m.imageUrl} name={personName(m)} shape="round" external={m.isClient} />,
       name: personName(m),
       detail: `${m.roleTitle} · joined ${formatDate(m.joinedAt, lang)}`,
       // Facet column (read by the filter engine, not the renderer).
@@ -543,30 +554,34 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       startsOn: m.startsAt.slice(0, 10),
       app: m.appName ?? "",
       where: m.location ?? "",
-      written: m.notes ? "Yes" : "",
+      // NO `written` ANY MORE (23 Sep 2026). It answered "does this meeting
+      // have notes?" as a Yes/blank cell for the old nine-column All view,
+      // and no column has read it since that table dropped to six (16 Sep
+      // 2026). Her ruling that day — "on meetings: rmeove notes (we have
+      // transcript for that)" — makes it the last UI-side mention of a
+      // surface the app no longer has, so it goes with the rest. Nothing is
+      // dropped from the ROW: `meetings.notes` is untouched and the door
+      // still reads and writes it.
       // WHO IS COMING, AS FACES — the table's own Attendees column. Rooms are
       // not stakeholders (`meeting-detail.tsx`'s own split, "a room shown as
       // a stakeholder is a stakeholder nobody can ring"), so they are
       // filtered out before anybody is counted. `null` for a typed meeting
       // with no guest list — the honest absence a `render` fallback below
       // draws as an em dash, never an invented name.
-      attendeesCell: (() => {
-        const people = (m.googleGuests ?? []).filter((g) => !g.resource)
-        if (people.length === 0) return null
-        const shown = people.slice(0, 3)
-        return (
-          <span className="flex items-center gap-1.5">
-            <span className="flex items-center gap-1">
-              {shown.map((g) => (
-                <RecordMark key={g.email} name={g.name || g.email} shape="round" size="choice" />
-              ))}
-            </span>
-            {people.length > shown.length ? (
-              <span className="text-muted-foreground text-xs">+{people.length - shown.length}</span>
-            ) : null}
-          </span>
-        )
-      })(),
+      // THE ROW ITSELF IS `PeopleFaces` (shared/web/people-faces.tsx) SINCE
+      // 23 SEP 2026 — the week view was asked for the same faces after its
+      // own card title, and eleven copied lines would have been a second
+      // answer to one drawing. What it draws is unchanged: three round
+      // `choice` marks and a quiet "+N". It returns `null` on an empty list
+      // itself, which is the same honest absence this cell already handed
+      // back for a typed meeting with no guest list.
+      attendeesCell: (
+        <PeopleFaces
+          people={(m.googleGuests ?? [])
+            .filter((g) => !g.resource)
+            .map((g) => ({ key: g.email, name: g.name || g.email }))}
+        />
+      ),
       // THE PLAIN-TEXT SIBLING, declared for the same reason `nameText` is
       // above — never read today (R14: the door owns this table's search),
       // visibly correct the day it stops being paged rather than silently
@@ -1291,9 +1306,26 @@ function choiceFieldWord(type: string): string | null {
 export function shapeChoicesTable(
   values: SelectableValue[],
   groupHome: Map<string, ChoiceGroupHome>,
-  lang: Language
+  lang: Language,
+  /** WHO EACH VALUE'S CREATOR IS, resolved off the SAME cached members list
+   * every picker in the app already reads — the identical fourth parameter,
+   * for the identical reason, that `shapeAccountsList` above already takes
+   * for its own manager column (R56: no second fetch for a face). `[]` is
+   * the honest default and costs nothing: every "Added by" cell then draws
+   * the initials tile it drew before this argument existed, which is still
+   * the right answer for a creator who has no photograph on file.
+   *
+   * WHY A FACE NEEDS A SECOND LIST AT ALL. `SelectableValue` carries the
+   * creator's NAME as a snapshot (`createdByName`) and, since 23 Sep 2026,
+   * their id (`createdById`) — but never their picture, because a picture is
+   * a fact about a PERSON that changes after the word was typed, not a fact
+   * about the word. So the row carries the key and this list carries the
+   * face, exactly as the tickets table resolves a raiser's face through
+   * `memberFace` against the same cache. */
+  members: PickablePerson[] = []
 ): ScreenData {
   const t = translator(lang)
+  const memberById = new Map(members.map((m) => [m.id, m]))
   return {
     rows: values.map((v) => {
       const home = groupHome.get(v.type)
@@ -1448,9 +1480,39 @@ export function shapeChoicesTable(
         // never a blank avatar over an empty name, for a value with no
         // recorded creator — the same seeded-vocabulary case `addedOn`'s own
         // note above describes, now independently honest here too.
+        //
+        // THEIR PHOTOGRAPH, NOT THEIR INITIALS — Aurora, 23 Sep 2026,
+        // verbatim: "on choices adde by show avatar, not initials. make this
+        // a rule, but not only for this case but always: where there's avatar
+        // show it- only initials when avatar is empty." This is the call site
+        // she found it on. The paragraph that used to stand here said
+        // `SelectableValue` "carries no picture … so `RecordMark` draws the
+        // initials tile alone off the name", and that was true of the TYPE
+        // and false of the DATA: `selectable_data.creator_id` has been
+        // selected by both doors since the Added columns shipped, with a
+        // comment naming this exact use ("the id is what a future face would
+        // resolve through"), and `toValue` dropped it. So the face was never
+        // missing, only unforwarded — which is the shape this ruling is
+        // about, and the reason it is a law rather than one fix: initials are
+        // the FALLBACK for a person with no picture, never the default for a
+        // call site that did not go and get one.
+        //
+        // `memberById`, not a name match. `createdByName` is a snapshot and
+        // two colleagues can share one (`assignableMembers`' own duplicate-
+        // name note, web/lib/members.ts), so matching a face by the words
+        // would hand one person another person's photograph. The id is unique
+        // by construction. A creator who has since left the team, a seeded
+        // row with no creator id at all, and a row older than the column all
+        // miss the map and fall through to the initials tile — the honest
+        // fallback, unchanged.
         addedBy: addedByName ? (
           <span className="flex min-w-0 items-center gap-2">
-            <RecordMark name={addedByName} shape="round" size="choice" />
+            <RecordMark
+              picture={v.createdById ? (memberById.get(v.createdById)?.photo ?? null) : null}
+              name={addedByName}
+              shape="round"
+              size="choice"
+            />
             <span className="min-w-0 truncate">{addedByName}</span>
           </span>
         ) : null,

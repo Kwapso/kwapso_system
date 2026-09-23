@@ -24,9 +24,17 @@ import {
   type AccountScope,
 } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
+import { requireActiveSelectableValue } from "@shared/workers/vocabulary"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { ACCOUNTS_DASHBOARD_GROUP_CAP, EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
+import {
+  ACCOUNTS_ARRIVAL_NAMES_PER_MONTH,
+  ACCOUNTS_DASHBOARD_GROUP_CAP,
+  EXPORT_HARD_CAP,
+  LIST_HARD_CAP,
+  MAX_ACCOUNT_DEPTH,
+} from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "@shared/types"
@@ -357,6 +365,54 @@ function toAccount(r: AccountRow, scope: AccountScope, sight?: ContactSight): Ac
     createdByName: ours ? null : r.creator_name,
     updatedAt: r.updated_at,
     editedByName: ours ? null : r.editor_name,
+  }
+}
+
+/** THE TWO PICKED FIELDS ON AN ACCOUNT, and the group each is picked from.
+ *
+ * Aurora, 23 Sep 2026, of the industry: "make it a drop down, adjustable on
+ * settings." The country had already been ruled the same way, much earlier and
+ * for the same stated reason — "a country typed free is a country spelled five
+ * ways" — so the two are one decision said twice and are enforced together
+ * here.
+ *
+ * NAMED THROUGH `SELECTABLE_GROUPS`, never as a literal: the screen that OFFERS
+ * a value and the door that WRITES one have to mean the same group, and two
+ * typed strings is exactly how they stop. That file's own header is the whole
+ * argument. */
+const PICKED_ACCOUNT_FIELDS = [
+  { field: "country", group: SELECTABLE_GROUPS.country, what: "Country" },
+  { field: "industry", group: SELECTABLE_GROUPS.industry, what: "Industry" },
+] as const
+
+/** Refuse a picked field whose value is not one of the team's CURRENT options.
+ *
+ * WHY IT IS HERE AND NOT IN `routes/accounts.ts`. The route already validates
+ * the SHAPE of every body field positionally (R20, `accountFields`); this is
+ * the second, semantic half, and it belongs where the record's BEFORE state is
+ * already in hand. `createAccount` and `updateAccount` are the only two callers
+ * of the write path (checked: nothing outside `routes/accounts.ts` imports
+ * either), so one call in each covers every door that can reach the column.
+ *
+ * `before` IS WHAT MAKES THIS LIVEABLE. A word retired on the Choices screen
+ * stops being settable — that is the ruling — but a record that already holds
+ * one must not become uneditable: correcting an account's phone number would
+ * otherwise be refused because of a decision somebody made about a vocabulary
+ * last month. So a value identical to the stored one is never re-checked.
+ * `null` for a create, where there is no stored value and every word is new. */
+async function requirePickedAccountValues(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  next: { country?: string | null; industry?: string | null },
+  before: { country: string | null; industry: string | null } | null
+): Promise<void> {
+  for (const { field, group, what } of PICKED_ACCOUNT_FIELDS) {
+    const value = next[field]
+    // Absent, null and blank are all "no value here" — clearing a field is
+    // always allowed, the same tri-state the patch itself already keeps.
+    if (value === undefined || value === null || value.trim() === "") continue
+    if (before && before[field] === value) continue
+    await requireActiveSelectableValue(cfg, guard, group, value, what)
   }
 }
 
@@ -774,26 +830,65 @@ export async function listAccounts(
  * years of one bar each, which is the ceiling past which a bar chart has
  * stopped being one anyway (see that constant's own header).
  *
- * NO PORTAL DOOR, NO CITY, NO TENURE, NO MISSING-FIELD READOUT — the fourth
- * strike, "how long its been" and "can reach the portal", is not a filter
- * this function drops, it is a QUESTION THIS FUNCTION NEVER ASKS: there is no
- * read here of `portal_users` and no arithmetic over `created_at` against
- * today's date. Building either would be inventing a fifth panel she did not
+ * NO PORTAL DOOR, NO CITY, NO MISSING-FIELD READOUT — three of the four
+ * strikes are not filters this function drops, they are QUESTIONS THIS
+ * FUNCTION NEVER ASKS: there is no read here of `portal_users` and no
+ * grouping by `city`. Building either would be inventing a panel she did not
  * ask for, on a screen whose whole brief was "do not add the sections what
- * you do not know yet". */
+ * you do not know yet".
+ *
+ * TENURE IS BACK, BY HER OWN LATER WORD — she struck "how lon its been" on 23
+ * Sep 2026 and reversed it the SAME DAY, looking at the built screen: "on
+ * accounts oevrview, fix how the kpis cards look, and add the median tenure",
+ * and, of the arrivals picture beside it, "make the how long weve had this
+ * account a line graphic, and when hover show who". So the fourth strike is
+ * SUPERSEDED, not satisfied, and this header keeps the overturned argument
+ * rather than deleting it (`shared/spine.ts`'s own discipline). What it buys
+ * is exactly two things, both below: `medianTenureDays` and the NAMES behind
+ * each arrival month.
+ *
+ * THE MEDIAN IS A TRUE MEDIAN, TAKEN BY THE DATABASE — never an average
+ * wearing the word, and never a middle picked off a page this door happened
+ * to load. An even count answers the MEAN OF THE TWO MIDDLES, which is the
+ * definition rather than a convenience: the query below skips to the middle of
+ * the tenures in order and takes one row for an odd n, two for an even one,
+ * and averages what it took — which is the median in both cases (the
+ * arithmetic is written out at the query itself). n = 1 takes that one
+ * account's own tenure; n = 0 never runs the query at all and the answer is
+ * `null` — "there is no middle of nothing" said as a value a screen can branch
+ * on, never 0, which would read as "we have had them no time". */
 export type AccountsDashboard = {
   /** the small row of figures at the top — R16 exact counts, the same
    * `countCollection` seam every other badge in the app is counted through. */
   activeCount: number
   countryCount: number
+  /** THE MIDDLE ACCOUNT'S AGE, IN DAYS, over the same active company fence
+   * every other figure here is counted through — `null`, and only `null`,
+   * when there is no account to be in the middle of. Days rather than months
+   * or years because days are what the database can measure exactly
+   * (`julianday`) and every other unit is a presentation choice the screen
+   * makes; see this function's own header for why the even case is a mean. */
+  medianTenureDays: number | null
   /** one row per country an active company names, busiest first — a country
    * nobody set is not a row here (see this function's own header). */
   byCountry: { country: string; n: number }[]
+  /** one row per industry an active company names, busiest first — read
+   * EXACTLY like `byCountry` beside it, and drawn beside it too (Aurora, 23
+   * Sep 2026: "add metric industry (side of where they are, so in the same row
+   * country & industry)"). An industry nobody set is silently outside this,
+   * the same silence a blank country keeps. */
+  byIndustry: { industry: string; n: number }[]
   /** one row per calendar month an active company was created in, oldest
    * first, every month in range even where the true count is one — the same
    * "no dropped bucket" reading `readTicketDashboard`'s own trend keeps,
-   * except this one never PICKS a range in the first place. */
-  arrivals: { month: string; n: number }[]
+   * except this one never PICKS a range in the first place.
+   *
+   * `names` IS WHO, AND IT IS BOUNDED — her "when hover show who". At most
+   * `ACCOUNTS_ARRIVAL_NAMES_PER_MONTH` names per month, A→Z, so the read
+   * stays R14-bounded at cap × cap rows however many companies arrived in one
+   * month; `n` is still the EXACT count, so a screen can always say how many
+   * more there were than it can name. */
+  arrivals: { month: string; n: number; names: string[] }[]
 }
 
 export async function readAccountsDashboard(
@@ -805,13 +900,18 @@ export async function readAccountsDashboard(
   const base = where([fence.sql, "account_type = 'entity'", "deactivated_at IS NULL", "archived_at IS NULL"])
   const params = [...fence.params]
   const cap = ACCOUNTS_DASHBOARD_GROUP_CAP
+  const namesPerMonth = ACCOUNTS_ARRIVAL_NAMES_PER_MONTH
   // A COUNTRY NOBODY SET IS NOT A ROW — both country reads add the identical
   // extra clause on top of the shared active-company fence above, so the
   // header count and the bars beneath it can never disagree about which rows
   // they are asking about.
   const knownCountry = `${base} AND country IS NOT NULL AND TRIM(country) <> ''`
+  // AND THE SAME CLAUSE ONE COLUMN ALONG. Her 23 Sep 2026 second pass put the
+  // industry split beside the country one, so it is read the identical way: an
+  // industry nobody set is not a row, over the same active-company fence.
+  const knownIndustry = `${base} AND industry IS NOT NULL AND TRIM(industry) <> ''`
 
-  const [activeCount, countryCount, byCountry, arrivals] = await Promise.all([
+  const [activeCount, countryCount, byCountry, byIndustry, arrivals, arrivalNames] = await Promise.all([
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${base}`, params),
     countCollection(
       cfg,
@@ -826,6 +926,15 @@ export async function readAccountsDashboard(
         GROUP BY country ORDER BY n DESC LIMIT ${cap}`,
       params
     ),
+    // BOUNDED THE SAME WAY (R14), by the same constant — an industry list is
+    // open-ended in principle for exactly the reason a country list is.
+    d1Query<{ industry: string; n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT industry, COUNT(*) AS n FROM accounts${knownIndustry}
+        GROUP BY industry ORDER BY n DESC LIMIT ${cap}`,
+      params
+    ),
     // BOUNDED BY GROUPING (R14) — at most `cap` distinct months, said above.
     d1Query<{ month: string; n: number }>(
       cfg,
@@ -834,9 +943,77 @@ export async function readAccountsDashboard(
         GROUP BY month ORDER BY month ASC LIMIT ${cap}`,
       params
     ),
+    // WHO ARRIVED IN EACH MONTH — her "when hover show who". BOUNDED TWICE,
+    // which is what makes a per-row list safe at all (R14): `ROW_NUMBER()`
+    // inside the month keeps at most `namesPerMonth` names per bucket, and
+    // the outer LIMIT keeps at most `cap` buckets' worth — so the worst case
+    // is a fixed cap × namesPerMonth rows however large the book grows, and
+    // never "every account, grouped in the browser".
+    d1Query<{ month: string; name: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT month, name FROM (
+         SELECT strftime('%Y-%m', created_at) AS month, name,
+                ROW_NUMBER() OVER (
+                  PARTITION BY strftime('%Y-%m', created_at)
+                  ORDER BY name ASC, id ASC
+                ) AS rn
+           FROM accounts${base}
+       ) WHERE rn <= ${namesPerMonth} ORDER BY month ASC, name ASC LIMIT ${cap * namesPerMonth}`,
+      params
+    ),
   ])
 
-  return { activeCount, countryCount, byCountry, arrivals }
+  // THE MIDDLE ACCOUNT'S AGE — a SECOND round trip on purpose, because the
+  // window that selects the middle row(s) is arithmetic over `n` and `n` is
+  // what the first read just answered. It is one bounded statement (`LIMIT 2`
+  // at most), not a page of tenures sorted here, and it is skipped entirely
+  // when there is nothing to be in the middle of — a query that can only
+  // answer `null` is a round trip nobody should pay for.
+  const medianTenureDays =
+    activeCount === 0
+      ? null
+      : ((
+          await d1Query<{ m: number | null }>(
+            cfg,
+            guard.databaseId,
+            // THE MIDDLE WINDOW, WRITTEN OUT: skip `(n - 1) / 2` rows and take
+            // `2 - (n % 2)` of them — one row when n is odd, two when n is
+            // even — then average what was taken. Odd n gives that one row
+            // back unchanged; even n gives the mean of the two middles, which
+            // is the definition of a median rather than a convenience. It is
+            // not a page: the window is two rows at most, whatever the book
+            // does, so this stays R14-bounded without a cap of its own.
+            `SELECT AVG(tenure) AS m FROM (
+               SELECT julianday('now') - julianday(created_at) AS tenure
+                 FROM accounts${base}
+                ORDER BY tenure ASC
+                LIMIT ${2 - (activeCount % 2)} OFFSET ${Math.floor((activeCount - 1) / 2)}
+             )`,
+            params
+          )
+        )[0]?.m ?? null)
+
+  // ONE `names` ARRAY PER MONTH, STITCHED ONTO THE COUNTED ROWS — never a
+  // second list the screen has to line up itself. A month whose names all
+  // fell outside the two caps above keeps an EMPTY array rather than losing
+  // its row: `n` is the exact count either way, so the picture never drops a
+  // point because the hover has nothing to say.
+  const namesByMonth = new Map<string, string[]>()
+  for (const r of arrivalNames) {
+    const list = namesByMonth.get(r.month)
+    if (list) list.push(r.name)
+    else namesByMonth.set(r.month, [r.name])
+  }
+
+  return {
+    activeCount,
+    countryCount,
+    medianTenureDays,
+    byCountry,
+    byIndustry,
+    arrivals: arrivals.map((r) => ({ ...r, names: namesByMonth.get(r.month) ?? [] })),
+  }
 }
 
 /** Every account this caller may see — NARROWED the same way the list narrows —
@@ -1074,6 +1251,12 @@ export async function createAccount(
     throw new GuardError(403, "forbidden", "New accounts have to sit under one of your accounts.")
   }
 
+  // THE TWO PICKED FIELDS, REFUSED BEFORE ANYTHING IS MINTED (0120). Checked
+  // ahead of the id, the geocode and the INSERT so a refused create spends
+  // nothing and leaves nothing behind — the same order the parent-scope
+  // refusal above already keeps.
+  await requirePickedAccountValues(cfg, guard, input, null)
+
   const id = ulid()
   const now = new Date().toISOString()
 
@@ -1268,6 +1451,17 @@ export async function updateAccount(
     timezone: keep(input.timezone, before.timezone),
     accountManagerUserId: keep(input.accountManagerUserId, before.account_manager_user_id),
   }
+
+  // THE TWO PICKED FIELDS, REFUSED AGAINST THE TEAM'S CURRENT OPTIONS (0120),
+  // and against `before` as well as the group — an edit that does not TOUCH the
+  // country or the industry re-sends whatever the row already holds, and a word
+  // retired on the Choices screen since must not make the rest of the record
+  // uneditable. Checked on `next` rather than on `input`, so a patch that says
+  // nothing about a field is compared with itself and passes by definition.
+  await requirePickedAccountValues(cfg, guard, next, {
+    country: before.country,
+    industry: before.industry,
+  })
 
   // 0118, RE-GEOCODE ONLY WHEN IT IS WORTH IT. The four address fields the
   // geocoder reads (`addressChanged`, ./geocode.ts) are compared against what

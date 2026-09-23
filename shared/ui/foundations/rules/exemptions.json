@@ -28,5 +28,125 @@
     "where": "components/record-detail/record-detail.tsx",
     "what": "#0000",
     "why": "Not a colour: `0 0 #0000` is CSS's way of writing a shadow that paints nothing, set on --hairline-strong to switch OFF the note field's ring for the one composer that must not look like a field. `transparent` would be a named colour, which RULES.md 2.2 refuses outright, so the four-digit hex is the least-wrong spelling of nothing available. If tokens.css ever declares a --shadow-none, this line goes with it."
+  },
+  {
+    "law": "boxes",
+    "where": "components/input/input.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a form control's own edge — and this is the file that defines it. RULES.md 2.7 blesses exactly two places, 'form fields and selection controls', and CH09 states the two strengths: --hair-strong standing, --hair when disabled, plus chapter 9's poppy at 65% for error. Nothing is contained by this stroke; it is what tells a reader the box is typeable at all, and the kit has no fill that says the same thing without also saying 'button'."
+  },
+  {
+    "law": "boxes",
+    "where": "components/textarea/textarea.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a form control's own edge. The same three strengths input.tsx draws, on the 24 box rather than the pill: --hair-strong standing, --hair disabled, the 65% poppy on error. It is the field affordance, not a box around a container."
+  },
+  {
+    "law": "boxes",
+    "where": "components/select/select.tsx",
+    "what": "*",
+    "why": "EXCEPTION D for the standing and disabled strokes, and EXCEPTION C for the two that fire on focus and on open. A select trigger IS a field, so it takes the field hairline; and 'the hairline goes to ink' on focus/open is the artifact's own answer to what an open select looks like. The ink one is a selection affordance in the strict sense - removing it would leave the reader no indication which control the list belongs to - and RULES.md 3.1's global ring is beside it, not instead of it."
+  },
+  {
+    "law": "boxes",
+    "where": "components/date-picker/date-picker.tsx",
+    "what": "*",
+    "why": "EXCEPTION D for the trigger's own two strengths and its 65% poppy error, EXCEPTION C for the ink stroke on data-[open=true], and EXCEPTION E for the ring on data-[today=true]: that last one IS the today marker inside the day grid, a mark rather than a box, and nothing is contained by it. Three exceptions in one file because the file draws a field, a state and a mark, and saying so is cheaper than three near-identical entries."
+  },
+  {
+    "law": "boxes",
+    "where": "components/sort-control/sort-control.tsx",
+    "what": "*",
+    "why": "EXCEPTION D for the field's own --border stroke and EXCEPTION C for the ink one on focus-visible. The control is a field in every respect the kit measures, and its focus stroke is the same 'hairline goes to ink' move select.tsx makes, for the same reason."
+  },
+  {
+    "law": "boxes",
+    "where": "components/checkbox/checkbox.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a selection control - RULES.md 2.7's second blessed place, named in that sentence. The 22 mark carries --hair-strong unchecked, --hair disabled and chapter 9's 65% poppy on error, including on the checked and indeterminate states, so an invalid box still reads as invalid after it is ticked. The mark has no interior to be a container of."
+  },
+  {
+    "law": "boxes",
+    "where": "components/radio-group/radio-group.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a selection control. A radio is the checkbox at pill radius and inherits both strengths for the same reason; the comment in that file states the inheritance explicitly."
+  },
+  {
+    "law": "boxes",
+    "where": "components/signature/signature.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a form control. A signature pad is a field with a canvas in it: its default, hover, filled and error skins move the hairline's TONE and never its thickness, which is the field grammar chapter 9 sets out. Remove it and the pad becomes an unmarked rectangle of paper that a reader has no reason to touch."
+  },
+  {
+    "law": "boxes",
+    "where": "components/file-upload/file-upload.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a form control. The drop zone's rejected state draws chapter 9's 65% poppy edge. The zone's own dashed border is a separate exception under the borders law in this same file, for a different reason recorded there; this entry covers the inset one only."
+  },
+  {
+    "law": "boxes",
+    "where": "components/filter-bar/filter-bar.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, form controls. Three strokes: the facet's selection control at --hair-strong, chapter 9's error edge, and the disabled chip-field's quiet --hair beside its disabled fill and ink. The bar's ordinary chips carry NO stroke - that was removed earlier and its history is written in the file - so what is left here is fields and a selection control only."
+  },
+  {
+    "law": "boxes",
+    "where": "components/comments/comments.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a form control, and this one is MEASURED rather than argued. On a phone in the dark palette, 25 Aug 2026, --surface-raised sat one step off the panel, the composer pill vanished, and the reader saw a bare placeholder floating over a dead Send: 'the conversation section is completely broken'. The 20% ring is what says the field is real. The same file's --hairline-start indent is a one-edge separator and is not this law's subject."
+  },
+  {
+    "law": "boxes",
+    "where": "components/permission-matrix/permission-matrix.tsx",
+    "what": "*",
+    "why": "EXCEPTION D, a selection control. The NOT-HELD slot is --card behind override 42's stroke; the HELD slot is --surface-inverse and draws none. The stroke is what says 'there is a control here and it is off', which is the same job checkbox.tsx's unchecked mark does, drawn at matrix scale."
+  },
+  {
+    "law": "boxes",
+    "where": "components/status-stepper/status-stepper.tsx",
+    "what": "*",
+    "why": "EXCEPTION E, a stroke that IS the object. These four are the step MARK for a step not yet reached - a disc on the rail and a pill on the row - drawn on --surface-idle or --surface-lift, whose fill sits under the contrast law's own boundary floor and is DISCHARGED by precisely this ring (check-contrast.mjs names these three lines by number on every run). There is no container under it and no paper step available: the tier below --surface-idle is the page itself."
+  },
+  {
+    "law": "boxes",
+    "where": "components/run-steps/run-steps.tsx",
+    "what": "*",
+    "why": "EXCEPTION E, a stroke that IS the object. The pending step's numbered disc, the row-shaped twin of status-stepper's rail mark, for the identical reason: raised paper with a hairline and a tertiary number is the whole drawing, not a box around one."
+  },
+  {
+    "law": "boxes",
+    "where": "components/flowchart/flowchart.tsx",
+    "what": "*",
+    "why": "EXCEPTION C for the two --hairline-ink strokes and EXCEPTION E for the legend's pending swatch. The ink pair is override 33's selection ring on a chosen node - the kit's own 1px selection treatment, and removing it leaves a reader no way to see which node they picked. The swatch is a colour sample; a pale sample on pale paper has no edge of its own without one."
+  },
+  {
+    "law": "boxes",
+    "where": "components/badge/badge.tsx",
+    "what": "*",
+    "why": "EXCEPTION E, a stroke that IS the object - and RULES.md 2.7 blesses it by name: variant='outline' is the single UNCOLOURED badge and therefore 'the only badge that draws a hairline'. Section 9.1 forbids dropping a variant value outright, so it could not go even if it were wanted. OPEN QUESTION FOR THE CLIENT, 23 Sep 2026: a chip is arguably a small container, and she has ruled on pill strokes before ('pills no border!'). Standing until she says otherwise."
+  },
+  {
+    "law": "boxes",
+    "where": "compositions/screens/brand.tsx",
+    "what": "*",
+    "why": "EXCEPTION E, a stroke that IS the object. A 32px colour SWATCH. The file's own note states the case: a pale swatch on pale paper is invisible without its own edge, and the edge is the sample's boundary rather than a box around anything."
+  },
+  {
+    "law": "boxes",
+    "where": "compositions/screens/settings.tsx",
+    "what": "*",
+    "why": "EXCEPTION E for the 14px colour swatch, same reason as brand.tsx's, and EXCEPTION C for the --hairline-ink stroke on a chosen theme tile, which is override 33's selection ring. The three card-and-panel PICTURES in this file wore a hairline until 23 Sep 2026 and do not any more: a picture of a card must wear what a card wears."
+  },
+  {
+    "law": "boxes",
+    "where": "components/web-embed/web-embed.tsx",
+    "what": "*",
+    "why": "OPEN QUESTION FOR THE CLIENT, 23 Sep 2026 - provisionally standing. By shape this IS a box around a container and would be removed under 2.8. The file's own header states the counter-argument: an embed paints content this system does not control, and off-beige on off-beige has no edge at all, so taking the stroke off lets a third party's page bleed into ours with nothing to say where one ends. Left drawn rather than guessed at either way; this entry is the record that it was weighed."
+  },
+  {
+    "law": "boxes",
+    "where": "components/unsaved-changes-bar/unsaved-changes-bar.tsx",
+    "what": "*",
+    "why": "OPEN QUESTION FOR THE CLIENT, 23 Sep 2026 - provisionally standing. A stroke on all four edges of a container, which 2.8 removes - except that it is tinted --warning at 35%, so it is carrying a STATUS rather than drawing an outline, and the bar has no second paper tone to fall back to if it goes. The same color-mix shape select.tsx and date-picker.tsx use for a tinted field edge. Left drawn; this entry is the record that it was weighed."
   }
 ]

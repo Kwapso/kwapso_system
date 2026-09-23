@@ -68,6 +68,7 @@ const value = (id: string, type: string, word: string): SelectableValue => ({
   position: null,
   createdAt: "2026-09-01T10:00:00.000Z",
   createdByName: "Aurora",
+  createdById: null,
 })
 
 const VALUES: SelectableValue[] = [

@@ -51,6 +51,29 @@ import { RecordMark } from "@shared/web/record-mark"
 
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 
+/** WHAT A ROW OF TIME WAS LOGGED AGAINST, in the words a person reads — the
+ * door's own `WORK_LOG_TARGETS` allow-list (workers/content/src/lib/
+ * work-logs.ts), keyed by the table name it matches.
+ *
+ * ONE VOCABULARY, THREE READERS. Aurora's ruling of 23 Sep 2026 made this the
+ * only meaning of "kind of work" in the app: the workLogs facet below, the
+ * Entries tab's own rows (`time-panel.tsx`) and the Dashboard tab's donut
+ * (`logs-dashboard.tsx`) all read it from here, so a fifth target table added
+ * to the door's allow-list is one line in this object rather than three places
+ * to remember.
+ *
+ * ENGLISH HERE, like every other word in this file, and translated on the way
+ * to the screen — the facets through `translatedFacets` below, the two screens
+ * through their own `t(...)` (R33). */
+export const WORK_LOG_TARGET_WORD: Record<string, string> = {
+  stories: "Story",
+  // The ticket module's table is `help` and stays that way on purpose
+  // (CLAUDE.md: "Don't 'finish the rename'"); the WORD is Ticket.
+  help: "Ticket",
+  tasks: "Task",
+  meetings: "Meeting",
+}
+
 /** One option on a facet: the word the DOOR matches, and the word a person
  * reads. They are different on purpose — a door matches `meeting`, a person is
  * looking for "From a meeting" — and conflating them is how a filter comes to
@@ -327,18 +350,27 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     // (useAssignableMembers already excludes a client login: R21 refuses one at
     // this door outright, so a client never belongs in this list).
     { field: "userId", label: "Who logged it" },
+    // WHOSE WORK IT WAS — Aurora, 23 Sep 2026: "add toolbar w filters by
+    // person, account". A facet over ROWS, so no vocabulary here: the door
+    // matches `work_logs.account_id`, a ULID the log INHERITED from whatever it
+    // was logged against, and the screen supplies the names. Our own admin
+    // belongs to no client, so picking a client never returns it — the
+    // dashboard's own client section keeps that pile as its own row instead.
+    { field: "accountId", label: "Whose work it was" },
     // WHAT KIND OF WORK — the door's own allow-list (WORK_LOG_TARGETS,
     // workers/content/src/lib/work-logs.ts), in the glossary's own words for
     // each (Story, Ticket, Task, Meeting) rather than the table name.
+    //
+    // THIS IS NOW THE WHOLE MEANING OF "KIND OF WORK" (Aurora, 23 Sep 2026:
+    // "kind of work is what its related to" and "on logs this kind of work
+    // shoudl not be manual, but automatic to where it was created"). The
+    // free-text `kind` column is no longer asked for or drawn anywhere; the
+    // words below are read from `WORK_LOG_TARGET_WORD` so this facet, the
+    // Entries rows and the Dashboard's donut cannot spell one thing three ways.
     {
       field: "targetTable",
       label: "Kind of work",
-      options: [
-        { value: "stories", label: "Story" },
-        { value: "help", label: "Ticket" },
-        { value: "tasks", label: "Task" },
-        { value: "meetings", label: "Meeting" },
-      ],
+      options: Object.entries(WORK_LOG_TARGET_WORD).map(([value, label]) => ({ value, label })),
     },
     // WHEN — a closed window rather than a free-form date range: nothing on
     // either front door draws a date-range picker, and three rolling windows are

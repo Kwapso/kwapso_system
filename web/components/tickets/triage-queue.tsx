@@ -470,10 +470,11 @@ export function TriageQueue({
       })
   )
 
-  /** THE TOOLBAR'S FILTER PILL AND ITS PANEL (R53's `filters` + `toolbarPanel`
-   * slots) — `useFilterBar`'s own `{ pill, panel }` split, so the count chip
-   * sits in the track and the open panel is a real sibling BENEATH it rather
-   * than an overlay floating over the card (client ruling, 2 Sep 2026).
+  /** THE TOOLBAR'S FILTER CONTROL (R53's `filters` slot) — ONE node, which
+   * carries the overlay it opens with it. The count chip sits in the track and
+   * the facets float above the rows, never under the toolbar (Aurora,
+   * 2026-09-23: "filter drop sheet popover", over her own "a temporary overlay
+   * not a second row"). There is no second value and no second slot.
    *
    * CALLED UNCONDITIONALLY, AND THAT IS THE WHOLE REASON IT SITS HERE. It is a
    * HOOK, and four early returns follow below (a failed read, an unanswered
@@ -489,7 +490,7 @@ export function TriageQueue({
    * declares its own — but handing it `matching` would make that fallback
    * wrong the day somebody adds a third facet without options, and a latent
    * wrong default is worse than an unused right one. */
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets: triageFacets(waiting, t, appsQ.data ?? []),
     values: facetValues,
     data: waiting,
@@ -911,7 +912,6 @@ export function TriageQueue({
           />
         }
         filters={filterPill}
-        toolbarPanel={filterPanel}
         // SORT BY RAISED, one option and a direction — see `TRIAGE_SORTS` for
         // why one option is the answer here rather than a stub, and for the
         // `TOOLBAR_SORT_EXEMPT` entry this replaces.

@@ -13,11 +13,33 @@
 //      page with nothing remembered opens on it.
 //   2. The tab's own door counts ACTIVE COMPANIES ONLY: never inactive,
 //      never archived, never a person linked under one.
-//   3. None of the four things she struck (the town breakdown, "how long",
-//      portal reach, a missing-field readout) is CODE anywhere in the
-//      screen's own component or its door — comments explaining what was
-//      struck and why do not count as the section being built, so every
-//      check here strips comments before it looks.
+//   3. None of the things she LEFT struck (the town breakdown, portal reach,
+//      a missing-field readout) is CODE anywhere in the screen's own
+//      component or its door — comments explaining what was struck and why do
+//      not count as the section being built, so every check here strips
+//      comments before it looks.
+//
+// ── THE FOURTH STRIKE IS SUPERSEDED, NOT SATISFIED (23 SEP 2026, SAME DAY) ──
+//
+// "how lon its been" was struck in the morning and asked for in the afternoon,
+// by her own word over the built screen: "on accounts oevrview, fix how the
+// kpis cards look, and add the median tenure", and, of the picture beside it,
+// "make the how long weve had this account a line graphic, and when hover show
+// who (like tickets tendency)". This file used to fail the build on the word
+// `tenure` and on `julianday(` anywhere in either file — the right check for
+// the morning's ruling and the wrong one from the afternoon on.
+//
+// THE TWO ASSERTIONS ARE RETIRED RATHER THAN INVERTED HERE. "The door computes
+// a median tenure" is a statement about a NUMBER, and a word search cannot
+// tell a true median from an average that spells itself the same way; it is
+// proved where the arithmetic is, against a real database, in
+// `workers/tenancy/test/accounts-dashboard.test.ts` (odd, even, one, none).
+// What this file gains instead is the two things a word search CAN hold and a
+// render cannot: that the tab reaches the KIT's own donut rather than drawing
+// a second one, and that its hand-drawn legend's colour sequence is still the
+// kit donut's own — read off BOTH files, so a key that drifts from its ring
+// turns the build red. The marks themselves are proved by mounting the
+// component, in `web/test/accounts-dashboard-marks.test.tsx`.
 
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -94,7 +116,7 @@ describe("the Accounts screen's Dashboard tab", () => {
     expect(body, "the dashboard's fence does not narrow to companies").toMatch(/account_type = 'entity'/)
   })
 
-  it("draws none of the four sections she struck", () => {
+  it("draws none of the sections she left struck", () => {
     const screenCode = stripComments(readFileSync(DASHBOARD, "utf8"))
     const doorSrc = readFileSync(DOOR, "utf8")
     const typeAt = doorSrc.indexOf("export type AccountsDashboard = {")
@@ -116,12 +138,11 @@ describe("the Accounts screen's Dashboard tab", () => {
       /\bcity\b/i
     )
 
-    // HOW LONG THEY'VE BEEN A CLIENT — she struck "how lon its been", i.e. a
-    // tenure figure computed off `created_at` against today. The door has no
-    // date arithmetic at all (`julianday`, the seam every duration figure in
-    // this codebase goes through) and no field or word naming tenure.
-    expect(code, "the accounts dashboard computes a duration, which she struck").not.toMatch(/julianday\(/i)
-    expect(code, "the accounts dashboard names a tenure figure, which she struck").not.toMatch(/tenure/i)
+    // HOW LONG THEY'VE BEEN A CLIENT was the fourth strike and she reversed
+    // it the same day — see this file's own header. The two assertions that
+    // used to stand here (no `julianday(`, no `tenure`) are retired, and the
+    // median is proved where the arithmetic is rather than by a word search:
+    // `workers/tenancy/test/accounts-dashboard.test.ts`.
 
     // PORTAL REACH — she struck "can reach the portal". Nothing here reads
     // `portal_users` or draws a portal-access column.
@@ -135,5 +156,46 @@ describe("the Accounts screen's Dashboard tab", () => {
       code,
       "the accounts dashboard reads or draws a missing/empty-field readout, which she struck"
     ).not.toMatch(/\bmissing\b|empty.?field/i)
+  })
+
+  // ── HER SECOND PASS: THE RING COMES FROM THE KIT ──────────────────────────
+
+  it("reaches the kit's own Donut rather than drawing a second one", () => {
+    // "make the where as a donut graphic". The kit ships one
+    // (`shared/ui/components/donut/donut.tsx`, in its own manifest), and R39
+    // is the standing rule that the kit supplies the UI: a ring hand-rolled
+    // here would be the app growing a second drawing of a shape the design
+    // system already owns.
+    const code = stripComments(readFileSync(DASHBOARD, "utf8"))
+    expect(code, "the accounts dashboard does not import the kit's `Donut`").toMatch(
+      /from\s+"@shared\/ui\/components\/donut\/donut"/
+    )
+    expect(code, "the accounts dashboard imports the kit's `Donut` but never draws it").toMatch(/<Donut\b/)
+  })
+
+  it("keys its legend to the kit donut's own colour sequence", () => {
+    // THE LEGEND IS THIS FILE'S OWN, and that is a REPORTED KIT GAP rather
+    // than a preference: `donut.tsx`'s own state table says "hover — none
+    // drawn", it exposes no per-segment callback and the ring is rendered
+    // inside the component, so her "(when hover show)" cannot be answered
+    // through the kit's legend today. The cost of drawing the rows here is
+    // that two files now decide one colour order, so this reads BOTH off disk
+    // — a key that drifts from the ring it explains is worse than no key.
+    const screen = readFileSync(DASHBOARD, "utf8")
+    const kit = readFileSync(join(REPO, "shared/ui/components/donut/donut.tsx"), "utf8")
+    const sequence = (src: string, marker: string) => {
+      const at = src.indexOf(marker)
+      expect(at, `could not find \`${marker}\``).toBeGreaterThan(-1)
+      const close = src.indexOf("]", at)
+      return [...src.slice(at, close).matchAll(/var\(--chart-\d\)/g)].map((m) => m[0])
+    }
+    const mine = sequence(screen, "const DONUT_SEGMENT_COLOURS = [")
+    const theirs = sequence(kit, "const SEGMENT_COLOURS = [")
+    expect(mine.length, "the accounts dashboard's legend names no chart colours").toBeGreaterThan(0)
+    expect(
+      mine,
+      "the accounts dashboard's legend dots no longer follow the kit donut's own segment sequence — " +
+        "the key and the ring would show different colours for the same country"
+    ).toEqual(theirs)
   })
 })

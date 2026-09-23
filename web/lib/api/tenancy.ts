@@ -52,16 +52,24 @@ import { api, enc, listQuery, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
 
 /** THE ACCOUNTS DASHBOARD, exactly as `readAccountsDashboard`
- * (workers/tenancy/src/lib/accounts.ts) hands it back — three grouped reads
- * over the ACTIVE company book in one round trip, every one of them counted
- * by the database and none of them tallied here off a loaded page. Its own
- * header carries the whole account of what her 23 Sep 2026 ruling struck
- * (the town breakdown, tenure, missing fields, portal reach) and why. */
+ * (workers/tenancy/src/lib/accounts.ts) hands it back — grouped reads over the
+ * ACTIVE company book in one round trip, every one of them counted by the
+ * database and none of them tallied here off a loaded page. Its own header
+ * carries the whole account of what her 23 Sep 2026 ruling struck (the town
+ * breakdown, missing fields, portal reach), why, and which of the four strikes
+ * she reversed the same day (tenure — `medianTenureDays` and the `names`
+ * behind each arrival month). */
 export type AccountsDashboard = {
   activeCount: number
   countryCount: number
+  /** `null`, and only `null`, when there is no active account to be in the
+   * middle of — never 0, which would read as "we have had them no time". */
+  medianTenureDays: number | null
   byCountry: { country: string; n: number }[]
-  arrivals: { month: string; n: number }[]
+  /** beside `byCountry`, not under it — her "in the same row country &
+   * industry" (23 Sep 2026), read through the identical fence and clause. */
+  byIndustry: { industry: string; n: number }[]
+  arrivals: { month: string; n: number; names: string[] }[]
 }
 
 export const tenancy = {

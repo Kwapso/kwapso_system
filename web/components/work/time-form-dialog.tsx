@@ -24,7 +24,6 @@ import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { FactRow } from "@shared/web/fact-row"
-import { Input } from "@shared/ui/components/input/input"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
@@ -45,12 +44,26 @@ export type TimeFormValues = {
   startedAt: string
   endedAt: string
   note: string
-  /** the kind of work, so a margin can group by it. Free text on purpose: the
-   * kinds an agency bills are its own vocabulary, and a picker fed from the
-   * internal rate card would show what our hours cost to anybody who may log
-   * time — a different permission entirely. */
-  kind: string
 }
+
+// THE FREE-TEXT "KIND OF WORK" FIELD STOOD HERE AND IS GONE (Aurora, 23 Sep
+// 2026, verbatim): "on logs this kind of work shoudl not be manual, but
+// automatic to where it was created: if it was creted in a story its stories,
+// in a ticket its a ticke, in a meeting its a meeting, etc".
+//
+// It was a text box beside the two moments, offered on both the new entry and
+// the correction, and the answer it asked for is one the app already knows: the
+// log is hung on a story, a ticket, a task or a meeting, and `target_table` says
+// which on every row by construction. So the question is not asked any more and
+// the RELATED RECORD TYPE is what the screens show wherever a kind used to be
+// drawn.
+//
+// THE COLUMN AND ITS DATA SURVIVE. `work_logs.kind` is still written by the
+// meetings door (its own constant, which the `meetingTime` filter reads) and
+// still accepted by the three write doors, so a row that already carries a typed
+// word keeps it: `editWorkLog` falls back to the stored value when a caller
+// sends none, which is exactly what this form does now. Nothing is migrated and
+// nothing is erased; it simply stops being something a person is asked for.
 
 const workField = { ...defaultFieldConfig, label: "What you worked on", required: true }
 /** The same field once the answer is settled — on a correction, or on a new
@@ -60,7 +73,6 @@ const workField = { ...defaultFieldConfig, label: "What you worked on", required
 const settledWorkField = { ...workField, required: false }
 const startField = { ...defaultFieldConfig, label: "Started", required: true }
 const endField = { ...defaultFieldConfig, label: "Finished", required: true }
-const kindField = { ...defaultFieldConfig, label: "Kind of work", required: false }
 const noteField = { ...defaultFieldConfig, label: "Note", required: false }
 
 export function TimeFormDialog({
@@ -101,7 +113,6 @@ export function TimeFormDialog({
       startedAt: toLocalInput(initial?.startedAt ?? null),
       endedAt: toLocalInput(initial?.endedAt ?? null),
       note: initial?.note ?? "",
-      kind: initial?.kind ?? "",
     },
     open
   )
@@ -124,7 +135,6 @@ export function TimeFormDialog({
         startedAt: toMoment(values.startedAt),
         endedAt: toMoment(values.endedAt),
         note: values.note.trim(),
-        kind: values.kind.trim(),
       })
       clearDraft()
       onOpenChange(false)
@@ -211,15 +221,6 @@ export function TimeFormDialog({
           onValueChange={(d) =>
             setValues((s) => ({ ...s, endedAt: d ? toLocalInput(d.toISOString()) : "" }))
           }
-          disabled={busy}
-        />
-      </Field>
-      <Field config={kindField} htmlFor="time-kind" className={fieldSpacing}>
-        <Input
-          id="time-kind"
-          value={values.kind}
-          onChange={(e) => setValues((s) => ({ ...s, kind: e.target.value }))}
-          placeholder={t("Development, design, project management…")}
           disabled={busy}
         />
       </Field>

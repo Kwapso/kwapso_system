@@ -434,7 +434,7 @@ export function AppsScreen({
 
   // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
   // (v1.2.27), used below only once the data has actually loaded.
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values: facetValues,
     data: loadedApps,
@@ -623,8 +623,8 @@ export function AppsScreen({
             this row's own sibling below it — the client's screenshot of
             exactly this screen ("Search apps… / Sort by / Name" on one row, a
             stranded dashed "Filter" chip under it) — so it is a slot of the
-            row now instead of a second row beside it; its open panel is the
-            separate `toolbarPanel` slot (v1.2.27's `useFilterBar` split).
+            row now instead of a second row beside it, and the facets it opens
+            float above the rows rather than landing under the toolbar.
             Options come from the WHOLE collection (see above), so narrowing
             by one facet never hides the other's choices. */}
         <ToolbarRow
@@ -645,7 +645,6 @@ export function AppsScreen({
             )
           }
           filters={(appsLoading || loadedApps.length > 0) && filterPill}
-          toolbarPanel={(appsLoading || loadedApps.length > 0) && filterPanel}
           // SORT AND VIEW ARE CONFIGS NOW, NOT NODES (R53, 2026-09-06 — the
           // client on two of her own screenshots: "why the fuck i still have
           // different toolbar variations??? unify joder"). This screen was one

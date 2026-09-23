@@ -775,7 +775,38 @@
   --btn-destructive-label: var(--destructive-foreground);
   --btn-destructive-hover: #D33E28;
 
-  --btn-disabled-fill:     var(--surface-quiet);
+  /* RULED BY ARITHMETIC, 23 SEP 2026 — THE ALIAS BROKE A WELL.
+     This line read `var(--surface-quiet)`, and `--surface-quiet` is ALSO the
+     ground `Image` paints under every picture ("the ground under every state
+     — a paper tone, never an alpha", image.tsx). So a disabled surface and
+     the media well inside it were the same #E2DDD4: the contrast law measured
+     1.000 on `Gallery`'s own disabled tile — the picture area vanished into
+     the tile, and a tile with no picture, a failed one, a loading one, or a
+     `fit="contain"` letterbox was a single flat grey rectangle with a caption
+     under it.
+
+     DARK ALREADY BROKE THIS ALIAS, for a neighbouring reason — see the dark
+     block's own note, "HELD at #2F2D28 while N2 lifts --surface-quiet". Light
+     never followed, so this is light catching up rather than a new idea.
+
+     THE VALUE IS THE SMALLEST STEP ALONG THE SAME BEIGE THAT CLEARS BOTH
+     FLOORS AT ONCE, which is the method override 9 used for `--kw-forest` and
+     override 43 for `--kw-poppy-ink`. Disabled can only go DARKER — light's
+     enabled secondary is `--card` #FFFEF9, the lightest paper there is, and
+     the dark block's own rule is that disabled must never end up lighter than
+     an enabled secondary. Darker is squeezed from the other side by
+     `--ink-tertiary` #5F5D59, which real components print ON this fill
+     (`ticket-thread.tsx`'s frozen composer) and which needs 4.5. That leaves
+     one narrow window, and #DCD7CD sits in the middle of it:
+
+         boundary vs --surface-quiet #E2DDD4    1.060   (floor 1.05)
+         ink        --ink-tertiary  #5F5D59     4.58    (floor 4.5)
+
+     `--btn-cancel-hover` #D8D2C7, the existing neighbour one rung further
+     down, was tried first and REFUSED by the law: it drops the ink to 4.368.
+     The hex is new because the light ramp has no rung inside the window; the
+     reason it is new is this paragraph. */
+  --btn-disabled-fill:     #DCD7CD;
   --btn-disabled-label:    var(--ink-disabled);
 }
 

@@ -115,16 +115,61 @@ const markClasses = [
 /* The five marks. Each is a fill and an ink — never an opacity — and each is
    the fill the kit already uses for that meaning:
      done     — the inverse mark chapter 15 draws for a completed phase
-     running  — MANGO with a charcoal glyph. Both of the artifact's steppers
-                fill the CURRENT mark that way: CH19 view 17's `stepColors`
-                gives `current: [MANGO, ONACC]` and CH15 draws
-                `background: var(--mango)` with `color: #1A1918`.
-                `StatusStepper` already does this on the rail
-                (status-stepper.tsx), so the row and the rail had been
-                disagreeing with each other. Override 17 licenses it: a mark
-                is not an ACTION, and only actions are counted. The `Spinner`
-                inside it keeps the ring, which is still the only thing on
-                the row that moves.
+     running  — MANGO with a charcoal glyph, AND IT STAYS THERE. This line
+                used to justify itself by pointing at the rail: both of the
+                artifact's steppers filled the CURRENT mark that way (CH19
+                view 17's `stepColors` gives `current: [MANGO, ONACC]`, CH15
+                draws `background: var(--mango)` with `color: #1A1918`), and
+                `StatusStepper` did the same on the rail, so matching it was
+                how the row and the rail stopped disagreeing.
+
+                THAT RAIL HAS MOVED, AND THIS MARK IS NOT FOLLOWING IT.
+                Aurora ruled twice on 23 Sep 2026 — "on ticket stages, mark
+                the active and past in black, only future are gray", then,
+                reviewing the result, "remove the numbers inside (they are
+                not numbered) is either check or empty". `StatusStepper
+                variant="steps"` now draws done AND current as one ink circle
+                with a `CheckFat` tick, and a later stage as an empty grey
+                circle. There is no mango left on that rail and no number
+                anywhere on it. This mark deliberately diverges, for three
+                reasons:
+
+                  · HER RULINGS NAME STAGES, AND A RUN IS NOT A PROGRESSION.
+                    Both are scoped by their own words — "on ticket stages",
+                    and "the stages are not numbered". The pass that made the
+                    change read that scope narrowly enough to leave the
+                    `stages` pill alone INSIDE `StatusStepper` itself, and
+                    filed the question back to her rather than acting on it.
+                    Carrying the ruling across into a different component's
+                    five-state EXECUTION mark is a longer reach than the one
+                    that pass already declined to make.
+                  · THE SECOND RULING'S PREMISE IS FALSE HERE. "They are not
+                    numbered" is what killed the number on the rail. A run
+                    step IS numbered: CH19 view 17's row is specified as "a
+                    two-digit number, a title, an owner and a time", which is
+                    why the `pending` mark below still prints that figure. A
+                    rule whose stated reason does not hold cannot be applied
+                    by its conclusion alone.
+                  · INK WOULD COST MORE THAN THE MANGO DOES. `done` is
+                    already the ink circle. Painting `running` ink too would
+                    leave the two told apart by GLYPH ALONE — tick versus
+                    ring — which is exactly the distinction she struck down
+                    on the rail. The ring moves, which is a stronger signal
+                    than a static glyph, but it would still mean the one step
+                    that is HAPPENING is filled the same as every step that
+                    has already finished.
+
+                The colour is also licensed here in a way it is not on the
+                rail: this mark carries meaning by fill ALREADY — `failed` is
+                poppy, two lines down — because a run mark reports a STATE
+                where a rail mark reports a POSITION. Override 17 still
+                covers the count: a mark is not an ACTION, and only actions
+                are counted. The `Spinner` inside it keeps the ring, which is
+                still the only thing on the row that moves.
+
+                IF SHE RULES OTHERWISE, this is the whole edit: `running`
+                takes `bg-surface-inverse text-ink-on-inverse` like `done`,
+                and the row loses its only accent.
      failed   — poppy with a CHARCOAL glyph. Never white on red.
      skipped  — the quiet fill with disabled ink: `.kw-stage--later`'s pair
      pending  — raised paper with a hairline and a tertiary number, exactly
@@ -175,8 +220,30 @@ const RAIL_STATE: Record<RunStepState, StatusStageState> = {
   // A skipped step is behind the run, so the rail shows it as passed.
   skipped: "done",
   running: "current",
-  // A failed step is where the run stopped, so the rail still points at it.
-  failed: "current",
+  /* A FAILED step used to map to `current` — "the run stopped here" — and
+     that reading broke on 23 Sep 2026. The rail drew `current` as a mango
+     circle carrying the stage's number, which said WHERE the run was and
+     stayed silent on the outcome. Aurora's two rulings that day (quoted in
+     the `running` note above) turned `current` into the same ink circle with
+     the same `CheckFat` tick that `done` draws. Left alone, a failed step
+     would now be marked on the rail with a TICK — the rail asserting the
+     step succeeded, directly above a row drawing it poppy with a destructive
+     Badge and the word "Failed".
+
+     `later` is the only one of the rail's three positions that does not lie
+     about it: the empty grey circle, not reached and not completed. Every
+     step after the failure is `later` too, so the rail reads exactly what
+     happened — the run got this far and stopped. The cost is that the rail
+     carries no `aria-current` while a run is failed, and that matches the
+     rows, which only set `aria-current="step"` on `running`; a failed run
+     already had no current row to point at.
+
+     `skipped` KEEPS `done` and therefore keeps its tick. That pairing
+     predates both rulings and is argued on its own terms above — a skipped
+     step is behind the run — so it is not something this change broke. It is
+     the weaker of the two claims and worth her eye, but moving it is not
+     this pass's call. */
+  failed: "later",
   pending: "later",
 };
 
@@ -274,9 +341,11 @@ const DEFAULT_STATE_LABELS: Record<RunStepState, string> = {
  *  8. error          — TWO different things again. A STEP that failed is
  *                      `state="failed"`: poppy on the mark and a destructive
  *                      `Badge`, with the words saying what happened — colour
- *                      on the pill, never across the row. The whole SEQUENCE
- *                      failing to load is `state="error"` and draws the
- *                      register.
+ *                      on the pill, never across the row. On the RAIL it is
+ *                      `later`, an empty circle, so the rail stops at the
+ *                      failure rather than ticking it off (see `RAIL_STATE`).
+ *                      The whole SEQUENCE failing to load is `state="error"`
+ *                      and draws the register.
  *  9. selected       — the RUNNING step is the one the reader is on:
  *                      `--surface-panel` and `aria-current="step"`. A run has
  *                      no second notion of selection.

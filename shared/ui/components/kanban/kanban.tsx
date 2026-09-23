@@ -1288,12 +1288,16 @@ function BoardCard({
            every call site would have to set — an unruled affordance this
            component's own law (above, on the chip-order decision) already
            argues against inventing. So this is not a new border and not a
-           new prop: it is `card.tsx`'s OWN `--hairline` token
-           (`hairline && "shadow-[var(--hairline)]"`, card.tsx), composed
-           here as a SECOND shadow layer alongside the `raised` variant's
-           `--shadow-rest` rather than either one overwriting the other, so
-           the card keeps its lift and gains the edge — never one instead of
-           the other.
+           new prop. THE EDGE HALF OF THIS LINE IS GONE, 23 SEP 2026 (RULES.md
+           § 2.8, the client's own `"by rule no borders nowhere in the
+           kit"`): it used to compose `card.tsx`'s OWN `--hairline` token as
+           a SECOND shadow layer alongside the `raised` variant's
+           `--shadow-rest`, and `card.tsx` does not draw that token any more,
+           so neither does this. What is left is the lift alone, which is not
+           a stroke: a board card standing on a bare column is told apart by
+           `--shadow-rest` and by the gap between two cards, both of which
+           are remedies the boundary law (`foundations/rules/borders.mjs`)
+           names.
 
            DETECTED OFF `Card`'s OWN ANCESTOR MARKER, NOT A PROP THIS
            COMPONENT WOULD HAVE TO REPEAT. `Card` unconditionally sets
@@ -1313,7 +1317,13 @@ function BoardCard({
            does not block the match — it is not itself `data-variant="plain"`,
            and a CSS descendant combinator matches any qualifying ancestor,
            not only the nearest one. */
-        "group-data-[variant=plain]/card:shadow-[var(--shadow-rest),var(--hairline)]",
+        /* NO BOX AROUND A CARD — 23 Sep 2026, RULES.md §2.8, and this line
+           composed `card.tsx`'s OWN `--hairline` so it went with it. What is
+           left is the lift, which is not a stroke: a board card standing in a
+           `plain` collection frame is told from the bare column by
+           `--shadow-rest` and by the gap between two cards, which is the
+           paper-step-or-spacing remedy the boundary law names. */
+        "group-data-[variant=plain]/card:shadow-[var(--shadow-rest)]",
         // A fill and an ink. Never an opacity, and no hover — a locked card
         // must not look movable.
         card.disabled === true &&

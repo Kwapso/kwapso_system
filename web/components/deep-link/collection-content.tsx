@@ -83,6 +83,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         total={totals.workLogs}
         canCreate={can("work", "create")}
         canEdit={can("work", "update")}
+        tab={ctx.query.tab}
+        go={go}
+        sectionPath={sectionPath}
+        lang={lang}
       />
     )
   }

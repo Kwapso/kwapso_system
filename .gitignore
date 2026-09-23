@@ -193,3 +193,13 @@ scripts/mcp-audit/branch-tools-list.json
 # The one-off bundle of deleted branches (14 Sep 2026). Not source; delete it
 # whenever the branches it holds stop being worth recovering.
 .archive/
+
+# The pre-import snapshots `glide-accounts-sync.mjs` writes before it touches a
+# row — every account's full row, and the SQL that puts them all back. Same rule
+# as `glide/data` above: this is the clients' own data in another shape, and it
+# is the restore path, so it must exist on disk and must never be committed.
+# No trailing slash, for the symlink reason spelled out at the top of this file.
+glide/backup-accounts-*.json
+glide/backup-accounts-*.sql
+
+glide/backup-contacts-purge-*.json

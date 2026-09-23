@@ -761,11 +761,20 @@ export function SettingsScreen({
             // call site answers a few lines below, about a different tab:
             // "please remove the title inside the collection. We will use the
             // title only at the top." The tab strip already names this panel
-            // "Appearance"; `AppearancePanel` passes `hideTitle` to its own
-            // `SettingsSection` now, so the box still labels itself for
-            // assistive tech (`aria-label`) without drawing a second,
-            // redundant "Appearance" heading one screen-height below the
-            // first. See `settings-section.tsx`'s own header for the prop.
+            // "Appearance"; `SettingsSection` draws NO visible heading at all
+            // any more, so the panel still labels itself for assistive tech
+            // (`aria-label`) without a second, redundant "Appearance" one
+            // screen-height below the first. That was a `hideTitle` prop from
+            // 14 to 23 Sep 2026 and is now the component's only behaviour —
+            // see `settings-section.tsx`'s own header for why the branch went.
+            //
+            // AND NO BOX EITHER, SINCE 23 SEP 2026 — Aurora, verbatim:
+            // "settings appearacne shoudl not have card - thats not minimal."
+            // The card was `SettingsSection`'s own `bg-surface-panel` and it
+            // came off there, not here; this tab's body is a bare `<section>`
+            // on the page ground now, its four rows separated by the kit
+            // `<Separator>`. `web/test/settings-appearance.test.tsx`'s own
+            // fifth block holds that claim, rendered.
             //
             // EVERY CONTROL APPLIES AT ONCE, AGAIN — the pending/Save shape
             // that stood here from 2026-09-14 to 22 Sep 2026 is gone: "lets go

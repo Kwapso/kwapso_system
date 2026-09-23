@@ -1880,14 +1880,14 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Rows of time — who worked on what, in whole seconds. `period`: '7d', '30d' or '90d'. `totalSeconds` is exact, never capped. For prose, ask_knowledge.",
     detail:
-      "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, `meetingTime` ('exclude' drops the time spent in meetings, 'only' keeps nothing else, leaving it off counts all of it), `q` (matches who logged it and what it was against — the same search the Time screen's toolbar asks), and `period` ('7d', '30d' or '90d', a rolling window on when it was logged; leave it off for all time). `sort` ('started', the default, newest first; 'duration', longest first; 'person', alphabetically by who logged it) and `dir` ('asc' or 'desc') choose the order; leave `sort` off to keep the door's own default. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+      "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, `meetingTime` ('exclude' drops the time spent in meetings, 'only' keeps nothing else, leaving it off counts all of it), `q` (matches who logged it and what it was against — the same search the Logs screen's toolbar asks), `accountId` (the client the work belongs to, inherited from whatever the time was logged against; our own admin belongs to no client and is never returned by it), and `period` ('7d', '30d' or '90d', a rolling window on when it was logged; leave it off for all time). `sort` ('started', the default, newest first; 'duration', longest first; 'person', alphabetically by who logged it) and `dir` ('asc' or 'desc') choose the order; leave `sort` off to keep the door's own default. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
     schema: obj({
-      scope: S, targetTable: S, targetId: S, userId: S, meetingTime: S, q: S, period: S, sort: S, dir: S, cursor: S,
+      scope: S, targetTable: S, targetId: S, userId: S, accountId: S, meetingTime: S, q: S, period: S, sort: S, dir: S, cursor: S,
     }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["scope", "targetTable", "targetId", "userId", "meetingTime", "q", "period", "sort", "dir", "cursor"])
+      for (const k of ["scope", "targetTable", "targetId", "userId", "accountId", "meetingTime", "q", "period", "sort", "dir", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

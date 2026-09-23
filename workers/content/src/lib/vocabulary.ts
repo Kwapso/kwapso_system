@@ -13,7 +13,7 @@
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import type { Actor } from "@shared/workers/activity"
-import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import type { MemberGuard } from "@shared/workers/gating"
 
 /**
  * Make sure `value` exists as an ACTIVE dropdown value in `group`, adding it if
@@ -49,32 +49,14 @@ export async function ensureSelectableValue(
   )
 }
 
-/**
- * REFUSE a value that is not a currently ACTIVE dropdown value in `group` — the
- * write-door counterpart to `ensureSelectableValue` above: that function
- * CREATES a missing label because a record write must not fail over a label
- * that simply doesn't exist yet; this one REFUSES, for the fields where the
- * team has ruled a CLOSED list rather than a free-typed one that grows itself.
+/** REFUSE a value that is not a currently ACTIVE dropdown value in `group` —
+ * the write-door counterpart to `ensureSelectableValue` above.
  *
- * Story type and Story category are the first callers (team migration 0094,
- * the client's 15 Sep 2026 ruling): "Fix" is deactivated on purpose and this
- * is the door that makes it stop being creatable, without the vocabulary
- * itself needing to know which of its own callers enforce that and which
- * (like a marketing post's free-typed channel) do not.
- */
-export async function requireActiveSelectableValue(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  group: string,
-  value: string,
-  what: string
-): Promise<void> {
-  const rows = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    "SELECT id FROM selectable_data WHERE type = ? AND value = ? AND deactivated_at IS NULL",
-    [group, value]
-  )
-  if (!rows[0])
-    throw new GuardError(400, "invalid_input", `${what} isn't one of the team's current options.`)
-}
+ * MOVED TO `shared/workers/vocabulary.ts` ON 23 SEP 2026 and re-exported from
+ * here, so every call site in this worker is unchanged. It moved because the
+ * TENANCY worker needs it too (an account's country and industry, Aurora's
+ * "make it a drop down, adjustable on settings"), and a worker cannot import
+ * another worker's lib — the choice was a move or a second copy, and that
+ * file's own header carries the argument. `ensureSelectableValue` stays HERE:
+ * its five callers are all in this worker. */
+export { requireActiveSelectableValue } from "@shared/workers/vocabulary"

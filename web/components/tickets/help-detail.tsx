@@ -1155,6 +1155,16 @@ export function HelpDetailScreen({
       // read. `?? undefined` — `memberFace` can answer `null` (no picture on
       // file); the kit's `image` is `string | undefined`, never `null`.
       image: memberFace(membersQ.data, r.authorId) ?? undefined,
+      // GREY IF THE SENDER IS NOT ONE OF OURS — Aurora, 23 Sep 2026:
+      // "external photos (from contacts) gray scale. keep staff nirmal."
+      // `authorIsClient` is the row's own answer and it is ALREADY read two
+      // fields up, to decide whether to trim the byline to a first name
+      // (R54); until now the words knew and the face did not. Unblocked by
+      // kit v1.2.166, which gave `ThreadMessage` its own `external`. This is
+      // the thread where the two populations genuinely alternate — a client
+      // writes, we answer, they write again — so it is the single clearest
+      // place in the app to read this ruling off.
+      external: r.authorIsClient,
       time: isLastOfRun ? formatRelative(r.createdAt, t, lang) : undefined,
       // The reply as the reader asked for it: what was typed, or the translation
       // they pressed for. Never both, and never a stored rewrite of somebody's
@@ -1979,6 +1989,17 @@ export function HelpDetailScreen({
                       image: ticket.raisedByContactName
                         ? undefined
                         : memberFace(membersQ.data, ticket.raiserId) ?? undefined,
+                      // GREY IF THIS BUBBLE IS THEIRS — the same ruling the
+                      // replies below carry. TWO WAYS IT CAN BE THEIRS, and
+                      // the `||` is not laziness: `raisedByContactName` means
+                      // the ticket was corrected to name a client CONTACT (no
+                      // photo reaches this screen for one, per the note above,
+                      // so this only greys an initials tile today and greys
+                      // the right thing the day a contact's face does arrive),
+                      // and `raiserIsClient` means a client LOGIN typed it
+                      // themselves, which is the case that has a photograph
+                      // on file right now. Either way the bubble is not ours.
+                      external: Boolean(ticket.raisedByContactName) || ticket.raiserIsClient,
                       body: <RichText html={translation.of(ticket.description)} />,
                     },
                     /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
@@ -2005,6 +2026,9 @@ export function HelpDetailScreen({
                       // position or not — see the RUNS comment on `replies`.
                       initials: r.initials,
                       image: r.image,
+                      // Carried across with the face it belongs to — `replies`
+                      // above resolved it off the row's own `authorIsClient`.
+                      external: r.external,
                       time: r.time,
                       // THE PLAIN STRING, NOT `<RichText>` — a reply now carries
                       // the actions menu (below), and the kit reads `message.

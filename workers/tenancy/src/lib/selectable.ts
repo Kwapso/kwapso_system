@@ -68,6 +68,13 @@ function toValue(r: Row): SelectableValue {
     // ON EVERY ROW NOW — see the `Row` type's own header.
     createdAt: r.created_at ?? null,
     createdByName: r.creator_name ?? null,
+    // THE FACE'S KEY, FORWARDED AT LAST — the `Row` above has always selected
+    // `creator_id` and has always said why ("the id is what a future face
+    // would resolve through (R35)"); this line is that future. Aurora, 23 Sep
+    // 2026: "on choices adde by show avatar, not initials." Nothing extra is
+    // read: the column is already in `COLUMNS`, already on every row of both
+    // doors, and was simply not being handed across.
+    createdById: r.creator_id ?? null,
   }
 }
 

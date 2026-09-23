@@ -99,6 +99,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useLanguage } from "@shared/web/language"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { sortedOptions } from "@shared/web/sorted-options"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import type { PickablePerson } from "@/lib/members"
@@ -302,8 +303,14 @@ export function AccountFormDialog({
     (vocabularyQ.data ?? [])
       .filter((v) => v.type === type && v.active)
       .map((v) => ({ value: v.value, label: v.value }))
-  const countries = group("Country")
-  const industries = group("Industry")
+  // NAMED THROUGH `SELECTABLE_GROUPS`, never as a typed literal (23 Sep 2026).
+  // The group a screen OFFERS from and the group a door WRITES into have to be
+  // the same string, and two literals is exactly how they stop being one — that
+  // file's own header is the argument, and the accounts door
+  // (`requirePickedAccountValues`, workers/tenancy/src/lib/accounts.ts) now
+  // reads the same two constants to REFUSE a word that is not on this list.
+  const countries = group(SELECTABLE_GROUPS.country)
+  const industries = group(SELECTABLE_GROUPS.industry)
 
   /** A picked image becomes a data URL on the record. Same seam the team logo
    * uses (lib/image downsizes before it ever reaches a body). */

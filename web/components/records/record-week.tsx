@@ -45,6 +45,17 @@
 // reason. A card with no `time` draws no eyebrow: there is no placeholder
 // dash, no reserved blank line: the row is one line shorter.
 //
+// AND THE SECOND LINE IS `detail`, ADDED 23 Sep 2026 — Aurora, verbatim:
+// *"tasks agenda view - show department"*. This component read `time`,
+// `dotTone` and `title` off the entry and silently ignored `detail`, which is
+// why a Tasks week card never showed the department the Tasks screen had been
+// computing for it since 16 Sep 2026 (`weekDetail`, tasks-screen.tsx). Drawn
+// under the title in the kit's own card-meta step (`List`'s
+// `list-description`, `cards` variant), truncating, and — like `time` and
+// like a face — absent entirely when the caller has nothing to say. Meetings
+// hand this component no `detail` at all, so nothing there changes.
+// `EntryCard` below carries the whole reasoning, chip included.
+//
 // THE PRIORITY DOT IS `dotTone` ONLY, NEVER `accent`. `RecordCalendar`'s own
 // chips fall back to `accent`'s department hash when `dotTone` is absent
 // (`dotClass`, that file); this component does not, because the ruling this
@@ -82,16 +93,10 @@ import { Card } from "@shared/ui/components/card/card"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ScrollArea } from "@shared/ui/components/scroll-area/scroll-area"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@shared/ui/components/dialog/dialog"
 import { CaretLeft, CaretRight } from "@shared/ui/foundations/icons"
-import { List } from "@shared/web/list-compat"
+import { orderChips } from "@shared/web/chip-order"
 
-import { formatDate } from "@shared/web/format"
+import { PeopleFaces } from "@shared/web/people-faces"
 import { useLanguage } from "@shared/web/language"
 import type { Language, Vars } from "@shared/i18n"
 
@@ -154,12 +159,6 @@ function weekRangeLabel(monday: Date, lang: Language): string {
   return `${start} to ${end}, ${year}`
 }
 
-/** A day key read as a full sentence, for the overflow dialog's own title —
- * `record-calendar.tsx`'s `formatDayKey`, same construction. */
-function formatDayLong(key: string, lang: Language): string {
-  return formatDate(parseLocalDay(key).toISOString(), lang)
-}
-
 /* --------------------------------- colour ----------------------------------- */
 
 /** THE PRIORITY DOT'S OWN FILL — copied in shape from `badge.tsx`'s own
@@ -193,7 +192,54 @@ const DOT_FILL: Record<EntryDotTone, string> = {
 
 /* ------------------------------- the pieces --------------------------------- */
 
-const MAX_PER_DAY = 3 // same default `RecordCalendar`'s own month grid ships
+/* THE WEEK'S OWN SPACING STEP — THE ONE PLACE IT IS DECIDED.
+ *
+ * CLIENT RULING, 23 Sep 2026, VERBATIM: *"everywhere week view add a bit
+ * more spacingto the cards"*. "Everywhere" is this file: Tasks
+ * (`tasks-screen.tsx`, both the Planned and the Everyone bodies), Stories
+ * (`stories-screen.tsx`) and Meetings (`meetings-screen.tsx`) all draw
+ * their week through `RecordWeek` and nothing else, so one edit here is
+ * every week view in the app.
+ *
+ * EVERY GAP AROUND AND BETWEEN A WEEK CARD MOVED UP EXACTLY ONE RUNG on the
+ * kit's own ladder — `--space-*`, `shared/ui/foundations/tokens/tokens.css`
+ * §2 — never a typed pixel (`docs/RULES.md` 1.1 and 1.2 for why the rung
+ * and not the number):
+ *
+ *   between two cards in a day, and a day head to its first card   8 → 12
+ *   between two day columns, and the phone pager's own stack      12 → 16
+ *   inside the folded weekend column                                6 → 8
+ *
+ * THE CARD'S OWN INSET IS UNTOUCHED. She asked for spacing to the cards,
+ * not inside them; `EntryCard`'s `p-2` is the card's business and moving it
+ * would change how a card reads, not how far apart two of them sit.
+ *
+ * `web/test/week-view-card-spacing.test.ts` fails if any of these three
+ * drops back a rung, or if a week-view gap is written as a bare Tailwind
+ * numeric again instead of through one of these three names. */
+const WEEK_CARD_GAP = "gap-[var(--space-3)]"
+const WEEK_COLUMN_GAP = "gap-[var(--space-4)]"
+const WEEK_WEEKEND_GAP = "gap-[var(--space-2)]"
+
+/* NO CAP. THE DAY SHOWS EVERYTHING IT HAS — Aurora, 23 Sep 2026, choosing
+ * week-view variation One, "Open column", verbatim: *"also what is this
+ * 'show more'? should show all."* `MAX_PER_DAY` (3, borrowed from the month
+ * grid) and the `WeekOverflowChip`/day-dialog pair it fed are gone from this
+ * file with it: a column grows with its entries and the PAGE scrolls.
+ *
+ * THE MONTH GRID'S OWN "+N more" IS UNTOUCHED AND SHARES NO CODE WITH THIS.
+ * `record-calendar.tsx` has its own chip, its own dialog and its own
+ * `DayRows` list; this file had a second, independent copy (the two were
+ * kept in step by hand, which the registry's own bounded-lists note called
+ * "THE IDENTICAL SHAPE, ONE ROOM OVER"). Deleting this one leaves the month
+ * exactly as it was — a month SQUARE genuinely cannot grow, so a fold there
+ * is answering a different question from the one she ruled on here.
+ *
+ * NOT VIRTUALISED, deliberately. A week's entries are what one screen's
+ * toolbar already narrowed to, and nothing here has been measured slow; a
+ * virtual window would be a performance fix with no measurement behind it,
+ * which this repo does not ship. If a real one ever arrives, the measurement
+ * comes first. */
 
 function EntryDot({ tone }: { tone: EntryDotTone }) {
   return <span aria-hidden className={cn("size-1.5 shrink-0 rounded-pill", DOT_FILL[tone])} />
@@ -213,6 +259,37 @@ function EntryCard({
   entry: CalendarEntry
   onSelect?: (entry: CalendarEntry) => void
 }) {
+  /* R94's own seam decides the order; this file only says which KIND each
+     chip is. A record with neither name builds an empty array and the row
+     above draws nothing at all — the same silence the card keeps about a
+     missing time, a missing detail and missing faces. */
+  const parentChips = orderChips<React.ReactNode>([
+    ...(entry.appName
+      ? [
+          {
+            kind: "mainParent" as const,
+            node: (
+              <Badge key="app" variant="secondary" size="pill" className="max-w-full">
+                <span className="block min-w-0 truncate">{entry.appName}</span>
+              </Badge>
+            ),
+          },
+        ]
+      : []),
+    ...(entry.accountName
+      ? [
+          {
+            kind: "secondaryParent" as const,
+            node: (
+              <Badge key="account" variant="secondary" size="pill" className="max-w-full">
+                <span className="block min-w-0 truncate">{entry.accountName}</span>
+              </Badge>
+            ),
+          },
+        ]
+      : []),
+  ])
+
   const body = (
     <>
       {/* THE EYEBROW — the file header's own ruling. Undefined `time` draws
@@ -222,10 +299,93 @@ function EntryCard({
           {entry.time}
         </span>
       ) : null}
+      {/* WHOSE IT IS — THE APP AND THE ACCOUNT, AS CHIPS, ABOVE THE TITLE.
+          Aurora, 23 Sep 2026, choosing week-view variation One ("Open
+          column"): her example was a meeting, and she wants the card to show
+          the app or the account chip beside the people's faces.
+
+          ABOVE THE TITLE IS R65, NOT A PREFERENCE (`shared/rules/registry
+          .ts`): "ON A CARD THAT STANDS FOR A RECORD, THE CHIP SITS ABOVE THE
+          TITLE" — her own ruling, twice, because "a card is read top-down in
+          one glance and the chip is what SORTS it". A week card is exactly
+          that card. Source order IS visual order here, as it is in a kit
+          `Card` ("a card is a column"), so the chips opening before the
+          title in this fragment is the law, drawn.
+
+          THE ORDER BETWEEN THEM IS R94, THROUGH THE ONE SEAM. `orderChips`
+          (`shared/web/chip-order.ts`) fixes id → status → type → MAIN PARENT
+          → SECONDARY PARENT; the app is the main parent and the account the
+          secondary, which is the reading `TicketChips` already takes for its
+          own app chip. Routing two chips through the seam rather than writing
+          them in order by hand is the point of R94: the order becomes a
+          property of the data, not of which line this file happens to put
+          first.
+
+          THE TREATMENT IS THE APP'S OWN PLAIN CHIP — `Badge variant=
+          "secondary" size="pill"`, the same lozenge `TicketChips` draws for
+          the app and `contacts-screen.tsx` for the account. Not a LINK: the
+          week card is already one big button that opens the record, and an
+          anchor inside a button is invalid HTML — which is also why neither
+          chip is underlined (the kit reserves `LINK_UNDERLINE` for a badge
+          that really is an anchor).
+
+          IT TRUNCATES, AND THE CARD IS WHAT MAKES IT. `badge.tsx`'s own
+          ten-states note says a badge "never wraps and never truncates. A row
+          that runs out of width is the parent's problem to wrap or scroll."
+          This is the parent taking that problem: the row wraps, and each chip
+          is capped at the card's own width (`max-w-full` plus a `truncate`
+          child) so a long client name ellipses INSIDE the column instead of
+          pushing its edge out. The badge is not shrinking to match its
+          neighbours — the column is capping it, which is the case that
+          paragraph hands to the parent. */}
+      {parentChips.length > 0 ? (
+        <span className="flex min-w-0 flex-wrap items-center gap-1">{parentChips}</span>
+      ) : null}
       <span className="flex min-w-0 flex-wrap items-center gap-1.5">
         {entry.dotTone ? <EntryDot tone={entry.dotTone} /> : null}
         <span className="min-w-0 truncate text-sm">{entry.title}</span>
       </span>
+      {/* WHAT IT IS ABOUT — `CalendarEntry.detail`, the caller's own quiet
+          second line. Aurora, 23 Sep 2026, verbatim: "tasks agenda view -
+          show department" — the week board is the shape she named "the
+          agenda" when she chose it (this file's own header quotes her: "For
+          the agenda [the week design], I love your designs"), and the Tasks
+          screen has built that line for this card since 16 Sep 2026
+          (`weekDetail`, tasks-screen.tsx: the task's department, and nothing
+          else) only for this component to drop it on the floor — computed,
+          handed over, never drawn.
+
+          PLAIN TEXT, NEVER A SECOND CHIP. The department already has exactly
+          one chip in this app, on the BOARD card, above the title, which is
+          where R65 puts a chip that sorts a record card; a week COLUMN is the
+          narrowest box in the app and a pill in it would either wrap the card
+          or overflow it. So this is the kit's own meta step for a card —
+          `text-micro` with the eyebrow's tracking reset, tertiary ink,
+          `truncate` (`List`'s own `list-description` in its `cards` variant,
+          shared/ui/components/list/list.tsx) — the same register the
+          "+N more" day dialog below already reads `detail` in. A long
+          department ELLIPSES inside the card rather than pushing its edge.
+
+          NOTHING AT ALL WITHOUT ONE. `weekDetail` answers `undefined` for a
+          task with no department, so the card is one line shorter — never the
+          word "None", never a reserved blank row: the identical silence this
+          card already keeps about a missing `time` and a missing face. */}
+      {entry.detail ? (
+        <span className="text-micro block truncate tracking-[var(--tracking-normal)] text-ink-tertiary">
+          {entry.detail}
+        </span>
+      ) : null}
+      {/* WHO IS IN IT — Aurora, 23 Sep 2026, verbatim: "meetings week view,
+          show the avatars on whos in the meeting after title". AFTER the
+          title, so it is its own line under it rather than a fourth thing
+          competing for the title's own row: a week COLUMN is the narrowest
+          box in the app and a face beside a truncating name would eat the
+          name. `PeopleFaces` (shared/web/people-faces.tsx) is the one row of
+          round `choice` marks the meetings TABLE's Attendees column already
+          draws — never a second, hand-rolled stack — and it renders NOTHING
+          at all for an entry with no faces, the same silence a card with no
+          `time` keeps about its eyebrow. */}
+      {entry.faces?.length ? <PeopleFaces people={entry.faces} /> : null}
     </>
   )
   return (
@@ -255,87 +415,101 @@ function EntryCard({
   )
 }
 
-/** The "+N more" chip — the mockup's own wording, reused verbatim from
- * `record-calendar.tsx`'s identical overflow ("+{n} more"), so the two
- * shapes never disagree about how a hidden count is said. A real `Badge`
- * (never a hand-rolled pill): a label-only chip is exactly its job. */
-function WeekOverflowChip({
-  hidden,
-  onOpen,
-  t,
-}: {
-  hidden: number
-  onOpen: () => void
-  t: (english: string, vars?: Vars) => string
-}) {
-  return (
-    <button type="button" onClick={onOpen} className="block w-full">
-      <Badge variant="secondary" size="pill" className="w-full justify-center">
-        {t("+{n} more", { n: hidden })}
-      </Badge>
-    </button>
-  )
-}
-
-/** ONE DAY'S HEADING PILL — ink when `today`, the same ink/quiet split
- * `record-calendar.tsx`'s own month grid draws for the identical reason
- * (client ruling, "make the tasks' background black instead of beige").
- * `compact` is the folded weekend's own smaller pill — one component, two
- * sizes, rather than a second copy. */
+/** ONE DAY'S HEADING — PLAIN TEXT, NO BOX.
+ *
+ * AURORA, 23 Sep 2026, choosing week-view variation One ("Open column"),
+ * verbatim: *"you invented the color of the 'not today' days"*. Until this
+ * ruling a day head was a FILLED PILL — `bg-muted` under tier-3 ink for an
+ * ordinary day, `bg-surface-inverse` under on-inverse ink for today. Both
+ * fills are real kit tokens, so this was never a palette breach (R32 is
+ * untouched either way); what nobody ever ruled is that a day should be a
+ * filled box at all. It was carried over from the month grid's own square,
+ * where a cell IS a box, and a column head is not a cell.
+ *
+ * SO: the weekday, the date number and THE DAY'S COUNT, as text.
+ *
+ *   an ordinary day   tier-3 ink (`text-ink-tertiary`), nothing else
+ *   TODAY             full ink, and a RULE UNDER IT rather than a fill
+ *
+ * THE RULE IS A ONE-EDGE HAIRLINE, `--hairline-under-strong` — the kit's own
+ * heavy under-rule, the same shape `Title` draws under a section and the same
+ * device the current stage label carries. Kit `docs/RULES.md` §2.8 (the
+ * container-box law, 23 Sep 2026) removes the box AROUND a container and
+ * blesses exactly this: a rule BETWEEN things, on one edge, is a separator
+ * and not a box. Marking today with a line rather than a fill is that law and
+ * this ruling agreeing.
+ *
+ * THE COUNT IS THE SECOND HALF OF "OPEN COLUMN". Once the fold is gone
+ * (`MAX_PER_DAY`'s note above) a column's length IS its count, so a reader
+ * scanning the week for "which day is heavy" reads the number in the head
+ * instead of counting cards. Zero is printed, not hidden: a day with nothing
+ * on it says 0 rather than leaving a reader to wonder whether it failed to
+ * load.
+ *
+ * `compact` is the folded weekend's own smaller step — one component, two
+ * sizes, rather than a second copy, exactly as before. */
 function WeekDayHead({
   weekday,
   dateNum,
+  count,
   today,
   compact,
 }: {
   weekday: string
   dateNum: number
+  /** how many entries the day holds — printed in the head since the fold went */
+  count: number
   today: boolean
   compact?: boolean
 }) {
   return (
     <div
       className={cn(
-        "flex items-baseline justify-between gap-1 rounded-pill px-3",
-        compact ? "py-1 text-[10px]" : "py-1.5 text-xs",
-        today ? "bg-surface-inverse text-ink-on-inverse" : "bg-muted"
+        "flex items-baseline justify-between gap-2 pb-[var(--space-1)]",
+        compact ? "text-[10px]" : "text-xs",
+        today
+          ? "text-foreground shadow-[var(--hairline-under-strong)]"
+          : "text-ink-tertiary"
       )}
     >
-      <span
-        className={cn(
-          "font-semibold uppercase tracking-wide",
-          compact ? "text-[9px]" : "text-[10px]",
-          today ? "text-ink-on-inverse-secondary" : "text-muted-foreground"
-        )}
-      >
-        {weekday}
+      <span className="flex min-w-0 items-baseline gap-1.5 truncate">
+        <span className="font-[var(--font-weight-medium)] uppercase tracking-wide">
+          {weekday}
+        </span>
+        <span className="tabular-nums font-[var(--font-weight-medium)]">{dateNum}</span>
       </span>
-      <span className="tabular-nums font-semibold">{dateNum}</span>
+      <span className="tabular-nums shrink-0">{count}</span>
     </div>
   )
 }
 
-/** ONE DAY'S BODY — loading skeleton, "nothing here" dash, or the entries
- * themselves, capped or not. `cap === null` is the phone pager's own reading
- * (one day, on its own screen, gets everything rather than a second fold). */
+/** ONE DAY'S BODY — the loading skeleton, the "nothing here" dash, or EVERY
+ * entry the day holds.
+ *
+ * NO `cap` PROP ANY MORE — Aurora, 23 Sep 2026, "Open column": *"also what
+ * is this 'show more'? should show all."* Both callers used to pass one (the
+ * desktop grid `MAX_PER_DAY`, the phone pager `null`) and the phone's
+ * reading — one day gets everything — is now the only reading there is.
+ *
+ * THE HONEST CONSEQUENCE, STATED RATHER THAN DESIGNED AROUND: an uneven week
+ * now LOOKS uneven. A Tuesday with nine meetings stands beside a Thursday
+ * with one and the grid's rows no longer line up. That is the point of the
+ * change — the fold used to hide exactly the information a week view exists
+ * to show. */
 function WeekDayBody({
   entries,
-  cap,
   loading,
   onSelect,
-  onOverflow,
   t,
 }: {
   entries: CalendarEntry[]
-  cap: number | null
   loading: boolean
   onSelect?: (entry: CalendarEntry) => void
-  onOverflow?: () => void
   t: (english: string, vars?: Vars) => string
 }) {
   if (loading) {
     return (
-      <div className="flex flex-col gap-2">
+      <div className={cn("flex flex-col", WEEK_CARD_GAP)}>
         <Skeleton className="h-12 w-full rounded-[var(--radius)]" label={t("Loading…")} />
         <Skeleton className="h-12 w-full rounded-[var(--radius)]" label={t("Loading…")} />
       </div>
@@ -348,16 +522,11 @@ function WeekDayBody({
       </p>
     )
   }
-  const shown = cap !== null ? entries.slice(0, cap) : entries
-  const hidden = entries.length - shown.length
   return (
-    <div className="flex flex-col gap-2">
-      {shown.map((e) => (
+    <div className={cn("flex flex-col", WEEK_CARD_GAP)}>
+      {entries.map((e) => (
         <EntryCard key={e.id} entry={e} onSelect={onSelect} />
       ))}
-      {hidden > 0 && onOverflow ? (
-        <WeekOverflowChip hidden={hidden} onOpen={onOverflow} t={t} />
-      ) : null}
     </div>
   )
 }
@@ -422,7 +591,6 @@ export function RecordWeek({
     return todayIdx === -1 ? 0 : Math.min(todayIdx, 5)
   })
 
-  const [openDay, setOpenDay] = React.useState<string | null>(null)
   const todayKey = dayKeyOf(new Date())
 
   const byDay = React.useMemo(() => {
@@ -445,8 +613,6 @@ export function RecordWeek({
     const dow = (now.getDay() + 6) % 7 // 0=Mon…6=Sun
     goToWeek(mondayOf(now), Math.min(dow, 5))
   }
-
-  const openEntries = openDay ? (byDay.get(openDay) ?? []) : []
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -484,44 +650,52 @@ export function RecordWeek({
 
       {/* FIVE WORKDAY COLUMNS + ONE FOLDED WEEKEND COLUMN — W4, hidden below
           `sm:`. */}
-      <div className="hidden grid-cols-[repeat(5,minmax(0,1fr))_minmax(160px,200px)] gap-3 sm:grid">
+      <div className={cn("hidden grid-cols-[repeat(5,minmax(0,1fr))_minmax(160px,200px)] sm:grid", WEEK_COLUMN_GAP)}>
         {weekDays.slice(0, 5).map((d, i) => {
           const key = dayKeyOf(d)
           return (
-            <div key={key} className="flex min-w-0 flex-col gap-2">
-              <WeekDayHead weekday={weekdayLabels[i]} dateNum={d.getDate()} today={key === todayKey} />
+            <div key={key} className={cn("flex min-w-0 flex-col", WEEK_CARD_GAP)}>
+              <WeekDayHead
+                weekday={weekdayLabels[i]}
+                dateNum={d.getDate()}
+                count={(byDay.get(key) ?? []).length}
+                today={key === todayKey}
+              />
               <WeekDayBody
                 entries={byDay.get(key) ?? []}
-                cap={MAX_PER_DAY}
                 loading={loading}
                 onSelect={onSelect}
-                onOverflow={() => setOpenDay(key)}
                 t={t}
               />
             </div>
           )
         })}
-        <div className="flex min-w-0 flex-col gap-3">
-          <div className="rounded-pill bg-muted px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className={cn("flex min-w-0 flex-col", WEEK_COLUMN_GAP)}>
+          {/* THE WEEKEND'S OWN LABEL — plain text now, for the same ruling
+              that took the fill off the day heads beside it ("you invented
+              the color of the 'not today' days"). It was the identical
+              `bg-muted` pill; leaving one filled lozenge standing in a row
+              of plain heads would have been the ruling applied to four of
+              five things. Tier-3 ink, no box. */}
+          <div className="pb-[var(--space-1)] text-xs font-[var(--font-weight-medium)] uppercase tracking-wide text-ink-tertiary">
             {t("Weekend")}
           </div>
           {[5, 6].map((i) => {
             const d = weekDays[i]
             const key = dayKeyOf(d)
             return (
-              <div key={key} className="flex min-w-0 flex-col gap-1.5">
+              <div key={key} className={cn("flex min-w-0 flex-col", WEEK_WEEKEND_GAP)}>
                 <WeekDayHead
                   compact
                   weekday={weekdayLabels[i]}
                   dateNum={d.getDate()}
+                  count={(byDay.get(key) ?? []).length}
                   today={key === todayKey}
                 />
                 <WeekDayBody
                   entries={byDay.get(key) ?? []}
-                  cap={MAX_PER_DAY}
                   loading={loading}
                   onSelect={onSelect}
-                  onOverflow={() => setOpenDay(key)}
                   t={t}
                 />
               </div>
@@ -530,11 +704,12 @@ export function RecordWeek({
         </div>
       </div>
 
-      {/* PHONE: ONE DAY AT A TIME, SIX PAGES — hidden at `sm:` and above. No
-          cap and no overflow chip here (`cap={null}`): the day already has
-          the whole screen, so `ScrollArea` carries whatever does not fit
-          rather than folding it a second time. */}
-      <div className="flex flex-col gap-3 sm:hidden">
+      {/* PHONE: ONE DAY AT A TIME, SIX PAGES — hidden at `sm:` and above.
+          `ScrollArea` carries whatever does not fit. This branch was already
+          uncapped before the 23 Sep "Open column" ruling (it passed
+          `cap={null}`); the ruling made its reading the only reading, so the
+          prop went and the two branches are now the same call. */}
+      <div className={cn("flex flex-col sm:hidden", WEEK_COLUMN_GAP)}>
         <div className="flex items-center justify-between gap-2">
           <Button
             variant="secondary"
@@ -563,11 +738,10 @@ export function RecordWeek({
           </Button>
         </div>
         <ScrollArea className="h-[min(60vh,32rem)]">
-          <div className="flex flex-col gap-3 pe-3">
+          <div className={cn("flex flex-col pe-3", WEEK_COLUMN_GAP)}>
             {pagerIndex < 5 ? (
               <WeekDayBody
                 entries={byDay.get(dayKeyOf(weekDays[pagerIndex])) ?? []}
-                cap={null}
                 loading={loading}
                 onSelect={onSelect}
                 t={t}
@@ -577,16 +751,16 @@ export function RecordWeek({
                 const d = weekDays[i]
                 const key = dayKeyOf(d)
                 return (
-                  <div key={key} className="flex min-w-0 flex-col gap-1.5">
+                  <div key={key} className={cn("flex min-w-0 flex-col", WEEK_WEEKEND_GAP)}>
                     <WeekDayHead
                       compact
                       weekday={weekdayLabels[i]}
                       dateNum={d.getDate()}
+                      count={(byDay.get(key) ?? []).length}
                       today={key === todayKey}
                     />
                     <WeekDayBody
                       entries={byDay.get(key) ?? []}
-                      cap={null}
                       loading={loading}
                       onSelect={onSelect}
                       t={t}
@@ -599,36 +773,6 @@ export function RecordWeek({
         </ScrollArea>
       </div>
 
-      {/* THE DAY, opened from "+N more" — everything on that day, the same
-          "a click that opens nothing is the bug" reasoning `record-
-          calendar.tsx`'s own dialog carries (UI-GAPS #22). Desktop grid
-          only: the phone pager already shows a day's every entry. */}
-      <Dialog open={openDay !== null} onOpenChange={(next) => !next && setOpenDay(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{openDay ? formatDayLong(openDay, lang) : ""}</DialogTitle>
-          </DialogHeader>
-          <List
-            surface="none"
-            items={openEntries.map((e) => ({
-              id: e.id,
-              leading: e.dotTone ? (
-                <span
-                  aria-hidden
-                  className={cn("mt-1.5 block size-2.5 shrink-0 rounded-pill", DOT_FILL[e.dotTone])}
-                />
-              ) : undefined,
-              title: e.title,
-              subtitle: e.time,
-            }))}
-            onItemClick={(item) => {
-              setOpenDay(null)
-              const entry = openEntries.find((e) => e.id === item.id)
-              if (entry) onSelect?.(entry)
-            }}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

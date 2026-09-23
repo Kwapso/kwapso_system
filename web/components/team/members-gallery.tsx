@@ -369,7 +369,7 @@ export function MembersGallery({
     // wall on `web/components/screens/settings-screen.tsx`.
     .sort((a, b) => staffFullName(a).localeCompare(staffFullName(b)) * (sortDir === "asc" ? 1 : -1))
 
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values: facetValues,
     data: staff,
@@ -532,7 +532,6 @@ export function MembersGallery({
               direction: sortDir,
               onDirectionChange: setSortDir,
             }}
-            toolbarPanel={(membersLoading || staff.length > 0) && filterPanel}
             actions={
               <>
                 {canSeeInvites && (

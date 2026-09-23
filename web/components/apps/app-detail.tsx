@@ -401,6 +401,17 @@ export function AppDetailScreen({
   const contactNames = new Map(
     (contactsQ.data?.links ?? []).map((l) => [l.personAccountId, l.personName])
   )
+  // THEIR FACES, from the same read — the contact half of the `memberPhotos`
+  // line two above, which our own side has had all along. Aurora, 23 Sep 2026:
+  // "where there's avatar show it- only initials when avatar is empty." The
+  // Stakeholders tab's "Theirs" column hardcoded `photo: null` while "Ours"
+  // resolved a real picture one line above it, so the two sides of one panel
+  // drew two different answers to one question. `AccountLink.personLogoUrl` is
+  // the door's own field for exactly this (its header names R35), carried on
+  // the SAME `links` array the names come off, so this costs no extra read.
+  const contactPhotos = new Map(
+    (contactsQ.data?.links ?? []).map((l) => [l.personAccountId, l.personLogoUrl ?? null])
+  )
   // THE TWO COMMA-JOINED LINES ARE GONE — see the Stakeholders tab below. They
   // were two Overview fields reading "Alaap K, Alexander Stadlmair, Aurora
   // Thalassa" and "Paras Maroo (main), Petya Bletsova": the people who own this
@@ -794,6 +805,7 @@ export function AppDetailScreen({
                 memberNames={memberNames}
                 memberPhotos={memberPhotos}
                 contactNames={contactNames}
+                contactPhotos={contactPhotos}
                 host={host}
                 appId={appId}
                 appName={app.name}
@@ -929,7 +941,10 @@ export function AppDetailScreen({
             purposeId: v.purposeId || undefined,
             location: v.location || undefined,
             agenda: v.agenda || undefined,
-            notes: v.notes || undefined,
+            // NO `notes` — the Notes surface is removed from the meetings UI
+            // (23 Sep 2026, meeting-form-dialog.tsx's own header). A meeting
+            // being CREATED has none to preserve, so the field is simply not
+            // sent and the column takes its NULL default.
           })
           invalidate(sliceKey("meetings-app", appId))
           invalidateFindsOf(sliceKey("meetings-app", appId)) // T3654 — see the ticket dialog's own note above

@@ -5,7 +5,7 @@
 // (`{metrics && (<div>…3 tiles…</div>)}`) and the metrics door's own nulls
 // (`StoryMetrics`/`TicketMetrics`, shared/types.ts): once at least one
 // record exists, the tiles must always render, with "0m"/"0h" figures where
-// a value is a real small number and "Not started"/"No time log" words where
+// a value is a real small number and "Not started"/"No logs" words where
 // the door has nothing to report (`cycleTimeSeconds`/`flowEfficiency` null).
 
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
@@ -149,7 +149,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     expect(screen.getByText("0m")).toBeTruthy()
   })
 
-  it("shows 'Not started' / 'No time log' words, never a blank tile, when the metrics door itself has nulls", async () => {
+  it("shows 'Not started' / 'No logs' words, never a blank tile, when the metrics door itself has nulls", async () => {
     api.workLogs = [SHORT_LOG]
     render(
       <EffortCard
@@ -162,7 +162,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     )
     expect(await screen.findByText("Cycle time")).toBeTruthy()
     expect(screen.getByText("Not started")).toBeTruthy()
-    expect(screen.getByText("No time log")).toBeTruthy()
+    expect(screen.getByText("No logs")).toBeTruthy()
     // Effort hours is never null on the type (StoryMetrics/TicketMetrics) —
     // it always draws a real figure, "0h" here.
     expect(screen.getByText("0h")).toBeTruthy()
@@ -174,7 +174,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     // No tile grid at all for a task — no metrics concept, documented in
     // this file's own header (unchanged by this fix) — but the row itself,
     // and the record it belongs to, are never hidden.
-    expect(await screen.findByText("Time log")).toBeTruthy()
+    expect(await screen.findByText("Logs")).toBeTruthy()
     expect(screen.queryByText("Cycle time")).toBeNull()
     expect(screen.getByText("0m")).toBeTruthy()
   })
@@ -192,7 +192,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     )
     // Give the list read a turn to settle before asserting absence.
     await waitFor(() => {
-      expect(screen.queryByText("Time log")).toBeNull()
+      expect(screen.queryByText("Logs")).toBeNull()
       expect(screen.queryByText("Cycle time")).toBeNull()
     })
   })
@@ -215,7 +215,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const card = (await screen.findByText("Time log")).closest('[data-slot="card"]') as HTMLElement
+    const card = (await screen.findByText("Logs")).closest('[data-slot="card"]') as HTMLElement
     expect(card.getAttribute("data-variant")).toBe("plain")
     expect(card.getAttribute("data-surface")).toBe("plain")
   })
@@ -240,7 +240,7 @@ describe("a 3 second log — the tiles always render once a record exists", () =
     await waitFor(() => {
       expect(onEmptyChange).toHaveBeenCalledWith(true)
     })
-    expect(screen.queryByText("Time log")).toBeNull()
+    expect(screen.queryByText("Logs")).toBeNull()
   })
 
   it("calls onEmptyChange(false) once a record exists", async () => {
@@ -288,7 +288,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
     expect(grid.className).toContain("gap-[var(--space-4)]")
     // No leading/trailing margin of the grid's own — its left edge is
     // whatever the section's own (unpadded) flow gives it, the same edge
-    // the "Time log" title stands on.
+    // the "Logs" title stands on.
     expect(grid.className).not.toMatch(/\bm[lxt]?-/)
   })
 
@@ -320,7 +320,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const list = await screen.findByRole("list", { name: "Time log" })
+    const list = await screen.findByRole("list", { name: "Logs" })
     expect(list.getAttribute("data-slot")).toBe("effort-log-rows")
     expect(list.className).not.toContain("bg-surface-panel")
     expect(list.className).not.toContain("rounded")
@@ -351,7 +351,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const list = await screen.findByRole("list", { name: "Time log" })
+    const list = await screen.findByRole("list", { name: "Logs" })
     const children = Array.from(list.children)
     expect(children.map((c) => c.getAttribute("data-slot") === "separator" || c.getAttribute("role") === "separator")).toEqual([
       false,
@@ -373,7 +373,7 @@ describe("the tile grid and the log rows match the validated artifact", () => {
         metrics={{ cycleTimeSeconds: 3, effortSeconds: 3, flowEfficiency: 100 }}
       />
     )
-    const list = await screen.findByRole("list", { name: "Time log" })
+    const list = await screen.findByRole("list", { name: "Logs" })
     expect(list.querySelector('[data-slot="separator"]')).toBeNull()
   })
 })

@@ -1030,6 +1030,7 @@
       "file": "components/filter-bar/filter-bar.tsx",
       "exports": [
         "FilterBar",
+        "FilterOverlay",
         "RangeFacet",
         "SearchableFacet",
         "CompactFacet",

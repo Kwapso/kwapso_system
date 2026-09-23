@@ -651,6 +651,16 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
       >
         <div
           data-slot="toolbar-row-track"
+          /* THE FILTER OVERLAY'S DROP-SHEET ANCHOR — `FILTER_ANCHOR_ATTR`
+             (filter-bar.tsx). The client's 2026-09-23 ruling gives the sheet
+             form a width that is a fact about THE TOOLBAR ("falls from the
+             toolbar across its full width"), and a popover anchors to its
+             trigger. This attribute is how the overlay finds the box it is
+             supposed to span: one attribute on the one row every collection
+             toolbar in the system is, rather than a ref threaded down through
+             every screen that happens to have facets. It changes nothing
+             about this element's own drawing. */
+          data-filter-anchor=""
           /* ONE ROW. AT EVERY WIDTH. Client, 2026-09-04, verbatim: "i want
              that toolbar is a single row like in the pdf i gave you long ago
              wiuth designs". Two children — a scrolling lane and a pinned

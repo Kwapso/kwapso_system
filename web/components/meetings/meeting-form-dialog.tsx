@@ -1,17 +1,26 @@
 "use client"
 
-// MEETING FORM — arrange a conversation, or write it up afterwards.
+// MEETING FORM — arrange a conversation, and set out what it is meant to cover.
 //
-// THE TWO LONG FIELDS ARE THE POINT. Everything above them (who with, when, why,
-// where) is the kind of thing every calendar holds; the agenda and the notes are
-// what the previous system had nowhere to put, so it folded 350 meetings into
-// work logs and kept only the hours. The form asks for them in the order they
-// happen: the agenda before, the notes after.
+// THE LONG FIELD IS THE POINT. Everything above it (who with, when, why, where)
+// is the kind of thing every calendar holds; the AGENDA is what the previous
+// system had nowhere to put, so it folded 350 meetings into work logs and kept
+// only the hours.
+//
+// NOTES ARE GONE FROM THIS FORM — Aurora's ruling, 23 Sep 2026, verbatim: *"on
+// meetings: rmeove notes (we have transcript for that)"*. A UI removal and
+// nothing else: `meetings.notes` is still a column, every row that holds text
+// still holds it, and the door still reads and writes it (`workers/content/
+// src/lib/meetings.ts`). What changed is that no screen in this app offers to
+// TYPE into it any more, and therefore this form no longer carries a `notes`
+// value at all — which is why `meeting-detail.tsx`'s own `save()` hands the
+// meeting's EXISTING `notes` straight back to the update door rather than a
+// blank: that door REPLACES what it is given, so omitting the field would have
+// quietly wiped what is stored the first time anybody edited a meeting.
 //
 // ITS DRAFT MATTERS more than most (R7). An agenda is typed while somebody is
-// still on the phone agreeing it, and notes are typed in the ten minutes before
-// the next call — both are moments where a mis-tap costs a conversation rather
-// than a field. FormShell (R4) + a per-session draft.
+// still on the phone agreeing it — a moment where a mis-tap costs a
+// conversation rather than a field. FormShell (R4) + a per-session draft.
 
 import * as React from "react"
 
@@ -71,7 +80,6 @@ const appField = { ...defaultFieldConfig, label: "Which app", required: false }
 const purposeField = { ...defaultFieldConfig, label: "Why we are meeting", required: false }
 const whereField = { ...defaultFieldConfig, label: "Where", required: false }
 const agendaField = { ...defaultFieldConfig, label: "Agenda", required: false }
-const notesField = { ...defaultFieldConfig, label: "Notes", required: false }
 
 export type MeetingFormValues = {
   title: string
@@ -82,7 +90,9 @@ export type MeetingFormValues = {
   purposeId: string
   location: string
   agenda: string
-  notes: string
+  // NO `notes` — the Notes surface is removed from the meetings UI (23 Sep
+  // 2026, this file's own header). A caller that must preserve what is stored
+  // sends the meeting's existing value itself.
 }
 
 export function MeetingFormDialog({
@@ -135,7 +145,6 @@ export function MeetingFormDialog({
       purposeId: initial?.purposeId || NONE,
       location: initial?.location ?? "",
       agenda: initial?.agenda ?? "",
-      notes: initial?.notes ?? "",
     },
     open
   )
@@ -156,7 +165,6 @@ export function MeetingFormDialog({
         purposeId: values.purposeId === NONE ? "" : values.purposeId,
         location: values.location.trim(),
         agenda: richTextValue(values.agenda),
-        notes: richTextValue(values.notes),
       })
       clearDraft()
       onOpenChange(false)
@@ -179,7 +187,7 @@ export function MeetingFormDialog({
       subtitle={
         <DialogDescription>
           {isEdit
-            ? t("Write up what was decided while it is still fresh, the notes are the part worth keeping.")
+            ? t("Change what it is about, when it is, and what you mean to cover.")
             : /* IT SAID "You can add it to your own calendar afterwards." AND THAT
                  STOPPED BEING TRUE. Every calendar WRITE was removed from this
                  product (workers/content/src/lib/google-api.ts, above
@@ -316,23 +324,6 @@ export function MeetingFormDialog({
           defaultValue={values.agenda}
           onChange={(html) => setValues((s) => ({ ...s, agenda: html }))}
           placeholder={t("What we mean to cover.")}
-          className="min-h-32"
-        />
-      </Field>
-      <Field config={notesField} htmlFor="meeting-notes" className={fieldSpacing}>
-        <Notes
-          key={open ? "open" : "shut"}
-          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
-          // the editable node itself, because the kit Field clones it onto its
-          // single child — and this is the label that id could never carry, since
-          // a label element's `for` attribute binds only to a labelable control
-          // and the editable node here is a plain div. Same words as the visible
-          // label, taken from the same config, so the two can never drift apart.
-          aria-label={t(notesField.label)}
-          disabled={busy}
-          defaultValue={values.notes}
-          onChange={(html) => setValues((s) => ({ ...s, notes: html }))}
-          placeholder={t("What was said and decided.")}
           className="min-h-32"
         />
       </Field>

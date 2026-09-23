@@ -154,6 +154,13 @@ export interface ActivityFeedItem {
   initials?: React.ReactNode;
   /** A photograph. Falls back to the initials silently if it fails. */
   avatarSrc?: string;
+  /** IS THIS PERSON FROM OUTSIDE? Forwarded straight to `Avatar`'s own
+   * `external` (see `components/avatar/avatar.tsx` for the ruling, the reason
+   * the fact is taken rather than guessed, and why the default is colour):
+   * an outside person's PHOTOGRAPH renders greyscale, one of our own in full
+   * colour. Aurora, 23 Sep 2026: "external photos (from contacts) gray scale.
+   * keep staff nirmal." Undefined reads as one of ours. */
+  external?: boolean;
   /**
    * `pill` for a person, `square` for a thing (ruling 30). Defaults to `pill`
    * because a feed entry is normally somebody doing something.
@@ -261,6 +268,7 @@ function FeedRow({
         size="sm"
         shape={item.shape ?? "pill"}
         variant={item.variant ?? "default"}
+        external={item.external}
         className="mt-[calc((var(--feed-line)_-_var(--avatar-sm))/2)] mb-[calc((var(--avatar-sm)_-_var(--feed-line))/2)]"
       >
         {item.avatarSrc ? <AvatarImage src={item.avatarSrc} alt={item.actor ?? ""} /> : null}

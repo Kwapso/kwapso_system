@@ -108,9 +108,20 @@ describe("accountScope — one fence per request", () => {
 
   it("NEVER crosses requests — a revoked login does not keep its fence", async () => {
     q.mockResolvedValueOnce([
-      { account_id: "ACC", app_restriction: null, current_account_id: null, deactivated_at: null },
+      {
+        account_id: "ACC",
+        app_restriction: null,
+        current_account_id: null,
+        deactivated_at: null,
+        // R112, 23 Sep 2026: the corridor now also reads the person's own row's
+        // archived state in the same statement, so the fake row carries it.
+        person_archived_at: null,
+      },
     ])
-    q.mockResolvedValueOnce([{ id: "ACC" }])
+    // `ROOTS_SQL` marks each root live rather than filtering archived ones out
+    // (see its own header — an empty result would otherwise be indistinguishable
+    // from the freelancer case), so a root fixture carries `live`.
+    q.mockResolvedValueOnce([{ id: "ACC", live: 1 }])
     q.mockResolvedValueOnce([{ id: "ACC" }])
     const first = await accountScope(cfg, newGuard())
     expect(first.kind).toBe("portal")

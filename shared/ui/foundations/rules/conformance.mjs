@@ -76,6 +76,7 @@ import * as radii from "./radii.mjs";
 import * as palette from "./palette.mjs";
 import * as borders from "./borders.mjs";
 import * as images from "./images.mjs";
+import * as boxes from "./boxes.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOKENS_CSS = path.join(HERE, "..", "tokens", "tokens.css");
@@ -85,7 +86,7 @@ const KIT_ROOT = path.join(HERE, "..", "..");
 const KIT_DEFAULT = ["components", "compositions", "lib"].map((d) => path.join(KIT_ROOT, d));
 const KIT_EXEMPTIONS = path.join(HERE, "exemptions.json");
 
-export const LAWS = { radii, palette, borders, images };
+export const LAWS = { radii, palette, borders, images, boxes };
 
 function parseArgv(argv) {
   const roots = [];

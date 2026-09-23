@@ -8374,6 +8374,166 @@ ALTER TABLE accounts ADD COLUMN lat REAL;
 ALTER TABLE accounts ADD COLUMN lng REAL;
 `,
   },
+  {
+    // THE INDUSTRY BECOMES A REAL DROPDOWN, AND THE COUNTRY FINALLY BECOMES ONE
+    // TOO. Aurora, 23 Sep 2026, verbatim: "make it a drop down, adjustable on
+    // settings."
+    //
+    // IT WAS ALREADY HALF A DROPDOWN, WHICH IS WHY IT DRIFTED. The account form
+    // has picked the industry from an "Industry" group since it was built,
+    // `VOCABULARY_HOMES` names `accounts.industry` as that group's home, and
+    // Settings > Accounts > "Industries and countries" already edits it. What
+    // never existed is the other two halves: the WRITE DOOR took free text
+    // (`optionalText(body.industry, ...)`, routes/accounts.ts), and the group
+    // was never seeded from the column, so on a live team the picker could be
+    // empty while the column held words. The live book holds "Insurance" and
+    // "Insurance Broker" as two spellings of one trade because of exactly that.
+    //
+    // THIS MIGRATION IS THE SEED; `requirePickedAccountValues`
+    // (workers/tenancy/src/lib/accounts.ts) is the door that closes behind it.
+    // The order matters and is the whole reason the two ship together: closing
+    // the door FIRST would strand every account whose stored word is not yet an
+    // option, because an edit that re-sends it would be refused.
+    //
+    // NOTHING IS MERGED, AND THAT IS DELIBERATE. Every distinct stored spelling
+    // becomes its own row, near-duplicates included. "Insurance" and "Insurance
+    // Broker" may be two real trades, and a migration is the worst possible
+    // place to guess: it runs once, per team, with nobody watching. They are
+    // reported to Aurora instead, and merging two words is already an ordinary
+    // act on the Choices screen -- a rename there REWRITES the stored words
+    // through `storedWordColumns` (shared/selectable-homes.ts), which is
+    // precisely the seam that makes a merge safe and a migration unnecessary.
+    //
+    // THE COUNTRY GETS THE IDENTICAL TREATMENT. Its group has been seeded with
+    // ten labels since 0018, but its door was open the whole time, which is how
+    // "Osterreich" got in beside "Austria" on the live team. Seeding from the
+    // column is what lets the door close without stranding those rows; the two
+    // spellings survive as two options, for Aurora to merge or keep.
+    //
+    // ONLY ACTIVE ROWS COUNT AS "ALREADY THERE". `NOT EXISTS` matches on
+    // (type, value) regardless of state, so a word a team RETIRED on purpose is
+    // not quietly revived -- the same restraint `ensureSelectableValue`'s own
+    // header states. A record still holding a retired word stays editable
+    // anyway, because the door compares against the stored value before it
+    // compares against the group.
+    //
+    // IDEMPOTENT AND RE-RUNNABLE: every INSERT is guarded, there is no schema
+    // change, and a second run inserts nothing.
+    //
+    // NUMBERED 0120, read live rather than recalled (CLAUDE.md, "team migration
+    // numbers are read, never recalled"): `git fetch origin`, then the tail of
+    // this file on every remote ref -- 0119 is the highest version on the local
+    // tree, on `origin/main` and on `origin/feat/ui-ux`, and no other remote
+    // branch carries anything at or above it, as of 23 Sep 2026.
+    version: "0120_an_accounts_industry_is_a_dropdown",
+    sql: `
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.industry)}, stored.word, 0, datetime('now'), NULL, NULL, 'System'
+  FROM (SELECT DISTINCT TRIM(industry) AS word FROM accounts
+         WHERE industry IS NOT NULL AND TRIM(industry) <> '') AS stored
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s
+    WHERE s.type = ${sqlString(SELECTABLE_GROUPS.industry)} AND s.value = stored.word
+ );
+
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.country)}, stored.word, 0, datetime('now'), NULL, NULL, 'System'
+  FROM (SELECT DISTINCT TRIM(country) AS word FROM accounts
+         WHERE country IS NOT NULL AND TRIM(country) <> '') AS stored
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s
+    WHERE s.type = ${sqlString(SELECTABLE_GROUPS.country)} AND s.value = stored.word
+ );
+`,
+  },
+  {
+    // THE NOTES BECOME THE AGENDA -- Aurora, 23 Sep 2026, verbatim: "moved
+    // existing notes to agenda", alongside the ruling that took the Notes
+    // surface off the meetings UI ("on meetings: rmeove notes (we have
+    // transcript for that)").
+    //
+    // WHY THIS IS A MIGRATION AND NOT A CLEAN-UP. The UI removal alone left
+    // real content unreachable: `meetings.notes` is the ONE column in this
+    // module that only a person writes -- no sync ever touches it (0035's own
+    // note) -- so nothing regenerates it if it is lost. Measured in the app's
+    // own source against the live staging base (`whereFor`'s search comment,
+    // workers/content/src/lib/meetings.ts): of 458 live meetings, 75 carry
+    // notes and 4 carry an agenda. Three quarters of the prose this module
+    // exists to keep was about to have no door.
+    //
+    // THE BACKUP COMES FIRST, AND IT IS RESTORABLE. `meeting_notes_backup`
+    // holds one row per meeting that had notes: the meeting's id, the notes
+    // EXACTLY as stored, and when they were copied. Restoring is one
+    // statement against that table, and it survives the merge because nothing
+    // below ever deletes from it. Deactivate-never-delete, applied to a column
+    // rather than a row.
+    //
+    // WHAT THE MERGE DOES, in her three cases:
+    //   * BOTH -- the agenda stays FIRST and the notes follow under a visible
+    //     divider. The divider is a bare `<hr>`: both fields are rich text and
+    //     `HR` is on the editor's own allow-list (shared/web/notes-editor/
+    //     logic.ts), so it survives the sanitiser on the way back out. It
+    //     carries NO WORDS on purpose -- a sentence written here would be
+    //     English in the DATA, shown to a German reader on a screen the
+    //     translation laws cannot reach (R28 reads the catalogue, not a
+    //     migration).
+    //   * AGENDA EMPTY -- the notes simply become the agenda.
+    //   * NOTES EMPTY -- nothing happens at all; the row is not even backed up.
+    //
+    // `notes` IS NOT CLEARED, and the column is not dropped. Deactivate-
+    // never-delete: the door still reads and writes it, the knowledge sweep
+    // still ingests it (knowledge-ingest.ts), and a merge that also wiped the
+    // source would make the backup the only copy of something we had just
+    // decided to keep two copies of.
+    //
+    // IDEMPOTENT, AND THE MARKER IS WHAT MAKES IT SO. `merged_at` on the
+    // backup row is the record of "this one has already been folded in": the
+    // INSERT skips a meeting already backed up, and the UPDATE only touches
+    // rows whose backup says `merged_at IS NULL`, setting it in the same
+    // breath. Run it twice and the second run changes nothing -- which matters
+    // because the alternative guard (does the agenda already contain the
+    // notes?) is a substring test over prose, and prose repeats itself.
+    //
+    // NUMBERED 0121, read live rather than recalled (CLAUDE.md, "team
+    // migration numbers are read, never recalled"): `git fetch origin`, then
+    // the tail of this file -- 0119 is the highest on `origin/main`, and 0120
+    // is taken by another lane's uncommitted entry directly above this one in
+    // the shared working tree, as of 23 Sep 2026. Two lines mint against one
+    // estate; if 0120 lands under a different name, this renumbers behind it.
+    version: "0121_meeting_notes_become_the_agenda",
+    sql: `
+CREATE TABLE IF NOT EXISTS meeting_notes_backup (
+  meeting_id TEXT PRIMARY KEY REFERENCES meetings(id),
+  notes TEXT NOT NULL,
+  saved_at TEXT NOT NULL,
+  merged_at TEXT
+);
+
+-- THE BACKUP. Only meetings that actually hold words, and only once: a second
+-- run matches every row it already wrote and inserts nothing.
+INSERT INTO meeting_notes_backup (meeting_id, notes, saved_at, merged_at)
+SELECT m.id, m.notes, datetime('now'), NULL
+  FROM meetings m
+ WHERE m.notes IS NOT NULL AND TRIM(m.notes) <> ''
+   AND NOT EXISTS (SELECT 1 FROM meeting_notes_backup b WHERE b.meeting_id = m.id);
+
+-- THE MERGE. Agenda first where there is one, then the divider, then the
+-- notes; the notes alone where there is not. Only rows the backup has not
+-- already marked as merged.
+UPDATE meetings
+   SET agenda = CASE
+         WHEN agenda IS NULL OR TRIM(agenda) = '' THEN notes
+         ELSE agenda || '<hr>' || notes
+       END
+ WHERE id IN (SELECT meeting_id FROM meeting_notes_backup WHERE merged_at IS NULL);
+
+-- AND THE MARKER, in the same run, so the UPDATE above can never fire twice
+-- on one meeting.
+UPDATE meeting_notes_backup
+   SET merged_at = datetime('now')
+ WHERE merged_at IS NULL;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

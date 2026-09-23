@@ -45,8 +45,7 @@ import {
   workLogsKey,
 } from "@/lib/live-resources"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { translatedFacets } from "@/lib/collection-filters"
-import { useAssignableMembers } from "@/lib/members"
+import { translatedFacets, WORK_LOG_TARGET_WORD } from "@/lib/collection-filters"
 import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
@@ -207,12 +206,22 @@ export function TimePanel({
   teamId,
   canCreate,
   canEdit,
+  personOptions,
+  accountOptions,
 }: {
   teamId: string
   canCreate: boolean
   /** `work:update` — a step above logging your own, because correcting a row of
    * time changes a number somebody else may already have read. */
   canEdit: boolean
+  /** THE TWO FACETS' OPTIONS, BUILT BY THE SCREEN ABOVE (23 Sep 2026). Aurora's
+   * ruling gave the Logs module two tabs with the same two filters — by person
+   * and by account — so the lists are resolved ONCE on the screen and handed to
+   * whichever tab is showing, rather than each tab making its own read of the
+   * members and accounts caches (R56: one door, one key). This panel used to
+   * call `useAssignableMembers` itself for the first of them. */
+  personOptions: { value: string; label: string; mark?: React.ReactNode }[]
+  accountOptions: { value: string; label: string; mark?: React.ReactNode }[]
 }) {
   const t = useT()
   const logsQ = useCached<WorkLog[]>(workLogsKey(teamId), () => listFetch.workLogs(teamId))
@@ -222,10 +231,6 @@ export function TimePanel({
   // R16: the exact server totals, primed by the same fetch that loaded page one —
   // never the loaded page's length, which on a paged list is just "50" for ever.
   const totalSeconds = useCachedValue<number>(totalKey("work-seconds", teamId))
-  // WHO MAY HAVE LOGGED IT — the team's own staff, for the "Who logged it"
-  // facet below. Never a client login: `useAssignableMembers` already drops
-  // one, which agrees with the door refusing a client login outright (R21).
-  const members = useAssignableMembers(teamId)
   const [addOpen, setAddOpen] = React.useState(false)
   // THE ROW BEING CORRECTED. Held rather than routed through the URL because a
   // correction is a thing you do to a line you are looking at — Back should
@@ -239,7 +244,6 @@ export function TimePanel({
       startedAt: values.startedAt,
       endedAt: values.endedAt,
       note: values.note || undefined,
-      kind: values.kind || undefined,
     })
     refreshTime(teamId)
     toast.success(t("Time logged."))
@@ -256,7 +260,11 @@ export function TimePanel({
       startedAt: values.startedAt,
       endedAt: values.endedAt,
       note: values.note,
-      kind: values.kind,
+      // NO `kind` (Aurora, 23 Sep 2026: the kind of work is automatic now, see
+      // `time-form-dialog.tsx`'s own note). `editWorkLog` falls back to the
+      // stored value when a caller sends none, so correcting an hour on a row
+      // that already carries a typed word LEAVES that word alone rather than
+      // wiping it.
     })
     refreshTime(teamId)
     toast.success(t("Time corrected."))
@@ -348,18 +356,25 @@ export function TimePanel({
         defaultSort={COLLECTION_SORTS.workLogs.defaultSort}
         // R50 — the resting read's own row count.
         restingEmpty={logs.length === 0}
+        // THE FOUR FACETS: who logged it, whose work it was, the kind of work
+        // (the RELATED RECORD TYPE — her 23 Sep ruling) and when. The two
+        // Aurora named for the toolbar (person, account) are the first two, and
+        // they are the SAME two the Dashboard tab beside this one draws, from
+        // the same declaration and the same option lists.
         facets={translatedFacets("workLogs", t, {
-          userId: members.map((m) => ({ value: m.id, label: m.name })),
+          userId: personOptions,
+          accountId: accountOptions,
         })}
         actions={() => (canCreate ? <AddButton label={t("Log time")} onClick={() => setAddOpen(true)} /> : null)}
         fetchPage={(query, cursor) => {
           // THE WHOLE QUESTION, read back off the door's own filter names —
-          // `q` (the search box), `userId` and `targetTable` (the two facets
-          // above) and `sort`/`dir` (the order control) — nothing here invents
-          // a name the door does not know (SEARCH.md layer 2).
+          // `q` (the search box), `userId`, `accountId` and `targetTable` (the
+          // facets above) and `sort`/`dir` (the order control) — nothing here
+          // invents a name the door does not know (SEARCH.md layer 2).
           const filter: LogQuery = {
             q: query.q,
             userId: query.userId,
+            accountId: query.accountId,
             targetTable: query.targetTable,
             period: query.period,
             sort: query.sort,
@@ -398,17 +413,26 @@ export function TimePanel({
                         <p className="truncate text-sm font-medium">{l.targetLabel ?? ""}</p>
                         <p className="text-muted-foreground flex items-center gap-2 truncate text-xs">
                           {line(l)}
-                          {/* THE STATE, at the END of the meta line, never
-                              inside it — a badge is how the eye reads "this
-                              row is unusual" without reading the row (N4).
-                              Only the exception is drawn: most time has no
-                              kind said, and a badge on every row is a badge
-                              that says nothing. */}
-                          {l.kind && (
-                            <Badge variant="secondary" className="shrink-0">
-                              {l.kind}
-                            </Badge>
-                          )}
+                          {/* THE KIND OF WORK, at the END of the meta line,
+                              never inside it — a badge is how the eye reads a
+                              row's category without reading the row (N4).
+                              IT IS THE RELATED RECORD TYPE NOW (Aurora, 23 Sep
+                              2026: "kind of work is what its related to", and
+                              "on logs this kind of work shoudl not be manual,
+                              but automatic to where it was created"). The
+                              free-text `kind` used to be drawn here and only
+                              when somebody had typed one, which is why most of
+                              this list carried no badge at all: `target_table`
+                              is on every row by construction, so every row is
+                              labelled now, and THIS list is the one place the
+                              label earns its space because its rows are mixed
+                              (a record's own panel is one type throughout and
+                              draws none). The word comes from the one shared
+                              vocabulary the "Kind of work" facet above reads,
+                              so the filter and the rows cannot disagree. */}
+                          <Badge variant="secondary" className="shrink-0">
+                            {t(WORK_LOG_TARGET_WORD[l.targetTable] ?? l.targetTable)}
+                          </Badge>
                         </p>
                       </div>
                       <span className="shrink-0 text-sm tabular-nums">

@@ -4,9 +4,9 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-109 laws, 105 resolved to at least one check file, 4 unresolved.
+112 laws, 108 resolved to at least one check file, 4 unresolved.
 
-## Architecture (28)
+## Architecture (29)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -38,8 +38,9 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 | R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/task-sheet.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
+| R112 | enforced | `archived-hides-its-children` | `workers/content/test/archived-hides-its-children.test.ts` |
 
-## UI (72)
+## UI (74)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -89,7 +90,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R80 | enforced | `rows-are-a-list` | `web/test/rows-are-a-list.test.ts` |
 | R81 | enforced | `form-carries-no-hints` | `web/test/help-form-dialog-loop-field.test.tsx` |
 | R82 | enforced | `table-column-budget` | `web/test/table-column-budget.test.ts` |
-| R83 | enforced | `toolbar-lead-gap` | `web/test/plain-surface-scope.test.tsx`<br>`web/test/toolbar-lead-gap-card.test.tsx`<br>`web/test/toolbar-lead-gap.test.ts` |
+| R83 | enforced | `toolbar-lead-gap` | `web/test/plain-surface-scope.test.tsx`<br>`web/test/tab-content-gap.test.ts`<br>`web/test/toolbar-lead-gap-card.test.tsx`<br>`web/test/toolbar-lead-gap.test.ts` |
 | R84 | enforced | `mango-in-title-only` | `web/test/mango-title-only.test.ts` |
 | R85 | enforced | `rail-labels-one-word` | `web/test/rail-labels-one-word.test.ts` |
 | R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/contacts-are-a-table.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |
@@ -103,7 +104,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R94 | enforced | `chip-order` | `web/test/chip-order.test.ts` |
 | R95 | enforced | `no-em-dash` | `web/test/no-em-dash.test.ts` |
 | R96 | enforced | `id-chip-is-black` | `web/test/id-chip-is-black.test.ts` |
-| R97 | enforced | `counts-beside-titles` | `web/test/counts-beside-titles.test.ts` |
+| R97 | enforced | `counts-beside-titles` | `web/test/accounts-dashboard-marks.test.tsx`<br>`web/test/counts-beside-titles.test.ts` |
 | R98 | enforced | `button-sizes` | `web/test/button-sizes.test.ts` |
 | R100 | enforced | `head-actions-centred` | `web/test/head-actions-centred.test.ts` |
 | R101 | enforced | `toolbar-search-edge` | `web/test/toolbar-search-edge.test.tsx` |
@@ -115,6 +116,8 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R107 | enforced | `effort-tiles` | *unresolved — see below* |
 | R108 | enforced | `section-title-one-style` | `web/test/section-title-one-style.test.ts` |
 | R109 | enforced | `content-inset` | `web/test/content-inset.test.ts` |
+| R110 | enforced | `filters-open-as-an-overlay` | `web/test/filters-open-as-an-overlay.test.tsx` |
+| R111 | enforced | `photo-beats-initials` | `web/test/photo-beats-initials.test.ts` |
 
 ## Workflow (2)
 

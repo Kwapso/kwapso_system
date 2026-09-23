@@ -795,6 +795,54 @@ export function closeTab(id: string): string | null {
   return pathOf(landingId)
 }
 
+/** CLOSE ONE TAB AND SAY WHERE TO GO — NEVER LEAVING THE STRIP EMPTY.
+ *
+ * THE CLIENT'S RULING, 23 SEP 2026, verbatim: *"when i close the last folder
+ * tab, it shoudl open a new screen (the one with search bar)"* — "the one
+ * with search bar" being `NewTabScreen` (`components/shell/new-tab-screen.tsx`,
+ * the `Where to?` page), which lives at `NEW_TAB_PATH` and is exactly what
+ * the strip's pinned "+" and cmd/ctrl-T already open.
+ *
+ * WHAT CLOSING THE LAST TAB DID BEFORE, which is not what it looked like.
+ * `closeTab` (above) returns `null` once the set is empty, and its one caller
+ * fell back to the collection of whatever had just been closed (`/apps` for a
+ * tab sitting on `/apps/A1`). That navigation then reached `visitTrail`,
+ * which — finding NO active tab — took its own cold-deep-link branch and
+ * SEEDED A FRESH TAB for that collection. So the strip never actually went
+ * empty and never looked broken: it silently refilled itself with a tab
+ * nobody had asked for, and persisted it, so a reload brought it back too.
+ * The close read as "closed that tab, opened this other one".
+ *
+ * A TAB, NOT AN EMPTY STRIP — the deliberate half of this decision, and the
+ * two designs are visibly different (one tab on the strip, versus no strip).
+ * An empty set is not a state this shell has anywhere: `tabStripState` only
+ * reports `showTabSet` when the current address is IN the set, so zero tabs
+ * would swap the folder strip for the plain text trail — the phone chrome —
+ * rather than show "a new screen"; and `visitTrail` would mint a tab on the
+ * very next navigation regardless. So the set keeps exactly one tab, and it
+ * is the same `/new` tab "+" mints.
+ *
+ * GOES THROUGH `openNewTab`, NOT `openBeside`, so this door and the "+"/cmd-T
+ * door stay ONE behaviour rather than two that merely agree today: same
+ * label, same insertion, same persisted shape. Its reuse branch is moot here
+ * (the set is empty, there is no unused tab to find) and harmless.
+ *
+ * AND THE PERSISTED SET CANNOT RESURRECT WHAT SHE JUST CLOSED: `closeTab`
+ * has already cleared the stored key by the time this runs, and `openNewTab`
+ * writes the `/new` tab back in the same breath — so the reload reads `/new`,
+ * never the closed tab.
+ *
+ * `newTabLabel` is passed in rather than spelled here for the identical
+ * reason `openNewTab` takes one: this file does no translation. Closing a
+ * BACKGROUND tab is unchanged and never reaches the fallback — see
+ * `closeTab`'s own contract. */
+export function closeTabAndLand(id: string, newTabLabel: string): string {
+  const landing = closeTab(id)
+  if (landing !== null) return landing
+  openNewTab(newTabLabel)
+  return NEW_TAB_PATH
+}
+
 /** MOVE ONE TAB, BY `id`, TO A NEW ARRAY POSITION. Direct successor of the
  * first design's `reorderTab` — identical mechanism, keyed by `id`. Recency
  * is untouched: a drag is her own act of arranging the strip, not a visit. */

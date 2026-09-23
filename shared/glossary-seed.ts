@@ -35,7 +35,12 @@ export const GLOSSARY_ENTRIES: readonly GlossarySeedEntry[] = [
   { word: "Phase Goal", definition: "\"A Phase Goal is the 'why' behind a cycle; every story in that cycle should support it, and anything that doesn't probably shouldn't be included.\"" },
   { word: "Burndown chart", definition: "\"A burndown chart plots work remaining (story points or story count) on the Y-axis against the days of the cycle on the X-axis, with a straight 'ideal' line from the starting total down to zero so the team can see whether they're ahead or behind.\"" },
   { word: "Cycle time", definition: "\"Cycle time = calendar time elapsed from when a story enters 'Now'/In Progress to when it reaches 'Completed'; capture this automatically via timestamps on those status changes.\"" },
-  { word: "Time log", definition: "\"Effort = the actual hours logged working on the story (from our existing time tracking).\", then, the same round: \"Inside stories and tickets, let's rename 'effort' to 'time log.'\"" },
+  // "WORD IS LOGS ONLY" — Aurora, 23 Sep 2026. This entry read "Time log" and
+  // quoted B0386 of 22 Sep 2026 ("Inside stories and tickets, let's rename
+  // 'effort' to 'time log'"), which her newer ruling reverses. The section on a
+  // story, a ticket and a task is called Logs now, the rail says Logs, and one
+  // entry is a Log.
+  { word: "Log", definition: "One row of time: who, what they worked on, and how long. The hours logged against a story, a ticket, a task or a meeting. Called Logs everywhere: the rail, the module and the section on a record." },
   { word: "Flow efficiency", definition: "\"Flow efficiency = effort \u00f7 cycle time, shown as a percentage; low flow efficiency means the story spent most of its life waiting or blocked rather than being actively worked.\"" },
   { word: "Spike", definition: "\"A Spike is a time-boxed research or investigation task whose output is a decision or knowledge (e.g. a prototype, a recommendation), not shippable features.\"" },
   { word: "Chore", definition: "\"A Chore is necessary work with no direct user-visible value, dependency upgrades, refactors, config cleanup, data migrations, that keeps the system healthy but a user wouldn't notice directly.\"" },

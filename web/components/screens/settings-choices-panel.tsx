@@ -222,6 +222,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { NoAccess } from "@/components/deep-link/screen-bits"
 import { shapeChoicesTable, type ChoiceGroupHome } from "@/components/deep-link/shape"
+import { useAssignableMembers } from "@/lib/members"
 import { moduleSettingsIndex } from "@/components/screens/module-settings-screen"
 import { RecordActionsMenu, type RecordAction } from "@/components/records/record-chrome"
 import { RecordTable, type TableColumn } from "@/components/records/record-table"
@@ -394,6 +395,17 @@ export function SettingsChoicesPanel({
     tenancy.selectable().then((r) => r.values)
   )
 
+  // THE FACES BEHIND "ADDED BY" — Aurora, 23 Sep 2026: "on choices adde by
+  // show avatar, not initials." A choice row carries its creator's id and the
+  // snapshot of their name, never their picture; the picture lives on the
+  // members list, which every picker in this app already holds, so this is
+  // the SAME cache four other screens read and not a second fetch (R56). It
+  // reads warm on any session that has opened a person picker; on a cold load
+  // straight to Settings it costs one round trip, and the column draws its
+  // initials tile until it lands — the same fallback a creator with no
+  // photograph keeps for good.
+  const members = useAssignableMembers(teamId)
+
   // ── THE ONE GATE, REUSED ────────────────────────────────────────────────
   // `moduleSettingsIndex(can)` is `visibleModuleSettings` asked once per
   // module (R61). No `can(` of its own is written anywhere in this file.
@@ -545,7 +557,7 @@ export function SettingsChoicesPanel({
   if (valuesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const rows = valuesQ.data.filter((v) => groupHome.has(v.type))
-  const data = shapeChoicesTable(rows, groupHome, lang)
+  const data = shapeChoicesTable(rows, groupHome, lang, members)
 
   /** Protect a value, or take the protection off — `SelectableScreen`'s own
    * `setDefault`, unchanged. Confirm-free either direction: protecting is

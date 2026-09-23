@@ -31,6 +31,7 @@ import { optionalText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Todo, TodoViewName } from "@shared/types"
 
 import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
+import { accountArchivedClause, ticketArchivedClause } from "./help"
 
 type TodoRow = {
   id: string
@@ -228,13 +229,28 @@ function todoSearchClause(q: string | undefined): { sql: string | null; params: 
   }
 }
 
+/** ARCHIVED MEANS INVISIBLE, AND IT REACHES DOWN (R112) — Aurora, 23 Sep 2026:
+ * "validated - this for everything when archived, not only accounts."
+ *
+ * A to-do hangs off both archivable records: its CLIENT (`todos.account_id`) and,
+ * when somebody raised it off one, its TICKET (`todos.ticket_id`). Both are
+ * asked, both short-circuit on NULL — the agency's own inputs carry neither —
+ * and neither reads the other's column. `t.cancelled_at` is a THIRD, unrelated
+ * fact about the to-do itself (somebody withdrew it) and stays exactly where it
+ * was: an archive is not a cancellation and the two must never be merged.
+ *
+ * Said once so the list and both counts cannot drift (R16). */
+function todoArchivedClauses(alias = "t"): string[] {
+  return [accountArchivedClause(alias), ticketArchivedClause(alias)]
+}
+
 /** The WHERE both the page and its counts are built from — the fence, the
  * withdrawn, the client, and which pile. One function, because R16 is not "an
  * exact count" but a count of the SAME collection the list showed. */
 function whereFor(scope: AccountScope, filter: TodoFilter): { sql: string; params: string[] } {
   const fence = todoFence(scope)
   const view = todoViewClause(filter.view ?? "open")
-  const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : []), view.sql]
+  const clauses = ["t.cancelled_at IS NULL", ...todoArchivedClauses(), ...(fence.sql ? [fence.sql] : []), view.sql]
   const params: string[] = [...fence.params, ...(view.dated ? [todayIso()] : [])]
   if (filter.accountId) {
     clauses.push("t.account_id = ?")
@@ -335,7 +351,9 @@ export async function countTodos(
 ): Promise<TodoCounts> {
   // The list's own WHERE minus the pile — the counts have to see both.
   const fence = todoFence(scope)
-  const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : [])]
+  // R112 + R16: the same two archive clauses `whereFor` rides, so each pile's
+  // badge counts the rows the list can actually show.
+  const clauses = ["t.cancelled_at IS NULL", ...todoArchivedClauses(), ...(fence.sql ? [fence.sql] : [])]
   const params: string[] = [...fence.params]
   if (filter.accountId) {
     clauses.push("t.account_id = ?")

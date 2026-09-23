@@ -1111,7 +1111,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // whole, so this reader's text did not move.
   // v2: 23 Sep 2026 — HOLE ONE. This reader never retired a source at all;
   // it gains its first reason, off its own aliased `account_archived_at`.
-  story: { version: 2, digest: "70bee08841217aff" },
+  // v3: 23 Sep 2026 — Aurora widened the ruling ("validated - this for
+  // everything when archived, not only accounts", R112). A story hangs off TWO
+  // archivable records and only one was being asked: its own TICKET, archived
+  // on the tickets screen, left the corpus while the story answering it stayed
+  // embedded and quotable. `retired` now also reads `h.archived_at` off its own
+  // aliased `ticket_archived_at`. The bump re-decides every story already filed.
+  story: { version: 3, digest: "007462fcd5c87e9a" },
   // v2: the summary says "already happened" / "still to come" from the start
   // time, where it used to quote the retired status column.
   // v3: a meeting that has not happened and carries no agenda, notes or
@@ -1144,7 +1150,10 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // v4: 23 Sep 2026 — HOLE ONE. "NOTHING HERE RETIRES" above stops being
   // true for one reason: a to-do for an archived account now retires, off
   // its own aliased `account_archived_at`.
-  todo: { version: 4, digest: "1cfae64481ca6e51" },
+  // v5: 23 Sep 2026 — the same widening (R112): a to-do raised off a ticket
+  // retires when that ticket is archived, read off its own aliased
+  // `ticket_archived_at`. The bump re-decides every to-do already filed.
+  todo: { version: 5, digest: "1ad7b56a58261610" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
   // the file and its digest covered every helper below the table. Bounding the

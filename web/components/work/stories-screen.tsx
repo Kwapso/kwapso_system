@@ -1005,7 +1005,7 @@ export function StoriesScreen({
         ]
       : []),
   ]
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values: facetValues,
     data: rawRows,
@@ -1126,8 +1126,27 @@ export function StoriesScreen({
         <span className={s.sprintName ? "text-sm" : "text-sm italic opacity-55"}>
           {s.sprintName ?? t("No phase")}
         </span>
+        {/* THEIR PHOTOGRAPH, NOT THEIR INITIALS — Aurora, 23 Sep 2026: "where
+            there's avatar show it- only initials when avatar is empty." The
+            card drew the initials tile for EVERY assignee, including the ones
+            with a photograph on file, which also quietly under-delivered the
+            20 Sep 2026 ruling this card was built from — "then sprint and
+            who's doing it (with avatar)". `membersById` is already in scope,
+            built a few hundred lines up off `options.members` for the
+            Assignee FACET, whose own comment already says that list carries
+            "a picture `Story` rows themselves do not"; the card simply never
+            asked it. Matched by `assigneeId`, never by the name: two
+            colleagues can share one (`assignableMembers`' own duplicate-name
+            note), and a name match would hand one of them the other's face.
+            An unassigned story, and an assignee who has since left the team,
+            both miss the map and keep the initials tile. */}
         <span className="flex items-center gap-1.5">
-          <RecordMark name={staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")} shape="round" size="choice" />
+          <RecordMark
+            picture={s.assigneeId ? (membersById.get(s.assigneeId)?.photo ?? null) : null}
+            name={staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")}
+            shape="round"
+            size="choice"
+          />
           <span className="text-sm">{staffNameFromSnapshot(s.assigneeName) || t("Nobody yet")}</span>
         </span>
       </span>
@@ -1171,6 +1190,18 @@ export function StoriesScreen({
       title: s.title,
       dotTone: storyStatusDotTone(s.status),
       detail: s.sprintName ?? undefined,
+      // WHOSE IT IS — Aurora, 23 Sep 2026, week-view variation One ("Open
+      // column"): the week card carries the app and the account as chips
+      // above its title, drawn by `EntryCard` through R94's own ordering
+      // seam. Handed over as NAMES, never ids: the card draws a chip, not a
+      // link (see that component's own note on why it is not an anchor), and
+      // a row with neither name simply draws one chip fewer.
+      //
+      // ONE CHIP HERE, NOT TWO: `Story` carries `accountId` and no
+      // `accountName` (shared/types.ts), so there is no account NAME on the
+      // row to draw. Left absent rather than resolved by a second lookup this
+      // ruling did not ask for.
+      appName: s.appName ?? undefined,
     }))
   const hasDueDated = rawRows.some((s) => s.sprintEndsOn || s.dueOn)
 
@@ -1229,7 +1260,6 @@ export function StoriesScreen({
         )
       }
       filters={(storiesLoading || !rawEmpty) && filterPill}
-      toolbarPanel={(storiesLoading || !rawEmpty) && filterPanel}
       sort={
         (storiesLoading || !rawEmpty) && {
           options: storySortOptions(t),

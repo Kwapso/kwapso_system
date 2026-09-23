@@ -53,6 +53,7 @@ export function PersonCard({
   secondary,
   orientation = "vertical",
   size = "band",
+  external = false,
 }: {
   /** The stored path to their picture, if they have one. */
   picture?: string | null
@@ -75,6 +76,15 @@ export function PersonCard({
    * panel has plenty of). */
   orientation?: "vertical" | "horizontal"
   size?: RecordMarkSize
+  /** ARE THEY FROM OUTSIDE — a client contact rather than one of ours?
+   * Aurora, 23 Sep 2026: *"external photos (from contacts) gray scale. keep
+   * staff nirmal."* Handed straight to the mark; see `RecordMark`'s own
+   * `external` for the ruling, for why the fact is taken rather than guessed,
+   * and for why the default is colour. BOTH walls this component draws change
+   * together, which is the whole reason it exists (see this file's header):
+   * the members gallery is staff and passes nothing, the contacts gallery is
+   * the client's people and passes `true`. */
+  external?: boolean
 }) {
   // THE ROUND CIRCLE, NOT THE SQUARE BAND — Aurora's ruling, 20 Sep 2026,
   // verbatim: "Avatars are always a round image ('Raised by' must be a round
@@ -90,7 +100,16 @@ export function PersonCard({
   // together because there is only the one component; see this file's own
   // header for why a second, hand-copied tile was rejected the day this was
   // extracted.
-  const face = <RecordMark picture={picture} mark={mark} name={markName} shape="round" size={size} />
+  const face = (
+    <RecordMark
+      picture={picture}
+      mark={mark}
+      name={markName}
+      shape="round"
+      size={size}
+      external={external}
+    />
+  )
 
   if (orientation === "horizontal") {
     return (

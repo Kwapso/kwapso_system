@@ -176,6 +176,14 @@ export interface DetailViewProps
   initials?: string;
   /** A photograph for the mark. `Avatar` falls back to the initials silently. */
   avatarSrc?: string;
+  /** IS THE PERSON IN THAT MARK FROM OUTSIDE? Forwarded straight to `Avatar`'s
+   * own `external` (see `components/avatar/avatar.tsx` for the ruling and why
+   * the fact is taken rather than guessed): an outside person's PHOTOGRAPH
+   * renders greyscale, one of our own in full colour. Aurora, 23 Sep 2026:
+   * "external photos (from contacts) gray scale. keep staff nirmal." A record
+   * that is a THING rather than a person (an account, an app — the common
+   * case for this header) never sets it. */
+  avatarExternal?: boolean;
   /** Anything else inside the mark — a glyph for a record that is not a person. */
   avatarFallback?: React.ReactNode;
   /**
@@ -315,6 +323,7 @@ const DetailView = React.forwardRef<HTMLDivElement, DetailViewProps>(
       meta,
       initials,
       avatarSrc,
+      avatarExternal,
       avatarFallback,
       avatarVariant = "default",
       badges,
@@ -397,7 +406,7 @@ const DetailView = React.forwardRef<HTMLDivElement, DetailViewProps>(
                 below at mobile rather than squeezing beside the name. */}
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               {hasMark ? (
-                <Avatar size="lg" shape="pill" variant={avatarVariant} aria-hidden="true">
+                <Avatar size="lg" shape="pill" variant={avatarVariant} external={avatarExternal} aria-hidden="true">
                   {avatarSrc !== undefined ? <AvatarImage src={avatarSrc} alt="" /> : null}
                   <AvatarFallback>
                     {avatarFallback ?? initials ?? (typeof title === "string" ? initialsOf(title) : "")}

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.165",
-  "sha": "f3b27e68bc2e51009237a117ca75031421b99f64",
+  "tag": "v1.2.166",
+  "sha": "98aeeb346461a73289d084df3810745495d176cd",
   "syncedAt": "2026-09-23"
  },
- "generatedAt": "2026-09-23T11:48:02.927Z",
+ "generatedAt": "2026-09-23T18:48:19.708Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -14,8 +14,8 @@
   "cvaSites": 54,
   "variantGroups": 82,
   "variantOptions": 274,
-  "typedEnumProps": 53,
-  "typedBooleanProps": 319,
+  "typedEnumProps": 54,
+  "typedBooleanProps": 323,
   "compositions": 47,
   "icons": 1514,
   "tokens": 373,
@@ -812,7 +812,7 @@
     {
      "file": "components/avatar/avatar.tsx",
      "name": "avatarVariants",
-     "line": 73,
+     "line": 79,
      "base": "relative inline-grid place-content-center shrink-0 grow-0 select-none overflow-hidden font-[var(--font-weight-medium)] leading-none uppercase",
      "groups": [
       {
@@ -900,7 +900,14 @@
      "variantsFrom": [
       "avatarVariants"
      ],
-     "props": []
+     "props": [
+      {
+       "name": "external",
+       "optional": true,
+       "kind": "boolean",
+       "note": "IS THIS PERSON FROM OUTSIDE? Aurora's ruling, 23 Sep 2026, verbatim: *\"external photos (from contacts) gray scale. keep staff nirmal.\"* (\"nirmal\" is normal.) An outside person's PHOTOGRAPH renders in greyscale; one of our own renders in full colour, so a reader can tell at a glance whose face they are looking at, in a table, on a card, in a chip, in an attendee list, on a record's header mark, anywhere. IT IS A FACT, NOT A GUESS. The kit has no idea who anybody is — it holds no notion of a team, a contact, or a company — so this is the one thing it can do honestly: TAKE the answer and draw it. A component that tried to infer \"external\" from a URL's host, or from whether initials were supplied, would be wrong the first time somebody put a staff photograph on a CDN. THE DEFAULT IS COLOUR (`false`), AND THAT IS A DELIBERATE CHOICE BETWEEN TWO IMPERFECT ONES. Defaulting to GREYSCALE fails more loudly — a call site nobody has updated greys our own people, which somebody notices the same morning — and it fails by SAYING SOMETHING FALSE about a real person, in every app that vendors this kit, on a screen nobody here can see. Defaulting to COLOUR is the status quo: an un-updated call site is merely NOT YET TREATED, never WRONGLY treated, and no face ever claims to be something it is not. So the loudness is bought somewhere that cannot lie instead — `check-avatar.mjs` reads every `AvatarImage` this kit renders and fails the build where the mark around it is not told, which is louder than a grey face (it is red, and it is before the thing ships) and costs nobody a false statement in the meantime. IT IS ABOUT THE PHOTOGRAPH, NOT THE INITIALS. Her word was \"photos\", and this file draws the two separately: `AvatarImage` desaturates, `AvatarFallback` does not. An initials tile has no colour OF THE PERSON to remove — its fill is the mark's own variant, the same token every other mark on the screen paints — so greying it would not say \"external\", it would say \"quiet\", a word this kit already spends on `variant=\"quiet\"` for a different meaning entirely. A SQUARE MARK NEVER PASSES IT. `shape=\"square\"` is a THING (ruling 30) — a company's logo, a record's mark — and a company is not a person to be one of us or not. Nothing enforces that here; it is simply never true."
+      }
+     ]
     },
     {
      "file": "components/avatar/avatar.tsx",
@@ -1752,7 +1759,7 @@
        "name": "hairline",
        "optional": true,
        "kind": "boolean",
-       "note": "`.kw-card--hairline` — the same-tone separation case, and the only reason a card may carry a stroke at all. Off by default: the kit separates blocks with colour and reaches for the hairline only when two cards of the SAME tone sit against each other."
+       "note": "RETIRED, 23 SEP 2026 — ACCEPTED AND IGNORED. CLIENT RULING, VERBATIM: *\"by rule no borders nowhere in the kit\"*. A card is a CONTAINER, and this prop drew the one thing that ruling is about: a stroke around the whole of one. `docs/RULES.md` §2.8 is the law and `foundations/rules/boxes.mjs` is what enforces it — a census that makes every remaining four-edge stroke in this kit say which of §2.8's four exceptions it falls under. WHAT REPLACES IT IS ALREADY IN THE FILE, and has been since §2.6: a card takes THE OTHER PAPER TONE from the band it sits in. `default` is soft paper, `raised` is off-beige, and the table in §2.6 says which belongs where. Two cards of the SAME tone against each other — the one case this prop existed for — separate the way `plain` already separates two sections after her 21 Sep ruling: a `Separator`, or the gap between them. Neither is a box, and both are the kit's own devices. THE PROP STAYS IN THE API AND DOES NOTHING. `docs/RULES.md` §9.1: never rename or drop an export, a component, or a variant value, because an app pinned to an older tag stops compiling the day it upgrades. It is still destructured below rather than left in `...props`, so it cannot reach the DOM as an unknown attribute. `components/card/check-card.mjs` pins both halves: the prop is still accepted, and it paints nothing."
       },
       {
        "name": "interactive",
@@ -3494,6 +3501,12 @@
      "variantsFrom": [],
      "props": [
       {
+       "name": "avatarExternal",
+       "optional": true,
+       "kind": "boolean",
+       "note": "IS THE PERSON IN THAT MARK FROM OUTSIDE? Forwarded straight to `Avatar`'s own `external` (see `components/avatar/avatar.tsx` for the ruling and why the fact is taken rather than guessed): an outside person's PHOTOGRAPH renders greyscale, one of our own in full colour. Aurora, 23 Sep 2026: \"external photos (from contacts) gray scale. keep staff nirmal.\" A record that is a THING rather than a person (an account, an app — the common case for this header) never sets it."
+      },
+      {
        "name": "avatarVariant",
        "optional": true,
        "kind": "enum",
@@ -3639,6 +3652,22 @@
        "optional": true,
        "kind": "boolean",
        "note": "Print each row's share of the whole, chapter 18's own \"Build 42%\". Defaults on; a caller reading chapter 19's plainer legend passes false."
+      },
+      {
+       "name": "interactive",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Whether a segment can be pointed at and tabbed to at all. `false` makes the picture inert: no buttons, no ring handlers, nothing reported — the reading the kit's own chapter 18 and 19 specimens draw. `sankey.tsx`'s prop, same word and same default."
+      },
+      {
+       "name": "figures",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "always",
+        "active"
+       ],
+       "note": "WHEN a row prints its figures — the percentage (`showPercent`) and the value (`formatValue`). `\"always\"` (the default) — chapter 18's own drawing: every row carries its share, at rest. No existing call site moves. `\"active\"` — nothing until that segment is pointed at or tabbed to. Aurora, 2026-09-23: \"make the where as a donut graphic (when hover show).\" The picture still READS at rest — the ring, the dots and every label — and it is the FIGURE that is asked for. It governs the printing only. The figures are in the row's accessible name either way, so a screen reader is never given less than a pointer reveals."
       },
       {
        "name": "loading",
@@ -4017,7 +4046,27 @@
    ],
    "exports": [
     {
+     "name": "FACET_SPAN",
+     "file": "components/filter-bar/filter-bar.tsx"
+    },
+    {
+     "name": "FILTER_POPOVER_BUDGET",
+     "file": "components/filter-bar/filter-bar.tsx"
+    },
+    {
+     "name": "filterOverlayForm",
+     "file": "components/filter-bar/filter-bar.tsx"
+    },
+    {
+     "name": "FILTER_ANCHOR_ATTR",
+     "file": "components/filter-bar/filter-bar.tsx"
+    },
+    {
      "name": "FilterBar",
+     "file": "components/filter-bar/filter-bar.tsx"
+    },
+    {
+     "name": "FilterOverlay",
      "file": "components/filter-bar/filter-bar.tsx"
     },
     {
@@ -4041,7 +4090,7 @@
     {
      "file": "components/filter-bar/filter-bar.tsx",
      "name": "filterChipVariants",
-     "line": 110,
+     "line": 119,
      "base": "inline-flex shrink-0 items-center gap-1 h-[var(--control-height-button)] rounded-pill whitespace-nowrap text-badge leading-none pe-1 transition-colors duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
@@ -4072,7 +4121,7 @@
     {
      "file": "components/filter-bar/filter-bar.tsx",
      "name": "facetFieldVariants",
-     "line": 253,
+     "line": 262,
      "base": "min-w-0 appearance-none h-[var(--control-height-dense)] px-3 rounded-pill text-sm font-[var(--font-weight-light)] tabular-nums placeholder:text-muted-foreground transition-[box-shadow,background-color] duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
@@ -4276,6 +4325,19 @@
        "optional": true,
        "kind": "boolean",
        "note": null
+      }
+     ]
+    },
+    {
+     "file": "components/filter-bar/filter-bar.tsx",
+     "type": "FilterOverlayProps",
+     "variantsFrom": [],
+     "props": [
+      {
+       "name": "open",
+       "optional": false,
+       "kind": "boolean",
+       "note": "Open, held by the CALLER: the toolbar pill has to report the same state (its count stays visible while the overlay is open, client ruling 2026-09-03), and a component that owned the boolean privately would make the pill guess at it."
       }
      ]
     }
@@ -6457,7 +6519,7 @@
     {
      "file": "components/select/select.tsx",
      "name": "selectTriggerVariants",
-     "line": 318,
+     "line": 330,
      "base": "flex w-full min-w-0 appearance-none items-center justify-between gap-2 h-[var(--control-height-input)] px-[var(--space-4h)] rounded-pill bg-background text-foreground text-sm font-[var(--font-weight-light)] whitespace-nowrap cursor-pointer [&>span]:min-w-0 [&>span]:truncate [&>span]:text-start data-[placeholder]:text-muted-foreground transition-[box-shadow,background-color] duration-[var(--duration-colour)] ease-kwapso disabled:cursor-not-allowed disabled:shadow-[inset_0_0_0_0.0625rem_var(--border)] disabled:bg-hair-faint disabled:text-ink-disabled disabled:[&_svg]:text-ink-disabled",
      "groups": [
       {

@@ -1208,7 +1208,13 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
             refuses by law. `days` is the week's seven cells; `agenda` is the
             picked day's list. */}
         {state === "default" && view === "week" ? (
-          <div data-slot="calendar-view-week" className="flex min-w-0 flex-col gap-4">
+          <div
+            data-slot="calendar-view-week"
+            /* WEEK_DAY_GAP — the space AROUND a week card: between the day-pill
+               row and the first day's stack, and between one day's stack and
+               the next day's heading. */
+            className="flex min-w-0 flex-col gap-[var(--space-5)]"
+          >
             <div className="grid grid-cols-7 gap-1.5">
               {cells.map((day, index) => {
                 const cellState = resolveDayState(day);
@@ -1261,7 +1267,9 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
             </div>
 
             {agendaDays.map((day) => (
-              <div key={day.key} className="flex min-w-0 flex-col gap-2">
+              /* WEEK_CARD_GAP — the space BETWEEN two week cards, and between a
+                 day's heading and its first card. */
+              <div key={day.key} className="flex min-w-0 flex-col gap-[var(--space-3)]">
                 <span className="text-micro font-[var(--font-weight-medium)] uppercase text-foreground">
                   {day.label}
                 </span>

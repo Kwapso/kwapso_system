@@ -29,6 +29,7 @@ import type {
   HelpStakeholder,
   HelpTicket,
   KnowledgeSource,
+  LogsDashboard,
   RunningTimer,
   Sprint,
   Story,
@@ -252,6 +253,10 @@ export type LogQuery = {
   /** a name out of the door's own WORK_LOG_SORTS, with `dir` flipping it */
   sort?: string
   dir?: string
+  /** WHOSE WORK IT WAS — the client the log inherited from what it was logged
+   * against (Aurora, 23 Sep 2026: the Logs toolbar filters by person and
+   * account). Our own admin belongs to no client and is never returned by it. */
+  accountId?: string
 }
 
 function logQuery(filter: LogQuery | undefined, cursor: string | null | undefined): string {
@@ -260,6 +265,7 @@ function logQuery(filter: LogQuery | undefined, cursor: string | null | undefine
   if (filter?.targetTable) params.set("targetTable", filter.targetTable)
   if (filter?.targetId) params.set("targetId", filter.targetId)
   if (filter?.userId) params.set("userId", filter.userId)
+  if (filter?.accountId) params.set("accountId", filter.accountId)
   if (filter?.q) params.set("q", filter.q)
   if (filter?.period) params.set("period", filter.period)
   if (filter?.sort) params.set("sort", filter.sort)
@@ -1027,6 +1033,13 @@ export const content = {
    * PAGE, so adding up what is loaded would answer about the newest fifty. */
   workLogSummary: (filter?: LogQuery) =>
     api<WorkLogSummary>(`/api/content/work-logs/summary${logQuery(filter, null)}`),
+  /** THE LOGS DASHBOARD — the first tab of the Logs module, over the same
+   * `LogFilter` the Entries tab beside it sends (the toolbar's person and
+   * account narrow both). One round trip for six grouped pictures: drawing them
+   * from the loaded page would picture the newest fifty rows under a heading
+   * that says the year (R14). */
+  logsDashboard: (filter?: LogQuery) =>
+    api<LogsDashboard>(`/api/content/work-logs/dashboard${logQuery(filter, null)}`),
   /** One row of time, read back off its own page — there is no by-id door,
    * because a work log is only ever read in a list of its neighbours. */
   workLogOne: (id: string) =>

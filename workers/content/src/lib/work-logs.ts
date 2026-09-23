@@ -29,7 +29,7 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { LIST_HARD_CAP, WORK_LOG_GROUP_CAP } from "@shared/workers/limits"
 import { pulseWeekStarts } from "./insights"
-import type { RunningTimer, WorkLog, WorkLogSummary } from "@shared/types"
+import type { LogsDashboard, RunningTimer, WorkLog, WorkLogSummary } from "@shared/types"
 
 /** WHAT TIME MAY BE LOGGED AGAINST — the whole allow-list, in one place, and the
  * only place. Each entry names the table, the column its human label lives in,
@@ -225,6 +225,21 @@ export type LogFilter = {
    * either front door draws one, and a closed vocabulary is a filter this door
    * can validate outright rather than trust two arbitrary dates handed to it. */
   period?: "7d" | "30d" | "90d"
+  /** WHOSE WORK IT WAS — the client the log belongs to.
+   *
+   * `work_logs.account_id` has been on every row since migration 0015, INHERITED
+   * from the target rather than told to the door (`targetOrThrow` reads it off
+   * the story/ticket/task/meeting), and indexed (`idx_work_logs_account`). Until
+   * Aurora's 23 Sep 2026 ruling on the Logs dashboard it had never been read
+   * back by ANY screen or filter in the app — the column existed, was written
+   * correctly and answered nobody.
+   *
+   * It is NULLABLE and often null on purpose: our own admin belongs to no
+   * client. A filter on a particular account therefore never returns our own
+   * work, which is the honest reading of "show me Bergman's hours"; the
+   * dashboard's own client section keeps a separate row for the no-client pile
+   * rather than folding it into somebody's total. */
+  accountId?: string
 }
 
 /** Escaped, case-folded and wrapped for a `LIKE`, or nothing at all — the same
@@ -286,6 +301,14 @@ function logWhere(
   if (filter.targetId) {
     parts.push("w.target_id = ?")
     params.push(filter.targetId)
+  }
+  // WHOSE WORK IT WAS. Bound, never interpolated, and matched on the log's own
+  // inherited column rather than through a join to the target — the whole point
+  // of `account_id` living on the row is that "Bergman's hours" is one indexed
+  // predicate over four different target tables.
+  if (filter.accountId) {
+    parts.push("w.account_id = ?")
+    params.push(filter.accountId)
   }
   const search = searchClause(filter.q)
   if (search.sql) {
@@ -496,6 +519,223 @@ export async function summariseWorkLogs(
       // SUM over no rows is NULL, not 0 — a record nobody has logged time against
       // gets a flat, honest zero line rather than a series of nulls.
       seconds: Math.max(0, Math.round(Number(row[`w${i}`] ?? 0))),
+    })),
+  }
+}
+
+/** THE LOGS DASHBOARD — Aurora's ruling, 23 Sep 2026, verbatim: "tabs:
+ * dahsbaord, entries" and "implement everything you suggested for dashboard -
+ * exclude running now. add toolbar w filters by person, account."
+ *
+ * WHY IT IS A DOOR OF ITS OWN AND NOT SIX MORE FIELDS ON `summariseWorkLogs`.
+ * That summary is read on EVERY story, ticket, task and meeting that draws an
+ * Effort section (`effort-card.tsx`, `work-logs-panel.tsx`) — it is the header
+ * over one record's rows. The dashboard asks five more grouped questions that
+ * no record header has ever needed, and hanging them on the shared summary
+ * would spend five extra reads on every record page in the app to draw a screen
+ * nobody is looking at. Same file, same `logWhere`, same `LogFilter`, same
+ * `pulseWeekStarts`: one more reader of the seams that exist, not a second
+ * definition of any of them.
+ *
+ * NOTHING HERE IS INVENTED. Every figure is a grouping of columns `work_logs`
+ * already carries:
+ *   • `started_at` — the four figures and the eight weekly buckets;
+ *   • `target_table` — WHERE THE HOURS WENT. Aurora's third ruling the same
+ *     day, verbatim: "kind of work is what its related to". The donut groups by
+ *     the RELATED RECORD TYPE (Story / Ticket / Task / Meeting), never by the
+ *     free-text `kind` column, and the difference is honesty rather than taste:
+ *     `target_table` is NOT NULL on every row by construction, whereas `kind`
+ *     is written by exactly two things — the meetings door stamping
+ *     `MEETING_LOG_KIND`, and whatever a person typed in the manual entry form
+ *     — so a picture grouped on it is a picture of the minority with a large
+ *     unlabelled slice beside it;
+ *   • `user_id`/`user_name` — WHO LOGGED IT, and the names behind each week;
+ *   • `account_id` — WHOSE WORK IT WAS. NEW GROUND: the column has been written
+ *     on every row since 0015 and read back by nothing. `NULL` is our own work
+ *     and is a ROW here rather than a dropped one, the same decision the kinds
+ *     grouping above already makes about time with no kind;
+ *   • `target_table` + `target_id` — WHAT ATE THE MOST, with the reference and
+ *     the title read through the same allow-list-built `REF_SQL`/`LABEL_SQL`
+ *     every other list of time renders.
+ *
+ * NO "RUNNING NOW" SECTION. She excluded it outright, and the header already
+ * carries every running timer on every screen.
+ *
+ * FIVE READS, each bounded at both ends (R14):
+ *   • ONE aggregate row carrying the four figures AND the eight weekly totals —
+ *     conditional sums with no GROUP BY, so there is nothing else it could
+ *     return, and the weekly windows are `pulseWeekStarts`' own, reused rather
+ *     than restated so this screen and Home can never open a week on two
+ *     different Mondays;
+ *   • BY PERSON, with each of the eight weeks beside the total: grouped,
+ *     biggest first, `WORK_LOG_GROUP_CAP` rows;
+ *   • BY RELATED TYPE: grouped, and four rows is its natural ceiling
+ *     (`WORK_LOG_TARGETS` is the whole allow-list) — the cap is said anyway,
+ *     because a ceiling that happens to hold is not a ceiling;
+ *   • BY CLIENT and BY RECORD: grouped, biggest first, `WORK_LOG_GROUP_CAP`
+ *     rows each.
+ *
+ * NOTHING HERE IS MONEY, for the same reason `summariseWorkLogs` says so: a
+ * work log's cost is derived in the one file R24 fences, and this counts hours.
+ */
+export async function logsDashboard(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  filter: LogFilter,
+  now: Date
+): Promise<LogsDashboard> {
+  const where = logWhere(guard, filter, now)
+  const starts = pulseWeekStarts(now)
+  // THE WEEK WINDOWS, built once and used by BOTH the one-row read and the
+  // per-person read below, so the bars on the line and the names under a point
+  // can never be counting two different weeks.
+  const windows = starts.map((start) => {
+    const end = new Date(start)
+    end.setUTCDate(end.getUTCDate() + 7)
+    return [start.toISOString(), end.toISOString()] as const
+  })
+  const weekSums = windows.map((_, i) => `SUM(CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.seconds ELSE 0 END) AS w${i}`)
+  const weekParams = windows.flatMap(([from, to]) => [from, to])
+
+  // THIS WEEK is the LAST of `pulseWeekStarts`' eight and last week is the one
+  // before it — read off the same array rather than computed a second time, so
+  // "hours this week" and the right-hand end of the line are one number.
+  const [thisFrom, thisTo] = windows[windows.length - 1]!
+  const [lastFrom, lastTo] = windows[windows.length - 2]!
+  // TODAY, in UTC, which is the clock every other window here is cut on
+  // (`mondayOf` is UTC too). One definition of a day boundary, not two.
+  const dayFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString()
+  const dayTo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString()
+  // THE EIGHT-WEEK WINDOW AS A WHOLE — the denominator behind "logged nothing
+  // last week". See `quietLastWeek` on the returned object for why this door
+  // will not pretend to know the team's roster.
+  const [eightFrom] = windows[0]!
+
+  const [figureRows, people, targets, accounts, records] = await Promise.all([
+    d1Query<Record<string, number | null>>(
+      cfg,
+      guard.databaseId,
+      // R14: ONE aggregate row — conditional sums and counts with no GROUP BY,
+      // so there is nothing else this can return, and `LIMIT 1` says it at the
+      // query rather than leaving it implied by the shape of the SQL.
+      `SELECT ${weekSums.join(", ")},
+              SUM(CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.seconds ELSE 0 END) AS this_week,
+              SUM(CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.seconds ELSE 0 END) AS last_week,
+              SUM(CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.seconds ELSE 0 END) AS today,
+              COUNT(DISTINCT CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.user_id END) AS today_people,
+              COUNT(DISTINCT CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.user_id END) AS eight_week_people,
+              COUNT(DISTINCT CASE WHEN w.started_at >= ? AND w.started_at < ? THEN w.user_id END) AS last_week_people,
+              COUNT(DISTINCT w.target_table || ':' || w.target_id) AS records_touched
+         FROM work_logs w WHERE ${where.sql} LIMIT 1`,
+      [
+        ...weekParams,
+        thisFrom, thisTo,
+        lastFrom, lastTo,
+        dayFrom, dayTo,
+        dayFrom, dayTo,
+        eightFrom, thisTo,
+        lastFrom, lastTo,
+        ...where.params,
+      ]
+    ),
+    d1Query<Record<string, string | number | null>>(
+      cfg,
+      guard.databaseId,
+      // WHO LOGGED IT, and what each of them put into each of the eight weeks —
+      // ONE read rather than two, because the bar chart and the line's hover are
+      // the same grouping asked at two resolutions.
+      `SELECT w.user_id, MAX(w.user_name) AS user_name, SUM(w.seconds) AS s, ${weekSums.join(", ")}
+         FROM work_logs w WHERE ${where.sql}
+        GROUP BY w.user_id ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
+      [...weekParams, ...where.params]
+    ),
+    d1Query<{ target_table: string; s: number | null }>(
+      cfg,
+      guard.databaseId,
+      // WHERE THE HOURS WENT. `target_table` is NOT NULL, so there is no null
+      // bucket to decide about — unlike the free-text `kind` this replaces.
+      `SELECT w.target_table, SUM(w.seconds) AS s
+         FROM work_logs w WHERE ${where.sql}
+        GROUP BY w.target_table ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
+      where.params
+    ),
+    d1Query<{ account_id: string | null; account_name: string | null; s: number | null }>(
+      cfg,
+      guard.databaseId,
+      // WHOSE WORK IT WAS. The name is a correlated subselect off the team's own
+      // `accounts` table rather than a JOIN, so a log whose account row has since
+      // been deactivated or archived still counts its hours and simply has no
+      // name — hours are never dropped because a client record moved on.
+      `SELECT w.account_id, (SELECT a.name FROM accounts a WHERE a.id = w.account_id) AS account_name,
+              SUM(w.seconds) AS s
+         FROM work_logs w WHERE ${where.sql}
+        GROUP BY w.account_id ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
+      where.params
+    ),
+    d1Query<{ target_table: string; target_id: string; target_ref: string | null; target_label: string | null; s: number | null }>(
+      cfg,
+      guard.databaseId,
+      // WHAT ATE THE MOST. The reference and the title come off the SAME two
+      // allow-list-built expressions every list of time already renders, so a new
+      // target table is one line in `WORK_LOG_TARGETS` and this picture follows.
+      `SELECT w.target_table, w.target_id, ${REF_SQL} AS target_ref, ${LABEL_SQL} AS target_label,
+              SUM(w.seconds) AS s
+         FROM work_logs w WHERE ${where.sql}
+        GROUP BY w.target_table, w.target_id ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
+      where.params
+    ),
+  ])
+
+  const row = figureRows[0] ?? {}
+  // SUM over no rows is NULL, not 0 — a team that has logged nothing gets flat,
+  // honest zeros rather than a row of nulls.
+  const num = (k: string) => Math.max(0, Math.round(Number(row[k] ?? 0)))
+
+  return {
+    thisWeekSeconds: num("this_week"),
+    lastWeekSeconds: num("last_week"),
+    todaySeconds: num("today"),
+    todayPeople: num("today_people"),
+    // THE DENOMINATOR IS SAID OUT LOUD. This door cannot see the team's roster —
+    // members live in the global core database, on the other side of the tenancy
+    // worker — so "how many people logged nothing last week" is answered over
+    // the people this door CAN see: everyone with time in the last eight weeks.
+    // Both numbers are returned so the screen names the denominator beside the
+    // figure instead of implying one it does not have.
+    activePeople: num("eight_week_people"),
+    quietLastWeek: Math.max(0, num("eight_week_people") - num("last_week_people")),
+    recordsTouched: num("records_touched"),
+    weeks: starts.map((start, i) => ({
+      weekStart: start.toISOString().slice(0, 10),
+      seconds: num(`w${i}`),
+    })),
+    people: people.map((r) => ({
+      userId: String(r.user_id),
+      // A `typeof` narrowing rather than a cast. The row type is the wide
+      // `Record` the eight conditional week columns need, and `r.user_name as
+      // string` would be a CAST — which R20's own doctrine calls not a check at
+      // all, and which `web/test/staff-names-are-first-names.test.ts` reads as a
+      // SQL `AS` alias besides (its census is case-insensitive, so a TypeScript
+      // cast on a `*_name` column registers as a wire field called "string").
+      userName: typeof r.user_name === "string" ? r.user_name : null,
+      seconds: Math.max(0, Math.round(Number(r.s ?? 0))),
+      weekSeconds: starts.map((_, i) => Math.max(0, Math.round(Number(r[`w${i}`] ?? 0)))),
+    })),
+    targets: targets.map((r) => ({
+      targetTable: r.target_table,
+      seconds: Math.max(0, Math.round(r.s ?? 0)),
+    })),
+    accounts: accounts.map((r) => ({
+      accountId: r.account_id,
+      accountName: r.account_name,
+      seconds: Math.max(0, Math.round(r.s ?? 0)),
+    })),
+    records: records.map((r) => ({
+      targetTable: r.target_table,
+      targetId: r.target_id,
+      targetRef: r.target_ref,
+      targetLabel: r.target_label,
+      seconds: Math.max(0, Math.round(r.s ?? 0)),
     })),
   }
 }

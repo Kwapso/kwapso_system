@@ -609,6 +609,7 @@ const selectableValue = (over: Partial<SelectableValue> & { id: string; type: st
   position: null,
   createdAt: null,
   createdByName: null,
+  createdById: null,
   ...over,
 })
 

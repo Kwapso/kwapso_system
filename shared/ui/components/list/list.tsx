@@ -93,6 +93,13 @@ export interface ListRow {
   initials?: React.ReactNode;
   /** A photograph for the mark. Falls back to `initials` when it fails. */
   image?: string;
+  /** IS THIS PERSON FROM OUTSIDE? Forwarded straight to `Avatar`'s own
+   * `external` (see `components/avatar/avatar.tsx` for the ruling, the reason
+   * the fact is taken rather than guessed, and why the default is colour):
+   * an outside person's PHOTOGRAPH renders greyscale, one of our own in full
+   * colour. Aurora, 23 Sep 2026: "external photos (from contacts) gray scale.
+   * keep staff nirmal." Undefined reads as one of ours. */
+  external?: boolean;
   /** Alt text for `image`. Empty is correct when the title repeats the name. */
   imageAlt?: string;
   /** An icon or any node in the well instead of initials. */
@@ -382,7 +389,7 @@ const List = React.forwardRef<HTMLDivElement, ListProps>(
                   the drawing; `variant="quiet"` is the hairline fill the
                   well names, and `shape="pill"` its radius. */}
               {hasMark ? (
-                <Avatar size="md" variant="quiet" className="flex-none">
+                <Avatar size="md" variant="quiet" external={row.external} className="flex-none">
                   {row.image ? (
                     <AvatarImage src={row.image} alt={row.imageAlt ?? ""} />
                   ) : null}

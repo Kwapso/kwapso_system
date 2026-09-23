@@ -557,10 +557,87 @@ function archiveClause(view: "live" | "archived"): string {
  * must never be hidden by a predicate about a company it was never raised
  * against. */
 export function accountArchivedClause(table = "help"): string {
-  const col = (name: string) => `${table}.${name}`
-  return `(${col("account_id")} IS NULL OR EXISTS (
-    SELECT 1 FROM accounts arc WHERE arc.id = ${col("account_id")} AND arc.archived_at IS NULL
+  return archivedParentClause({ parent: "accounts", table, column: "account_id" })
+}
+
+/** ── THE GENERAL LAW, AND WHY THE CLAUSE ABOVE IS NOW ONE LINE ──────────────
+ *
+ * Aurora, 23 Sep 2026, validating the account round and widening it in the same
+ * breath, verbatim: **"validated - this for everything when archived, not only
+ * accounts"**. So "archived means invisible" is not a fact about a company. It
+ * is a fact about ARCHIVING, and it reaches the rows that hang off whatever was
+ * archived, whichever record type that is.
+ *
+ * WHICH RECORD TYPES CAN BE ARCHIVED IS READ, NOT GUESSED. Exactly two tables in
+ * the team schema carry the archive quartet (`archived_at` + `archiver_id` /
+ * `archiver_email` / `archiver_name`): `help` (a ticket somebody put away,
+ * migration 0011's own `ALTER TABLE help ADD COLUMN archived_at`) and `accounts`
+ * (migration 0117). The thirty-two tables carrying `deactivated_at` are NOT in
+ * this set and must never be folded into it — that column is Aurora's INACTIVE,
+ * her own distinction the same week: "inactive have their own tab … i can still
+ * see them and acces everything underneath, archived however are completley
+ * invisible." `retired_at` (a ref alias), `removed_at` (a process step),
+ * `gone_at` (a sighting), `discarded_at` (a runaway timer) and `cancelled_at` (a
+ * to-do) were each read at their own migration before being left out: none of
+ * them is an archive wearing another word.
+ *
+ * `ARCHIVABLE` is DATA so the day a third record type gains the quartet it is one
+ * line here plus its own edges, never a second mechanism — and so the check
+ * (R112) can read the set rather than a hand-kept list.
+ *
+ * `parentArchivedClause` IS THE ACCOUNT CLAUSE'S OWN BODY, PARAMETERISED, and
+ * everything the account version's header argues holds for every parent because
+ * it is the SAME SQL: a correlated `EXISTS` with its OWN alias (never a bare
+ * `archived_at`, never a join of its own — see `archiveClause`'s header for the
+ * live "ambiguous column name: archived_at" this shape exists to make
+ * impossible), and the `IS NULL` short-circuit FIRST, because a row whose
+ * pointer is null has no parent's archived state to inherit. That short-circuit
+ * is load-bearing twice over now: four out of five stories in the real base have
+ * no ticket (`stories.ticket_id` is nullable on purpose, migration 0014's own
+ * header), exactly as most tickets have no account.
+ *
+ * THE ALIAS IS PER-PARENT (`arc` for accounts, `arh` for help) and scoped to its
+ * own subquery, so two of these clauses can ride the same WHERE — which
+ * `storyWhere` and `todoWhere` both now do — without either colliding with the
+ * other or with whatever the caller's own FROM/JOIN aliases those tables as. */
+export const ARCHIVABLE: Record<string, { alias: string }> = {
+  accounts: { alias: "arc" },
+  help: { alias: "arh" },
+}
+
+export function archivedParentClause(opts: {
+  /** the ARCHIVABLE table the pointer points at */
+  parent: string
+  /** the table (or alias) holding the pointer */
+  table: string
+  /** the column on it */
+  column: string
+}): string {
+  const entry = ARCHIVABLE[opts.parent]
+  // A parent that is not archivable has no archived state to ask about, and a
+  // clause that quietly became `1 = 1` would be a fence that silently opened.
+  if (!entry) throw new Error(`archivedParentClause: ${opts.parent} is not archivable`)
+  const col = `${opts.table}.${opts.column}`
+  return `(${col} IS NULL OR EXISTS (
+    SELECT 1 FROM ${opts.parent} ${entry.alias} WHERE ${entry.alias}.id = ${col} AND ${entry.alias}.archived_at IS NULL
   ))`
+}
+
+/** THE TICKET'S OWN ARCHIVED STATE, asked of a row that hangs off one — the
+ * account clause above, one record type along, under Aurora's widening.
+ *
+ * A story answers a ticket (`stories.ticket_id`), and a to-do can be raised off
+ * one (`todos.ticket_id`). Until this round both kept showing after somebody put
+ * the ticket away: the ticket left the tickets list, the triage queue, the
+ * assistant's corpus and the record map, and its own work carried on being
+ * listed, counted and quoted — which is the identical leak the account round
+ * closed, one level down.
+ *
+ * `ticket_id IS NULL` SHORT-CIRCUITS FIRST, and here it is the COMMON case
+ * rather than the rare one: a story with no ticket is the agency's own enabler
+ * work, and hiding it would empty most of the board. */
+export function ticketArchivedClause(table: string, column = "ticket_id"): string {
+  return archivedParentClause({ parent: "help", table, column })
 }
 
 /** WHAT THE SEARCH BOX ON THE TICKETS SCREEN ASKS THE SERVER. It rides the list

@@ -220,6 +220,28 @@ export type SelectableValue = {
    * pair is never `undefined`. */
   createdAt: string | null
   createdByName: string | null
+  /** THEIR user id, so the "Added by" cell can draw THEIR FACE rather than
+   * their initials — Aurora, 23 Sep 2026, verbatim: "on choices adde by show
+   * avatar, not initials. make this a rule, but not only for this case but
+   * always: where there's avatar show it- only initials when avatar is
+   * empty."
+   *
+   * NOTHING NEW IS READ FOR THIS. `selectable_data.creator_id` was already on
+   * the door's own `Row` and already in its `COLUMNS` list, put there with a
+   * comment saying exactly what this field is for ("the id is what a future
+   * face would resolve through (R35)") — `toValue` simply dropped it on the
+   * floor. So the face was one line away from the screen for as long as the
+   * column has existed, which is why the cell drew initials for people who
+   * have a photograph on file: not a missing fact, an unforwarded one.
+   *
+   * `createdByName` STAYS AND IS STILL THE WORDS. It is a SNAPSHOT of the
+   * name at the time — a person since renamed still reads correctly — and
+   * this id is only ever the key a picture is looked up by, against the one
+   * members cache every picker in the app already holds. Null on a seeded row
+   * (most of a team's vocabulary) and on a row old enough to predate the
+   * column, which is the ordinary case and the one the mark falls through to
+   * an initial for. */
+  createdById: string | null
 }
 
 /** A role's permission matrix as the tenancy worker returns it: the module rows
@@ -2738,6 +2760,61 @@ export type TeamPulse = {
  *
  * NOTHING HERE IS MONEY. What an hour costs us is derived in the one file R24
  * fences and never travels on this object. */
+/** THE LOGS DASHBOARD — the first tab of the Logs module (Aurora's ruling, 23
+ * Sep 2026: "tabs: dahsbaord, entries", the dashboard always first).
+ *
+ * Every field is a grouping of a column `work_logs` already carries, over the
+ * SAME `LogFilter` the Entries tab beside it sends, so the two tabs are one
+ * question asked at two resolutions. The door is
+ * `GET /api/content/work-logs/dashboard`; `logsDashboard`
+ * (workers/content/src/lib/work-logs.ts) has the reasoning for each read. */
+export type LogsDashboard = {
+  /** whole seconds in the week that is running now — the last of `weeks`. */
+  thisWeekSeconds: number
+  /** and in the week before it, so the figure above can say which way it moved. */
+  lastWeekSeconds: number
+  /** whole seconds logged today, UTC — the same clock every week window is cut on. */
+  todaySeconds: number
+  /** and by how many different people. */
+  todayPeople: number
+  /** HOW MANY PEOPLE LOGGED NOTHING LAST WEEK, over the people this door can
+   * see — `activePeople` below is the denominator and is returned beside it on
+   * purpose. The team's roster lives in the global core database behind the
+   * tenancy worker; this door holds work logs, so it answers about the people
+   * who have logged time in the last eight weeks and the screen says so. */
+  quietLastWeek: number
+  /** how many different people logged any time in the last eight weeks. */
+  activePeople: number
+  /** how many distinct records were worked on, over the whole filter. */
+  recordsTouched: number
+  /** WHERE THE HOURS WENT — by the RELATED RECORD TYPE (`target_table`: one of
+   * `WORK_LOG_TARGETS`' four), biggest first. Her ruling: "kind of work is what
+   * its related to". Never the free-text `kind` column. */
+  targets: { targetTable: string; seconds: number }[]
+  /** the last eight weeks, oldest first — `pulseWeekStarts`' own windows, the
+   * same eight Home draws. */
+  weeks: { weekStart: string; seconds: number }[]
+  /** WHO LOGGED IT, biggest first, top `WORK_LOG_GROUP_CAP`. `weekSeconds` is
+   * that person's own share of each of the eight weeks above, in the same order,
+   * so hovering a point on the line can name who was behind it. */
+  people: { userId: string; userName: string | null; seconds: number; weekSeconds: number[] }[]
+  /** WHOSE WORK IT WAS — by client, biggest first, top `WORK_LOG_GROUP_CAP`. A
+   * null `accountId` is OUR OWN WORK, which belongs to no client: a real row,
+   * never a dropped one. `accountName` is null when the account row has since
+   * been deactivated or archived — the hours still count. */
+  accounts: { accountId: string | null; accountName: string | null; seconds: number }[]
+  /** WHAT ATE THE MOST — the records with the most hours against them, biggest
+   * first, top `WORK_LOG_GROUP_CAP`, each with the reference and title every
+   * other list of time already renders. */
+  records: {
+    targetTable: string
+    targetId: string
+    targetRef: string | null
+    targetLabel: string | null
+    seconds: number
+  }[]
+}
+
 export type WorkLogSummary = {
   /** how many entries — a badge number, bounded like every other count. */
   total: number

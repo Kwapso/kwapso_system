@@ -126,6 +126,13 @@ export interface CommentItem {
   initials?: string;
   /** A photograph for the mark. `Avatar` falls back to the initials silently. */
   avatarSrc?: string;
+  /** IS THIS PERSON FROM OUTSIDE? Forwarded straight to `Avatar`'s own
+   * `external` (see `components/avatar/avatar.tsx` for the ruling, the reason
+   * the fact is taken rather than guessed, and why the default is colour):
+   * an outside person's PHOTOGRAPH renders greyscale, one of our own in full
+   * colour. Aurora, 23 Sep 2026: "external photos (from contacts) gray scale.
+   * keep staff nirmal." Undefined reads as one of ours. */
+  external?: boolean;
   /**
    * When. A node rather than a `Date`: formatting a date is a locale decision
    * and this component must not make one. The kit's specimen reads `12:04`.
@@ -578,6 +585,7 @@ function Comment({
         size="sm"
         shape="pill"
         variant={item.highlight === true ? "brand" : "default"}
+        external={item.external}
         aria-hidden="true"
       >
         {item.avatarSrc !== undefined ? <AvatarImage src={item.avatarSrc} alt="" /> : null}

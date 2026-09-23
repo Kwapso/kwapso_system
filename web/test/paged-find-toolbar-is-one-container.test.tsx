@@ -80,7 +80,14 @@ afterEach(cleanup)
  * expected value) is deliberate: the point here is that the track did not
  * move, and the aria state has its own test elsewhere. */
 const trackShape = (el: HTMLElement) =>
-  el.outerHTML.replace(/ aria-expanded="(?:true|false)"/g, "")
+  el.outerHTML
+    .replace(/ aria-expanded="(?:true|false)"/g, "")
+    // The control's own `data-open`, for the same reason: a state
+    // announcement, not a move. And `aria-hidden`, which a modal overlay puts
+    // over everything behind it (2026-09-23) — again a state, not a layout.
+    .replace(/ data-open="true"/g, "")
+    .replace(/ aria-hidden="true"/g, "")
+    .replace(/ data-aria-hidden="true"/g, "")
 
 
 const fetchPage = async (_query: FindQuery, _cursor: string | null) => ({
@@ -116,10 +123,11 @@ function renderFind() {
   )
 }
 
-const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
+const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/, hidden: true }))
+const overlay = () => document.querySelector('[data-slot="filter-overlay"]') as HTMLElement | null
 
 describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () => {
-  it("the track never moves, the panel paints no surface, and one container switches radius", async () => {
+  it("the track never moves, and the facets never land in the container at all", async () => {
     renderFind()
 
     const column = document.querySelector('[data-slot="toolbar-row-column"]')
@@ -129,7 +137,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
     expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
 
     // i · CLOSED: one container, and nothing painted on it (L43, 21 Sep 2026).
-    expect(document.querySelector('[data-slot="filter-bar-row"]'), "nothing is open yet").toBeNull()
+    expect(overlay(), "nothing is open yet").toBeNull()
     expect(column!.className, "the container paints no fill of its own any more").not.toContain(
       "bg-surface-raised"
     )
@@ -142,54 +150,40 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
       "the track paints no fill or shape of its own either"
     ).not.toMatch(/rounded-pill|bg-background|bg-surface-raised|bg-\[var\(--surface-raised\)\]/)
     const closedTrack = trackShape(track)
+    const closedColumn = trackShape(column as HTMLElement)
 
     openPanel()
     const panel = await screen.findByRole("group", { name: "Type" })
-    const panelRow = panel.closest('[data-slot="filter-bar-row"]') as HTMLElement
-    expect(panelRow, "the panel opens").toBeTruthy()
+    const surface = panel.closest('[data-slot="filter-overlay"]') as HTMLElement
+    expect(surface, "the overlay opens").toBeTruthy()
 
     // ii · THE TRACK ITSELF DID NOT MOVE.
     expect(
       trackShape(track),
-      "opening the panel must not change the track's own markup"
+      "opening the overlay must not change the track's own markup"
     ).toBe(closedTrack)
-    expect(track.contains(panelRow), "the panel must never be inside the track").toBe(false)
 
-    // iii · THE PANEL IS IN FLOW, UNDER THE TRACK, AND PAINTS NOTHING OF ITS OWN.
+    // iii · AND NEITHER DID THE CONTAINER. The facets are not in the track,
+    // not in the column, not anywhere in the toolbar: they float (Aurora,
+    // 2026-09-23, "filter drop sheet popover", over her own "a temporary
+    // overlay not a second row"). This is the strongest form her 2026-09-03
+    // "one single background or container" ruling can take — there is not a
+    // second box, because there is not a second thing in the container.
+    expect(track.contains(surface), "the overlay is never inside the track").toBe(false)
+    expect(column!.contains(surface), "the overlay is never inside the container either").toBe(false)
     expect(
-      panelRow.className,
-      "an in-flow panel positions nothing — no overlay"
-    ).not.toMatch(/(?:^|\s)(?:absolute|fixed|sticky|top-full|inset-x-0|z-\d+)(?:\s|$)/)
-    expect(column!.contains(panelRow), "the panel lives in the merged container").toBe(true)
+      trackShape(column as HTMLElement),
+      "the container's own markup is untouched by opening it"
+    ).toBe(closedColumn)
     expect(
-      track.compareDocumentPosition(panelRow) & Node.DOCUMENT_POSITION_FOLLOWING,
-      "…and beneath it, never before it"
-    ).toBeTruthy()
-    expect(
-      panelRow.className,
-      "the open panel must not paint its own background — one surface, not two"
-    ).not.toMatch(/bg-background|bg-\[var\(--surface-raised\)\]/)
-    expect(
-      panelRow.className,
-      "the open panel must not round its own corners — the merged container does"
-    ).not.toMatch(/rounded-\[var\(--radius\)\]/)
+      surface.getAttribute("data-form"),
+      "and it took one of the three forms the ruling names"
+    ).toMatch(/^(popover|sheet|bottom-sheet)$/)
 
-    // iv · OPEN: it is the SAME container, and it still paints nothing. The
-    // ruling's own words are "one single background or container" — with no
-    // background left, "one container" is the whole of it, and this is the
-    // assertion that keeps a second box from coming back when the panel opens.
-    expect(column!.contains(panelRow), "still one container, holding both").toBe(true)
-    expect(column!.className, "still no fill when a panel is open").not.toContain("bg-surface-raised")
-    expect(column!.className, "still no radius either").not.toMatch(
-      /(?:^|\s)rounded-pill(?:\s|$)|rounded-\[var\(--radius\)\]/
-    )
-
-    // v · AND IT CLOSES BACK TO EXACTLY THE SAME MARKUP.
-    openPanel()
-    await waitFor(() =>
-      expect(document.querySelector('[data-slot="filter-bar-row"]')).toBeNull()
-    )
+    // iv · AND IT CLOSES BACK TO EXACTLY THE SAME MARKUP.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    await waitFor(() => expect(overlay()).toBeNull())
     expect(trackShape(track)).toBe(closedTrack)
-    expect(column!.className).not.toContain("bg-surface-raised")
+    expect(trackShape(column as HTMLElement)).toBe(closedColumn)
   })
 })

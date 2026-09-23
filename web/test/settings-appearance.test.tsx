@@ -37,6 +37,7 @@ import { join } from "node:path"
 import type * as React from "react"
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { stripComments } from "@shared/rules/source-scan"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@shared/ui/components/sonner/sonner", () => ({
@@ -62,11 +63,13 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+let lastContainer: HTMLElement | null = null
+
 function renderPanel(overrides: Partial<React.ComponentProps<typeof AppearancePanel>> = {}) {
   const saveLanguage = vi.fn().mockResolvedValue(undefined)
   const saveScale = vi.fn().mockResolvedValue(undefined)
   const saveSpine = vi.fn().mockResolvedValue(undefined)
-  render(
+  const view = render(
     <LanguageProvider value="en">
       <AppearancePanel
         saveLanguage={saveLanguage}
@@ -78,7 +81,15 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof AppearancePa
       />
     </LanguageProvider>
   )
+  lastContainer = view.container
   return { saveLanguage, saveScale, saveSpine }
+}
+
+/** The panel's own root, as a person's browser receives it. */
+function panelRoot(): HTMLElement {
+  const root = lastContainer?.firstElementChild
+  if (!(root instanceof HTMLElement)) throw new Error("the panel rendered no root element")
+  return root
 }
 
 // ── 1. MANGO CANNOT RETURN AS A BACKGROUND OPTION ───────────────────────────
@@ -304,5 +315,129 @@ describe("Settings · Appearance is a row layout — name and a short line on th
     expect(screen.getByText("Text and controls, throughout the app.")).toBeTruthy()
     expect(screen.getByText("Follow the system, or choose light or dark.")).toBeTruthy()
     expect(screen.getByText("The ground the whole window stands on.")).toBeTruthy()
+  })
+})
+
+// ── 5. AND IT IS NOT A CARD — AURORA, 23 SEP 2026 ───────────────────────────
+//
+//   "settings appearacne shoudl not have card - thats not minimal."
+//
+// The box was `SettingsSection`'s own `rounded-[var(--radius)]
+// bg-surface-panel p-4 lg:p-[var(--space-7)]` (`shared/web/settings-
+// section.tsx`), and `AppearancePanel` is its only call site. It survived the
+// same day's module-wide minimal sweep because that sweep's census
+// (`web/test/settings-minimal.test.ts`) reads `web/components/screens/**` and
+// `web/components/team/**`, and the last box in the settings module was one
+// folder away in `shared/web/`. Those files are in that census now; this
+// block is the same claim asked of the RENDERED panel, which is the half a
+// source census cannot make.
+//
+// FOUR THINGS ARE A CARD AND ALL FOUR MUST BE GONE: the paper fill, the
+// radius, the inset, and — because a law minted the same day in the kit
+// (`foundations/rules/boxes.mjs`, "by rule no borders nowhere in the kit")
+// forbids a four-edge stroke around a container in either spelling — anything
+// that draws the edge back as an outline or an inset shadow instead. A screen
+// that swapped its fill for a hairline would have obeyed the letter of her
+// sentence and undone it.
+//
+// WHAT SEPARATES THE ROWS INSTEAD is the kit `<Separator>`, one BETWEEN
+// adjacent rows and never above the first or below the last — R107's own
+// shipped shape (`web/components/work/effort-card.tsx`'s work-log list). It
+// replaces a `divide-y`, which is a literal CSS border between children and
+// is the exact thing R67's surviving half ("separation is a fill or an inset
+// shadow, never a stroke") and `settings-minimal`'s third census forbid.
+
+describe("Settings · Appearance does not stand in a card (Aurora, 23 Sep 2026)", () => {
+  // COMMENTS STRIPPED FIRST, and this is not hygiene — it is the difference
+  // between reading the code and reading the prose about the code. This
+  // file's own header narrates the box it used to draw, quotes the exact
+  // class list that came off, and writes the words "the `<section>`
+  // landmark" several times. A regex over the raw text matches the FIRST of
+  // those and proves nothing: caught on this test's own proof-of-red run,
+  // where the real box was restored and this case stayed green because it
+  // was reading a sentence. `stripComments` keeps length, so the tag's own
+  // text is unchanged — the same seam `settings-minimal.test.ts` and R67's
+  // census already read their subjects through.
+  const SECTION_SRC = stripComments(read("shared/web/settings-section.tsx"), { keepLength: true })
+
+  /** The opening tag of the one `<section>` `SettingsSection` returns. */
+  function sectionOpeningTag(): string {
+    const match = SECTION_SRC.match(/<section\b[^>]*>/)
+    expect(match, "SettingsSection must still return a <section> landmark").toBeTruthy()
+    return match![0]
+  }
+
+  it("source: the section declares no paper fill, no radius and no inset", () => {
+    const tag = sectionOpeningTag()
+    expect(tag, "no paper fill").not.toMatch(/\bbg-(surface-panel|card)\b/)
+    expect(tag, "no box radius").not.toMatch(/\brounded-/)
+    expect(tag, "no card inset").not.toMatch(/(^|[\s"'`])(lg:)?p-/)
+  })
+
+  it("source: the edge is not drawn back as a stroke, an outline or an inset shadow", () => {
+    const tag = sectionOpeningTag()
+    expect(tag, "no CSS border (R67's surviving half, BUILD-A-SCREEN §6.1)").not.toMatch(/\bborder(-|\b)/)
+    expect(tag, "no outline").not.toMatch(/\boutline-/)
+    // The kit's container-box law (`foundations/rules/boxes.mjs`, 23 Sep
+    // 2026): a four-edge stroke is a box in either spelling — the named
+    // `--hairline*` tokens, and `inset 0 0 0 …` written out. A ONE-EDGE
+    // shape (`--hairline-under` and friends) is a separator, not a box, and
+    // is deliberately not matched, exactly as that law does not match it.
+    expect(tag, "no four-edge inset shadow").not.toMatch(
+      /shadow-\[(var\(--hairline(-strong|-error|-ink)?\)|inset_0_0_0)/
+    )
+  })
+
+  it("painted: the panel's own root paints no card — no fill class, no radius, no inset, no stroke", () => {
+    renderPanel()
+    const root = panelRoot()
+    expect(root.tagName, "still the <section> landmark").toBe("SECTION")
+    expect(root.getAttribute("aria-label"), "still named for assistive tech").toBe("Appearance")
+    const cls = root.className
+    expect(cls, "no paper fill").not.toMatch(/\bbg-(surface-panel|card)\b/)
+    expect(cls, "no box radius").not.toMatch(/\brounded-/)
+    expect(cls, "no card inset").not.toMatch(/(^|\s)(lg:)?p-/)
+    expect(cls, "no CSS border").not.toMatch(/\bborder(-|\b)/)
+    expect(cls, "no four-edge inset shadow").not.toMatch(
+      /shadow-\[(var\(--hairline(-strong|-error|-ink)?\)|inset_0_0_0)/
+    )
+  })
+
+  it("painted: no CONTAINER inside the panel re-draws the box one level in", () => {
+    renderPanel()
+    // THE SUBJECT IS THE FURNITURE, NOT EVERY DESCENDANT, and the line is
+    // drawn where `PAPER_ON_PURPOSE` already draws it. A `bg-surface-panel`
+    // deep inside a pill is a BADGE's own quiet fill — the kit's
+    // `--badge-quiet-fill`, a chip standing for itself, one of the five
+    // things a grouping section is not — and failing it here would be this
+    // test enforcing a sentence nobody said. What the ruling is about is the
+    // box AROUND the rows: the section (asserted above), the column it
+    // holds, and the four rows themselves. If any of those paints paper, the
+    // card is back under a different tag.
+    const root = panelRoot()
+    const column = root.querySelector<HTMLElement>(":scope > div")
+    expect(column, "the rows still stand in one column").toBeTruthy()
+    const furniture = [column!, ...Array.from(column!.children)] as HTMLElement[]
+    const boxed = furniture.filter((el) => /\bbg-(surface-panel|card)\b/.test(el.className.toString()))
+    expect(
+      boxed.map((el) => el.className.toString().slice(0, 100)),
+      "taking the box off the section means nothing if the column or a row paints it back"
+    ).toEqual([])
+  })
+
+  it("painted: the rows are separated by the kit Separator, never a divide-y stroke", () => {
+    renderPanel()
+    const root = panelRoot()
+    const column = root.querySelector<HTMLElement>(":scope > div")
+    expect(column, "the rows still stand in one column").toBeTruthy()
+    expect(column!.className, "a divide-y is a literal border between children").not.toMatch(/\bdivide-[xy]\b/)
+
+    const kids = Array.from(column!.children)
+    const separators = kids.filter((el) => el.getAttribute("data-slot") === "separator")
+    const rows = kids.filter((el) => el.getAttribute("data-slot") !== "separator")
+    expect(rows, "the four rows: Language, Size, Appearance, Background").toHaveLength(4)
+    expect(separators, "one rule BETWEEN adjacent rows — three, not four").toHaveLength(3)
+    expect(kids[0].getAttribute("data-slot"), "never a rule above the first row").not.toBe("separator")
+    expect(kids[kids.length - 1].getAttribute("data-slot"), "never a rule below the last row").not.toBe("separator")
   })
 })

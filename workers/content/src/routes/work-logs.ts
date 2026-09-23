@@ -26,6 +26,7 @@ import {
   editWorkLog,
   getWorkLog,
   listWorkLogs,
+  logsDashboard,
   logTime,
   requireTarget,
   resolveRunaway,
@@ -66,6 +67,12 @@ function logFilterFrom(url: URL): LogFilter {
     // A CLOSED WINDOW ON WHEN — three words the door knows, anything else means
     // all time. Never a free-form pair of dates: see lib/work-logs's own note.
     period: period === "7d" || period === "30d" || period === "90d" ? period : undefined,
+    // WHOSE WORK IT WAS — the Logs toolbar's second filter (Aurora, 23 Sep
+    // 2026: "add toolbar w filters by person, account"). Parsed HERE, in the one
+    // place this door reads a filter, so the list, its totals and the dashboard
+    // are all asked the same question (R16) and the machine surface has one
+    // thing to mirror (R19).
+    accountId: queryText(url.searchParams.get("accountId"), "Account"),
   }
 }
 
@@ -143,6 +150,26 @@ export async function getWorkLogSummary(request: Request, env: Env): Promise<Res
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   return json(await summariseWorkLogs(cfg, guard, logFilterFrom(url), new Date()))
+}
+
+/** GET /api/content/work-logs/dashboard — THE PICTURE OVER THE SAME ROWS.
+ *
+ * Aurora's ruling, 23 Sep 2026: the Logs module gains two tabs, Dashboard first,
+ * and the toolbar above it filters by person and by account. Same gate, same
+ * portal refusal and the SAME `logFilterFrom` as the list and the summary beside
+ * it — which is the whole reason it lives in this file rather than getting a
+ * parser of its own: a dashboard narrowed by a different sentence from the
+ * Entries tab under the same toolbar would be two answers to one question (R16).
+ *
+ * `json`, not `pagedJson`: it answers one object and no rows, the same shape the
+ * summary door beside it takes. Every read behind it is bounded and says its
+ * ceiling at the query (`logsDashboard`, lib/work-logs.ts).
+ */
+export async function getLogsDashboard(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  return json(await logsDashboard(cfg, guard, logFilterFrom(url), new Date()))
 }
 
 /** GET /api/content/work-logs/running — what the caller has running RIGHT NOW.

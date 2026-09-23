@@ -39,9 +39,9 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L43)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K62)
+- [4. Collections](#4-collections) (K1 to K63)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B49)
-- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
+- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F19)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S8)
 - [9. Mobile](#9-mobile) (M1 to M6)
@@ -5490,6 +5490,64 @@ a box, a height or a width to whatever a screen is showing.
 checked only by the test named above.
 
 ---
+### K63: the filters open as an overlay, never as a second row, and the overlay picks its own form
+
+**The rulings, two of them, a Chapter apart.** Aurora, 2 Sep 2026, verbatim: the filters
+must open as *"a temporary overlay not a second row"*. Aurora, 23 Sep 2026, choosing among
+five drawn designs: *"filter drop sheet popover"*. The first says where the facets may not
+land; the second says what they look like when they land properly. Neither works without
+the other.
+
+**The mechanism.** One component decides, and it decides from the CONTENT.
+`filterOverlayForm(span, hasRoom)` (`shared/ui/components/filter-bar/filter-bar.tsx`) is a
+pure function of what the declared facets cost, never a prop, never a breakpoint, never a
+screen's own opinion, so a facet added to a collection tomorrow moves the form on its own,
+which is what her *"the sheet is simply a popover that ran out of room"* describes. It
+counts HEIGHT rather than heads (`FACET_SPAN`: a field costs 1, a range costs 2, because a
+range draws a min and a max side by side with a line kept under them for its error state),
+spends that against `FILTER_POPOVER_BUDGET` (3, her own "two or three facets" against "four
+or more"), and answers `popover` at or under the budget, `sheet` above it, and
+`bottom-sheet` on a phone whatever the content costs. The drop sheet's ANCHOR is the
+toolbar's own track, marked once by a shared toolbar with `data-filter-anchor`
+(`FILTER_ANCHOR_ATTR`) rather than a ref threaded through every screen that has filters:
+that attribute is the difference between a sheet the width of the toolbar and a sheet the
+width of the Filter pill.
+
+**What it costs.** Nothing at a call site: a screen hands `useFilterBar` its facets and
+puts the ONE node it returns in the toolbar's `filters` slot. What it forbids is the
+position. There is no second slot to put anything in, `useFilterBar` no longer returns a
+`{ pill, panel }` pair a caller could place separately, and `ToolbarRow`/`ToolbarColumn`
+carry no `toolbarPanel` prop (the vendored kit's `CollectionFrame` still declares one, so
+the rule is about the APP: nothing here hands anything to that position). A toolbar that
+draws its own track owes one thing, the anchor attribute on the same element as
+`data-slot="toolbar-row-track"`, and the census is derived rather than listed, so
+`wave-finder.tsx`'s registered hand-copy is held to it too.
+
+**Status: ruled 2 Sep 2026, form chosen 23 Sep 2026, enforced the same day.** The four ways
+this shipped green before are one shape, the facets landing somewhere in the toolbar's own
+box: a panel nested in the pill track (a giant oval), a panel absolutely positioned but
+still inside the toolbar's column, a panel in normal flow under the track pushing the
+collection down, and two same-toned boxes with a seam between them read as a second
+toolbar. So the check is STRUCTURAL rather than visual.
+
+**Law.** [R110](../RULES.md) (`filters-open-as-an-overlay`),
+`web/test/filters-open-as-an-overlay.test.tsx`. The decision is proved twice, directly as
+the function (`FILTER_POPOVER_BUDGET` is 3; a field plus a field plus a range is 4 and
+therefore a sheet; a phone gets neither form) and then as a RENDER, that the component
+really asks it (`data-form` on the open dialog). The no-second-row half is asserted at all
+three widths: the toolbar's in-flow markup is byte for byte unchanged when the overlay
+opens, its column still has exactly one child, the rows below are not displaced, and the
+overlay is a descendant of the column, of the pinned box and of the screen's own container:
+none of the three. Plus the overlay's own behaviour (Escape closes it, a press on the
+ground closes it, focus is trapped and returns to the Filter control), its two foot
+controls (Clear all only once something is on; Show N says the live count and closes the
+overlay, because the filters are already applied), the phone's kit bottom sheet with its
+side marker, grabber and heading, and four censuses over `web/`, `web-portal/` and
+`shared/web/`, including that `FilterOverlay` is reached through the KIT with the app-side
+twin `shared/web/screen-engine/filter-overlay.tsx` asserted NOT to exist (R39).
+
+---
+
 
 ## 5. Buttons and actions
 
@@ -8481,6 +8539,61 @@ clamp, they shorten it themselves.
 **Law.** R87's own amendment (`title-length`), no new rule number.
 
 ---
+### F19: a photograph always beats initials; initials are the fallback, never the default
+
+**The ruling.** Aurora, verbatim, 23 Sep 2026, over the Choices table's own "Added by"
+cell, and generalised by her in the same sentence before anybody could scope it to that
+screen: *"on choices adde by show avatar, not initials. make this a rule, but not only for
+this case but always: where there's avatar show it- only initials when avatar is empty."*
+
+**The mechanism.** Wherever this app draws a PERSON, that mark is handed the person's
+photograph, and the initials tile renders only where there is genuinely no photograph on
+file. THE COMPONENT WAS NEVER THE DEFECT: `RecordMark` (`shared/web/record-mark.tsx`) has
+drawn a picture when given one and fallen back to an initial when not since the day it was
+written, so a check that read the component would have been green on the morning she filed
+this. The defect is upstream of it every time, and all six found the day this law shipped
+were the same shape, a fact the call site already held, or could reach in one lookup, and
+simply did not forward: the Choices Added-by cell (the door had been selecting
+`selectable_data.creator_id` since the Added columns landed, and `toValue` dropped it); the
+Kanban card's assignee (`membersById` was already in scope, built for the Assignee facet);
+the app stakeholders checklist AND its Main stakeholder picker (both callers flattened
+`AccountLink.personLogoUrl` away in their own `.map`); the task sheet's assignee chip
+(drawing a letter tile while the Effort card three hundred lines down the same file drew
+each logger's real face off the same members cache); and the Stakeholders tab's "Theirs"
+column, which hardcoded `photo: null` while "Ours" beside it resolved a real picture one
+line above.
+
+**What it costs.** A `picture={…}` at the call site, which is almost always one lookup away
+from something already in scope. Where it genuinely is not, the cost is a line in
+`PHOTO_UNREACHABLE` saying why, keyed by `{file, contains}`, a fragment of the call site's
+own text and never a line number. That table is NOT expected to be empty, unlike most in
+this repo, and that is deliberate: a person with no photograph on file is the ordinary
+case, and some marks stand for somebody who is not a record yet at all (a pending invite's
+only identity is the email it was sent to). What the table buys is the DIFFERENCE being
+written down: "this person has no picture", which is fine and is exactly the fallback she
+asked for, against "this screen never went and got the picture", which was the defect, six
+times over.
+
+**What it cannot see.** A call site that passes `picture={…}` with a value that is
+hardcoded `null`. The Stakeholders tab's "Theirs" column was exactly that, and it was found
+by reading, not by the check: a census over VALUES rather than prop names would have to
+resolve an expression, which is a type-checker's job. This law catches the missing ASK; a
+reader still has to catch a dishonest answer.
+
+**Status: ruled and enforced, 23 Sep 2026.**
+
+**Law.** [R111](../RULES.md) (`photo-beats-initials`), `web/test/photo-beats-initials.test.ts`,
+a CALL-SITE census over every `.tsx` under `web/components`, read through the repo's one
+comment stripper (four of the files walked quote `<RecordMark shape="round" />` in their own
+prose, and a census that counted those would report findings that are not code): every
+`<RecordMark shape="round">` and every `<PersonCard>` that carries no `picture=` is a
+finding, unless the call site is named in `PHOTO_UNREACHABLE` with its reason, rot-checked
+both ways so the list can only shrink. A tripwire renders a synthetic sample through the
+same parser and asserts it FINDS the offender, so the census cannot pass by matching
+nothing.
+
+---
+
 
 ## 7. Typography
 
@@ -10153,6 +10266,162 @@ library, not a synthesised weight in the host.
 
 ## Rulings awaiting implementation
 
+**The Logs module (2026-09-23):** five rulings, verbatim: *"tabs: dahsbaord, entries."* ·
+*"word is logs only"* · *"kind of work is what its related to"* · *"implement everything you
+suggested for dashboard - exclude running now. add toolbar w filters by person, account."* ·
+and, later the same day, *"on logs this kind of work shoudl not be manual, but automatic to
+where it was created: if it was creted in a story its stories, in a ticket its a ticke, in a
+meeting its a meeting, etc"*. **Status: built.**
+
+1. **Two tabs, Dashboard first and default.** Exactly two, and nothing else becomes one. The
+   same place Tickets' and Accounts' own Dashboard tabs hold on their strips; a Logs URL with
+   no `tab` lands on Dashboard, and pressing back onto it drops `tab` from the address.
+   Entries is the timesheet that was the whole screen until today, its rows unchanged.
+
+2. **One word: Logs.** One concept had been wearing FOUR: "Logs" on the rail, "Work logs" on
+   the Home tile and a meeting's own tab, "Time log" on a story, a ticket and a task, and
+   "Work log" in the glossary. It is **Logs** everywhere now and a single entry is a **Log**;
+   the glossary term, the glossary knowledge seed and the translation seeds moved with it.
+   **This REVERSES ticket B0386 of 22 Sep 2026** ("Inside stories and tickets, let's rename
+   'effort' to 'time log'"), which was itself an approved rename. Her ruling is the newer one
+   and its date is recorded beside it in `shared/glossary.ts` so nobody reverts it next week on
+   the strength of the older note. **One string still owed:** the meeting detail's own tab
+   (`web/components/meetings/meeting-detail.tsx`), owned by another lane;
+   `web/test/logs-dashboard.test.tsx` pins that it is the ONLY one left.
+
+3. **"Kind of work" is the related record type, and nobody types it.** It now means what the
+   time was logged AGAINST: Story, Ticket, Task or Meeting (`work_logs.target_table`, NOT NULL
+   on every row). The free-text `kind` text box is gone from the log form and the correction
+   sheet, the badge on an Entries row draws the related type instead, and the record panel's
+   old "Hours by kind of work" card is deleted (on one record that split can only have a single
+   bar). **The column and its stored data survive**: the meetings door still stamps its own
+   constant, the `meetingTime` filter still reads it, and a correction that sends no kind falls
+   back to the stored value, so a row that already carries a typed word keeps it and simply
+   stops being shown it.
+
+4. **The dashboard, six sections and no "running now".** Four figures across the top (hours
+   this week with the change on last week, hours today with how many people, how many people
+   logged nothing last week, and how many records were worked on), a donut by related record
+   type, a line of the last eight weeks whose hover names who logged them, a bar per person
+   with their face, a bar per client **plus a row for our own work**, and the records with the
+   most hours against them. She excluded "running now" by name: the header bar already carries
+   every running timer on every screen. **`work_logs.account_id` had never been displayed
+   anywhere in the app** - written on every row since migration 0015, inherited from the
+   target, indexed, and read back by nothing until this tab.
+
+5. **The denominator is printed, not implied.** "How many people logged nothing last week"
+   cannot be answered against a roster this door cannot see (members live in the global core
+   database behind the tenancy worker), so it is answered over the people it CAN see - everyone
+   with time in the last eight weeks - and the figure prints "of N who logged in the last eight
+   weeks" beside itself, every time.
+
+6. **The toolbar: two filters, person and account, narrowing every section.** Declared through
+   the shared facet table (`web/lib/collection-filters.ts`) and drawn through the shared filter
+   seam; the filters ride the dashboard's own cache key, so two narrowings can never share one
+   answer. Both tabs offer the same two. The Dashboard row draws no search box and no sort, and
+   both are named, reasoned lines in `TOOLBAR_EXEMPT` / `TOOLBAR_SORT_EXEMPT` rather than
+   silent omissions: there is nothing on a tab of grouped pictures for a browser to sieve, and
+   each picture already carries its own order.
+
+
+**The Accounts dashboard, her second pass (2026-09-23):** four rulings over the tab she had
+ordered that same morning, verbatim: *"on accounts oevrview, fix how the kpis cards look, and
+add the median tenure"* · *"make the where as a donut graphic (when hover show)"* · *"make the
+how long weve had this account a line graphic, and when hover show who (like tickets
+tendency)"* · *"on accounts dashbard, the mandatory space between tabs and content is
+missing"*. **Status: built.**
+
+1. **The figures.** They were a wrapping baseline row (a `text-3xl` figure beside a grey word,
+   `gap-8`), which reads as one run-on sentence rather than a set of figures. They are the
+   kit's own stat register now, borrowed from `stat-grid.tsx` without its box: a `text-micro`
+   uppercase eyebrow over a `text-4xl` figure, on a real `sm:grid-cols-3` so three figures line
+   up. **Still not cards and still not `<StatGrid>`** - R97 is explicit that a count never gets
+   one, and the kit's own primitive is a number-and-label card by construction. The third
+   figure is the new median tenure.
+
+2. **Median tenure.** A TRUE median, taken by the database over the active company book
+   (`readAccountsDashboard`, `workers/tenancy/src/lib/accounts.ts`): an even count answers the
+   mean of the two middles, one account answers its own tenure, and no accounts answers `null`
+   rather than 0. Handed over in DAYS, the only unit the database measures exactly; the screen
+   spells it in MONTHS, because the picture under it has one point per calendar month and a
+   figure should share its neighbour's ruler. Proved in `workers/tenancy/test/
+   accounts-dashboard.test.ts` (odd, even, one, none, and the fence).
+
+3. **Where they are, as a donut.** The ring is the KIT's own `Donut`. **The legend is not, and
+   that is a kit gap rather than a preference**: `donut.tsx`'s own state table says "hover -
+   none drawn", it exposes no per-segment callback, and the ring is rendered inside the
+   component, so her "(when hover show)" cannot be answered through the kit's legend today. So
+   the rows are drawn app-side as real `<button>`s under the kit's `HoverCard`, the same hover
+   language `tickets-dashboard.tsx` already uses. At rest every country is named with its own
+   colour; the COUNT and the share are what hover reveals. The legend's colour sequence is
+   pinned to the kit donut's own, read off both files, so a key can never drift from its ring.
+   **Open upstream:** give `Donut` an optional per-segment hover, then this legend collapses
+   back into `legend`/`showPercent`.
+
+4. **How long we have had them, as a line.** The arrivals bars became a line plus a filled
+   area, drawn in `ClosureTrend`'s exact language (unit-square `viewBox` under
+   `preserveAspectRatio="none"`, months as rules behind the mark, one HTML hit area per month
+   over the plot, each a real button so the hover card opens on focus too, the readout carried
+   as the button's accessible name). Her "show who" is the account NAMES behind each month,
+   which the door now hands back bounded (`ACCOUNTS_ARRIVAL_NAMES_PER_MONTH`, eight) with the
+   exact count beside them, so a busier month says how many more it could not name. A single
+   month is still a dot rather than nothing.
+
+5. **The gap is R83, and it was missing app-wide.** Since 21 Sep the strip pays nothing and the
+   content pays the whole `--toolbar-lead-gap`, but the only payer written was
+   `[data-slot="card"]` - so every collection tab collected it and every DASHBOARD tab, being
+   bare panels, collected zero. Fixed at the law in `web/app/globals.css`, never in the screen
+   (R83's own census forbids the caller a `gap-*`, and a margin in the component would be the
+   per-screen hard-code the 2026-09-03 ruling refuses). See RULES.md R83's own amendment for
+   why the STRIP pays it in the non-card case and why `--pinned-chrome-h` moves with it.
+   **Corrected the same day, and the correction is worth reading:** the first landing wrote both
+   exclusions into one condition, `:has(+ *:not([data-slot="card"]):not(:has(> …)))`, which the
+   grammar forbids - `:has()` may not contain `:has()` - so every browser discarded the rule and
+   the lead stayed 0px everywhere, including the dashboard it was written for. Nothing complained:
+   the stylesheet loaded, lightningcss parsed and emitted it, and the check that shipped with it
+   was a string search over the text of `globals.css`, so it passed against a fix that did
+   nothing. It is two possible selectors now, a paying rule and a cancelling one, and
+   `web/test/tab-content-gap.test.ts` asks a real selector engine what each rule MATCHES over the
+   four real bodies a tab can have (bare column, bare `<section>`, card sibling, wrapper around a
+   card) rather than only that it is written.
+
+6. **Industry joins the row, beside "Where they are"** (her later ruling the same day:
+   *"add metric industry (side of where they are , so in the same row country & industry)"*).
+   The two splits are one `SplitDonut` drawn twice, in a `lg:grid-cols-2` row that stacks into
+   one column below `lg` - the same arrangement every panel row on `tickets-dashboard.tsx`
+   already keeps, rather than a stacking rule invented for this screen. The door gained
+   `byIndustry`, read through the identical fence and the identical "a word nobody set is not a
+   row" clause as `byCountry`. The section title is **"What they do"**, a question because its
+   neighbour is one; the FIELD is still called Industry everywhere a person sets one.
+
+7. **Industry stops being free text** (*"make it a drop down, adjustable on settings"*).
+   **Status: built.** It was already half a dropdown, which is why it drifted: the form has
+   picked from an "Industry" group since it was built, `VOCABULARY_HOMES` has named
+   `accounts.industry` as its home, and Settings > Accounts > "Industries and countries" has
+   edited it - but the WRITE DOOR took free text, and the group was never seeded from the
+   column. Three parts landed together, and the order matters:
+   - **The seed first.** Team migration **0120** back-fills the `Industry` and `Country` groups
+     from the distinct non-blank words already stored on `accounts`. Measured against the
+     22 Sep 2026 account backup, ten of the eleven live industries and two of the six live
+     countries were outside the team's own seeded vocabulary, so closing the door first would
+     have made those accounts uneditable.
+   - **Then the door.** `requirePickedAccountValues` (`workers/tenancy/src/lib/accounts.ts`)
+     refuses a word that is not a currently active option, on create and on edit, through the
+     shared `requireActiveSelectableValue` (moved to `shared/workers/vocabulary.ts` so tenancy
+     can reach it; the content worker re-exports it and no call site there changed). An edit
+     that re-sends the word the row ALREADY holds is never re-checked - retiring a word must
+     stop it being set, not make an existing record uneditable.
+   - **Country gets the identical fix**, because it is the same field twice and its door had
+     been open longer.
+   **Nothing is merged.** Every distinct stored spelling becomes its own option, near-duplicates
+   included: "Insurance" / "Insurance Broker", "Events" / "Event & Sport", "Austria" /
+   "Osterreich". A migration runs once, per team, with nobody watching, and these may be real
+   distinctions. Merging two of them is an ordinary rename on the Choices screen, which rewrites
+   the stored words through `storedWordColumns` - Aurora's call, and safe to make whenever she
+   wants. Checked by `workers/tenancy/test/accounts-picked-vocabulary.test.ts` (the seed and the
+   door, called for real) and `web/test/account-fields-are-picked.test.ts` (the wiring).
+
+
 **Assistant conversations (2026-09-15):** A "+" tab is always visible in the assistant's tab
 strip and remains visible even when the assistant is closed. A new conversation opens on a
 scope picker first. A pinned clock tab sits ahead of "+", never closable, and opens the
@@ -10428,16 +10697,16 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**268 rules.**
+**270 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L43 (43) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K62 (62) |
+| 4. Collections | K1 to K63 (63) |
 | 5. Buttons and actions | B1 to B49 (49) |
-| 6. Forms and dialogs | F1 to F18 (18) |
+| 6. Forms and dialogs | F1 to F19 (19) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S8 (8) |
 | 9. Mobile | M1 to M6 (6) |
@@ -10491,6 +10760,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R104 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R105 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 | R106 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R107 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 | R108 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R109 | [S8](#s8-every-screen-carries-the-apps-content-inset-and-none-gets-its-own-number) |
+| R110 | [K63](#k63-the-filters-open-as-an-overlay-never-as-a-second-row-and-the-overlay-picks-its-own-form) | R111 | [F19](#f19-a-photograph-always-beats-initials-initials-are-the-fallback-never-the-default) |
 
 ### The seven files that carry most of it
 

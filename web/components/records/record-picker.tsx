@@ -211,6 +211,16 @@ export type PickerOption = {
   mark?: string | null
   /** a person in their own right is a circle; a client, an app, a thing is not */
   shape?: "square" | "round"
+  /** IS THIS PERSON FROM OUTSIDE — a client contact rather than one of ours?
+   * Aurora, 23 Sep 2026: *"external photos (from contacts) gray scale. keep
+   * staff nirmal."* Their PHOTOGRAPH draws greyscale; a staff photograph draws
+   * in colour. Handed to `RecordMark`'s own `external` at all three places
+   * this picker draws a mark — the open list, the closed trigger and the
+   * chosen value chip — so a contact does not turn colour the moment the list
+   * shuts. Undefined reads as one of ours (see `RecordMark`'s own `external`
+   * for why the safe default is colour); a `square` option (an account, an
+   * app) never sets it. */
+  external?: boolean
   /** THE THIRD KIND OF MARK — a colour this option is known by, drawn as a dot
    * before the label. A CSS colour VALUE that must resolve through a token
    * (`var(--chart-3)`, `var(--ink-tertiary)`); R32 has no opinion about a
@@ -627,6 +637,7 @@ export function RecordPicker({
           name={o.label}
           shape={o.shape}
           size="choice"
+          external={o.external}
           className="mt-0.5"
         />
       ) : o.icon ? (
@@ -897,6 +908,7 @@ export function RecordPicker({
         name={chosenOption.label}
         shape={chosenOption.shape}
         size="choice"
+        external={chosenOption.external}
         className="shrink-0"
       />
     ) : chosenOption.icon ? (
@@ -1129,6 +1141,7 @@ function RowChip({
           name={option.label}
           shape={option.shape}
           size="choice"
+          external={option.external}
         />
       ) : option.icon ? (
         // THE FOURTH KIND OF MARK — see `PickerOption.icon`'s own header and

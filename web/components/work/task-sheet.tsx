@@ -123,6 +123,7 @@ import { clampRecordHeading } from "@shared/web/record-heading"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 import { formatDate } from "@shared/web/format"
 import { invalidate, mergePage, primeCache, removeFromPage, useCached } from "@shared/web/store"
+import { memberFace } from "@/components/tickets/tickets-collection"
 import { nameInitials } from "@/lib/identity"
 import { PersonCard } from "@shared/web/person-card"
 import { RichText } from "@shared/web/rich-text-view"
@@ -465,6 +466,18 @@ export function TaskSheet({
                     <PersonCard
                       orientation="horizontal"
                       size="choice"
+                      /* THEIR PHOTOGRAPH, NOT THEIR INITIALS — Aurora, 23 Sep
+                         2026: "where there's avatar show it- only initials
+                         when avatar is empty." This chip drew a letter tile
+                         for every assignee, photograph or not, while the
+                         EFFORT CARD three hundred lines down this same file
+                         drew each logger's real face off `membersQ` — two
+                         answers to one question on one screen. Same cache,
+                         same `memberFace` seam, matched by `assigneeId`
+                         rather than by the name (two colleagues can share
+                         one). An unassigned task and an assignee who has
+                         since left both fall back to the initials, unchanged. */
+                      picture={memberFace(membersQ.data, task.assigneeId)}
                       mark={nameInitials(assigneeName ?? "")}
                       markName={assigneeName ?? undefined}
                       title={

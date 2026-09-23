@@ -1379,6 +1379,50 @@ again, which is the only property that matters here.
   the pane's padded edge (or a blunt `w-screen`/`100vw`) needs a reasoned,
   rot-checked line in `CONTENT_INSET_EXEMPT`. The census is
   `web/test/content-inset.test.ts`.
+- **R110 `filters-open-as-an-overlay`**, if your module's collection has
+  filters, hand `useFilterBar` your facets and put the ONE node it returns in
+  the toolbar's `filters` slot. You do not choose the form: `filterOverlayForm`
+  (`shared/ui/components/filter-bar/filter-bar.tsx`) decides popover, drop
+  sheet or bottom sheet from what the facets cost (`FACET_SPAN` counts height,
+  a field 1 and a range 2, against `FILTER_POPOVER_BUDGET`, 3), so adding a
+  facet moves the form on its own. Never put the facets in normal flow: there
+  is no `toolbarPanel` prop to hand them to, the hook returns no `panel` to
+  destructure, and if you draw your own toolbar track its element carries
+  `data-filter-anchor` beside `data-slot="toolbar-row-track"` or the drop sheet
+  cannot be the toolbar's width. Reach `FilterOverlay` through the kit, never
+  an app-side copy (R39). The check is
+  `web/test/filters-open-as-an-overlay.test.tsx`.
+- **R111 `photo-beats-initials`**, wherever your module draws a PERSON — a
+  `<RecordMark shape="round">`, a `<PersonCard>`, a picker option — pass
+  `picture={…}`. `RecordMark` already falls back to initials when there is no
+  photograph, so initials are its answer for a person with none, never yours
+  for a call site that did not go and get one; the face is almost always one
+  lookup away from something already in scope (a members cache, an
+  `AccountLink.personLogoUrl`, a `creator_id` the door already selects). The
+  census is `web/test/photo-beats-initials.test.ts`, over every `.tsx` under
+  `web/components`; where the photograph genuinely cannot be reached from where
+  the call site stands, say so in that check's own `PHOTO_UNREACHABLE`, keyed
+  by `{file, contains}`, never a line number. Note what it cannot see: a
+  `picture={…}` whose value is hardcoded `null` passes, so a reader still has
+  to catch a dishonest answer.
+- **R112 `archived-hides-its-children`**, if your module's table can be
+  ARCHIVED, or hangs off a table that can. Two tables carry the archive quartet
+  today, `help` and `accounts`, and `ARCHIVABLE`
+  (`workers/content/src/lib/help.ts`) is that list as data — add yours there
+  rather than inventing a second mechanism. Every list door that reads a row
+  hanging off an archivable record ANDs in
+  `archivedParentClause({ parent, table, column })`, and so does the count
+  beside it (R16), or the badge counts rows the list refuses to show. Build the
+  clause through that helper, never a bare `archived_at`: two archivable tables
+  in one statement both carry the column and SQLite refuses the ambiguous
+  reference at runtime. Your knowledge reader, if you have one, SELECTs the
+  parent's archived state under its own alias and hands it to `retired`, then
+  bumps its `textVersion` — filtering archived rows out of the sweep instead
+  looks correct and strands the embedded copy for ever. Leave the door that is
+  allowed to see it (an Archive view, an Archived tab, a record's own map)
+  alone, and never refuse staff. `deactivated_at` is NOT this; it is the
+  reachable INACTIVE state and hides nobody's children. The check is
+  `workers/content/test/archived-hides-its-children.test.ts`.
 
 **The words** (the ones that catch every new module, every time)
 

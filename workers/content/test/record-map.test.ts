@@ -26,7 +26,13 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import worker from "../src/index"
-import { edgesFor, NEIGHBOURS_PER_EDGE, RECORD_EDGES, RETIRABLE } from "../src/lib/record-map"
+import {
+  ARCHIVED_PARENT_HIDES,
+  edgesFor,
+  NEIGHBOURS_PER_EDGE,
+  RECORD_EDGES,
+  RETIRABLE,
+} from "../src/lib/record-map"
 import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
 
 const db = () => holder.db as DatabaseSync
@@ -446,11 +452,22 @@ describe("an archived account is not a neighbour, on any edge that reaches one",
     )
   })
 
-  it("a ticket no longer draws its archived company as a neighbour", async () => {
-    const before = await map("help", "T_MAP")
+  // ── WHY NOT ONE OF THESE STANDS ON THE TICKET ANY MORE ────────────────────
+  //
+  // Every case here was written standing on T_MAP, which was the right place
+  // for it on the day: the ticket edge is the one that motivated the clause.
+  // The block at the bottom of this file then took the ruling to its far end,
+  // and a ticket whose client is archived now has NO MAP AT ALL — so each of
+  // these would have gone on passing against an empty picture, proving the
+  // account node absent for a reason that has nothing to do with this clause.
+  // A green assertion measuring nothing is worse than a red one. They stand on
+  // the APP and the MEETING instead: live records of an archived company,
+  // where the company is still the far end of an edge and must still be gone.
+  it("a record no longer draws its archived company as a neighbour", async () => {
+    const before = await map("apps", "APP_MAP")
     expect((before.body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(true)
     db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
-    const after = await map("help", "T_MAP")
+    const after = await map("apps", "APP_MAP")
     const nodes = after.body.nodes as { table: string; id: string }[]
     expect(nodes.some((n) => n.table === "accounts"), "the archived account must be gone").toBe(false)
     const links = after.body.links as { to: string }[]
@@ -463,18 +480,22 @@ describe("an archived account is not a neighbour, on any edge that reaches one",
 
   it("…and the count agrees with the picture (R16)", async () => {
     db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
-    const { body } = await map("help", "T_MAP")
+    const { body } = await map("apps", "APP_MAP")
     const nodes = body.nodes as { id: string }[]
     expect(body.total).toBe(nodes.length - 1)
   })
 
-  it("also proved on an edge that is not the ticket one", async () => {
-    // apps.account_id -> accounts ("is built for") — a second edge, to show
-    // the fix is the shared clause and not a special case for help.
-    const before = await map("apps", "APP_MAP")
+  it("also proved on an edge that is neither the ticket's nor the app's", async () => {
+    // meetings.account_id -> accounts ("was with") — a third edge, to show the
+    // fix is the shared clause and not a special case for any one table.
+    db().exec(
+      `INSERT INTO meetings (id, account_id, title, starts_at, created_at)
+         VALUES ('M_MAP', 'A_MAP', 'Quarterly review', '2026-03-01T09:00:00Z', '2026-02-20')`
+    )
+    const before = await map("meetings", "M_MAP")
     expect((before.body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(true)
     db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
-    const after = await map("apps", "APP_MAP")
+    const after = await map("meetings", "M_MAP")
     expect((after.body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(false)
   })
 
@@ -488,14 +509,14 @@ describe("an archived account is not a neighbour, on any edge that reaches one",
     // still null. Proved together, so neither clause can be mistaken for
     // covering the other.
     db().exec(`UPDATE accounts SET deactivated_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
-    const deactivatedOnly = await map("help", "T_MAP")
+    const deactivatedOnly = await map("apps", "APP_MAP")
     expect(
       (deactivatedOnly.body.nodes as { table: string }[]).some((n) => n.table === "accounts"),
       "deactivated (inactive) alone already hid it before this fix — unrelated, pre-existing"
     ).toBe(false)
 
     db().exec(`UPDATE accounts SET deactivated_at = NULL, archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
-    const archivedOnly = await map("help", "T_MAP")
+    const archivedOnly = await map("apps", "APP_MAP")
     expect(
       (archivedOnly.body.nodes as { table: string }[]).some((n) => n.table === "accounts"),
       "archived alone, with deactivated_at back to null, must ALSO hide it — this fix's own clause, tested in isolation"
@@ -503,20 +524,207 @@ describe("an archived account is not a neighbour, on any edge that reaches one",
   })
 
   it("standing ON the archived account still draws its own neighbours — the focus is exempt", async () => {
+    // THE FOCUS DRAWS ITSELF, which is the rule this file already wrote for a
+    // retired row: an archived company is reached deliberately, through the
+    // accounts screen's own Archived view, and the map of a record somebody
+    // just opened cannot be empty of that record.
+    //
+    // ITS APP IS THE NEIGHBOUR THIS CASE NAMES, not its ticket. This assertion
+    // read `table === "help"` when it was written, and that is the one thing
+    // here the ruling contradicts — the block below takes the ticket edge away
+    // and says why the app's edge stays.
     db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
     const { status, body } = await map("accounts", "A_MAP")
     expect(status).toBe(200)
     expect((body.focus as { label: string }).label).toBe("Mapland GmbH")
-    expect((body.nodes as { table: string }[]).some((n) => n.table === "help")).toBe(true)
+    expect((body.nodes as { table: string }[]).some((n) => n.table === "apps")).toBe(true)
   })
 
   it("un-archiving hands the account back as a neighbour — reversible, no second mechanism", async () => {
     db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
     expect(
-      (await map("help", "T_MAP")).body.nodes as { table: string }[]
+      (await map("apps", "APP_MAP")).body.nodes as { table: string }[]
     ).not.toContainEqual(expect.objectContaining({ table: "accounts" }))
     db().exec(`UPDATE accounts SET archived_at = NULL WHERE id = 'A_MAP'`)
-    const { body } = await map("help", "T_MAP")
+    const { body } = await map("apps", "APP_MAP")
     expect((body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(true)
+  })
+})
+
+describe("an archived account's TICKETS are not neighbours either — the far end of the ruling", () => {
+  // HOLE THREE, AND THE OTHER HALF OF HOLE TWO. The clause above hides an
+  // archived COMPANY wherever it is the far end of an edge. It says nothing
+  // about that company's TICKETS, and Aurora's ruling is about those in as
+  // many words: "yes, archived accounts should hide their tickets too."
+  //
+  // The ticket screens obey it (`accountArchivedClause`, lib/help.ts, riding
+  // `ticketWhere` and the triage queue's own hand-built WHERE). The map did
+  // not, from THREE standing points — every one of them a place where `help`
+  // is the FAR end of an edge:
+  //
+  //   • the APP            (help.app_id      -> apps,    read backwards)
+  //   • a STORY on it      (stories.ticket_id -> help,   read forwards)
+  //   • the ACCOUNT itself (help.account_id  -> accounts, read backwards)
+  //
+  // The first two are the leak proper: a live app and a live story handing
+  // back an archived client's ticket TITLE to a reader who can no longer open
+  // that ticket on its own page. The third is a disagreement with a screen
+  // rather than a leak — the account's own Tickets tab counts zero through the
+  // fixed `ticketWhere`, so a map on the same record drawing them said two
+  // different things about one company.
+  //
+  // THE CONTROL IS THE TICKET NOBODY RAISED AGAINST A CLIENT, seeded here
+  // exactly as `help-archived-account-collision.test.ts` seeds its own: a
+  // predicate about a company must never take away a ticket that names no
+  // company. Without it every "is gone" assertion below would pass just as
+  // happily against a blanket "the map draws no tickets", and prove nothing.
+  const ORPHAN = "T_ORPHAN"
+  const archive = () =>
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO help (id, account_id, app_id, description, status, created_at)
+        VALUES ('${ORPHAN}', NULL, 'APP_MAP', 'Our own billing export died', 'new', '2026-02-02');
+      INSERT INTO stories (id, ticket_id, title, created_at)
+        VALUES ('S_MAP', 'T_MAP', 'Keep the session alive', '2026-02-10');
+    `)
+  })
+
+  const helpNodes = (body: Record<string, unknown>) =>
+    (body.nodes as { table: string; id: string }[])
+      .filter((n) => n.table === "help")
+      .map((n) => n.id)
+      .sort()
+
+  it("names exactly the tables this reaches, and which archived parent hides each", () => {
+    // WIDENED 23 Sep 2026 (R112) from a set of one to three tables, because
+    // Aurora widened the ruling: "validated - this for everything when
+    // archived, not only accounts." A story and a to-do each hang off TWO
+    // archivable parents (their client, and the ticket they answer), which is
+    // why this is a map and no longer a set.
+    //
+    // THE NINE OTHER `account_id` TABLES ARE STILL ABSENT and that is still
+    // deliberate: apps, meetings, tasks, sprints, waves, portal_users,
+    // account_links and knowledge_sources hide nothing whose client is
+    // archived on their OWN list doors, and a map that hid a meeting the
+    // meetings list shows would be the map inventing a ruling. Adding one here
+    // is one line of data on the day its door moves, and this assertion is
+    // what keeps that a deliberate act.
+    expect(
+      Object.fromEntries(
+        Object.entries(ARCHIVED_PARENT_HIDES).map(([t, ps]) => [t, ps.map((p) => p.parent).sort()])
+      )
+    ).toEqual({
+      help: ["accounts"],
+      stories: ["accounts", "help"],
+      todos: ["accounts", "help"],
+    })
+  })
+
+  it("every pointer it names really exists on its table — rot-checked against the schema", () => {
+    // Each clause is `o.<column>`, written blind from a table name. A table
+    // named here without that column is a statement SQLite refuses at runtime,
+    // on a door nobody opens every day. Read off the real database the
+    // migrations built, the same way RETIRABLE is.
+    for (const [table, parents] of Object.entries(ARCHIVED_PARENT_HIDES)) {
+      const cols = (
+        db().prepare(`SELECT name FROM pragma_table_info('${table}')`).all() as { name: string }[]
+      ).map((c) => c.name)
+      for (const p of parents) {
+        expect(cols, `${table} must carry ${p.column}`).toContain(p.column)
+        // …and the parent it points at must really be archivable, or the
+        // subquery asks a column that is not there.
+        const parentCols = (
+          db().prepare(`SELECT name FROM pragma_table_info('${p.parent}')`).all() as {
+            name: string
+          }[]
+        ).map((c) => c.name)
+        expect(parentCols, `${p.parent} must carry archived_at`).toContain("archived_at")
+      }
+    }
+  })
+
+  it("standing on the APP does not hand back the archived client's ticket", async () => {
+    const before = await map("apps", "APP_MAP")
+    expect(helpNodes(before.body), "both tickets, while the client is live").toEqual(
+      [ORPHAN, "T_MAP"].sort()
+    )
+
+    archive()
+    const { body } = await map("apps", "APP_MAP")
+    expect(helpNodes(body), "the archived client's ticket is gone, the orphan stays").toEqual([
+      ORPHAN,
+    ])
+    // …and the app's other neighbour is untouched, so this is a filter on one
+    // edge rather than the picture falling over.
+    expect((body.nodes as { table: string }[]).some((n) => n.table === "processes")).toBe(true)
+  })
+
+  it("…and the count agrees with the picture (R16)", async () => {
+    archive()
+    const { body } = await map("apps", "APP_MAP")
+    // The account edge is gone too (the clause above), so every node left is a
+    // neighbour this reader may have — focus excluded, which is what `total`
+    // has always meant here.
+    expect(body.total).toBe((body.nodes as unknown[]).length - 1)
+  })
+
+  it("standing on a STORY does not hand back the archived client's ticket", async () => {
+    archive()
+    const { status, body } = await map("stories", "S_MAP")
+    expect(status).toBe(200)
+    expect((body.focus as { id: string }).id, "the story itself still draws").toBe("S_MAP")
+    expect(helpNodes(body), "the ticket it answers belongs to an archived client").toEqual([])
+    expect(body.total).toBe(0)
+  })
+
+  it("standing ON the archived account draws the company, and none of its tickets", async () => {
+    // THE FOCUS STAYS EXEMPT and the company still draws itself — see the case
+    // above. Refusing the whole map would be wrong about the record too: the
+    // company still HAS an app, and the apps screen still lists it.
+    //
+    // What goes is the ticket edge, because the account's own Tickets tab
+    // counts zero through the fixed `ticketWhere`. Two pictures of one company
+    // disagreeing about whether it has tickets is the bug.
+    archive()
+    const { status, body } = await map("accounts", "A_MAP")
+    expect(status).toBe(200)
+    expect((body.focus as { label: string }).label).toBe("Mapland GmbH")
+    expect((body.nodes as { table: string }[]).some((n) => n.table === "apps")).toBe(true)
+    expect(helpNodes(body)).toEqual([])
+  })
+
+  it("and the map REFUSES a ticket of an archived client as its focus", async () => {
+    // THE FOCUS EXEMPTION DOES NOT REACH THIS ONE, and the distinction is the
+    // reason it is written down: the exemption rests on the record still being
+    // openable on its own page. A ticket whose client is archived is not —
+    // `GET /api/content/help?id=` refuses it (`hideArchivedAccount`), so the
+    // map would be the one door left handing back its title.
+    //
+    // The answer is the shape this door already gives for a row that is not
+    // there, which is right twice over: it does not disclose that the ticket
+    // exists.
+    archive()
+    const { status, body } = await map("help", "T_MAP")
+    expect(status).toBe(200)
+    expect(body.focus).toBe(null)
+    expect(body.nodes).toEqual([])
+    expect(body.total).toBe(0)
+
+    const orphan = await map("help", ORPHAN)
+    expect(
+      (orphan.body.focus as { id: string }).id,
+      "a ticket raised against no company keeps its own map"
+    ).toBe(ORPHAN)
+  })
+
+  it("un-archiving hands every one of them back — reversible, no second mechanism", async () => {
+    archive()
+    expect(helpNodes((await map("apps", "APP_MAP")).body)).toEqual([ORPHAN])
+    db().exec(`UPDATE accounts SET archived_at = NULL WHERE id = 'A_MAP'`)
+    expect(helpNodes((await map("apps", "APP_MAP")).body)).toEqual([ORPHAN, "T_MAP"].sort())
+    expect(helpNodes((await map("stories", "S_MAP")).body)).toEqual(["T_MAP"])
+    expect(((await map("help", "T_MAP")).body.focus as { id: string }).id).toBe("T_MAP")
   })
 })

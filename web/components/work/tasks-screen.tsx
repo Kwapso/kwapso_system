@@ -951,7 +951,7 @@ export function TasksScreen({
   // CALLED UNCONDITIONALLY, ABOVE EVERY EARLY RETURN — same discipline
   // `apps-screen.tsx`/`collection-frame.tsx` keep for their own `useFilterBar`
   // calls: a hook cannot skip renders the way a component can.
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values: facetValues,
     data: rawRows,
@@ -1101,7 +1101,21 @@ export function TasksScreen({
       // read (`PRIORITY_DOT_TONE`, `shared/departments.ts`), so all three faces
       // of one task's priority agree.
       dotTone: PRIORITY_DOT_TONE[r.priority],
-      detail: [priorityWord(t, r.priority), staffNameFromSnapshot(r.assigneeName)] // R54
+      // THE DEPARTMENT RIDES THIS LINE TOO, 23 Sep 2026 — Aurora, verbatim:
+      // "tasks agenda view - show department". The WEEK board is where that
+      // landed (`weekDetail`, above, drawn by `EntryCard` now); this is the
+      // SAME task read as a day, in the month view's own "+N more" day list
+      // and its hover card — the only two readers of `CalendarEntry.detail`
+      // on the grid — and a department named on one date view and missing
+      // from the other is precisely the drift the board/week/list chips were
+      // already unified to avoid. LAST of the three, after the two facts this
+      // line already carried (a priority word, R54's first-name-only
+      // assignee), because those answer "how bad and whose" and the
+      // department answers "whose side of the house" — and `weekDetail`'s own
+      // string is reused rather than re-derived, so the two lines can never
+      // disagree about how a department is spelled or marked. A task with no
+      // department contributes nothing and the line is exactly what it was.
+      detail: [priorityWord(t, r.priority), staffNameFromSnapshot(r.assigneeName), weekDetail(r)] // R54
         .filter(Boolean)
         .join(" · "),
     }))
@@ -1128,6 +1142,14 @@ export function TasksScreen({
       title: r.title,
       dotTone: PRIORITY_DOT_TONE[r.priority],
       detail: weekDetail(r),
+      // WHOSE IT IS — Aurora, 23 Sep 2026, week-view variation One ("Open
+      // column"): the week card carries the app and the account as chips
+      // above its title, drawn by `EntryCard` through R94's own ordering
+      // seam. Handed over as NAMES, never ids: the card draws a chip, not a
+      // link (see that component's own note on why it is not an anchor), and
+      // a row with neither name simply draws one chip fewer.
+      appName: r.appName ?? undefined,
+      accountName: r.accountName ?? undefined,
     }))
 
   // THE VIEW SLOT — R53's config, built by the toolbar itself. Completed
@@ -1226,7 +1248,6 @@ export function TasksScreen({
         )
       }
       filters={(tasksLoading || !trueEmpty) && filterPill}
-      toolbarPanel={(tasksLoading || !trueEmpty) && filterPanel}
       // R53's SORT DEFAULT — "add sort by task priority and deadline. That's
       // it." Picking the OTHER field lands on that field's own default
       // direction (`taskSortOptions`' `defaultDir`), not whatever direction

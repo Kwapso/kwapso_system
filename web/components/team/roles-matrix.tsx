@@ -263,8 +263,9 @@
 // the ruling beside `sortDir` above) and "Deactivated" was an `actions`
 // button carrying a facet's own job — narrowing WHICH ROLES' STATUS this
 // panel is showing — in the one slot `ToolbarRow` never treats as a facet.
-// It is `useFilterBar`'s own `statusPill`/`statusPanel` now (`roleStatusFacets`,
-// above), sitting in `filters`/`toolbarPanel` exactly where R53 puts them.
+// It is `useFilterBar`'s own `statusPill` now (`roleStatusFacets`, above),
+// sitting in the `filters` slot exactly where R53 puts it, with the facets it
+// opens floating above the rows rather than under the toolbar.
 // Nothing below THIS list changed: the disclosure is still the same `<List>`
 // of `inactiveRoles`, each row still carries its own one-step reactivate,
 // and it is still gated on nothing but `deactivatedOpen` — only WHAT SETS
@@ -562,7 +563,7 @@ export function RolesMatrix({
       ],
     },
   ]
-  const { pill: statusPill, panel: statusPanel } = useFilterBar({
+  const statusPill = useFilterBar({
     facets: roleStatusFacets,
     values: statusFilter,
     // No facet here declares its own `options`-free derivation, so `data` is
@@ -975,7 +976,6 @@ export function RolesMatrix({
         // sitting inside `search` for the identical reason — a slot a call
         // site can put the wrong thing in is not a rule.
         filters={statusPill}
-        toolbarPanel={statusPanel}
         // A→Z / Z→A ON MODULE NAME — client, 17 Sep 2026: "in the toolbar, I
         // want to be able to sort by Module Name." One field, `SortControl`'s
         // own direction button doing the A↔Z half (`ToolbarRow` never passes

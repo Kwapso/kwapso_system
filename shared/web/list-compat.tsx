@@ -21,6 +21,23 @@ export interface ListItem {
    * circular box inside the kit's. Ignored when `leading` is set. */
   image?: string | null
   imageAlt?: string
+  /** IS THE PERSON IN THAT PHOTOGRAPH FROM OUTSIDE — a client contact rather
+   * than one of ours? Aurora, 23 Sep 2026: *"external photos (from contacts)
+   * gray scale. keep staff nirmal."* Handed straight to the kit's own
+   * `ListRow.external` (kit v1.2.166), which forwards it to the `Avatar`
+   * wrapping this row's mark, so the photograph desaturates and the initials
+   * fallback does not.
+   *
+   * NO CALLER PASSES IT TODAY, AND THAT IS WORTH SAYING RATHER THAN LEAVING
+   * AS AN ODD SILENCE. Both `image` call sites in this app are a TEAM's logo
+   * (`settings-screen.tsx`'s team list, `invitations.tsx`) — a thing, not a
+   * person, so neither is ours or theirs. The field exists because this file
+   * is the ONE translation between the app's list contract and the kit's, and
+   * a seam that silently drops a fact is how the next person-shaped list
+   * quietly ships untreated: the gap would be invisible at the call site,
+   * which is exactly the failure `people-faces.tsx` and `record-mark.tsx`
+   * both have headers about. Undefined reads as one of ours. */
+  external?: boolean
   /** The fallback shown until `image` loads, or when there is none. */
   initials?: React.ReactNode
   title?: React.ReactNode
@@ -97,6 +114,7 @@ export function List({
         mark: leadingMarkFor(i.leading),
         image: i.image ?? undefined,
         imageAlt: i.imageAlt,
+        external: i.external,
         initials: i.initials,
         title: i.title,
         description: i.subtitle,
