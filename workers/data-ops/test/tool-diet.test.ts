@@ -607,7 +607,11 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // `add_app_link`, `update_app_attachment` and `remove_app_attachment`
     // (what an app shows for itself, the Files tab) all shipped with a
     // `detail` from the start, the same shape as their story siblings.
-    const DETAILED_TOOLS = 134
+    // 134 → 135 on 23 Sep 2026: `add_help_attachment` (T3658/B0295's own
+    // gap — an agent could not PUT bytes on a ticket, only link one)
+    // shipped with a `detail` from the start, same shape as its
+    // `add_help_link` sibling.
+    const DETAILED_TOOLS = 135
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

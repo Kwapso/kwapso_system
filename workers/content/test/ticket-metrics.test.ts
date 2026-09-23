@@ -24,7 +24,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
-import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { buildSpineDb, IDS, makeEnv, seedImageAttachment } from "../../tenancy/test/spine-harness"
 
 const db = () => holder.db as DatabaseSync
 
@@ -102,6 +102,7 @@ describe("a ticket's own metrics", () => {
       const resolved = await call(IDS.staffUser, "POST /api/content/help/resolve", {
         id,
         resolution: "Fixed it, and here is what changed.",
+        attachmentIds: [seedImageAttachment(db(), id)],
       })
       expect(resolved.status).toBe(200)
     } finally {
@@ -148,12 +149,20 @@ describe("a ticket's own metrics", () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date("2026-09-19T09:00:00.000Z"))
-      await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "First answer." })
+      await call(IDS.staffUser, "POST /api/content/help/resolve", {
+        id,
+        resolution: "First answer.",
+        attachmentIds: [seedImageAttachment(db(), id)],
+      })
       // Back to triaged — the reopen the door's own `resolveBlock` NULLs
       // `resolved_at` for.
       await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "triaged" })
       vi.setSystemTime(new Date("2026-09-21T09:00:00.000Z"))
-      await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Second, real answer." })
+      await call(IDS.staffUser, "POST /api/content/help/resolve", {
+        id,
+        resolution: "Second, real answer.",
+        attachmentIds: [seedImageAttachment(db(), id)],
+      })
     } finally {
       vi.useRealTimers()
     }

@@ -120,6 +120,9 @@ export const TOOL_GATES: Record<string, string> = {
   // Showing somebody what you mean is the same bar as saying it — a person who
   // can see a ticket can attach to it, exactly as they can reply to it.
   add_help_link: "help:read",
+  // Same door, same gate (`postHelpAttachment`'s own `kind: "image"` branch) —
+  // an agent's own picture is no different from a person's.
+  add_help_attachment: "help:read",
   list_story_attachments: "work:read",
   add_story_link: "work:update",
   update_story_attachment: "work:update",

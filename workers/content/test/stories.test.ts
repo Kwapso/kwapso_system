@@ -19,7 +19,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
-import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { buildSpineDb, IDS, makeEnv, seedImageAttachment } from "../../tenancy/test/spine-harness"
 
 const db = () => holder.db as DatabaseSync
 
@@ -808,6 +808,7 @@ describe("the Ready flip", () => {
     await call(IDS.staffUser, "POST /api/content/help/resolve", {
       id: ticket,
       resolution: "All done, here is what we changed.",
+      attachmentIds: [seedImageAttachment(db(), ticket)],
     })
     await call(IDS.staffUser, "POST /api/content/stories/status", { id: straggler, status: "done" })
     // The client has been told. Un-answering their request because a loose end

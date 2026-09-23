@@ -1009,6 +1009,34 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Take an attachment off ticket ${str(i, "id")}` },
   },
   {
+    // T3658/B0295's own gap, closed: resolve_help_ticket needs an IMAGE
+    // attachment (`content_type` starting `image/`) on the ticket before it
+    // will close it, and until this tool existed nothing on this surface
+    // could PUT one there — add_help_link only ever stores a clickable
+    // address, never bytes. This tool does, so an agent (or a caller with no
+    // browser at all) can satisfy the rule itself.
+    name: "add_help_attachment",
+    summary:
+      "Attach an IMAGE to a ticket, from a `url` this fetches itself OR bytes as a base64 `dataUrl`. Satisfies resolve_help_ticket's own screenshot rule.",
+    detail:
+      "Attach an IMAGE to a ticket: `id` is the ticket, `label` what a person reads. Give EITHER `url` — an http(s) link this door fetches itself, so the ticket keeps its own copy rather than a link that can go stale or point somewhere else later — OR `dataUrl`, a base64 data URL for bytes you already hold. Exactly one is read; if `url` is present it is used and `dataUrl` is ignored. Refused (400) for a non-http(s) url, a fetch that times out or answers with anything but an image, or a file over 10MB. This is the one attachment this surface can PUT bytes with — add_help_link only ever stores a clickable address — and it exists so a ticket resolve_help_ticket refuses for having no screenshot can be given one without a browser.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/attachments",
+    schema: obj({ id: S, label: S, url: S, dataUrl: S }, ["id", "label"]),
+    // `kind` is fixed to "image" — the door's own narrower, screenshot-shaped
+    // path (`postHelpAttachment`), never the general `kind: "file"` any-type
+    // upload the app's own picker uses. `dataUrl` forwards as the door's own
+    // `fileDataUrl` field name; named `dataUrl` here because that is the
+    // shape a caller with no upload widget actually holds.
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      kind: "image",
+      label: str(i, "label"),
+      url: opt(i, "url"),
+      fileDataUrl: opt(i, "dataUrl"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Attach "${str(i, "label")}" to ticket ${str(i, "id")}` },
+  },
+  {
     name: "list_story_attachments",
     summary:
       "The files and links on one story (`id`): each `kind`, `label` and `url`, plus `total`. A story needs at least one before it can go for review.",
@@ -1201,12 +1229,19 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "resolve_help_ticket",
     summary:
-      "ANSWER a ticket and email the client: `resolution` is the words they read. Read the ticket's draft resolution first. A second call sends nothing.",
+      "ANSWER a ticket and email the client: `resolution` the words, `attachmentIds` a required screenshot (add_help_attachment first). A second call sends nothing.",
     detail:
-      "ANSWER a ticket and TELL THE CLIENT: `resolution` is the words they will read. It resolves the ticket, appends those words to its conversation, and EMAILS the people at that client, one of only two things in the whole product that reach a customer's inbox. Read the ticket's draft resolution first (it is built from each story's closing note as the work finished) and send that, edited. An already-resolved ticket answers `{sent:false, alreadyResolved:true}` and emails nobody: a second call is not a second answer.",
+      "ANSWER a ticket and TELL THE CLIENT: `resolution` is the words they will read. It resolves the ticket, appends those words to its conversation, and EMAILS the people at that client, one of only two things in the whole product that reach a customer's inbox. Read the ticket's draft resolution first (it is built from each story's closing note as the work finished) and send that, edited. `attachmentIds` names at least one image already on the ticket (add_help_attachment puts one there, list_help_attachments reads what is already there) — the ticket cannot be closed without a screenshot, so this refuses (400, screenshot_required) unless at least one id in the list is an image on THIS ticket. An already-resolved ticket answers `{sent:false, alreadyResolved:true}` and emails nobody, screenshot or not: a second call is not a second answer.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/resolve",
-    schema: obj({ id: S, resolution: S }, ["id", "resolution"]),
-    buildBody: (i) => ({ id: str(i, "id"), resolution: str(i, "resolution") }),
+    schema: obj({ id: S, resolution: S, attachmentIds: { type: "array" } }, ["id", "resolution"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      resolution: str(i, "resolution"),
+      // R22 — the door now REQUIRES this (T3658/B0295's screenshot rule), so
+      // withholding it here would not narrow the tool, it would break it: no
+      // call through this surface could ever resolve a ticket again.
+      attachmentIds: Array.isArray(i.attachmentIds) ? i.attachmentIds : undefined,
+    }),
     agent: {
       write: true,
       // CONFIRM, and of everything in this catalogue this is the one that most

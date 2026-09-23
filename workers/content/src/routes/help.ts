@@ -732,6 +732,18 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   const resolution = requireText(body.resolution, "Resolution", TEXT_LIMITS.long)
 
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+
+  // R17 IS THE SEND GUARD, AND IT COMES BEFORE THE SCREENSHOT RULE — an
+  // already-resolved ticket is a no-op regardless of what this call's body
+  // carries, the same way it always was before the screenshot requirement
+  // landed. Checking the ticket's own status (read above) rather than
+  // waiting on `setStatus`'s own zero-rows-moved answer lets this short
+  // circuit BEFORE the attachment door query runs at all — a second press
+  // of "resolve" needs no screenshot to be told nothing happened.
+  if (ticket.status === "resolved") return json({ sent: false, alreadyResolved: true })
+
   // R20: Positional validation of attachmentIds
   if (!Array.isArray(body.attachmentIds)) {
     throw new GuardError(400, "screenshot_required", "Attach a screenshot before closing.")
@@ -746,15 +758,15 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
     throw new GuardError(400, "screenshot_required", "Attach a screenshot before closing.")
   }
 
-  const ticket = await getTicket(cfg, guard, scope, id)
-  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
-
-  // Verify that at least one attachment is an image on THIS ticket
+  // Verify that at least one attachment is an image ON THIS TICKET — the
+  // `help_id` clause (`help_attachments`'s own column, not `ticket_id`) is
+  // what refuses an id borrowed from a different ticket (it simply is not in
+  // the result set), not a second lookup.
   const attachments = await d1Query<{ id: string; content_type: string | null }>(
     cfg,
     guard.databaseId,
     `SELECT id, content_type FROM help_attachments
-     WHERE ticket_id = ${sqlString(id)} AND id IN (${attachmentIds.map(sqlString).join(",")})
+     WHERE help_id = ${sqlString(id)} AND id IN (${attachmentIds.map(sqlString).join(",")})
      AND deactivated_at IS NULL`
   )
 
@@ -763,8 +775,9 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
     throw new GuardError(400, "screenshot_required", "Attach a screenshot before closing.")
   }
 
-  // R17 IS THE SEND GUARD. Zero rows moved = already answered = nothing appended
-  // and nobody emailed. A second press of a button is not a second answer.
+  // The status move itself — `ticket.status !== "resolved"` was already
+  // confirmed above, so this only guards the rare concurrent-write race; the
+  // ordinary R17 no-op path returned already.
   const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, "resolved")
   if (!moved) return json({ sent: false, alreadyResolved: true })
 
@@ -1023,11 +1036,19 @@ export async function getHelpAttachments(request: Request, env: Env): Promise<Re
  * Attaching your own and reading your own back are untouched; the line is on
  * somebody ELSE'S file.
  *
- * TWO KINDS, ONE DOOR, because it is one act. `kind: "link"` carries a URL and
+ * THREE KINDS, ONE DOOR, because it is one act. `kind: "link"` carries a URL and
  * nothing else; `kind: "file"` carries a data URL, which is parsed, capped and
  * put in the SHARED media bucket — the one both gateways serve, so the client
  * can read their own file back at their own hostname (lib/help-attachments says
- * why it is not `HELP_MEDIA`).
+ * why it is not `HELP_MEDIA`). `kind: "image"` is the MCP surface's own shape
+ * (`add_help_attachment`, T3658/B0295): an agent has no file picker, only a
+ * link it found or bytes it already holds, and it carries EITHER — the
+ * `url` is FETCHED here (R11, http(s) only, size-capped the same as an
+ * upload) rather than trusted as a stored link, so the ticket keeps its own
+ * copy exactly as an app-uploaded screenshot does. Image-only, narrower than
+ * `kind: "file"`'s own ANY_FILE_TYPE: this kind exists to satisfy the
+ * screenshot-before-close rule (`postResolveHelp`'s own `content_type`
+ * check), never a general attachment.
  *
  * The fence resolves the ticket BEFORE anything is written or stored: bytes put
  * in a bucket cannot be un-put, and 404 rather than 403 so "not yours" never
@@ -1041,8 +1062,8 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
     fileDataUrl?: unknown
   }>(request, env, "help", "read")
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
-  if (body.kind !== "file" && body.kind !== "link")
-    return fail(400, "invalid_input", "kind must be file or link.")
+  if (body.kind !== "file" && body.kind !== "link" && body.kind !== "image")
+    return fail(400, "invalid_input", "kind must be file, link or image.")
   const label = requireText(body.label, "Name", TEXT_LIMITS.short)
 
   const scope = await callerScope(cfg, guard)
@@ -1066,6 +1087,32 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
     if (!safe || !/^https?:\/\//i.test(safe))
       return fail(400, "invalid_input", "A link has to start with http:// or https://.")
     url = safe
+  } else if (body.kind === "image") {
+    // EITHER A LINK TO FETCH OR BYTES ALREADY HELD — an MCP caller has no file
+    // picker, so it names one or the other, and only one is validated: a url
+    // present at all (positionally, per R20) is read as "fetch this", never
+    // silently ignored in favour of `fileDataUrl`.
+    let parsed: { contentType: string; bytes: Uint8Array } | null
+    if (typeof body.url === "string" && body.url.length > 0) {
+      parsed = await fetchRemoteImage(body.url, TICKET_FILE_MAX_BYTES)
+      if (!parsed)
+        return fail(400, "invalid_input", "Couldn't fetch an image from that link — check it's a direct image URL.")
+    } else {
+      parsed = parseUploadDataUrl(body.fileDataUrl, TICKET_FILE_MAX_BYTES, IMAGE_UPLOAD_TYPE)
+      if (!parsed)
+        return fail(
+          400,
+          "invalid_input",
+          typeof body.fileDataUrl === "string" && dataUrlBytes(body.fileDataUrl) > TICKET_FILE_MAX_BYTES
+            ? "That image is over 10MB. Try a smaller one."
+            : "That didn't come through as an image. Try again."
+        )
+    }
+    const key = teamMediaKey(guard.teamId, "ticket")
+    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
+    url = `/media/${key}`
+    contentType = parsed.contentType
+    sizeBytes = parsed.bytes.byteLength
   } else {
     // ANY TYPE, STORED SO IT CANNOT RUN. The list used to be inline-safe media
     // only, which refused an .md, a .csv, a saved page — most of what somebody
@@ -1094,7 +1141,10 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
   }
 
   const attachments = await addAttachment(cfg, guard, scope, actor, id, {
-    kind: body.kind,
+    // `help_attachments.kind` only ever distinguishes file vs link for
+    // RENDERING (`toAttachment`) — an "image" is stored and served exactly
+    // like any other file.
+    kind: body.kind === "image" ? "file" : body.kind,
     label,
     url,
     contentType,
@@ -1102,6 +1152,52 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
   })
   await publishChange(env, guard.teamId, "help", id, "edit", ticket.accountId ?? undefined)
   return json({ attachments, total: attachments.length })
+}
+
+/** IMAGE-ONLY, the narrower sibling of `ANY_FILE_TYPE` — `kind: "image"`'s own
+ * allow rule, on the data-URL half of that path. */
+const IMAGE_UPLOAD_TYPE = /^image\/[\w.+-]+$/
+
+/** THE R11-SHAPED CEILING on the `kind: "image"` url fetch — the same reasoning
+ * `LINK_FETCH_TIMEOUT_MS` (source-readers.ts) and `GOOGLE_TIMEOUT_MS`
+ * (google-oauth.ts) already state for an outbound call this worker does not
+ * control the other end of. */
+const REMOTE_ATTACHMENT_TIMEOUT_MS = 10_000
+
+/** Fetch a caller-NAMED url and return its bytes, or null for anything that
+ * did not come back as a usable image — a bad scheme, a timeout, a non-2xx, a
+ * declared type that is not `image/*`, or a body over the cap. http(s) only:
+ * an MCP caller names an address with no browser between them and the fetch,
+ * so `file://`/an internal address dressed as an "image URL" is refused at
+ * the scheme rather than trusted. Sized the same way `parseUploadDataUrl`
+ * is — checked before the full body is held in memory where the response
+ * says so, and again after, since a `content-length` header is a claim, not
+ * a guarantee. */
+async function fetchRemoteImage(
+  rawUrl: string,
+  maxBytes: number
+): Promise<{ contentType: string; bytes: Uint8Array } | null> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return null
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null
+  let res: Response
+  try {
+    res = await fetch(parsed.toString(), { signal: AbortSignal.timeout(REMOTE_ATTACHMENT_TIMEOUT_MS) })
+  } catch {
+    return null // network error, refusal, or the timeout above firing
+  }
+  if (!res.ok) return null
+  const declared = res.headers.get("content-type")?.split(";")[0]?.trim() ?? ""
+  if (!IMAGE_UPLOAD_TYPE.test(declared)) return null
+  const declaredLength = Number(res.headers.get("content-length") ?? "")
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) return null
+  const buf = await res.arrayBuffer()
+  if (buf.byteLength > maxBytes) return null
+  return { contentType: declared, bytes: new Uint8Array(buf) }
 }
 
 /** POST /api/content/help/attachments/remove — take a file or a link off

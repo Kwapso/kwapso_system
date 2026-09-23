@@ -491,8 +491,8 @@ Today it covers:
     `triage_help_ticket`, `resolve_help_ticket`,
     `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
     `update_help_reply`, `delete_help_reply`, `ticket_metrics`,
-    `add_help_stakeholder`, plus the three that carry the files and links on a
-    ticket: `list_help_attachments`, `add_help_link` and
+    `add_help_stakeholder`, plus the four that carry the files and links on a
+    ticket: `list_help_attachments`, `add_help_link`, `add_help_attachment` and
     `remove_help_attachment`. (The module is Tickets; the tool NAMES carry the old
     `help` spelling because they are a published contract outside developers
     already call by name, so the rename of the section a person reads

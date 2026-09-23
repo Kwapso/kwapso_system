@@ -2451,6 +2451,8 @@ export function HelpDetailScreen({
         draft={ticket.draftResolution}
         draftKey={`help:resolve:${helpId}`}
         onSubmit={resolve}
+        uploadFile={uploadReplyFile}
+        removeUploadedFile={removeReplyFile}
       />
 
       <HelpFormDialog

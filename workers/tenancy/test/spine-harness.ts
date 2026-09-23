@@ -421,6 +421,23 @@ export function makeEnv(get: () => DatabaseSync, userId: string): never {
   } as never
 }
 
+/** T3658/B0295 — `postResolveHelp` refuses (400 `screenshot_required`) unless
+ * the ticket carries at least one IMAGE attachment. Every content-worker
+ * suite that resolves a ticket through the real door needs one on the fixture
+ * first; this is the one place that INSERT is written; a raw row rather than
+ * a call through `POST /api/content/help/attachments`, because the fixture is
+ * the SETUP for a test about a different door, not itself under test (the
+ * upload door has its own suite). Returns the new row's id, to hand straight
+ * to `attachmentIds` on the resolve call. */
+export function seedImageAttachment(db: DatabaseSync, ticketId: string): string {
+  const id = `att_${Math.random().toString(36).slice(2)}`
+  db.exec(
+    `INSERT INTO help_attachments (id, help_id, kind, label, url, content_type, size_bytes, created_at, creator_id, creator_email, creator_name)
+     VALUES ('${id}', '${ticketId}', 'file', 'screenshot.png', '/media/test/screenshot.png', 'image/png', 1024, '2026-02-01T00:00:00.000Z', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
+  )
+  return id
+}
+
 /** A JSON request at a route — the same shape the gateway forwards. */
 export function req(route: string, body?: unknown, query = ""): Request {
   const [method, path] = route.split(" ")

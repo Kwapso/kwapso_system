@@ -36,7 +36,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
-import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { buildSpineDb, IDS, makeEnv, seedImageAttachment } from "../../tenancy/test/spine-harness"
 
 const ROOT = join(__dirname, "..", "..", "..")
 const db = () => holder.db as DatabaseSync
@@ -132,6 +132,7 @@ describe("every move along the ladder leaves a row", () => {
     await call(IDS.staffUser, "POST /api/content/help/resolve", {
       id,
       resolution: "Fixed and deployed this morning.",
+      attachmentIds: [seedImageAttachment(db(), id)],
     })
     expect(rungs(id).map((r) => `${r.from_status ?? "-"}→${r.to_status}`)).toEqual([
       "-→new",
@@ -177,9 +178,17 @@ describe("a reopen no longer erases the answer", () => {
     // timestamp, yeah — but keep it in activity, like closed on x, reopen on y,
     // closed again on z."
     const id = await raise()
-    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Done." })
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Done.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
     await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "in_progress" })
-    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Done again." })
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Done again.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
 
     expect(rungs(id).map((r) => r.to_status)).toEqual([
       "new",
@@ -194,7 +203,11 @@ describe("a reopen no longer erases the answer", () => {
     // no standing answer — so `setStatus` NULLing it is correct and is left
     // alone. What was wrong was that nothing else remembered.
     const id = await raise()
-    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Done." })
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Done.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
     await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "in_progress" })
 
     const row = db()
@@ -213,7 +226,11 @@ describe("a reopen no longer erases the answer", () => {
 
   it("the reader counts the reopen, and reads the sequence rather than the from-column", async () => {
     const id = await raise()
-    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Done." })
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id,
+      resolution: "Done.",
+      attachmentIds: [seedImageAttachment(db(), id)],
+    })
     await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "in_progress" })
 
     const res = await call(IDS.staffUser, `GET /api/content/help/stages?id=${id}`)

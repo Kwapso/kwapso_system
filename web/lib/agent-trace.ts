@@ -176,6 +176,7 @@ export function traceFor(
     // Attaching or taking off a file or a link lands on the ticket too — its
     // Files and links tab is where the change is.
     case "add_help_link":
+    case "add_help_attachment":
     case "remove_help_attachment":
     // Answering lands on the ticket, where the words that were sent are now the
     // last thing in the conversation.
