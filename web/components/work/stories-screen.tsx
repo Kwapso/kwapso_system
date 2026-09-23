@@ -872,8 +872,37 @@ export function StoriesScreen({
     ? rawRows.filter((r) => r.title.toLowerCase().includes(needle) || (r.ref ?? "").toLowerCase().includes(needle))
     : rawRows
   if (facetValues.category) filteredRows = filteredRows.filter((r) => r.category === facetValues.category)
+  if (facetValues.appId) filteredRows = filteredRows.filter((r) => (r.appId ?? "") === facetValues.appId)
+  if (facetValues.storyType) filteredRows = filteredRows.filter((r) => (r.storyType ?? "") === facetValues.storyType)
+  if (facetValues.assigneeId) filteredRows = filteredRows.filter((r) => (r.assigneeId ?? "") === facetValues.assigneeId)
+  if (facetValues.sprintId) filteredRows = filteredRows.filter((r) => (r.sprintId ?? "") === facetValues.sprintId)
   // THE MOSCOW FACET STOOD HERE. PARKED, 21 Sep 2026 (`moscow-filters.tsx`'s
   // own `moscowFacet`).
+
+  // T3851 — "a filter option inside backlog would be good, where I can filter
+  // my backlogs." Category (and, on Backlog, Status) were already here; App,
+  // Story type, Assignee and Phase — what a person actually narrows a backlog
+  // by — were not. Derived from the loaded page (client-side, same seam
+  // Category already uses) rather than a door param, so R14/R16 are
+  // untouched. The App and Assignee marks join against `options.apps`/
+  // `options.members` (already loaded for the create dialog, both carrying a
+  // picture `Story` rows themselves do not) — the same join the ticket
+  // triage queue's own App/Account facets make against a separately loaded
+  // list (`tickets-collection.tsx`).
+  const appsById = new Map(options.apps.map((a) => [a.id, a]))
+  const appsSeen = new Map<string, { name: string; logo: string | null }>()
+  for (const r of rawRows)
+    if (r.appId) appsSeen.set(r.appId, { name: r.appName ?? t("An app"), logo: appsById.get(r.appId)?.logoUrl ?? null })
+  const membersById = new Map(options.members.map((m) => [m.id, m]))
+  const assigneesSeen = new Map<string, { name: string; photo: string | null }>()
+  for (const r of rawRows)
+    if (r.assigneeId)
+      assigneesSeen.set(r.assigneeId, {
+        name: r.assigneeName ?? t("Someone who has left"),
+        photo: membersById.get(r.assigneeId)?.photo ?? null,
+      })
+  const phasesSeen = new Map<string, string>()
+  for (const r of rawRows) if (r.sprintId) phasesSeen.set(r.sprintId, r.sprintName ?? t("A phase"))
 
   // CALLED UNCONDITIONALLY, ABOVE EVERY EARLY RETURN — `apps-screen.tsx`/
   // `collection-frame.tsx`'s own discipline for `useFilterBar`. Options come
@@ -889,6 +918,49 @@ export function StoriesScreen({
       label: t("Category"),
       control: "select",
       options: options.categories.map((c) => ({ value: c, label: c })),
+    },
+    {
+      field: "appId",
+      label: t("App"),
+      control: "select",
+      options: [...appsSeen].map(([value, { name, logo }]) => ({
+        value,
+        label: name,
+        mark: <RecordMark picture={logo} name={name} size="choice" />,
+      })),
+    },
+    {
+      field: "storyType",
+      label: t("Story type"),
+      control: "select",
+      // Words, not copy — a story type is the team's own live vocabulary
+      // (`options.storyTypes`), the same reason Category's own labels above
+      // are not wrapped in `t()` either.
+      options: options.storyTypes.map((v) => {
+        const iconName = storyTypeIconName(v)
+        const TypeIcon = iconName ? iconComponent(iconName) : null
+        return {
+          value: v,
+          label: v,
+          mark: TypeIcon ? <TypeIcon className="text-muted-foreground size-3.5 shrink-0" /> : undefined,
+        }
+      }),
+    },
+    {
+      field: "assigneeId",
+      label: t("Assigned to"),
+      control: "select",
+      options: [...assigneesSeen].map(([value, { name, photo }]) => ({
+        value,
+        label: name,
+        mark: <RecordMark picture={photo} name={name} size="choice" />,
+      })),
+    },
+    {
+      field: "sprintId",
+      label: t("Phase"),
+      control: "select",
+      options: [...phasesSeen].map(([value, name]) => ({ value, label: name })),
     },
     // THE BACKLOG TAB'S OWN STATUS FACET (Aurora's ruling, 21 Sep 2026,
     // verbatim: "To Do means its scheduled in an active phase, Backlog

@@ -859,6 +859,28 @@ export function TasksScreen({
   let filteredRows = needle ? rawRows.filter((r) => r.title.toLowerCase().includes(needle)) : rawRows
   if (facetValues.priority) filteredRows = filteredRows.filter((r) => String(r.priority) === facetValues.priority)
   if (facetValues.department) filteredRows = filteredRows.filter((r) => (r.department ?? "") === facetValues.department)
+  if (facetValues.appId) filteredRows = filteredRows.filter((r) => (r.appId ?? "") === facetValues.appId)
+  if (facetValues.accountId) filteredRows = filteredRows.filter((r) => (r.accountId ?? "") === facetValues.accountId)
+  if (facetValues.assigneeId) filteredRows = filteredRows.filter((r) => (r.assigneeId ?? "") === facetValues.assigneeId)
+
+  // T3846 — "a filter option inside tasks would be good, where I can filter my
+  // tasks." Priority and Department were already here; the App/Account/
+  // Assignee a person actually narrows by were not. Derived from the loaded
+  // page (client-side, same seam as Priority/Department above) rather than a
+  // door param — every field is already on `Task` (R14/R16 untouched, no new
+  // request shape). One pass each, keyed by id so a repeated app/account/
+  // assignee across many tasks is one option, not one per row.
+  const appsSeen = new Map<string, { name: string; logo: string | null }>()
+  for (const r of rawRows) if (r.appId) appsSeen.set(r.appId, { name: r.appName ?? t("An app"), logo: r.appLogoUrl })
+  const accountsSeen = new Map<string, { name: string; logo: string | null }>()
+  for (const r of rawRows) if (r.accountId) accountsSeen.set(r.accountId, { name: r.accountName ?? t("An account"), logo: r.accountLogoUrl })
+  // ASSIGNEE, EVERYONE'S TAB ONLY (below) — the other three tabs are already
+  // narrowed to the caller's own name at the door (`seesEveryones`, above),
+  // so a picker offering only their own name is a control with nothing to
+  // control (the same reasoning `work-logs-panel.tsx`'s own "Logged by"
+  // filter states for a set of one).
+  const assigneesSeen = new Map<string, string>()
+  for (const r of rawRows) if (r.assigneeId) assigneesSeen.set(r.assigneeId, r.assigneeName ?? t("Someone who has left"))
 
   // THE TWO FACETS — client ruling: "Filters by priority, by department."
   // Priority's four options are the app's own SCALE (`PRIORITY_ORDER`), a
@@ -891,6 +913,40 @@ export function TasksScreen({
       control: "select",
       options: options.departments.map((d) => ({ value: d, label: d })),
     },
+    {
+      field: "appId",
+      label: t("App"),
+      control: "select",
+      options: [...appsSeen].map(([value, { name, logo }]) => ({
+        value,
+        label: name,
+        mark: <RecordMark picture={logo} name={name} size="choice" />,
+      })),
+    },
+    {
+      field: "accountId",
+      label: t("Account"),
+      control: "select",
+      options: [...accountsSeen].map(([value, { name, logo }]) => ({
+        value,
+        label: name,
+        mark: <RecordMark picture={logo} name={name} size="choice" />,
+      })),
+    },
+    ...(view === "all"
+      ? [
+          {
+            field: "assigneeId",
+            label: t("Assigned to"),
+            control: "select" as const,
+            options: [...assigneesSeen].map(([value, name]) => ({
+              value,
+              label: name,
+              mark: <RecordMark name={name} size="choice" />,
+            })),
+          },
+        ]
+      : []),
   ]
   // CALLED UNCONDITIONALLY, ABOVE EVERY EARLY RETURN — same discipline
   // `apps-screen.tsx`/`collection-frame.tsx` keep for their own `useFilterBar`

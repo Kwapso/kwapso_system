@@ -1707,6 +1707,7 @@ export const SEED: Catalogue = {
     es: "Una parte de su empresa, como Operaciones o Finanzas.",
     ca: "Una part de la seva empresa, com Operacions o Finances.",
   },
+  "A phase": { de: "Eine Phase", es: "Una fase", ca: "Una fase" },
   "A price needs a number.": {
     de: "Ein Preis benötigt eine Zahl.",
     es: "Un precio necesita un número.",
@@ -3890,6 +3891,7 @@ export const SEED: Catalogue = {
    * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
    * falls and never rises). */
   "Story types": { de: "Aufgaben-Typen", es: "Tipos de historia", ca: "Tipus d'història" },
+  "Story type": { de: "Aufgaben-Typ", es: "Tipo de historia", ca: "Tipus d'història" },
   "Stages and deliverable kinds": { de: "Phasen und Ergebnisarten", es: "Etapas y tipos de entregable", ca: "Etapes i tipus de lliurable" },
   "Industries and countries": { de: "Branchen und Länder", es: "Sectores y países", ca: "Sectors i països" },
   "Asset categories": { de: "Asset-Kategorien", es: "Categorías de activos", ca: "Categories de recursos" },
