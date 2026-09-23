@@ -164,37 +164,34 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
        * now says what a token IS before you make one. If she wants that sentence
        * back it belongs in the register's own `description`, on the page ground
        * (R103), the same shape the Google card beside it uses. */}
-      {/* ONE BOX, WHATEVER THE SECTION IS SAYING — client ruling, 2026-09-10:
-       * "once again, nothing shoudl sit on the white, everything contained!"
-       * (and, on the Team tab the day before, "nothing on top of white
-       * background, its a rule!"). Three of this section's four bodies — the
-       * error, the skeleton and the zero — used to be drawn straight onto the
-       * page ground while only the ROWS stood on soft paper, so the section
-       * changed shape as well as content every time it changed state. The
-       * panel is the section's, not the list's: `--surface-panel` against the
-       * page's `--background`, measured at 1.103 light / 1.079 dark
-       * (web/components/team/team-panel.tsx has the numbers and the reasoning).
-       * The inset is on the STATES rather than on the box, because a row
-       * already carries its own `p-3` and a box inset would double it. R67.
-       *
-       * AMENDED 22 Sep 2026 (R103): an empty or filtered-empty register draws
-       * no card and no paper fill, so the zero body moved back out to the page
-       * ground above this panel. Only the error and the skeleton still draw
-       * inside it; the panel itself only renders at all when one of those two,
-       * or the rows, has something to show. */}
+      {/* PLAIN, AS OF 23 SEP 2026. Aurora: "the whole settings module does
+       * not have the mibnimal aspect! Make minimal the whole app, not only
+       * tickets anymore." This box used to paint `bg-surface-panel` behind
+       * the create row, the error, the skeleton and the rows together — the
+       * OLD default this ruling took off every other section. Read on its
+       * own merits today rather than on the paragraph that used to justify
+       * it: this is a plain row list — the create row and each token row
+       * already separate with their own inset `shadow-[var(--hairline-
+       * under)]` hairline, the identical construction R80 ("rows are a
+       * list, never a banded table. No inner card around a list") already
+       * names for every other list in the app — and it is none of
+       * `PAPER_ON_PURPOSE`'s five things (not a conversation card, an empty
+       * or error state, a tile, a well, or a not-a-section). R103's own
+       * amendment already took the zero state out to the page ground below;
+       * this takes the box off the rest of it for the same reason. */}
       {tokensQ.data !== undefined && !tokensQ.error && tokens.length === 0 ? (
         // The kit's register (27.21) with the one act, on the page ground
-        // rather than inside the panel's own paper (R103) — owner ruling
+        // rather than inside a panel's paper (R103) — owner ruling
         // 2026-09-07, amended 22 Sep 2026.
         <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
       ) : (
-      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
+      <div className="flex flex-col">
         {/* THE CREATE BUTTON CAME INSIDE THE BOX WITH THE HEADING'S REMOVAL —
          * 2026-09-11. It used to ride the header row opposite the eyebrow, and
          * R67 let it stand on the page because a heading row is a title block
          * and a lone control is an act. With the eyebrow gone it would have been
-         * a `+` floating alone over a panel on the white, which is the shape she
-         * has now objected to four times; so it takes the panel's own top row,
+         * a `+` floating alone over the page, which is the shape she
+         * has now objected to four times; so it takes the list's own top row,
          * with the same inset hairline every other row in this list carries.
          *
          * R50, ONE LAYER DOWN — client ruling, 2026-09-10, over a screenshot of
@@ -619,9 +616,21 @@ function TokenCallLog({ token }: { token: McpTokenSummary }) {
             <CollectionEmptyState filtered={Boolean(q)} title={t("No calls yet.")} />
           ) : (
             <>
-              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+              {/* PLAIN, AS OF 23 SEP 2026 — this used to paint
+                  `bg-surface-panel` AND draw its row rule as a literal
+                  `divide-y` border, both wrong on their own merits today:
+                  R105 says a sheet's own sections paint no background (this
+                  list lives inside the call-log Sheet), and R67's surviving
+                  half says separation is a fill or an inset shadow, never a
+                  stroke — `divide-y` is a stroke. Each row now carries the
+                  same inset `shadow-[var(--hairline-under)]` hairline every
+                  other list in this file already uses. */}
+              <ul className="flex flex-col">
                 {calls.map((c) => (
-                  <li key={c.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm shadow-[var(--hairline-under)] last:shadow-none"
+                  >
                     <span className="min-w-0 flex-1 basis-[12rem] truncate font-mono text-xs">{c.toolName}</span>
                     {c.ok ? (
                       <Badge variant="secondary" className="shrink-0 text-badge">

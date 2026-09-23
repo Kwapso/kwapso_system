@@ -816,52 +816,115 @@ describe("shapeChoicesTable", () => {
     expect(rows?.[0].whereField).toBe("")
   })
 
-  // ADDED, FOLDED BACK INTO ONE CELL. K59, Aurora, 22 Sep 2026 (later),
-  // this function's own header has the full accounting: restoring Details to
-  // its own column put the table at seven named facts again, so Added by and
-  // Added on (split apart by the 21 Sep 2026 evening reading) fold back
-  // together, the creator's face and first name on the first line, the
-  // formatted date muted beneath it, the same "who over when" shape the very
-  // first 21 Sep 2026 reading shipped. `createdAtRaw` keeps riding beside it,
-  // raw, for the toolbar's own "Added on" sort option
-  // (`sorted-columns-declare-their-type.test.ts`'s own law: never the
-  // formatted string).
-  it("the Added cell carries the creator's face and first name over the formatted date, plus the raw instant for sort", () => {
+  // ADDED ON / ADDED BY, SPLIT AGAIN. Aurora, 23 Sep 2026, verbatim: "split
+  // added on and by in 2 separate columns." This function's own header has
+  // the full accounting: the two columns were folded into one "who over
+  // when" cell on 22 Sep 2026 to hold R82's six-column ceiling, and this
+  // ruling reopens the split — `settings-choices-panel.tsx`'s own unscoped
+  // column list is named in `TABLE_COLUMN_BUDGET_EXEMPT` instead of folding
+  // anything else. `addedOn` is the plain formatted date, its own cell now;
+  // `addedBy` is the creator's face and first name, drawn the way this file's
+  // neighbouring tables already draw a person in a row
+  // (`shapeAccountsList`'s `manager`, `shapeMeetingsList`'s `attendeesCell`:
+  // `RecordMark` at `shape="round" size="choice"` beside the name).
+  // `createdAtRaw` keeps riding beside `addedOn`, raw, for the toolbar's own
+  // "Added on" sort option (`sorted-columns-declare-their-type.test.ts`'s own
+  // law: never the formatted string).
+  it("draws Added on as the formatted date and Added by as the creator's face and first name, plus the raw instant for sort", () => {
     const rows = shapeChoicesTable(
       [
         selectableValue({
           id: "a1",
           type: "Industry",
           value: "Retail",
-          createdAt: "2026-05-01T09:00:00.000Z",
+          createdAt: "2026-05-01T12:00:00.000Z",
           createdByName: "Ana Bergman",
         }),
       ],
       choicesGroupHome,
       "en"
     ).rows
-    expect(React.isValidElement(rows?.[0].added), "Added draws a node (face + name + date)").toBe(true)
+    expect(rows?.[0].addedOn, "Added on is the plain formatted date, its own cell").toBe(
+      "May 1, 2026"
+    )
+    expect(React.isValidElement(rows?.[0].addedBy), "Added by draws a node (face + name)").toBe(true)
     // R54: staff are shown by first name only, everywhere.
-    expect(rows?.[0].addedText).toBe("Ana")
+    expect(rows?.[0].addedByText).toBe("Ana")
+    // THE PERSON SHAPE MATCHES ITS NEIGHBOURS — round, `size="choice"`, mark
+    // then name, one line, no second line (the date moved out to its own
+    // column).
+    const addedBy = rows?.[0].addedBy as React.ReactElement<{ children?: React.ReactNode }> | undefined
+    expect(React.Children.toArray(addedBy!.props.children).length, "mark + name, one line").toBe(2)
     expect(rows?.[0].createdAtRaw, "the sort's own raw value, never the shaped date").toBe(
-      "2026-05-01T09:00:00.000Z"
+      "2026-05-01T12:00:00.000Z"
     )
   })
 
   // A value from before the audit columns existed (or a row the fixture just
-  // never set them on) draws the Added cell with nothing to say, not a crash
-  // and not a dash, the same "carries nothing" answer R81 gives elsewhere.
-  // `null`, never an empty wrapper node, because there is no face to anchor
-  // one.
-  it("the Added cell is empty, not broken, for a value with no audit block", () => {
+  // never set them on) draws BOTH cells with nothing to say, not a crash, not
+  // a dash and not the word "undefined" — the same "carries nothing" answer
+  // R81 gives Details. `addedBy` is `null`, never an empty wrapper node,
+  // because there is no face to anchor one; `addedOn` is `""`, the same
+  // fallback every other plain-text fact on this row already uses.
+  it("both Added cells are empty, not broken, for a value with no audit block at all", () => {
     const rows = shapeChoicesTable(
       [selectableValue({ id: "a2", type: "Industry", value: "Retail" })],
       choicesGroupHome,
       "en"
     ).rows
-    expect(rows?.[0].added).toBeNull()
-    expect(rows?.[0].addedText).toBe("")
+    expect(rows?.[0].addedBy).toBeNull()
+    expect(rows?.[0].addedByText).toBe("")
+    expect(rows?.[0].addedOn).toBe("")
     expect(rows?.[0].createdAtRaw).toBeNull()
+  })
+
+  // THE TWO FACTS ARE INDEPENDENT NOW — the one thing the old coupled cell
+  // got wrong. A SEEDED value (this team's own bulk-loaded vocabulary, never
+  // typed in by a person) can carry a `createdAt` with no `createdByName` at
+  // all: the old cell gated the date on the name (`addedByName ? (...) :
+  // null` wrapped both facts), so a seeded row with a real date showed
+  // nothing whatsoever. Split, Added on must show the date on its own.
+  it("Added on shows the date even with no recorded creator (the seeded-vocabulary case)", () => {
+    const rows = shapeChoicesTable(
+      [
+        selectableValue({
+          id: "a3",
+          type: "Industry",
+          value: "Retail",
+          createdAt: "2026-05-01T12:00:00.000Z",
+          createdByName: null,
+        }),
+      ],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(rows?.[0].addedOn, "the date reads honestly even with no name recorded").toBe(
+      "May 1, 2026"
+    )
+    expect(rows?.[0].addedBy).toBeNull()
+    expect(rows?.[0].addedByText).toBe("")
+  })
+
+  // THE MIRROR CASE: a name with no date recorded shows the person on its
+  // own, never held back by the missing date the way the old coupled cell's
+  // second line (`{addedOn && <span>…</span>}`) would have silently dropped.
+  it("Added by shows the person even with no recorded date", () => {
+    const rows = shapeChoicesTable(
+      [
+        selectableValue({
+          id: "a4",
+          type: "Industry",
+          value: "Retail",
+          createdAt: null,
+          createdByName: "Ana Bergman",
+        }),
+      ],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(React.isValidElement(rows?.[0].addedBy)).toBe(true)
+    expect(rows?.[0].addedByText).toBe("Ana")
+    expect(rows?.[0].addedOn).toBe("")
   })
 })
 

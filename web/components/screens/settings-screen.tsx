@@ -814,19 +814,21 @@ export function SettingsScreen({
             // the same toolbar and the same act (invite) it always carried
             // — only the tab it answers to moved.
             //
-            // THE REFUSAL STANDS ON PAPER TOO (R67) — the same
-            // `rounded-[var(--radius)] bg-surface-panel` wrapper the Modules
-            // and Automations panels below give their own `<NoAccess>`
-            // branch. It was not needed on the old nested "team" panel
-            // because that whole branch returned ONE outer div (the Teams
-            // list's own `bg-surface-panel` satisfied the census for the
-            // WHOLE body, refusal included); now Members is a top-level
-            // return with `<NoAccess>` as its own conditional arm, which
-            // R67's census walks as its own body.
+            // THE REFUSAL STANDS ON THE PAGE NOW, NEVER ON PAPER — Aurora,
+            // 23 Sep 2026, over the whole settings module: "the whole
+            // settings module does not have the minimal aspect! Make
+            // minimal the whole app, not only tickets anymore." The
+            // `rounded-[var(--radius)] bg-surface-panel` wrapper this branch
+            // used to carry predates R67's 21 Sep 2026 flip to plain-by-
+            // default and was never updated with the rest of the app: a bare
+            // `<NoAccess />` is what every OTHER refusal in the app already
+            // draws (`web/components/deep-link/module-content.tsx`,
+            // `settings-choices-panel.tsx`), and `<NoAccess>` itself is a
+            // plain `<StateLine>` (an icon and a line of text) with no card
+            // of its own to begin with — boxing it here was the one place in
+            // the app that disagreed with its own component.
             return !can("team_members", "read") ? (
-              <div className="rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
-                <NoAccess />
-              </div>
+              <NoAccess />
             ) : (
               <div className="flex flex-col gap-8">
                 <MembersGallery
@@ -858,10 +860,22 @@ export function SettingsScreen({
                     about the team's own roster. */}
                 {!TEAM_SCREENS_HIDDEN && (
                   <section className="flex flex-col gap-3">
-                    <Headline as="h2" size="h4">{t("Teams")}</Headline>
+                    {/* THE EYEBROW, NOT A HEADING SIZE (R108's own register,
+                        Aurora, 23 Sep 2026: make the whole settings module
+                        minimal) — the identical `text-micro
+                        text-muted-foreground uppercase` string this same
+                        screen already prints above `<InvitationsPanel>`, a
+                        few lines up. This section used to draw a real
+                        `size="h4"` (20px) heading and sit inside a
+                        `bg-surface-panel` box; both were the boxed, heading-
+                        sized reading the rest of the app moved off on 21 Sep
+                        2026 (R67) and 22 Sep 2026 (R108). Neither survives:
+                        this is a plain list of rows, not one of
+                        `PAPER_ON_PURPOSE`'s five things a section may still
+                        stand on paper for. */}
+                    <h2 className="text-muted-foreground text-micro uppercase">{t("Teams")}</h2>
                     <List
                       surface="none"
-                      className="rounded-[var(--radius)] bg-surface-panel"
                       onItemClick={(item) => void openTeam(item.id)}
                       items={ctx.teams.map((team) => ({
                         id: team.id,
@@ -899,14 +913,12 @@ export function SettingsScreen({
             // first stacked layout made (2026-09-09: "Everything should be
             // in different containers… not taken anywhere else").
             //
-            // THE REFUSAL STANDS ON PAPER TOO (R67) — see the identical note
-            // on the Members branch above for why this wrapper is needed now
-            // that Roles is its own top-level return rather than an arm
-            // hidden inside a `const` the census never walked.
+            // THE REFUSAL STANDS ON THE PAGE NOW — see the identical note on
+            // the Members branch above (Aurora, 23 Sep 2026: make the whole
+            // settings module minimal); a bare `<NoAccess />` is the shape
+            // every other refusal in the app already takes.
             return !can("member_roles", "read") ? (
-              <div className="rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
-                <NoAccess />
-              </div>
+              <NoAccess />
             ) : teamId ? (
               <RolesMatrix
                 teamId={teamId}
@@ -987,19 +999,14 @@ export function SettingsScreen({
             // "no module has settings you may change" and "no module has
             // settings" are not worth telling apart on screen, and telling them
             // apart would disclose which modules this team has configured.
-            // ON PAPER, LIKE THE WALL IT STANDS IN PLACE OF (R67). The refusal
-            // is this tab's other branch, and the branch with nothing in it is
-            // the one the law was earned by: `access-tokens.tsx` drew its rows
-            // on soft paper and its zero on the page, so "is there a panel on
-            // this tab" answered yes and described the screen nobody was
-            // looking at. Same inset as the wall, so a reader who is refused
-            // and a reader who is not are standing on the same sheet.
-            if (modules.length === 0)
-              return (
-                <div className="rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
-                  <NoAccess />
-                </div>
-              )
+            // ON THE PAGE, LIKE EVERY OTHER REFUSAL (Aurora, 23 Sep 2026 —
+            // the settings module was not reading minimal). This used to be
+            // boxed to match the wall it stood in place of; the wall itself
+            // is plain now (`Card variant="plain"` below), so there is
+            // nothing left for the refusal to match by staying boxed, and a
+            // bare `<NoAccess />` is what a reader sees everywhere else in
+            // the app this exact sentence appears.
+            if (modules.length === 0) return <NoAccess />
 
             return (
               /* THE CONTAINER MOVED OUT OF THE WALL AND ROUND THE WHOLE PANEL,
@@ -1315,12 +1322,8 @@ export function SettingsScreen({
             // with no automations-bearing module is not told whether that is
             // because the team has none or because they may see none of
             // them, which is `automationModules.length === 0` either way.
-            if (automationModules.length === 0 || !teamId)
-              return (
-                <div className="rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
-                  <NoAccess />
-                </div>
-              )
+            // ON THE PAGE, NOT BOXED — see the Modules branch above.
+            if (automationModules.length === 0 || !teamId) return <NoAccess />
 
             // NO `title` — client ruling, 2026-09-14, naming this exact tab:
             // "the title inside the collection" repeats the tab strip's own

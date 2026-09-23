@@ -86,6 +86,30 @@
 // in, from the SAME "selectable:all" cache the account form already reads
 // (R56: one door, whichever screen asks first).
 //
+// ── A THIRD VIEW, MAP, ON ACTIVE ONLY — Aurora's ruling, 23 Sep 2026, verbatim:
+// "for accounts/active add a map view." The kit's `Map`
+// (`shared/ui/components/map/map.tsx`) had zero direct call sites before this;
+// its own header is emphatic about what it does and does not draw (no tiles,
+// no projection — the APPLICATION hands it pins at an `x`/`y` PERCENTAGE across
+// a muted plate, "DATA, not a design value"), and it is followed to the letter
+// here rather than reinvented: the list stays beside the plate always, an
+// account this screen cannot place is counted in words under the list rather
+// than dropped, and the plate demotes to a header strip below 720px — all of
+// that is the kit's own law, not this file's. WHAT TURNS A COUNTRY INTO A
+// POSITION lives in `./country-centroids.ts`: a small, hand-kept table of
+// country centroids (not fetched, not guessed from the free-text address —
+// see that file's own header for the honest argument), and `./account-map.ts`
+// is the pure function that turns a page of accounts into the plate's pins
+// and the list's rows, one pin per account (several accounts sharing a
+// country stand in a small ring around it, never folded into one pin — see
+// that file's header). ONLY OFFERED ON THE ACTIVE TAB, her own word: her
+// ruling names "accounts/active" and not the other three, and the map has
+// never been asked to draw a mix of active/inactive/archived pins together —
+// so `accountTab === "active"` below is what decides whether "map" is even
+// among the choices `<PagedFind>`'s own `view` slot offers, and a reader who
+// had it open and then switches tab falls back to gallery rather than the
+// view switch pointing at an option that is no longer on the list.
+//
 // ── THE STRIP BECOMES STATUS, 16 SEP 2026 — "keep active, inactive, and all" ─
 //
 // Second client ruling, same evening as the Settings › Team split above it in
@@ -156,8 +180,9 @@ import * as React from "react"
 
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { Map } from "@shared/ui/components/map/map"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Plus, SquaresFour, ListBullets } from "@shared/ui/foundations/icons"
+import { Plus, SquaresFour, ListBullets, MapTrifold } from "@shared/ui/foundations/icons"
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import {
@@ -190,8 +215,16 @@ import { accountsKey, totalKey } from "@/lib/live-resources"
 import { tenancy } from "@/lib/api"
 import type { Can } from "@/lib/perms"
 import type { Account, TeamMember } from "@shared/types"
+import type { Vars } from "@shared/i18n"
+import { placeAccountsOnMap } from "@/components/accounts/account-map"
 
-type Translate = (english: string) => string
+// `vars?` widened in, matching `contacts-screen.tsx`'s own `Translate` one
+// module over — needed here now because the map view's missing-count
+// sentence (below) carries a `{count}` hole, the same shape `t()` already
+// takes at every OTHER call site in this app (`shared/i18n.ts`'s `translate`);
+// this file's own narrower alias had just never asked for the second
+// argument before.
+type Translate = (english: string, vars?: Vars) => string
 
 /** One shaped accounts row, read by BOTH bodies below — `shapeAccountsList`'s
  * own contract (`web/components/deep-link/shape.tsx`). The `Record<string,
@@ -389,7 +422,14 @@ export function AccountsScreen({
   // order). Local, like `ctx.knowledgeView`/`ctx.taskView` one module over,
   // except owned by this component instead of the host: nothing else on the
   // app needs to know which body the accounts screen is showing.
-  const [view, setView] = React.useState<"gallery" | "list">("gallery")
+  //
+  // NOTHING PERSISTS ACROSS A REMOUNT, "map" INCLUDED — this was already true
+  // of gallery/list and stays true rather than growing a store this screen
+  // did not have before: leave Accounts for another module and come back, or
+  // reload, and the switch reads "gallery" again, her own first-load default.
+  // WITHIN one mount it is ordinary React state, so switching tabs and back
+  // (see `effectiveView` below) does remember which body was picked.
+  const [view, setView] = React.useState<"gallery" | "list" | "map">("gallery")
 
   // THE COUNTRY FACET'S OPTIONS — the team's own "Country" vocabulary
   // (`shared/selectable-groups.ts`), read through the SAME "selectable:all"
@@ -458,6 +498,18 @@ export function AccountsScreen({
   // archived account is ever listed, and the one door back to it.
   const accountTab =
     tab === "archived" ? "archived" : tab === "all" ? "all" : tab === "inactive" ? "inactive" : "active"
+
+  // MAP, ACTIVE ONLY — her ruling names "accounts/active", not the other
+  // three tabs, and the map has never been asked to draw inactive/archived
+  // pins beside active ones. DERIVED rather than a second piece of state: a
+  // reader who picked "map" and then switched to Inactive sees gallery (the
+  // switch itself only ever OFFERS map on Active, below), and switching back
+  // to Active without a remount reads `view` unchanged and draws the map
+  // again — no effect, no stale flag to reset, just what the tab allows this
+  // render.
+  const showMapView = accountTab === "active"
+  const effectiveView = view === "map" && !showMapView ? "gallery" : view
+
   const accountsBadge = formatCount(total)
   const accountTabs = [
     {
@@ -605,9 +657,16 @@ export function AccountsScreen({
               // the WORD on the switch and the glyph beside it, matched to
               // Tickets' own list icon (`tickets-collection.tsx`).
               { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+              // THE THIRD BODY, ACTIVE TAB ONLY (her ruling, this file's own
+              // header) — spread in rather than a third literal so the array
+              // this screen offers and `showMapView` never say two different
+              // things about whether "map" is on it.
+              ...(showMapView
+                ? [{ value: "map", label: t("Map"), icon: <MapTrifold className="size-4" /> }]
+                : []),
             ],
-            value: view,
-            onValueChange: (v) => setView(v === "list" ? "list" : "gallery"),
+            value: effectiveView,
+            onValueChange: (v) => setView(v === "list" ? "list" : v === "map" ? "map" : "gallery"),
           }}
           actions={() => (
             <>
@@ -633,6 +692,21 @@ export function AccountsScreen({
             // and the gallery above both read `config` from.
             const tunedRecipe = withDataDrivenCollection(recipe, shaped)
             const config = tunedRecipe.collection as CollectionConfig
+            // THE MAP'S OWN TWO ARRAYS — built off `rows` (the raw `Account[]`
+            // page, not `shaped`): `placeAccountsOnMap` (`./account-map.ts`)
+            // wants `country` and `active` off the real row, not the JSX
+            // `shaped` has already turned them into. Computed only when the
+            // map is actually the body on screen — the same "don't build what
+            // nobody reads" the table/gallery split above already keeps.
+            const mapPlacement = effectiveView === "map" ? placeAccountsOnMap(rows) : null
+            const mapMissingLabel =
+              mapPlacement === null || mapPlacement.missingCount === 0
+                ? null
+                : mapPlacement.missingCount === 1
+                  ? t("1 account has no country and is not on the map. It is in the list view.")
+                  : t("{count} accounts have no country and are not on the map. They are in the list view.", {
+                      count: mapPlacement.missingCount,
+                    })
             return (
               <CollectionCreateActionProvider
                 action={
@@ -645,7 +719,7 @@ export function AccountsScreen({
                     : null
                 }
               >
-                {view === "list" ? (
+                {effectiveView === "list" ? (
                   <RecordTable
                     columns={accountTableColumns(t)}
                     rows={shaped}
@@ -656,6 +730,25 @@ export function AccountsScreen({
                     onRowClick={(row) => onIntent({ kind: "open", module: "accounts", id: String(row.id) })}
                     rowPath={(row) => `/t/${teamId}/accounts/${row.id}`}
                     rowLabel={(row) => row.nameText}
+                  />
+                ) : effectiveView === "map" && mapPlacement !== null ? (
+                  // THE KIT'S OWN MAP, AS SPECIFIED — a muted plate the app
+                  // never draws tiles or a projection onto (that is the
+                  // component's own job to refuse), `items` carrying EVERY
+                  // row on the page so the list never loses an account the
+                  // plate could not place, and `missingLabel` saying so in
+                  // words rather than dropping it — the artifact's own three
+                  // rules, quoted in `shared/ui/components/map/map.tsx`'s own
+                  // header. Opening a pin or a row calls the SAME `onIntent`
+                  // the table's `onRowClick` already does, above — a map pin
+                  // is a `<button>`, not a real anchor (R37 is the table and
+                  // gallery's law, not a plain kit button's), so the soft-nav
+                  // dispatcher is the correct door here, not `<InAppLink>`.
+                  <Map
+                    items={mapPlacement.items}
+                    pins={mapPlacement.pins}
+                    missingLabel={mapMissingLabel}
+                    onSelectItem={(id) => onIntent({ kind: "open", module: "accounts", id })}
                   />
                 ) : (
                   accountGalleryBody({

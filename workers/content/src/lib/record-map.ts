@@ -280,8 +280,36 @@ export const RETIRABLE = new Set([
 /** `AND o.deactivated_at IS NULL`, where the far table HAS that column. Built
  * once so the list and the R16 count below can never carry different versions of
  * it — the failure `sourcesWhere` in knowledge.ts already names: a count is
- * exact about the wrong question the moment the two clauses drift. */
-const liveOnly = (table: string) => (RETIRABLE.has(table) ? ` AND o.deactivated_at IS NULL` : "")
+ * exact about the wrong question the moment the two clauses drift.
+ *
+ * AND, SEPARATELY: `AND o.archived_at IS NULL` whenever the far table IS
+ * `accounts`. Team migration 0117 gave an account a SECOND, independent
+ * put-away state (`archived_at`, beside the `deactivated_at` every retirable
+ * table already carries) — Aurora's ruling, 22-23 Sep 2026: an archived
+ * account is "not visible anywhere", and asked directly whether that reaches
+ * a ticket, "yes, archived accounts should hide their tickets too." Every
+ * edge in `RECORD_EDGES` that names `accounts` built its own SQL and never
+ * asked `help.ts`'s ticket filter, so standing on a ticket (or any of the
+ * other nine edges below that reach an account) still drew an archived
+ * company as a neighbour.
+ *
+ * `accounts` is never `RETIRABLE`'s far end in a query that omits this
+ * clause's other half by construction — `deactivated_at` and `archived_at`
+ * are two INDEPENDENT facts on the SAME row (0117's own header), so both are
+ * checked, never one in place of the other.
+ *
+ * QUALIFIED TO `o`, the far table's own alias in every statement below, never
+ * bare. The ticket edge (`help.account_id -> accounts`, "was raised by") is
+ * the one whose OUTWARD statement joins `help` (aliased `n`) and `accounts`
+ * (aliased `o`) in the SAME FROM clause, and `help` carries its own
+ * `archived_at` column — the ticket's own put-away state, a different fact
+ * from the account's. A bare `archived_at IS NULL` there is exactly the
+ * ambiguity `workers/content/src/lib/help.ts`'s own `accountArchivedClause`
+ * describes SQLite refusing at runtime; qualifying to `o` here is what keeps
+ * this file from reproducing that failure. */
+const liveOnly = (table: string) =>
+  (RETIRABLE.has(table) ? ` AND o.deactivated_at IS NULL` : "") +
+  (table === "accounts" ? ` AND o.archived_at IS NULL` : "")
 
 const key = (n: { table: string; id: string }) => `${n.table}:${n.id}`
 

@@ -31,13 +31,22 @@
    chapter draws it. Both variants are the kit's own; neither is invented.
 
    THE LAW THIS FILE OBEYS
-   · ONE MANGO PER VIEW, AND IT IS THE PRESENT. The current stage carries the
-     only mango in the hero. This is not mango-as-a-status, which ruling 26
-     forbids — it is mango marking position, the same use `.kw-stage--current`
-     makes and the same use t20-gaps.md T20-3 records as explicitly not
-     violating the ruling. Done and later stages carry no accent at all.
+   · ONE MANGO PER VIEW, AND IT IS THE PRESENT — `stages` ONLY, amended 23 SEP
+     2026. The current PILL carries the only mango in the hero. This is not
+     mango-as-a-status, which ruling 26 forbids — it is mango marking
+     position, the same use `.kw-stage--current` makes and the same use
+     t20-gaps.md T20-3 records as explicitly not violating the ruling. Done
+     and later stages carry no accent at all. THIS BULLET IS SCOPED TO
+     `variant="stages"` (chapter 23's hero row of pills) SINCE 23 SEP 2026 —
+     see the `steps` mark's own comment, below, for why `variant="steps"`
+     (chapter 15's rail, both orientations) no longer marks its current step
+     with mango at all: Aurora's ruling that day ("on ticket stages, mark the
+     active and past in black, only future are gray") retired the accent for
+     that variant's small circular MARK specifically, and only for it — the
+     `stages` pill and this law both stand unchanged.
    · Charcoal on every accent: the current pill's label is `--ink-on-accent`,
-     never white, in both palettes.
+     never white, in both palettes. (Also `stages`-only since 23 Sep 2026, for
+     the same reason — `steps`' current mark carries `--ink-on-inverse` now.)
    · Every pill is a pill (`--radius-pill`). No box radius reaches this file.
    · Disabled is a fill and an ink — `--surface-idle` with `--ink-disabled` —
      which is exactly how the kit already draws a LATER stage. "Later is
@@ -212,11 +221,18 @@ function plainNumber(value: number): string {
  * The system's record progression.
  *
  * TEN STATES
- *  1. default        — the kit's three positions at once: done stages on
- *                      `--surface-raised` with a tertiary-ink number, the
- *                      current stage on mango with a charcoal label at
- *                      weight 500, later stages on `--surface-idle` with
- *                      `--ink-disabled`.
+ *  1. default        — the kit's three positions at once, `stages` (the hero
+ *                      row of pills): done stages on `--surface-raised` with
+ *                      a tertiary-ink number, the current stage on mango with
+ *                      a charcoal label at weight 500, later stages on
+ *                      `--surface-idle` with `--ink-disabled`. `steps` (the
+ *                      chapter-15 rail, both orientations) draws its MARK
+ *                      differently since 23 Sep 2026 — done and current share
+ *                      one ink fill (`--surface-inverse`/`--ink-on-inverse`),
+ *                      told apart by the tick-vs-number glyph and the
+ *                      current mark's own extra weight; only later stays
+ *                      grey. See the `steps` mark's own render-site comment
+ *                      for Aurora's ruling and the full argument.
  *  2. hover          — a pressable stage takes one defined step from its own
  *                      fill: `--surface-quiet` for done and later,
  *                      `--btn-primary-hover` for the mango current pill. A
@@ -231,8 +247,9 @@ function plainNumber(value: number): string {
  *                      everything but markup. `aria-current` carries which
  *                      one is the present.
  *  5. disabled       — `disabled`: every stage renders as a span, and the
- *                      current pill keeps its mango because the record is
- *                      still at that stage — the progression is not
+ *                      current stage keeps its own fill (mango on `stages`,
+ *                      ink on `steps` since 23 Sep 2026) because the record
+ *                      is still at that stage — the progression is not
  *                      switched off, the navigation is. Later stages already
  *                      carry the disabled ink by design.
  *  6. loading        — does not apply, deliberately. A progression drawn
@@ -248,8 +265,13 @@ function plainNumber(value: number): string {
  *                      words); a poppy stage would put a status colour into
  *                      a position mark and break "one mango, and it is the
  *                      present". GAPS-CE STP-3.
- *  9. selected       — the current stage IS the selected one. Mango fill,
- *                      charcoal label, `aria-current="step"`.
+ *  9. selected       — the current stage IS the selected one, `aria-current=
+ *                      "step"` on every variant. `stages` still draws it with
+ *                      the mango fill and charcoal label chapter 23 specifies;
+ *                      `steps`' own MARK no longer carries an accent for this
+ *                      (23 Sep 2026 — see above), so "selected" there reads
+ *                      through the mark's ink fill plus its glyph and weight,
+ *                      not through colour.
  * 10. read-only      — every stepper without `onStageSelect` is read-only,
  *                      and that is the default. The stages become spans, so
  *                      there are no tab stops that do nothing.
@@ -351,9 +373,20 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   data-slot="status-stepper-mark"
                   className={cn(
                     markClasses,
-                    isDone && "bg-surface-inverse text-ink-on-inverse",
-                    isCurrent &&
-                      "bg-[var(--surface-brand)] text-ink-on-accent font-[var(--font-weight-medium)]",
+                    /* AURORA, 23 SEP 2026, VERBATIM: "on ticket stages, mark
+                       the active and past in black, only future are gray."
+                       See the horizontal `steps` block below for the full
+                       argument (this vertical wizard rail draws the identical
+                       mark, never wired to a real call site as of this pass,
+                       so it is fixed in step rather than left to drift the
+                       day something does call it). `isDone` and `isCurrent`
+                       now share the one ink fill; the checkmark-vs-number
+                       glyph is what still says which is which. */
+                    (isDone || isCurrent) && "bg-surface-inverse text-ink-on-inverse",
+                    // The current mark alone keeps the extra weight it always
+                    // had — the smallest non-colour mark of "you are here"
+                    // once the fill can no longer say it.
+                    isCurrent && "font-[var(--font-weight-medium)]",
                     !isDone && !isCurrent && "bg-surface-lift text-ink-tertiary shadow-[var(--hairline)]",
                   )}
                 >
@@ -448,9 +481,91 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                 data-slot="status-stepper-mark"
                 className={cn(
                   markClasses,
-                  isDone && "bg-surface-inverse text-ink-on-inverse",
-                  isCurrent &&
-                    "bg-[var(--surface-brand)] text-ink-on-accent font-[var(--font-weight-medium)]",
+                  /* AURORA, 23 SEP 2026, VERBATIM: "on ticket stages, mark
+                     the active and past in black, only future are gray."
+
+                     THIS RAIL IS THE TICKET LADDER (`web/components/tickets/
+                     ticket-stages.tsx`, this app's own `variant="steps"
+                     orientation="horizontal"` caller). The app lane that read
+                     her ruling found the label text was already ONE reading
+                     by inheritance — done and current both painted this
+                     span's own `text-foreground`, only a later stage dropped
+                     to `text-ink-tertiary` — so the label was never the
+                     problem. The THIRD reading was this mark: done took an
+                     ink circle with a tick, a later stage took a grey circle
+                     with its number, and the current stage alone took a
+                     MANGO circle with its number — the one accent in the
+                     view, which is exactly what her ruling is asking to
+                     stop.
+
+                     THE APP LANE ALSO TRIED, AND REJECTED, A LOCAL FIX:
+                     rebinding `--surface-brand`/`--ink-on-accent` from the
+                     app leaks, because `--warning-foreground` (the
+                     "Reopened" badge on the same ladder) resolves through
+                     `--ink-on-accent` too — repainting the mark black would
+                     repaint that badge's label and break its contrast on
+                     `--warning`. That is why this is a kit change and not an
+                     app-side rebind.
+
+                     THE FIX: `isCurrent` now takes the SAME ink fill `isDone`
+                     already takes — `--surface-inverse` / `--ink-on-inverse`,
+                     the token pair the vertical wizard rail's own mark has
+                     used from the start. A later stage is untouched, still
+                     `--surface-idle` / `--ink-disabled`. Two readings survive
+                     where three stood before: reached (ink) and not yet
+                     reached (grey) — which is her sentence exactly, "the
+                     active and past in black, only future are gray."
+
+                     A READER STILL SEES WHERE THEY ARE without a third
+                     colour, on THREE surviving, non-colour signals, none of
+                     them invented for this fix: (1) the mark's own CONTENT —
+                     a done stage draws the tick glyph, the current stage is
+                     the first mark still drawing a NUMBER, so the tick-to-
+                     number boundary in the row IS the position, structurally,
+                     the same way a reader finds today's date on a calendar by
+                     finding the boundary between the crossed-off days and the
+                     ones still blank; (2) `aria-current="step"` on the
+                     pressable/static stage below, unchanged; (3) weight — the
+                     current mark and its label both kept the
+                     `font-[var(--font-weight-medium)]` they already carried,
+                     so the current stage still reads slightly heavier than a
+                     done stage's tick or a later stage's grey number. Nothing
+                     new was invented here: this fix REMOVES the accent and
+                     keeps every signal that survives without one.
+
+                     SCOPE — checked against every variant and orientation
+                     this file draws, not only this one:
+                       · `steps` / horizontal (this block) — CHANGED. The
+                         ticket ladder, plus every other kit caller of
+                         `variant="steps"` with no explicit orientation
+                         (`import-wizard.tsx`, `run-steps.tsx`, `import.tsx`'s
+                         own rail) — same mark, same fix, so the rail does not
+                         draw one rule on the ticket screen and a different
+                         one inside an import dialog.
+                       · `steps` / vertical (the wizard rail, above) —
+                         CHANGED, for the same reason: it is the identical
+                         `markClasses` fill logic, laid out in a column rather
+                         than a row, and leaving it on mango would mean the
+                         same "current step" concept reads two different ways
+                         depending only on which way the rail is drawn.
+                       · `stages` (chapter 23's hero row of pills, this file's
+                         OTHER drawing, at the very bottom) — LEFT ALONE. It
+                         has no separate mark at all; the whole PILL is the
+                         position indicator, and colouring the current pill IS
+                         the drawing chapter 23 specifies ("current takes
+                         mango with a charcoal label"), ruled and measured
+                         under GAPS-CONTRAST §2 row 8 (see that block, below).
+                         Her ruling names "ticket stages" and the app's own
+                         reasoning names "the MARK, the small circle beside
+                         each label" — a structure `stages` does not have — so
+                         nothing here reaches it; `record-detail.tsx`'s own
+                         progression header and `import-proposal.tsx` both
+                         call `variant="stages"` and are unaffected. */
+                  (isDone || isCurrent) && "bg-surface-inverse text-ink-on-inverse",
+                  // The current mark alone keeps the extra weight it always
+                  // had — the smallest non-colour mark of "you are here" once
+                  // the fill can no longer say it on its own.
+                  isCurrent && "font-[var(--font-weight-medium)]",
                   /* Not yet reached. The paper tone IS the separation; the
                      edge is the artifact's hairline drawn as an inset shadow,
                      never a `border` property (review 1A · fix 2).

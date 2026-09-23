@@ -127,10 +127,20 @@ export function RolePickerDialog({
           className="gap-2"
         >
           {choices.map((r) => (
+            // PLAIN AT REST, AS OF 23 SEP 2026 — this row used to paint
+            // `bg-surface-panel` whether or not a reader was near it. Judged
+            // on its own merits today: a radio choice is not one of
+            // `PAPER_ON_PURPOSE`'s five things (not a conversation card, an
+            // empty or error state, a tile, a well, or a not-a-section) — it
+            // is a selectable row, R80's own shape ("rows are a list… no
+            // inner card"), and the app's other pickers (a Select's own
+            // options, the record picker) read plain at rest too. The
+            // pointer/keyboard affordance is the hover and rounded corners
+            // it already carried; only the RESTING fill is gone.
             <Label
               key={r.id}
               htmlFor={`role-${r.id}`}
-              className="hover:bg-muted/50 flex items-start gap-2 rounded-[var(--radius)] bg-surface-panel p-3 motion-hover"
+              className="hover:bg-muted/50 flex items-start gap-2 rounded-[var(--radius)] p-3 motion-hover"
             >
               <RadioGroupItem
                 id={`role-${r.id}`}

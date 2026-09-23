@@ -85,14 +85,19 @@ export function InvitationsPanel({ refresh }: { refresh: () => Promise<void> }) 
     )
   if (invites === undefined) return <Skeleton variant="list" lines={2} />
 
-  // Library List (flat surface + a fill to match the design language, per
-  // BUILD-A-SCREEN §6.1 — separation is a fill or an inset shadow, never a
-  // stroke). Rows aren't clickable — the trailing Accept button is the only
-  // action.
+  // PLAIN, ON THE PAGE — R67's 21 Sep 2026 flip to plain-by-default, applied
+  // here 23 Sep 2026 (Aurora: "make minimal the whole app, not only tickets
+  // anymore"). This used to carry a `rounded-[var(--radius)] bg-surface-panel`
+  // fill, reasoned off BUILD-A-SCREEN §6.1's OLD sentence ("separation is a
+  // fill or an inset shadow, never a stroke") from before that section's own
+  // scope narrowed to what a section still paints ON PURPOSE — and a plain
+  // list of invite rows is none of `PAPER_ON_PURPOSE`'s five things (not a
+  // conversation card, an empty/error state, a tile, a well, or a
+  // not-a-section). Rows aren't clickable — the trailing Accept button is the
+  // only action.
   return (
     <List
       surface="none"
-      className="rounded-[var(--radius)] bg-surface-panel"
       empty={t("No invites waiting for you.")}
       items={invites.map((inv) => ({
         id: inv.id,

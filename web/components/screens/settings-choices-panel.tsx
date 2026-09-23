@@ -683,33 +683,47 @@ export function SettingsChoicesPanel({
   //     third (after Status, which keeps the second one the morning reading
   //     gave it), holding only the text left once the mark is gone: Sprint
   //     type's own day-count `Badge`, the one real case.
-  //   • ADDED BY / ADDED ON FOLD BACK TOGETHER. Details reclaiming a header
-  //     seat puts the table at SEVEN named facts again (Value, Status,
-  //     Details, Where, Added by, Added on, Actions) the moment the two
-  //     Added columns stay split, one past R82's six-column ceiling, so they
-  //     fold back into one **Added** cell (who, over when), the same shape
-  //     the very first 21 Sep 2026 reading of K59 shipped, before the
-  //     same-day split this rulebook entry's own history records.
+  //   • ADDED BY / ADDED ON FOLD BACK TOGETHER (22 Sep 2026, THEN UNDONE THE
+  //     NEXT DAY). Details reclaiming a header seat put the table at SEVEN
+  //     named facts again (Value, Status, Details, Where, Added by, Added
+  //     on, Actions) the moment the two Added columns stayed split, one past
+  //     R82's six-column ceiling, so they folded back into one **Added**
+  //     cell (who, over when) that day. THE FOLD DID NOT SURVIVE — Aurora,
+  //     23 Sep 2026, reviewing this same screen, verbatim: "split added on
+  //     and by in 2 separate columns." Split again now, in the order she
+  //     wrote them (Added on, then Added by), and this time the seventh
+  //     column is not folded away — it is named in `TABLE_COLUMN_BUDGET_EXEMPT`
+  //     (shared/rules/registry.ts), R82's own sanctioned way past the
+  //     ceiling, because her ruling names the two columns outright and there
+  //     is nothing left here that is a candidate to fold instead. See
+  //     `shapeChoicesTable`'s own header (deep-link/shape.tsx) for the two
+  //     cells themselves and how each reads when empty.
   //   • THE HEADER SORT MOVES TO THE TOOLBAR. "Remove the sort from the
   //     headers and add it in toolbar", no `TableColumn` below carries a
   //     `sort` any more (the affordance R53 calls "a table already has its
   //     control" is retired for this one table, on her own instruction), and
   //     `config.sortable`/`sortOptions` below draw a `<SortControl>` in the
-  //     toolbar instead, offering Name and Added on, the same
-  //     `CollectionConfig` seam Stories' own List view already drives its
-  //     toolbar sort through (`shared/web/screen-engine/collection.ts`'s
-  //     `selectRows`, run by `CollectionFrame`, never a second sort engine).
+  //     toolbar instead, offering Name, Added on and (since the 23 Sep split,
+  //     below) Added by, the same `CollectionConfig` seam Stories' own List
+  //     view already drives its toolbar sort through
+  //     (`shared/web/screen-engine/collection.ts`'s `selectRows`, run by
+  //     `CollectionFrame`, never a second sort engine).
   //
-  // R82, RE-READ: `actions` counts toward the six-column ceiling.
-  // `table-column-budget`'s own census (web/test/table-column-budget.test.ts)
-  // asks only whether every element of a `TableColumn[]` literal carries a
-  // `key` AND a `label` property assignment, and this table's own `actions`
-  // entry below always has both (`label: ""` included), so seven NAMED
-  // facts is seven columns for this law's purposes, one past six, and the
-  // Added fold above is what holds the line rather than an optional tidy-up.
-  // The Module-into-Where fold is unaffected and unrelated: two different
-  // facts folded into two different columns for two different reasons, on
-  // the same table, is not a pattern straining under its own rule.
+  // R82, RE-READ, THEN RE-READ AGAIN 23 SEP 2026: `actions` counts toward
+  // the six-column ceiling. `table-column-budget`'s own census
+  // (web/test/table-column-budget.test.ts) asks only whether every element
+  // of a `TableColumn[]` literal carries a `key` AND a `label` property
+  // assignment, and this table's own `actions` entry below always has both
+  // (`label: ""` included), so seven NAMED facts is seven columns for this
+  // law's purposes, one past six. THE 22 SEP FOLD held the line by merging
+  // Added by/Added on back together; the 23 Sep UN-FOLD (her own ruling,
+  // above) reopens the seventh column on purpose, so the unscoped array
+  // below is named in `TABLE_COLUMN_BUDGET_EXEMPT` instead of folding
+  // anything else — the reasoned way R82 is built to be gone past, not a
+  // quiet breach of it. The Module-into-Where fold is unaffected and
+  // unrelated: two different facts folded into two different columns for two
+  // different reasons, on the same table, is not a pattern straining under
+  // its own rule.
   // THE WHERE COLUMN, DROPPED UNDER `scope.type` — 22 Sep 2026, see that
   // field's own header. Two full literals rather than one array with a
   // spliced-in element: `web/test/table-column-budget.test.ts`'s own census
@@ -723,7 +737,12 @@ export function SettingsChoicesPanel({
         { key: "value", label: t("Value"), searchKey: "valueText" },
         { key: "status", label: t("Status"), searchKey: "statusText" },
         { key: "details", label: t("Details") },
-        { key: "added", label: t("Added"), searchKey: "addedText" },
+        // ADDED ON / ADDED BY, split — see this file's header, "THE ADDED
+        // COLUMNS, SPLIT AGAIN". No `searchKey` on Added on: the cell IS its
+        // own plain text (`addedOn`), the same shape every other unset
+        // `searchKey` in this table already relies on.
+        { key: "addedOn", label: t("Added on") },
+        { key: "addedBy", label: t("Added by"), searchKey: "addedByText" },
         { key: "actions", label: "" },
       ]
     : [
@@ -741,10 +760,17 @@ export function SettingsChoicesPanel({
         // taken and for the same reason.
         { key: "details", label: t("Details") },
         { key: "where", label: t("Where"), searchKey: "whereText" },
-        // ADDED, who over when, folded back into one cell (see above).
-        // `addedText` (the plain first name, R54-trimmed) is the search key,
-        // since the cell itself (`added`) is a node, not text.
-        { key: "added", label: t("Added"), searchKey: "addedText" },
+        // ADDED ON / ADDED BY, split again — Aurora, 23 Sep 2026: "split
+        // added on and by in 2 separate columns." See this file's header,
+        // "THE ADDED COLUMNS, SPLIT AGAIN", for why this is a SEVENTH named
+        // column on this branch and where that is accounted for (R82,
+        // `TABLE_COLUMN_BUDGET_EXEMPT`) rather than folded again. Added on
+        // FIRST, then Added by — her own order. No `searchKey` on Added on:
+        // the cell IS its own plain text (`addedOn`, deep-link/shape.tsx).
+        { key: "addedOn", label: t("Added on") },
+        // `addedByText` (the plain first name, R54-trimmed) is the search
+        // key, since the cell itself (`addedBy`) is a node, not text.
+        { key: "addedBy", label: t("Added by"), searchKey: "addedByText" },
         // NO `label`/`sort`: an actions column is a control, never a fact to
         // order the table by (the same shape `record-table.tsx`'s OWN built-in
         // `actions` slot draws, used instead of that slot because its fixed
@@ -833,14 +859,23 @@ export function SettingsChoicesPanel({
     // collection.ts), the same seam Stories' own table view already drives
     // its toolbar sort through. Two options, both reading a RAW field the
     // row already carries beside its shaped cell, never the shaped text
-    // (`valueText` beside `value`, `createdAtRaw` beside `added`, the same
+    // (`valueText` beside `value`, `createdAtRaw` beside `addedOn`, the same
     // discipline the retired header sort's own `sortKey`s took, and ISO
     // instants compare correctly as plain strings, so no `sortType` is
     // needed here the way a `TableColumn` would have wanted one).
+    //
+    // A THIRD OPTION, 23 SEP 2026, THE SAME SESSION THE COLUMN SPLIT: once
+    // Added by is its own column (see this file's header, "THE ADDED
+    // COLUMNS, SPLIT AGAIN"), the toolbar offers ordering by it too, reading
+    // `addedByText` — the same plain first name the column's own `searchKey`
+    // already reads, never the shaped node. `createdAtRaw` keeps ordering
+    // "Added on"; it is the RAW instant the date column's `addedOn` cell was
+    // shaped from, unchanged by the split.
     sortable: true,
     sortOptions: [
       { value: "valueText", label: t("Name") },
       { value: "createdAtRaw", label: t("Added on"), defaultDir: "asc" },
+      { value: "addedByText", label: t("Added by") },
     ],
   }
 

@@ -17,6 +17,12 @@ import { logActivity, type Actor } from "@shared/workers/activity"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
+// THE ACCOUNT'S OWN ARCHIVED STATE (`accountArchivedClause`'s own header,
+// lib/help.ts) — a fact about the CLIENT, never about the ticket. This queue
+// builds its own WHERE by hand rather than through `ticketWhere` (it has no
+// account fence at all, by design — see `needsTriage`'s own header), so it
+// has to ask for this condition explicitly rather than inheriting it.
+import { accountArchivedClause } from "./help"
 import { workingDaysAgo, workingDaysBetween } from "@shared/business-days"
 
 /** How long a ticket may sit unread before it is somebody's problem out loud.
@@ -297,14 +303,15 @@ export async function needsTriage(
             -- case, SCOPE ch.07) still names somebody in the raisedBy cell.
             EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client
        FROM help
-      WHERE status = 'new' AND archived_at IS NULL AND created_at < ?
+      WHERE status = 'new' AND archived_at IS NULL AND ${accountArchivedClause()} AND created_at < ?
       ORDER BY created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [cutoff]
   )
   const counted = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM help WHERE status = 'new' AND archived_at IS NULL AND created_at < ?`,
+    `SELECT COUNT(*) AS n FROM help
+      WHERE status = 'new' AND archived_at IS NULL AND ${accountArchivedClause()} AND created_at < ?`,
     [cutoff]
   )
   return {

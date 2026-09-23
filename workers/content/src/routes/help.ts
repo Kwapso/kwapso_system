@@ -267,7 +267,12 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // deliberately ignores the view: opening an ARCHIVED ticket by id has to work,
   // or nothing could ever be restored.
   if (id) {
-    const one = await getTicket(cfg, guard, scope, id)
+    // hideArchivedAccount: this IS the display surface — the deep link, and
+    // the exact door `list_help_tickets`' own `id` parameter calls
+    // (shared/workers/tool-catalog.ts) — so it asks `getTicket` for the
+    // reader's question rather than the existence question a mutation's
+    // pre-check needs (Aurora's ruling, 23 Sep 2026: getTicket's own header).
+    const one = await getTicket(cfg, guard, scope, id, { hideArchivedAccount: true })
     const counts = await countTickets(cfg, guard, scope, filter)
     return pagedJson(
       "tickets",

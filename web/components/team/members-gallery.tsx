@@ -408,23 +408,32 @@ export function MembersGallery({
   const invitesBadge = formatCount(pending.length)
 
   return (
-    /* THE CONTAINER — "nothing on top of white background, its a rule!"
-       (client, 2026-09-09). AMENDED 21 SEP 2026 — the same finding, and the
-       same fix, `roles-matrix.tsx` carries in full: this tab's toolbar sat
-       32px under the tab strip and 32px in from the pane edge, because
-       `<TeamPanel>` (default `narrowGround`, always soft paper) wrapped the
-       heading, the toolbar AND the wall together inside its own
-       `p-6 lg:p-[var(--space-7)]` inset — every OTHER toolbar in the app
-       sits 10px under its strip and flush with the pane edge (R83). The
-       outer box is `<CollectionCard>` now (plain, the app's own R83 seam —
-       it publishes `--toolbar-lead-gap` on itself), and `<TeamPanel>` moved
-       DOWN, wrapping only the wall of member cards (and the invites
-       disclosure above it) — the soft paper those `raised` cards genuinely
-       need for contrast, unchanged from what this comment always argued.
-       The wall itself still keeps `CardGrid`'s default `tone="bare"`: the
-       ground is paid for one level down now instead of one level up, and a
-       second `bg-surface-panel` inside THAT panel would still be the 1.000
-       team-panel.tsx's own header measures against.
+    /* THE CONTAINER — plain, throughout, as of 23 Sep 2026. Aurora: "the
+       whole settings module does not have the mibnimal aspect! Make minimal
+       the whole app, not only tickets anymore." AMENDED 21 SEP 2026 first:
+       this tab's toolbar sat 32px under the tab strip and 32px in from the
+       pane edge, because `<TeamPanel>` (default `narrowGround`, then always
+       soft paper) wrapped the heading, the toolbar AND the wall together
+       inside its own `p-6 lg:p-[var(--space-7)]` inset — every OTHER toolbar
+       in the app sits 10px under its strip and flush with the pane edge
+       (R83). The outer box became `<CollectionCard>` (plain, the app's own
+       R83 seam — it publishes `--toolbar-lead-gap` on itself), and
+       `<TeamPanel>` moved DOWN, wrapping only the wall of member cards (and
+       the invites disclosure above it).
+
+       AMENDED AGAIN 23 SEP 2026 — the paper that move kept turned out to be
+       wrong, not merely old. The member cards below are `Card
+       variant="default"` (soft paper, `bg-surface-panel`) standing directly
+       on the plain page — the exact "per-record card in a grid" reading
+       `PAPER_ON_PURPOSE` already names this file for, the same shape
+       Accounts/Apps/Contacts use. Wrapping that wall in `<TeamPanel>`'s own
+       soft-paper fill put a `bg-surface-panel` card inside a
+       `bg-surface-panel` panel — contrast 1.000, the identical bug this file
+       existed to fix, recreated in the other direction once the cards
+       stopped being `raised`. `team-panel.tsx` no longer paints anything
+       (its own header carries the full account); `<TeamPanel>` stays here
+       for its spacing rhythm only (`flex flex-col gap-4`), not for a ground
+       neither it nor the wall need any more.
 
        NO `className="relative"` HERE ANY MORE — that was the positioning
        context for a gear docked to this card's own corner, 2026-09-14 to
@@ -606,12 +615,12 @@ export function MembersGallery({
             }
           />
 
-          {/* THE PAPER MOVES DOWN HERE — `<TeamPanel>` no longer wraps the
-              toolbar above (21 Sep 2026, this file's header). It wraps only
-              what still needs it: the invites disclosure and the wall of
-              `raised` member cards, which measure 1.000 against the plain
-              page ground without a soft-paper band under them (team-panel.tsx
-              carries the full argument and the measured contrast). */}
+          {/* SPACING ONLY, NOT A GROUND, AS OF 23 SEP 2026 — `<TeamPanel>`
+              still wraps the invites disclosure and the wall, but only for
+              its `gap-4` rhythm between them now. The member cards below are
+              `variant="default"` soft paper standing directly on the plain
+              page (see the container comment above for the measured
+              argument); a panel fill here would double it. */}
           <TeamPanel>
           {/* THE PANEL'S OWN RHYTHM, KEPT BETWEEN THESE THREE AND NOWHERE ELSE
               — `gap-4`, the number `TeamPanel` spends on its children, which
@@ -653,13 +662,15 @@ export function MembersGallery({
                 ) : (
                   <List
                     surface="none"
-                    /* OFF-BEIGE, NOT SOFT PAPER — this line said
-                       `bg-surface-panel` while the section had no ground of its
-                       own, which was right then and is the 1.000 bug now that the
-                       section IS a soft-paper panel. RULES.md §2.6 in one edit: a
-                       block takes the OTHER paper tone from the band it stands
-                       in. Measured on the panel: 1.103 light, 1.111 dark. */
-                    className="rounded-[var(--radius)] bg-card"
+                    /* PLAIN, AS OF 23 SEP 2026 — this line painted `bg-card`
+                       to read against `<TeamPanel>`'s own soft-paper band; the
+                       band is gone (see the container comment above), so the
+                       "other tone" argument no longer has a panel to answer
+                       to. A plain list of pending invites is not one of
+                       `PAPER_ON_PURPOSE`'s five things, the same reading
+                       `settings-screen.tsx`'s own "Invites waiting for you"
+                       list and `web/components/team/invitations.tsx` already
+                       carry. */
                     items={pending.map((i) => ({
                       id: i.id,
                       initials: i.email.slice(0, 1).toUpperCase(),

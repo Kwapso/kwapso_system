@@ -218,13 +218,22 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
       ).toBe(false)
     })
 
-    it("pins the name column, and names the paper it paints", () => {
+    it("pins the name column, and names the ground it actually stands on", () => {
       // Twenty-two columns overflow; without this a role's band is bands of
       // `R C U D` with nothing saying whose they are. The ground is not
       // cosmetic — the wrong one is a pale band down every grid at rest.
+      // AMENDED 23 SEP 2026 — it used to be `"panel"`, matching the soft
+      // paper `TeamPanel` painted behind the grid; `team-panel.tsx` paints
+      // nothing any more (its own header carries the full account: both
+      // remaining callers' content already reads correctly against the
+      // plain page, so the wrapper was doubling a fill nothing needed), so
+      // the sticky column now reads the kit's own default ground, "page"
+      // (`bg-background`), matching what is actually behind it. The wrong
+      // one is still a pale band at rest either way, which is what makes
+      // this worth asserting rather than trusting.
       const src = source()
       expect(src).toContain("stickyNames")
-      expect(src).toContain('stickyGround="panel"')
+      expect(src).toContain('stickyGround="page"')
     })
 
     it("still owns the vocabulary this suite assumes", () => {

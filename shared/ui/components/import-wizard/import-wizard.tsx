@@ -388,11 +388,15 @@ export interface ImportWizardProps
  *                      and go back. Announced as an alert. A per-ROW failure
  *                      is not this: it is an outcome in the report table,
  *                      drawn as a `Badge` and chapter 9's ink message.
- *  9. selected       — the current step, on the rail: `StatusStepper`'s mango
- *                      current stage with its charcoal label, plus
- *                      `aria-current`. Both channels, because colour alone
- *                      must never carry a meaning. Row selection inside the
- *                      review step is `DataPreviewTable`'s.
+ *  9. selected       — the current step, on the rail: `StatusStepper`'s
+ *                      current mark, plus `aria-current`. AMENDED 23 SEP
+ *                      2026 — the mark no longer carries mango (Aurora's
+ *                      ruling, `status-stepper.tsx`'s own render-site
+ *                      comment on its `steps` mark); it now shares done's ink
+ *                      fill, told apart by its own number (done shows a tick)
+ *                      and its extra weight. `aria-current` is unchanged and
+ *                      still the second, non-colour channel. Row selection
+ *                      inside the review step is `DataPreviewTable`'s.
  * 10. read-only      — the `run` and `report` steps are read-only by nature:
  *                      nothing on them can be changed, so neither draws a
  *                      control that suggests otherwise. `Back` is withdrawn

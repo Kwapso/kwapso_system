@@ -169,7 +169,13 @@ export interface StepperHeroProps
  * The stage hero.
  *
  * TEN STATES
- *  1. default        — the pills, the current one carrying the only mango.
+ *  1. default        — `stages` doors (not `delivery`): the pills, the
+ *                      current one carrying the only mango. `door="delivery"`
+ *                      draws `variant="steps"` instead, whose current MARK no
+ *                      longer carries mango since 23 Sep 2026 (Aurora's
+ *                      ruling; see `status-stepper.tsx`'s own `steps` mark
+ *                      comment) — it shares done's ink fill, told apart by
+ *                      its glyph and weight.
  *  2. hover          — owned by `StatusStepper`'s pressable stage.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once.
  *  4. active/pressed — not drawn. Pressing a stage scrolls the record; the

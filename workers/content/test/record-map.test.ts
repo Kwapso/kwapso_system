@@ -416,3 +416,107 @@ describe("a retired row is not a neighbour", () => {
     expect(invented, `RETIRABLE names tables with no deactivated_at column: ${invented}`).toEqual([])
   })
 })
+
+describe("an archived account is not a neighbour, on any edge that reaches one", () => {
+  // HOLE TWO. `neighbourhood` builds its own SQL per edge and never asks
+  // help.ts's ticket filter, so the map could still draw a ticket beside an
+  // archived company after Aurora's ruling, 22-23 Sep 2026, that an archived
+  // account is "not visible anywhere" and — asked directly — "yes, archived
+  // accounts should hide their tickets too." `accounts` is never `from` on
+  // any edge (a company never points AT itself), so every edge that reaches
+  // one has `to: "accounts"`, and the fix (`liveOnly`'s own new clause) is
+  // one line that covers all of them by construction — proved here across
+  // more than the ticket edge that motivated it.
+  const accountEdges = RECORD_EDGES.filter((e) => e.to === "accounts")
+
+  it("names ten edges reaching accounts, so this is not a one-table fix", () => {
+    expect(accountEdges.map((e) => e.from).sort()).toEqual(
+      [
+        "account_links",
+        "apps",
+        "help",
+        "knowledge_sources",
+        "meetings",
+        "portal_users",
+        "sprints",
+        "tasks",
+        "todos",
+        "waves",
+      ].sort()
+    )
+  })
+
+  it("a ticket no longer draws its archived company as a neighbour", async () => {
+    const before = await map("help", "T_MAP")
+    expect((before.body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(true)
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    const after = await map("help", "T_MAP")
+    const nodes = after.body.nodes as { table: string; id: string }[]
+    expect(nodes.some((n) => n.table === "accounts"), "the archived account must be gone").toBe(false)
+    const links = after.body.links as { to: string }[]
+    expect(links.some((l) => l.to === "accounts:A_MAP")).toBe(false)
+    expect(
+      (after.body.total as number) < (before.body.total as number),
+      "absent, not counted — the same rule a denied module gets"
+    ).toBe(true)
+  })
+
+  it("…and the count agrees with the picture (R16)", async () => {
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    const { body } = await map("help", "T_MAP")
+    const nodes = body.nodes as { id: string }[]
+    expect(body.total).toBe(nodes.length - 1)
+  })
+
+  it("also proved on an edge that is not the ticket one", async () => {
+    // apps.account_id -> accounts ("is built for") — a second edge, to show
+    // the fix is the shared clause and not a special case for help.
+    const before = await map("apps", "APP_MAP")
+    expect((before.body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(true)
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    const after = await map("apps", "APP_MAP")
+    expect((after.body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(false)
+  })
+
+  it("a deactivated (merely inactive) account was ALREADY hidden — this fix adds a second, independent reason", async () => {
+    // `accounts` was already in RETIRABLE before this change (0117 predates
+    // it), so `liveOnly` already carried `AND o.deactivated_at IS NULL` for
+    // it — a deactivated (inactive) account never showed as a neighbour
+    // either, on its own, pre-existing and unrelated to archiving. What this
+    // fix adds is the SEPARATE `archived_at` clause: not a replacement for
+    // the deactivated check, a second one that fires when deactivated_at is
+    // still null. Proved together, so neither clause can be mistaken for
+    // covering the other.
+    db().exec(`UPDATE accounts SET deactivated_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    const deactivatedOnly = await map("help", "T_MAP")
+    expect(
+      (deactivatedOnly.body.nodes as { table: string }[]).some((n) => n.table === "accounts"),
+      "deactivated (inactive) alone already hid it before this fix — unrelated, pre-existing"
+    ).toBe(false)
+
+    db().exec(`UPDATE accounts SET deactivated_at = NULL, archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    const archivedOnly = await map("help", "T_MAP")
+    expect(
+      (archivedOnly.body.nodes as { table: string }[]).some((n) => n.table === "accounts"),
+      "archived alone, with deactivated_at back to null, must ALSO hide it — this fix's own clause, tested in isolation"
+    ).toBe(false)
+  })
+
+  it("standing ON the archived account still draws its own neighbours — the focus is exempt", async () => {
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    const { status, body } = await map("accounts", "A_MAP")
+    expect(status).toBe(200)
+    expect((body.focus as { label: string }).label).toBe("Mapland GmbH")
+    expect((body.nodes as { table: string }[]).some((n) => n.table === "help")).toBe(true)
+  })
+
+  it("un-archiving hands the account back as a neighbour — reversible, no second mechanism", async () => {
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = 'A_MAP'`)
+    expect(
+      (await map("help", "T_MAP")).body.nodes as { table: string }[]
+    ).not.toContainEqual(expect.objectContaining({ table: "accounts" }))
+    db().exec(`UPDATE accounts SET archived_at = NULL WHERE id = 'A_MAP'`)
+    const { body } = await map("help", "T_MAP")
+    expect((body.nodes as { table: string }[]).some((n) => n.table === "accounts")).toBe(true)
+  })
+})

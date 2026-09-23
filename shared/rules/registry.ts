@@ -2089,8 +2089,6 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "no human-to-human messaging feature exists — the app's two thread UIs (the AI assistant, ticket conversations) are both already-adopted, different kit parts (agent-chat, ticket-thread) solving a different problem.",
   "components/tiles":
     "the home screen (web/components/screens/home-screen.tsx) uses PulseBand/StatGrid small KPI cards plus a links list — not a big-number wall-screen tile grid.",
-  "components/map":
-    "no lat/lng, address-mapping, or map integration exists anywhere in web/, web-portal/, or shared/web/.",
   "components/compare":
     "no 2-4 record side-by-side comparison screen exists anywhere in the app.",
   "components/flowdetail":
@@ -5579,9 +5577,24 @@ export const STAFF_PILL_ROW_EXEMPT: Record<string, string> = {}
  * EMPTY ON THE DAY THIS LAW SHIPPED (16 Sep 2026): the one table this census
  * found over the ceiling — Waves' own `waveListColumns` — was fixed rather
  * than excused (the App fact moved onto the Account cell's own second line).
- * If this table ever gains a line, it is a real, reasoned exception, never a
- * placeholder for "do this later". */
-export const TABLE_COLUMN_BUDGET_EXEMPT: Record<string, string> = {}
+ *
+ * ONE LINE HELD HERE SINCE 23 SEP 2026 — Settings › Choices' own
+ * whole-team table (`SettingsChoicesPanel`, unscoped mounting only; the
+ * `scope.type`-narrowed branch stays at six, Where dropped, and is not this
+ * key at all). The table had already held Added by and Added on together in
+ * one cell for exactly this reason (22 Sep 2026: Details reclaiming its own
+ * column put the table at seven names, and the two Added facts were the fold
+ * that held the line). Aurora reopened it the next day, verbatim: "split
+ * added on and by in 2 separate columns" — a ruling that NAMES the two
+ * columns outright, leaving nothing here still a candidate to fold instead
+ * (Where, Details and Status are each named in their own right too, see
+ * `settings-choices-panel.tsx`'s own header for the accounting of every
+ * column on this table). The exemption is the sanctioned way past the
+ * ceiling for exactly this case, not a placeholder for "do this later". */
+export const TABLE_COLUMN_BUDGET_EXEMPT: Record<string, string> = {
+  "web/components/screens/settings-choices-panel.tsx#SettingsChoicesPanel":
+    "Aurora, 23 Sep 2026, verbatim: \"split added on and by in 2 separate columns.\" The whole-team Choices table's unscoped column list (Value, Status, Details, Where, Added on, Added by, Actions) is seven named facts because her ruling names both Added columns outright — nothing left on this table is a candidate to fold back the way Added by/Added on itself was folded on 22 Sep. The scope.type-narrowed branch of the same function stays within six (Where drops under a single-type scope) and is not this offender.",
+}
 
 // ── R83 (toolbar-lead-gap) ──────────────────────────────────────────────────
 

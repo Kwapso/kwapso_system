@@ -868,18 +868,26 @@ export function RolesMatrix({
   const notHeldWord = t("Not granted")
 
   return (
-    /* THE CONTAINER — "nothing on top of white background, its a rule!"
-       (client, 2026-09-09). AMENDED 21 SEP 2026: the outer box is now
-       `<CollectionCard>` (`@/components/deep-link/screen-bits`), the app's
-       own R83 seam — plain by default, it publishes `--toolbar-lead-gap` on
-       itself so the first thing inside it sits 10px under the tab strip and
-       flush with the pane edge, exactly like every other toolbar in the app.
-       `TeamPanel narrowGround={false}` moved DOWN, below the toolbar, and
-       wraps only the deactivated list and the matrix now — see that
-       component's own comment for why the kit's narrow `PermissionMatrix`
-       fallback still needs the soft paper it provides. The two sections on
-       this tab still agree with members-gallery.tsx's own container; only
-       the toolbar's position relative to it changed. */
+    /* THE CONTAINER — plain, throughout, as of 23 Sep 2026. Aurora: "the
+       whole settings module does not have the mibnimal aspect! Make minimal
+       the whole app, not only tickets anymore." AMENDED 21 SEP 2026 first:
+       the outer box became `<CollectionCard>` (`@/components/deep-link/
+       screen-bits`), the app's own R83 seam — plain by default, it publishes
+       `--toolbar-lead-gap` on itself so the first thing inside it sits 10px
+       under the tab strip and flush with the pane edge, exactly like every
+       other toolbar in the app. `TeamPanel narrowGround={false}` moved DOWN,
+       below the toolbar, wrapping the deactivated list and the matrix.
+
+       AMENDED AGAIN 23 SEP 2026 — `team-panel.tsx` no longer paints a ground
+       at either width. Below 45rem the kit's own narrow `PermissionMatrix`
+       fallback already paints its own per-module `bg-surface-panel` cards
+       (a not-a-section reading, same as any per-item card); at ≥45rem the
+       kit's `<table>` carries no fill anywhere in its body — verified off
+       the kit's own source — and the sticky name column now reads
+       `stickyGround="page"` (below) instead of `"panel"`, the kit's own
+       supported answer for exactly this "no panel behind the grid" case.
+       `TeamPanel` stays for its `gap-4` spacing rhythm only; see
+       `team-panel.tsx`'s own header for the full account. */
     <CollectionCard>
       <div className="flex min-w-0 flex-col">
       {/* THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
@@ -1009,13 +1017,13 @@ export function RolesMatrix({
         }
       />
 
-      {/* THE PAPER MOVES DOWN HERE — `TeamPanel narrowGround={false}` no
-          longer wraps the toolbar above (21 Sep 2026, this file's header).
-          It wraps only what still needs it: the kit's `PermissionMatrix`
-          swaps to a stack of hard-coded `bg-surface-panel` module cards
-          below 45rem, which on a soft-paper panel would measure 1.000 — see
-          team-panel.tsx's own comment for the full argument and the
-          measured contrast in both palettes. */}
+      {/* SPACING ONLY, NOT A GROUND, AS OF 23 SEP 2026 — `TeamPanel
+          narrowGround={false}` still wraps the deactivated list and the
+          matrix, but only for its `gap-4` rhythm between them now. Below
+          45rem the kit's own narrow cards paint their own soft paper; at
+          ≥45rem the sticky column reads `stickyGround="page"` below, so
+          nothing here needs a panel fill of its own any more (this file's
+          header carries the full account). */}
       <TeamPanel narrowGround={false}>
       {/* THE PANEL'S OWN RHYTHM, KEPT BETWEEN THESE TWO AND NOWHERE ELSE —
           `gap-4`, the same number `TeamPanel` spends on its own children,
@@ -1049,13 +1057,13 @@ export function RolesMatrix({
               nothing left for a future branch to fall outside of. */}
           <List
             surface="none"
-            // OFF-BEIGE, NOT SOFT PAPER — the same reasoning
-            // `members-gallery.tsx`'s Invites list carries: this panel is
-            // `narrowGround={false}` soft paper below 45rem and a bare kit
-            // `<Table>` above it, so a `bg-card` row is the OTHER paper
-            // tone either way, never the 1.000 pairing RULES.md §2.6 warns
-            // against.
-            className="rounded-[var(--radius)] bg-card"
+            // PLAIN, AS OF 23 SEP 2026 — this line painted `bg-card` to read
+            // against `TeamPanel`'s own soft-paper band at either width; the
+            // band is gone (this file's header carries the full account), so
+            // there is no longer another tone to answer to. A plain list of
+            // deactivated roles is not one of `PAPER_ON_PURPOSE`'s five
+            // things, the same reading every other disclosure list in
+            // Settings now carries.
             empty={t("No deactivated roles.")}
             items={inactiveRoles.map((role) => ({
               id: role.id,
@@ -1145,10 +1153,13 @@ export function RolesMatrix({
             // THE NAME COLUMN STAYS PINNED. Four roles no longer overflow (the
             // kit's width floor counts COLUMNS), but a dozen will — and then
             // the module each row is about is the thing that must not scroll
-            // away. `stickyGround` is the paper `TeamPanel` actually paints at
-            // the width this wide grid exists at — see this file's header.
+            // away. `stickyGround="page"`, AS OF 23 SEP 2026 — it used to be
+            // `"panel"`, matching the paper `TeamPanel` painted at this width;
+            // `TeamPanel` paints nothing now (this file's header), so the
+            // sticky column reads the kit's own default ground instead,
+            // `bg-background`, matching what is actually behind it.
             stickyNames
-            stickyGround="panel"
+            stickyGround="page"
             label={t("Roles and what each one may do")}
             state={activeRoles.length === 0 ? "empty" : "ready"}
             // TWO DIFFERENT ZEROS, ONE `emptyTitle`/`emptyDescription` PAIR —

@@ -1333,13 +1333,20 @@ export function shapeChoicesTable(
           <span className="min-w-0 truncate">{v.value}</span>
         </span>
       )
-      // ADDED, creator's face and first name, over the date. FOLDED BACK
-      // INTO ONE CELL, 22 Sep 2026 (later): Aurora's ruling put Details back
-      // at its own seat (this function's own header), which puts the table
-      // at seven named facts the moment Added by/Added on stay split, so
-      // they fold back into one Added cell, the same shape the very first
-      // 21 Sep 2026 reading of K59 shipped, before that same-day split
-      // (documents/UI-RULEBOOK.md's own K59 has the full back and forth).
+      // ADDED, creator's face and the date, SPLIT AGAIN — Aurora, 23 Sep
+      // 2026, verbatim: "split added on and by in 2 separate columns." The
+      // single "who over when" cell (this function's own history: split
+      // 21 Sep evening, folded back together 22 Sep once Details reclaimed
+      // its own seat and the fold was the only way to hold R82's six-column
+      // ceiling — documents/UI-RULEBOOK.md's K59 has the full back and
+      // forth) is two cells again, in the order she wrote them: Added on
+      // first, then Added by. THIS RE-OPENS THE SEVENTH COLUMN R82 EXISTS TO
+      // CATCH, and this time nothing here is a candidate to fold back into —
+      // her ruling names the two columns outright, so `settings-choices-
+      // panel.tsx`'s own unscoped column list is named in
+      // `TABLE_COLUMN_BUDGET_EXEMPT` (shared/rules/registry.ts) instead,
+      // R82's own sanctioned way out, a reasoned line rather than a silent
+      // breach.
       // R54: a dropdown value is written only by staff (every write door on
       // `selectable_data` refuses a portal caller, R21), so
       // `staffNameFromSnapshot` is unconditional here the way it is for every
@@ -1351,7 +1358,9 @@ export function shapeChoicesTable(
       // needs its own `sortType` declared where it lives, this table's own
       // sort lives in the TOOLBAR now (settings-choices-panel.tsx's
       // `sortOptions`), reading `createdAtRaw` below directly, never this
-      // formatted string).
+      // formatted string). The SAME `formatDate` every other date cell in
+      // this file reads (`shapeMembersList`'s "joined …", `shapeMeetingsList`'s
+      // `when`) — no new format invented for this column.
       const addedOn = v.createdAt ? formatDate(v.createdAt, lang) : ""
       return {
         id: v.id,
@@ -1404,24 +1413,45 @@ export function shapeChoicesTable(
         // Details has nothing left to say about, now that the icon/dot marks
         // moved to Value.
         details: detailsNode,
-        // THE ADDED CELL, who over when: the creator's face (R90's own
-        // "no photo field yet" shape, `SelectableValue` carries no picture,
-        // so `RecordMark` draws the initials tile alone off the name, the
-        // same gap the work-logs panel's own Logged-by filter already
-        // carries) and first name on the first line, the formatted date
-        // muted beneath it. `null`, never an empty wrapper, for a value with
-        // no audit block, the same "carries nothing" answer Details already
-        // gives R81.
-        added: addedByName ? (
+        // ADDED ON, its own column now, first (she wrote "added on and by",
+        // in that order). Plain formatted text, the same `formatDate` every
+        // other date cell in this file draws, and the same `""` fallback
+        // every other plain-text fact on this row already uses for "nothing
+        // recorded" (`whereField`, two lines up) — never a dash, never a
+        // placeholder word, the "carries nothing" answer R81 already gives
+        // Details a few lines up. INDEPENDENT OF THE PERSON NOW: the old
+        // coupled cell gated the date on `addedByName` too, so a seeded
+        // value with a `createdAt` and no `createdByName` — most of a team's
+        // vocabulary, seeded rather than typed in by hand — showed nothing
+        // at all. Split, this cell answers only for its own fact.
+        addedOn,
+        // ADDED BY, second. THE PERSON, DRAWN THE WAY THIS TABLE'S OWN
+        // NEIGHBOURS DRAW ONE (R35/R90): `shapeAccountsList`'s `manager`
+        // cell and `shapeMeetingsList`'s `attendeesCell`, one screen either
+        // side of this function, are both `<RecordMark … shape="round"
+        // size="choice" />` beside the name in a `flex items-center gap-2`
+        // span — the SAME shape, read here rather than invented. `shape=
+        // "round"` because this is a PERSON, not a company/account square
+        // (R60's own account-mark note, `shapeAccountsList` above, draws the
+        // opposite shape on purpose for that reason); `size="choice"`, the
+        // kit's smallest, is what a single table-row text line already needs
+        // without stretching the row taller (client ruling, 18 Sep 2026,
+        // quoted throughout this file). No second line under the name any
+        // more — the date moved to its own column — so this cell is one
+        // line, mark then name, same as `manager`'s. `SelectableValue`
+        // carries no picture (R90's own "no photo field yet" shape, the same
+        // gap the work-logs panel's own Logged-by filter carries), so
+        // `RecordMark` draws the initials tile alone off the name. `null`,
+        // never a blank avatar over an empty name, for a value with no
+        // recorded creator — the same seeded-vocabulary case `addedOn`'s own
+        // note above describes, now independently honest here too.
+        addedBy: addedByName ? (
           <span className="flex min-w-0 items-center gap-2">
             <RecordMark name={addedByName} shape="round" size="choice" />
-            <span className="flex min-w-0 flex-col">
-              <span className="min-w-0 truncate">{addedByName}</span>
-              {addedOn && <span className="text-muted-foreground text-xs">{addedOn}</span>}
-            </span>
+            <span className="min-w-0 truncate">{addedByName}</span>
           </span>
         ) : null,
-        addedText: addedByName,
+        addedByText: addedByName,
         // THE SORT'S OWN RAW VALUE, the RAW ISO instant, read by the
         // toolbar's own "Added on" `SortOption` (settings-choices-panel.tsx),
         // never the shaped `addedOn` string above

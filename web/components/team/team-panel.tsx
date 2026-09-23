@@ -1,58 +1,70 @@
-// THE TEAM TAB'S GROUND — one container, two sections, so they cannot disagree.
+// THE TEAM TAB'S OWN SPACING RHYTHM — no longer a ground.
 //
-// ── THE CLIENT'S RULE, VERBATIM, 2026-09-09 ─────────────────────────────────
+// ── WHAT THIS FILE WAS, KEPT FOR THE NEXT READER ────────────────────────────
+//
+// It used to paint `bg-surface-panel` behind the Members wall and the Roles
+// matrix, earned by the client's own words, 2026-09-09:
 //
 //   "more members in each row, too much blank space. needs container!! nothing
 //    on top of white background, its a rule!"
 //
-// She is stating a LAW, not asking for a box round one gallery: nothing sits
-// directly on the page ground. The kit already has that law written down and
-// this app already broke it on this exact tab.
+// At the time that was a real bug, not a style choice: both sections drew a
+// bare `<section>` on `<body className="bg-background">`, and their member
+// cards were `Card variant="raised"` — `bg-card`, which in light mode is the
+// SAME literal colour as `--background` (#FFFEF9). Contrast 1.000, held up by
+// the card's own shadow alone. This file existed to give those cards the
+// panel they needed to read against.
 //
-// ── WHAT WAS ACTUALLY ON SCREEN, AND WHY IT LOOKED LIKE "BLANK SPACE" ───────
+// ── WHY IT DOES NOT ANY MORE, AS OF 23 SEP 2026 ─────────────────────────────
 //
-// `members-gallery.tsx`'s own header claimed the wall "sits inside
-// `CollectionCard`, which is a `--surface-panel` box". It did not, and had not
-// since the tab was rebuilt: both sections rendered a bare `<section>` straight
-// onto `<body className="bg-background">`, and the member cells were
-// `Card variant="raised"` — `bg-card`.
+// Aurora, verbatim, 23 Sep 2026, over the whole settings module: "the whole
+// settings module does not have the mibnimal aspect! Make minimal the whole
+// app, not only tickets anymore." Read against R67 (21 Sep 2026: plain is the
+// DEFAULT now) and `PAPER_ON_PURPOSE` (the five things a grouping section may
+// still stand on paper for — a conversation card, an empty or error state, a
+// tile, a well, or a not-a-section) rather than against this file's own
+// history: this component is none of those five. It is a plain grouping
+// wrapper, and the 2026-09-09 bug it fixed no longer exists at either of its
+// two remaining call sites, for two independent, verified reasons — not
+// because a paragraph says so, because the tokens say so:
 //
-// In LIGHT, `--background`, `--card`, `--surface-raised` and `--popover` are
-// ALL `#FFFEF9`. So every member card measured CONTRAST 1.000 against the page
-// and was held up by `--shadow-rest` alone. `shared/ui/docs/RULES.md` §2.6 has
-// that exact pairing in its table of the two BAD rows —
+//   MEMBERS (members-gallery.tsx). The member cards moved from
+//   `variant="raised"` (`bg-card`, the 1.000 bug) to `variant="default"`
+//   (`bg-surface-panel`, soft paper) on 21 Sep 2026, the same day this app
+//   went plain-by-default — the identical move Accounts, Apps and Contacts
+//   made to their own gallery cards, and `members-gallery.tsx` is already
+//   named in `PAPER_ON_PURPOSE` for exactly this reason (a per-record card in
+//   a grid, standing on the plain page). A soft-paper card already reads at
+//   1.103 against the plain page directly. Wrapping that wall in ANOTHER
+//   soft-paper band (this file's own fill) put a `bg-surface-panel` card
+//   inside a `bg-surface-panel` panel — the 1.000 bug, recreated in the other
+//   direction, by the interaction of two separate, later, individually
+//   correct changes.
 //
-//     | `bg-background` | `<Card variant="raised">` | off-beige on off-beige · shadow only |
+//   ROLES (roles-matrix.tsx). The kit's `PermissionMatrix` (shared/ui/
+//   components/permission-matrix/permission-matrix.tsx) draws a bare
+//   `<table>` at width ≥45rem with no fill anywhere in its body — verified
+//   off the kit's own source, which carries exactly two hard-coded `bg-*`
+//   classes in the whole file, both on the narrow (<45rem) per-module cards,
+//   which paint their own soft paper regardless of context (a not-a-section
+//   reading, same as any other per-item card). The ONLY other background the
+//   kit ever paints is the sticky name column, and only when `stickyNames` is
+//   set — through `stickyGround`, a prop the kit defaults to `"page"`
+//   (`bg-background`) for exactly this "no panel behind the grid" case.
+//   `roles-matrix.tsx` used to override it to `"panel"` to match this file's
+//   own fill; now that this file paints nothing, it reads `"page"` instead —
+//   the kit's own supported answer, not a workaround.
 //
-// — and the reason it survived every static check is stated there too: "it was
-// found by looking at [the rendered page], not by reading a file." Which is
-// what the client just did. Her "too much blank space" and her "needs
-// container" are one fault, not two.
-//
-// ── THE ANSWER IS THE ONE THE REST OF THE APP ALREADY USES ──────────────────
-//
-// A card takes THE OTHER PAPER TONE from the band it stands in (§2.6). There
-// are two tones and no third: off-beige `--background` is the page, soft paper
-// `--surface-panel` is the panel. So a section on this page is a soft-paper
-// panel, and a card inside it is `raised` (off-beige). That is what
-// `CollectionFrame` does for every collection screen in the app — an off-beige
-// frame with a `--surface-panel` panel inside holding the toolbar and the rows
-// — and its own source states the numbers this container reproduces:
-// "Measured against the panel at #F7F2EB: 1.103 light, 1.111 dark."
-//
-// MEASURED HERE, on the running page, both palettes (2026-09-09):
-//
-//     light   panel #F7F2EB on page #FFFEF9      1.103
-//     light   raised card #FFFEF9 on panel       1.103
-//     dark    panel #1C1B18 on page #141310      1.079
-//     dark    raised card #26241F on panel       1.111
-//
-// against the 1.000 both sections were shipping in light.
-//
-// The inset is `p-6 lg:p-[var(--space-7)]` — the same 24/32 step
-// `collectionPanelVariants` and `CardGrid`'s own `tone="panel"` spend, so a
-// team panel and a collection panel are the same box and not two nearly-equal
-// ones.
+// So both remaining calls are now spacing-only. `narrowGround` is kept in the
+// signature, UNUSED, rather than deleted: `members-gallery-toolbar.test.tsx`
+// and `roles-matrix-toolbar.test.tsx` assert the literal `<TeamPanel>` /
+// `<TeamPanel narrowGround={false}>` JSX text at both call sites (proving the
+// toolbar sits OUTSIDE this wrapper's own box, R83) — an assertion that is
+// still true and still worth keeping, and rewriting two call sites' JSX text
+// to satisfy a prop this file no longer reads would be exactly the kind of
+// change that turns a real invariant into noise. If a THIRD caller ever wants
+// this component again for genuine soft paper, that is a new decision to
+// write down, not a default to fall back into.
 
 import * as React from "react"
 
@@ -61,57 +73,14 @@ import { cn } from "@shared/ui/lib/utils"
 export function TeamPanel({
   children,
   className,
-  /**
-   * DROP THE GROUND BELOW 45rem — the roles section, and ONLY because the
-   * kit's own `PermissionMatrix` forces it.
-   *
-   * Above 45rem that component draws a bare `<Table>` with no ground of its
-   * own, which is exactly what a panel is for. BELOW 45rem it swaps to
-   * `data-slot="permission-matrix-narrow"`, a stack of per-module cards each
-   * hard-coded `rounded-[var(--radius)] bg-surface-panel p-4` — soft paper,
-   * with no `tone` prop to say otherwise. Put a soft-paper panel behind those
-   * and every module card measures 1.000 in both palettes: the identical fault
-   * this container exists to fix, moved one breakpoint down.
-   *
-   * There is no third tone to reach for. Soft paper must stand on off-beige,
-   * so the kit's narrow matrix can ONLY stand on the page — and it is not
-   * standing on nothing while it does: below 45rem every module is already
-   * inside its own container, which is the client's rule satisfied by the kit
-   * rather than by us. The switch is written at `45rem` because that is the
-   * literal breakpoint `permission-matrix.tsx` swaps its two renders at
-   * (`min-[45rem]:hidden`); the two must never drift apart.
-   *
-   * THE UPSTREAM ASK, so this prop can be deleted rather than reworded:
-   * `PermissionMatrix` needs the `tone: "panel" | "bare"` that `CardGrid`
-   * already has, applied to its narrow render, so a caller can say "you are
-   * already on soft paper". Then both sections take the plain container and
-   * this flag goes.
-   *
-   * The token side needs nothing. `--btn-secondary-fill` is rebound by the
-   * GROUND (tokens.css: `.bg-surface-panel { --btn-secondary-fill:
-   * var(--surface-raised) }`), and a variant-prefixed class does not match that
-   * selector — but `:root`'s own base value is `var(--card)`, and
-   * `--surface-raised` IS `var(--card)`. Same colour either way, so the
-   * secondary controls inside (the reactivate chips) are off-beige on soft
-   * paper at every width, which is what ruling 01 asks for.
-   */
-  narrowGround = true,
+  /** UNUSED as of 23 Sep 2026 — see this file's own header. Kept so neither
+   * call site's JSX text has to change for a prop that decided a fill this
+   * component no longer paints. */
+  narrowGround: _narrowGround = true,
 }: {
   children: React.ReactNode
   className?: string
   narrowGround?: boolean
 }) {
-  return (
-    <section
-      className={cn(
-        "flex min-w-0 flex-col gap-4 rounded-[var(--radius)]",
-        narrowGround
-          ? "bg-surface-panel p-6 lg:p-[var(--space-7)]"
-          : "min-[45rem]:bg-surface-panel min-[45rem]:p-6 lg:p-[var(--space-7)]",
-        className
-      )}
-    >
-      {children}
-    </section>
-  )
+  return <div className={cn("flex min-w-0 flex-col gap-4", className)}>{children}</div>
 }

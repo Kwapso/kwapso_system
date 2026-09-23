@@ -495,23 +495,53 @@ export function TicketStages({
 
   const { rungs, current } = buildRungs(history?.spans ?? [], status, createdAt)
 
-  const stages: StatusStage[] = rungs.map((rung) => ({
+  // AURORA, 23 SEP 2026, VERBATIM: "on ticket stages, mark the active and
+  // past in black, only future are gray." Three readings collapsed into two:
+  // a rung at or behind the ticket's own position (`index <= current` — every
+  // stage it has already passed AND the one it stands on now) reads
+  // `text-foreground`, the app's ink; a rung still ahead reads
+  // `text-muted-foreground`, the app's muted text. Both are the exact tokens
+  // this file already spends elsewhere (the date line two lines down, the
+  // error line at the foot of this component) — no literal colour typed.
+  //
+  // BEFORE THIS PASS the name span carried no colour class of its own and
+  // inherited whatever `status-stepper.tsx`'s own wrapping `status-stepper-
+  // label` span painted it: `text-foreground` for BOTH done and current,
+  // `text-ink-tertiary` for later — which, name-for-name, is already the same
+  // two-reading split (`--ink-tertiary` IS `--muted-foreground`,
+  // tokens.css:1037). So spelling it out here changes no pixel; what it
+  // fixes is the THIRD reading the kit's inherited cascade could never reach:
+  // the MARK itself. `status-stepper.tsx`'s `steps` rail paints a `current`
+  // mark on mango (`bg-[var(--surface-brand)]`, chapter 15's own "current
+  // takes mango with a charcoal label") — a third fill beside done's ink
+  // circle and later's grey one, which is the "three readings" she is
+  // naming. That fill is drawn by the vendored kit, not by this component,
+  // and cannot be changed from here: a rebind of `--surface-brand`/`--ink-
+  // on-accent` scoped to this wrapper was tried on paper and rejected —
+  // `--warning-foreground` (the "Reopened" badge, below) resolves THROUGH
+  // `--ink-on-accent` too (tokens.css:506), so the same rebind that repaints
+  // the mango mark black would repaint that badge's own label to the wrong
+  // ink and break its contrast on `--warning`. Recolouring the mark itself is
+  // therefore a kit change (`shared/ui/components/status-stepper/status-
+  // stepper.tsx`), outside this file's own boundary and outside this ruling,
+  // which is scoped to the app. Reported, not silently patched around.
+  const stages: StatusStage[] = rungs.map((rung, index) => ({
     id: rung.key,
     // ONE BLOCK PER LINE INSIDE THE KIT'S OWN LABEL. The kit's label span is
     // `block w-full truncate`, so a `block` child inherits the width and gets
     // its OWN ellipsis — the column clips the name and the date separately
     // instead of one cutting the other short. THE NAME IS BACK, ABOVE THE
     // DATE, ON EVERY RUNG (this file's header, "AND THEN BACK", 19 Sep 2026)
-    // — it carries no colour class of its own, so it inherits the kit's own
-    // done/current/later ink straight off `status-stepper.tsx`'s wrapping
-    // `status-stepper-label` span (`text-ink-tertiary` later, `text-
-    // foreground` done, bold current): the same "later is disabled ink, not
-    // hidden" skin the mark already wears, applied to the word for free. The
-    // date stays the second line, unchanged, through `formatStageMoment`
+    // — and now carries its OWN colour, spelled out rather than inherited
+    // (see the 23 Sep 2026 comment above `stages`): `text-foreground` at or
+    // behind the ticket's own position, `text-muted-foreground` ahead of it.
+    // The date stays the second line, unchanged, through `formatStageMoment`
     // (shared/web/format.ts), one line, month/day/(year)/hour, no minutes.
     label: (
       <>
-        <span className="block truncate">{stageLabel(rung.status, t)}</span>
+        <span className={`block truncate ${index <= current ? "text-foreground" : "text-muted-foreground"}`}>
+          {stageLabel(rung.status, t)}
+        </span>
         {rung.reopened ? (
           // The one thing here that is not the name or the date. It stays a
           // Badge — this is the moment the ticket came back, and her

@@ -523,6 +523,46 @@ function archiveClause(view: "live" | "archived"): string {
   return view === "archived" ? "help.archived_at IS NOT NULL" : "help.archived_at IS NULL"
 }
 
+/** THE ACCOUNT'S OWN ARCHIVED STATE — Aurora's ruling, 23 Sep 2026, answering a
+ * question put to her directly: "yes, archived accounts should hide their
+ * tickets too." Her account ruling (0117) already made an archived company
+ * invisible everywhere ELSE a record can name it (the accounts list, a
+ * picker's own door query, a contact's Account column) — nothing filtered a
+ * TICKET by its client's archived state, so an archived company's name and
+ * problems kept showing in the tickets list, its facets, the dashboard, the
+ * triage queue and the generic record query tool.
+ *
+ * A SEPARATE CONDITION FROM `archiveClause`, DELIBERATELY, and never merged
+ * into it: `archiveClause` is a FACT ABOUT THE TICKET (did somebody put it
+ * away), this is a fact about the CLIENT (has their company been archived).
+ * Archiving an account must never silently archive its tickets, and a ticket
+ * archived on its own must not un-hide the moment its account is restored —
+ * `setTicketArchived` and `setAccountArchived` write two different columns on
+ * two different tables and neither reads the other's.
+ *
+ * A CORRELATED `EXISTS` WITH ITS OWN ALIAS, never a bare `archived_at` and
+ * never a join of its own. `countTicketFacets`'s own `perAccount` read already
+ * LEFT JOINs `accounts` (aliased `a`) over the SAME `ticketWhere` output this
+ * clause rides inside, and `readTicketDashboard`'s 2B panel does the same
+ * inside a CTE — a second, unaliased reference to `accounts` here would be
+ * exactly the ambiguity `archiveClause`'s own header describes SQLite
+ * refusing at runtime. This clause's own alias (`arc`) is scoped to its own
+ * subquery, so it can never collide with whatever the caller's own FROM/JOIN
+ * happens to alias `accounts` as.
+ *
+ * `account_id IS NULL` SHORT-CIRCUITS FIRST — not every ticket has a client
+ * (the agency's own housekeeping carries no account at all, and SCOPE ch.07
+ * is explicit that a request nobody filed against a company is still a real
+ * ticket), and a ticket with no account has no archived state to inherit: it
+ * must never be hidden by a predicate about a company it was never raised
+ * against. */
+export function accountArchivedClause(table = "help"): string {
+  const col = (name: string) => `${table}.${name}`
+  return `(${col("account_id")} IS NULL OR EXISTS (
+    SELECT 1 FROM accounts arc WHERE arc.id = ${col("account_id")} AND arc.archived_at IS NULL
+  ))`
+}
+
 /** WHAT THE SEARCH BOX ON THE TICKETS SCREEN ASKS THE SERVER. It rides the list
  * AND the count, so the number beside the results counts the same question the
  * rows answer.
@@ -860,7 +900,17 @@ function ticketWhere(
     searchClause(filter.q),
   ].filter((p) => p.sql)
   return {
-    sql: [archiveClause(filter.view), ...(fence.sql ? [fence.sql] : []), ...parts.map((p) => p.sql)],
+    sql: [
+      archiveClause(filter.view),
+      // THE ACCOUNT'S OWN ARCHIVED STATE — see `accountArchivedClause`'s own
+      // header. Unconditional, exactly like `archiveClause` above it: there is
+      // no "show me the archived clients' tickets too" view, because her
+      // ruling was that an archived account is invisible everywhere, not that
+      // it gets a drawer of its own the way a put-away TICKET does.
+      accountArchivedClause(),
+      ...(fence.sql ? [fence.sql] : []),
+      ...parts.map((p) => p.sql),
+    ],
     params: [...fence.params, ...parts.flatMap((p) => p.params)],
   }
 }
@@ -1728,7 +1778,23 @@ export async function getTicket(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  id: string
+  id: string,
+  opts: {
+    /** THE DISPLAY SURFACE'S OWN OPT-IN, off by default. Most callers of this
+     * function are not showing a ticket at all — they are resolving one to
+     * check it exists before a mutation (`postHelpStatus`'s own 404 message),
+     * to notify about it, or to echo the row a write just touched back to the
+     * screen that made it (`ticketMutationReply`). Aurora's ruling ("archived
+     * accounts should hide their tickets too") is about DISCOVERING a ticket
+     * on a company that has been put away, never about refusing staff a write
+     * they deliberately aimed at an id they already had — so a mutation still
+     * succeeds against a ticket on an archived account, and this stays false
+     * for every one of those internal callers. Only the door that hands a
+     * ticket to a READER by id — `GET /api/content/help?id=`, which is also
+     * what `list_help_tickets`'s own `id` parameter calls
+     * (shared/workers/tool-catalog.ts) — passes `true`. */
+    hideArchivedAccount?: boolean
+  } = {}
 ): Promise<HelpTicket | null> {
   // The fence rides the WHERE here too: a by-id lookup that skipped it would be
   // the leak in its most convenient form (one id, one ticket, no list to page).
@@ -1736,7 +1802,9 @@ export async function getTicket(
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TICKET_COLS} FROM help WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
+    `SELECT ${TICKET_COLS} FROM help WHERE id = ?${
+      opts.hideArchivedAccount ? ` AND ${accountArchivedClause()}` : ""
+    }${fence.sql ? ` AND ${fence.sql}` : ""}`,
     [id, ...fence.params]
   )
   return rows[0] ? toTicket(rows[0], scope) : null

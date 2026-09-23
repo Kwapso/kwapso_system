@@ -485,8 +485,13 @@ export interface ImportScreenProps
  *                      that keeps the commit control live, and a row that
  *                      could not be written is DATA on the report step, drawn
  *                      as `DataPreviewTable`'s `invalid` outcome.
- *  9. selected       — the current step, `StatusStepper`'s mango, with
+ *  9. selected       — the current step, `StatusStepper`'s current mark, with
  *                      `aria-current="step"` beside it. Colour never alone.
+ *                      AMENDED 23 SEP 2026 — the mark itself dropped mango
+ *                      (Aurora's ruling, `status-stepper.tsx`'s own `steps`
+ *                      mark comment); it now shares done's ink fill, told
+ *                      apart by its own glyph (a number, not a tick) and its
+ *                      extra weight, plus `aria-current` unchanged.
  * 10. read-only      — the report step is read-only by nature: nothing on it
  *                      can be changed, so `Back` is withdrawn rather than
  *                      drawn dead. A reader with no import right never

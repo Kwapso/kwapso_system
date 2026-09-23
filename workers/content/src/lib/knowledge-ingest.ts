@@ -400,7 +400,18 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "ticket",
     table: "help",
     label: "tickets",
-    textVersion: 1,
+    // v2: 23 Sep 2026 — Aurora's ruling, answering a direct question: "yes,
+    // archived accounts should hide their tickets too." The ticket screens
+    // already obey it (`accountArchivedClause`, workers/content/src/lib/
+    // help.ts) but this reader — the one that feeds the assistant — did not,
+    // so an archived company's tickets stayed embedded and quotable
+    // indefinitely. `retired` now also fires when the ticket's OWN account is
+    // archived (a SEPARATE fact from the ticket's own `archived_at`, read off
+    // its own aliased column, never a bare one — see `account_archived_at`
+    // below). The bump is what walks the cursor back over every ticket
+    // already filed so an account archived before this shipped is caught up
+    // on the next full rewalk rather than only from here on.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, TICKET_SORT, "h.id")
       const rows = await d1Query<{
@@ -417,6 +428,11 @@ export const INGEST_KINDS: IngestKind[] = [
         app_name: string | null
         raised_by: string | null
         archived_at: string | null
+        // THE ACCOUNT'S OWN ARCHIVED STATE, aliased to its own name so it can
+        // never collide with the ticket's own `h.archived_at` above — the exact
+        // ambiguity `help.ts`'s `accountArchivedClause` header describes SQLite
+        // refusing at runtime, reproduced here if this were ever selected bare.
+        account_archived_at: string | null
         created_at: string
         sort_at: string
         thread: string | null
@@ -433,7 +449,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // questions. They come back marked `retired`, and the source is
         // deactivated — which is what "take it away" already means here.
         `SELECT h.id, h.ref, h.title_en, h.title_de, h.description, h.help_type, h.status, h.account_id,
-                h.app_id, h.archived_at, h.created_at, a.name AS account_name,
+                h.app_id, h.archived_at, h.created_at, a.name AS account_name, a.archived_at AS account_archived_at,
                 ${TICKET_SORT} AS sort_at,
                 (SELECT ap.name FROM apps ap WHERE ap.id = h.app_id) AS app_name,
                 (SELECT c.name FROM accounts c WHERE c.id = h.raised_by_contact_id) AS raised_by,
@@ -487,7 +503,10 @@ export const INGEST_KINDS: IngestKind[] = [
           ticketId: r.id,
           recordDate: r.created_at,
           sourceUrl: null,
-          retired: r.archived_at !== null,
+          // TWO SEPARATE FACTS, both retire the source: the ticket's own
+          // put-away state, and the client's — Aurora's ruling that an
+          // archived account's tickets must hide too.
+          retired: r.archived_at !== null || r.account_archived_at !== null,
           ownerUserId: null,
         }
       })
@@ -551,7 +570,14 @@ export const INGEST_KINDS: IngestKind[] = [
     // v7: team migration 0116, 22 Sep 2026 — the account's own website joins
     // the contact line beside email and phone. An account with none set
     // reads exactly as before; one that has it now says so.
-    textVersion: 7,
+    // v8: 23 Sep 2026 — team migration 0117 gave an account a SECOND, stronger
+    // put-away state (`archived_at`, beside the existing `deactivated_at`),
+    // and Aurora's ruling is that an archived account is "not visible
+    // anywhere". This reader's own `retired` only ever looked at
+    // `deactivated_at`, so an archived company's own rollup — its systems,
+    // its people, its open tickets — stayed embedded and quotable. The bump
+    // walks the cursor back over every account already filed.
+    textVersion: 8,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -575,6 +601,7 @@ export const INGEST_KINDS: IngestKind[] = [
         about: string | null
         parent_name: string | null
         deactivated_at: string | null
+        archived_at: string | null
         created_at: string
         sort_at: string
         apps: string | null
@@ -597,7 +624,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // by 25 accounts, not by how many accounts the team has.
         `SELECT a.id, a.name, a.account_type, a.code, a.status, a.email, a.phone, a.address,
                 a.street, a.postal_code, a.city, a.country, a.industry, a.website, a.about,
-                a.deactivated_at, a.created_at,
+                a.deactivated_at, a.archived_at, a.created_at,
                 (SELECT p.name FROM accounts p WHERE p.id = a.parent_account_id) AS parent_name,
                 COALESCE(a.updated_at, a.created_at) AS sort_at,
                 ${childLines(
@@ -721,7 +748,11 @@ export const INGEST_KINDS: IngestKind[] = [
           // A row this app owns — it belongs to the team, not to one person.
           ownerUserId: null,
           sourceUrl: null,
-          retired: r.deactivated_at !== null,
+          // TWO INDEPENDENT PUT-AWAY STATES on the SAME row (0117's own header:
+          // "two independent nullable timestamps, not one three-value column"),
+          // and either one retires this source — INACTIVE always did, and
+          // ARCHIVED (the stronger, "not visible anywhere" state) now does too.
+          retired: r.deactivated_at !== null || r.archived_at !== null,
         }
       })
     },
@@ -741,7 +772,14 @@ export const INGEST_KINDS: IngestKind[] = [
     label: "contacts",
     // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 2,
+    // v3: 23 Sep 2026 — a contact is filed under the COMPANY's compartment
+    // ("THE COMPANY'S compartment, not the person's", below), so it is the
+    // COMPANY's own archived state that retires it, read off its own aliased
+    // column (`company_archived_at`) so it can never collide with `p`'s or
+    // any other joined `archived_at`. Aurora's ruling, 23 Sep 2026: an
+    // archived account is "not visible anywhere". The bump walks the cursor
+    // back over every contact already filed.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(l.updated_at, l.created_at)", "l.id")
       const rows = await d1Query<{
@@ -755,6 +793,7 @@ export const INGEST_KINDS: IngestKind[] = [
         phone: string | null
         about: string | null
         deactivated_at: string | null
+        company_archived_at: string | null
         created_at: string
         sort_at: string
       }>(
@@ -762,7 +801,8 @@ export const INGEST_KINDS: IngestKind[] = [
         guard.databaseId,
         // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
         `SELECT l.id, l.relationship, l.is_main_stakeholder, l.account_id, l.deactivated_at, l.created_at,
-                c.name AS company_name, p.name AS person_name, p.email, p.phone, p.about,
+                c.name AS company_name, c.archived_at AS company_archived_at,
+                p.name AS person_name, p.email, p.phone, p.about,
                 COALESCE(l.updated_at, l.created_at) AS sort_at
            FROM account_links l
            JOIN accounts c ON c.id = l.account_id
@@ -800,7 +840,7 @@ export const INGEST_KINDS: IngestKind[] = [
           recordDate: r.created_at,
           ownerUserId: null,
           sourceUrl: null,
-          retired: r.deactivated_at !== null,
+          retired: r.deactivated_at !== null || r.company_archived_at !== null,
         }
       })
     },
@@ -825,7 +865,12 @@ export const INGEST_KINDS: IngestKind[] = [
     //
     // v3: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 3,
+    // v4: 23 Sep 2026 — an app built for an archived account now retires too,
+    // Aurora's ruling that an archived account is "not visible anywhere".
+    // `account_archived_at` rides its own alias, never bare, beside `ap`'s
+    // own `deactivated_at`. The bump walks the cursor back over every app
+    // already filed.
+    textVersion: 4,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(ap.updated_at, ap.created_at)", "ap.id")
       const rows = await d1Query<{
@@ -840,6 +885,7 @@ export const INGEST_KINDS: IngestKind[] = [
         account_id: string | null
         account_name: string | null
         deactivated_at: string | null
+        account_archived_at: string | null
         created_at: string
         sort_at: string
         processes: string | null
@@ -852,7 +898,8 @@ export const INGEST_KINDS: IngestKind[] = [
         // question is about, so the process names ride the same read.
         `SELECT ap.id, ap.name, ap.url, ap.stage, ap.about, ap.client_context, ap.solution, ap.key_actors,
                 ap.account_id, ap.deactivated_at, ap.created_at,
-                a.name AS account_name, COALESCE(ap.updated_at, ap.created_at) AS sort_at,
+                a.name AS account_name, a.archived_at AS account_archived_at,
+                COALESCE(ap.updated_at, ap.created_at) AS sort_at,
                 ${childLines(
                   `SELECT name AS line FROM processes
                     WHERE app_id = ap.id AND deactivated_at IS NULL ORDER BY name LIMIT ${PROCESS_STEPS}`
@@ -916,7 +963,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // A row this app owns — it belongs to the team, not to one person.
         ownerUserId: null,
         sourceUrl: r.url,
-        retired: r.deactivated_at !== null,
+        retired: r.deactivated_at !== null || r.account_archived_at !== null,
       }))
     },
   },
@@ -946,7 +993,12 @@ export const INGEST_KINDS: IngestKind[] = [
     // out here specifically: a process's own name is one R87's FORM cap
     // deliberately never covers, so this is the one kind where the clamp is
     // not just a legacy-row backstop.
-    textVersion: 3,
+    // v4: 23 Sep 2026 — a process map for an archived account now retires
+    // too (Aurora's ruling, "not visible anywhere"), read off its own
+    // aliased `account_archived_at`, never bare against `p`'s own
+    // `deactivated_at`. The bump walks the cursor back over every process
+    // map already filed.
+    textVersion: 4,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(p.updated_at, p.created_at)", "p.id")
       const rows = await d1Query<{
@@ -962,6 +1014,7 @@ export const INGEST_KINDS: IngestKind[] = [
         steps: string | null
         comments: string | null
         deactivated_at: string | null
+        account_archived_at: string | null
         created_at: string
         sort_at: string
       }>(
@@ -972,7 +1025,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // its own inner select.
         `SELECT p.id, p.name, p.description, p.role_name, p.account_id, p.app_id,
                 p.deactivated_at, p.created_at,
-                a.name AS account_name, ap.name AS app_name,
+                a.name AS account_name, a.archived_at AS account_archived_at, ap.name AS app_name,
                 COALESCE(p.updated_at, p.created_at) AS sort_at,
                 (SELECT MAX(v.version_no) FROM process_versions v WHERE v.process_id = p.id) AS version_no,
                 ${childLines(
@@ -1033,7 +1086,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // A row this app owns — it belongs to the team, not to one person.
         ownerUserId: null,
         sourceUrl: null,
-        retired: r.deactivated_at !== null,
+        retired: r.deactivated_at !== null || r.account_archived_at !== null,
       }))
     },
   },
@@ -1050,7 +1103,11 @@ export const INGEST_KINDS: IngestKind[] = [
     label: "sprints",
     // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 2,
+    // v3: 23 Sep 2026 — a sprint sold to an archived account now retires too
+    // (Aurora's ruling, "not visible anywhere"), read off its own aliased
+    // `account_archived_at`, never bare against `sp`'s own `deactivated_at`.
+    // The bump walks the cursor back over every sprint already filed.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(sp.updated_at, sp.created_at)", "sp.id")
       const rows = await d1Query<{
@@ -1068,6 +1125,7 @@ export const INGEST_KINDS: IngestKind[] = [
         app_name: string | null
         stories: string | null
         deactivated_at: string | null
+        account_archived_at: string | null
         created_at: string
         sort_at: string
       }>(
@@ -1077,7 +1135,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // capped at its own inner select.
         `SELECT sp.id, sp.ref, sp.name, sp.sprint_type, sp.goal, sp.starts_on, sp.ends_on, sp.completed_at,
                 sp.account_id, sp.app_id, sp.deactivated_at, sp.created_at,
-                a.name AS account_name, ap.name AS app_name,
+                a.name AS account_name, a.archived_at AS account_archived_at, ap.name AS app_name,
                 COALESCE(sp.updated_at, sp.created_at) AS sort_at,
                 ${childLines(
                   `SELECT s.title || ' (' || REPLACE(s.status, '_', ' ') || ')' AS line FROM stories s
@@ -1125,7 +1183,7 @@ export const INGEST_KINDS: IngestKind[] = [
           // A row this app owns — it belongs to the team, not to one person.
           ownerUserId: null,
           sourceUrl: null,
-          retired: r.deactivated_at !== null,
+          retired: r.deactivated_at !== null || r.account_archived_at !== null,
         }
       })
     },
@@ -1137,7 +1195,13 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "story",
     table: "stories",
     label: "stories",
-    textVersion: 1,
+    // v2: 23 Sep 2026 — this reader never retired a source at all (nothing
+    // about a story's own status makes its material stop being citable). It
+    // gains its first reason: a story for an archived account now retires,
+    // Aurora's ruling that an archived account is "not visible anywhere",
+    // read off its own aliased `account_archived_at`. The bump walks the
+    // cursor back over every story already filed.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(s.updated_at, s.created_at)", "s.id")
       const rows = await d1Query<{
@@ -1155,6 +1219,7 @@ export const INGEST_KINDS: IngestKind[] = [
         ticket_id: string | null
         sprint_id: string | null
         account_name: string | null
+        account_archived_at: string | null
         app_name: string | null
         sprint_name: string | null
         ticket_ref: string | null
@@ -1169,7 +1234,8 @@ export const INGEST_KINDS: IngestKind[] = [
         // capped at its own inner select.
         `SELECT s.id, s.ref, s.title, s.detail, s.status, s.story_type, s.closing_note, s.review_note,
                 s.assignee_name, s.account_id, s.app_id, s.ticket_id, s.sprint_id, s.created_at,
-                a.name AS account_name, ap.name AS app_name, sp.name AS sprint_name, h.ref AS ticket_ref,
+                a.name AS account_name, a.archived_at AS account_archived_at,
+                ap.name AS app_name, sp.name AS sprint_name, h.ref AS ticket_ref,
                 COALESCE(s.updated_at, s.created_at) AS sort_at,
                 ${childLines(
                   `SELECT pr.name AS line FROM story_processes stp
@@ -1226,6 +1292,9 @@ export const INGEST_KINDS: IngestKind[] = [
         // The customer spine is the team's, like every other row this app owns.
         ownerUserId: null,
         sourceUrl: null,
+        // THE ONLY REASON A STORY RETIRES: its account has been archived.
+        // Nothing else about a story's own lifecycle takes its material away.
+        retired: r.account_archived_at !== null,
       }))
     },
   },
@@ -1287,7 +1356,11 @@ export const INGEST_KINDS: IngestKind[] = [
     //
     // v6: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 6,
+    // v7: 23 Sep 2026 — a meeting with an archived account now retires too
+    // (Aurora's ruling, "not visible anywhere"), read off its own aliased
+    // `account_archived_at`, never bare against `m`'s own `deactivated_at`.
+    // The bump walks the cursor back over every meeting already filed.
+    textVersion: 7,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -1307,6 +1380,7 @@ export const INGEST_KINDS: IngestKind[] = [
         account_id: string | null
         app_id: string | null
         account_name: string | null
+        account_archived_at: string | null
         purpose_name: string | null
         deactivated_at: string | null
         sort_at: string
@@ -1320,7 +1394,7 @@ export const INGEST_KINDS: IngestKind[] = [
                 m.transcript_text, m.transcript_note, m.transcript_url,
                 m.google_event_id, m.google_event_url, m.google_organizer,
                 m.account_id, m.app_id, m.deactivated_at,
-                a.name AS account_name,
+                a.name AS account_name, a.archived_at AS account_archived_at,
                 (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name,
                 COALESCE(m.updated_at, m.created_at) AS sort_at
            FROM meetings m LEFT JOIN accounts a ON a.id = m.account_id
@@ -1428,7 +1502,9 @@ export const INGEST_KINDS: IngestKind[] = [
         // pastes a transcript or Gemini files its notes, the condition stops
         // being true and the next sweep revives it with its words.
         retired:
-          r.deactivated_at !== null || (!r.agenda && !r.notes && !r.transcript_text),
+          r.deactivated_at !== null ||
+          r.account_archived_at !== null ||
+          (!r.agenda && !r.notes && !r.transcript_text),
       }))
     },
   },
@@ -1449,7 +1525,11 @@ export const INGEST_KINDS: IngestKind[] = [
     //
     // v3: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 3,
+    // v4: 23 Sep 2026 — "NOTHING HERE RETIRES" above stops being true for one
+    // reason: a to-do for an archived account now retires (Aurora's ruling,
+    // "not visible anywhere"), read off its own aliased `account_archived_at`.
+    // The bump walks the cursor back over every to-do already filed.
+    textVersion: 4,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
       const rows = await d1Query<{
@@ -1465,6 +1545,7 @@ export const INGEST_KINDS: IngestKind[] = [
         account_id: string
         ticket_id: string | null
         account_name: string | null
+        account_archived_at: string | null
         ticket_ref: string | null
         created_at: string
         sort_at: string
@@ -1474,7 +1555,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
         `SELECT t.id, t.ref, t.title, t.detail, t.due_on, t.completed_at, t.cancelled_at,
                 t.completer_name, t.file_name, t.account_id, t.ticket_id, t.created_at,
-                a.name AS account_name, h.ref AS ticket_ref,
+                a.name AS account_name, a.archived_at AS account_archived_at, h.ref AS ticket_ref,
                 COALESCE(t.updated_at, t.created_at) AS sort_at
            FROM todos t
            LEFT JOIN accounts a ON a.id = t.account_id
@@ -1522,6 +1603,9 @@ export const INGEST_KINDS: IngestKind[] = [
           recordDate: r.created_at,
           ownerUserId: null,
           sourceUrl: null,
+          // THE ONLY REASON A TO-DO RETIRES: its account has been archived.
+          // Nothing else takes a to-do's material away — see the header above.
+          retired: r.account_archived_at !== null,
         }
       })
     },
@@ -1536,7 +1620,12 @@ export const INGEST_KINDS: IngestKind[] = [
     label: "tasks",
     // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 2,
+    // v3: 23 Sep 2026 — this reader never retired a source at all. It gains
+    // its first reason: a task about an archived account now retires
+    // (Aurora's ruling, "not visible anywhere"), read off its own aliased
+    // `account_archived_at`. The bump walks the cursor back over every task
+    // already filed.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
       const rows = await d1Query<{
@@ -1553,6 +1642,7 @@ export const INGEST_KINDS: IngestKind[] = [
         account_id: string | null
         app_id: string | null
         account_name: string | null
+        account_archived_at: string | null
         app_name: string | null
         work_notes: string | null
         created_at: string
@@ -1564,7 +1654,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // capped at their own inner select.
         `SELECT t.id, t.ref, t.title, t.detail, t.status, t.department, t.important, t.urgent,
                 t.assignee_name, t.due_on, t.account_id, t.app_id, t.created_at,
-                a.name AS account_name, ap.name AS app_name,
+                a.name AS account_name, a.archived_at AS account_archived_at, ap.name AS app_name,
                 COALESCE(t.updated_at, t.created_at) AS sort_at,
                 ${childLines(workNotes("'tasks'", "t.id"))} AS work_notes
            FROM tasks t
@@ -1612,6 +1702,8 @@ export const INGEST_KINDS: IngestKind[] = [
         recordDate: r.created_at,
         ownerUserId: null,
         sourceUrl: null,
+        // THE ONLY REASON A TASK RETIRES: its account has been archived.
+        retired: r.account_archived_at !== null,
       }))
     },
   },
@@ -2000,7 +2092,11 @@ export const INGEST_KINDS: IngestKind[] = [
     label: "portal logins",
     // v2: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
     // through `clampTitle` when it is over TITLE_MAX_CHARS.
-    textVersion: 2,
+    // v3: 23 Sep 2026 — a login at an archived account now retires too
+    // (Aurora's ruling, "not visible anywhere"), read off its own aliased
+    // `account_archived_at`, never bare against `pu`'s own `deactivated_at`.
+    // The bump walks the cursor back over every portal login already filed.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(pu.updated_at, pu.created_at)", "pu.id")
       const rows = await d1Query<{
@@ -2009,6 +2105,7 @@ export const INGEST_KINDS: IngestKind[] = [
         user_id: string
         app_restriction: string | null
         account_name: string | null
+        account_archived_at: string | null
         app_name: string | null
         deactivated_at: string | null
         created_at: string
@@ -2020,7 +2117,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
         `SELECT pu.id, pu.account_id, pu.user_id, pu.app_restriction, pu.deactivated_at,
                 pu.created_at, pu.creator_name,
-                a.name AS account_name, ap.name AS app_name,
+                a.name AS account_name, a.archived_at AS account_archived_at, ap.name AS app_name,
                 COALESCE(pu.updated_at, pu.created_at) AS sort_at
            FROM portal_users pu
            LEFT JOIN accounts a ON a.id = pu.account_id
@@ -2064,7 +2161,7 @@ export const INGEST_KINDS: IngestKind[] = [
           accountId: r.account_id,
           appId: r.app_restriction,
           recordDate: r.created_at,
-          retired: r.deactivated_at !== null,
+          retired: r.deactivated_at !== null || r.account_archived_at !== null,
           ownerUserId: null,
           sourceUrl: null,
         }

@@ -729,6 +729,27 @@ describe("the fences did not move", () => {
   })
 })
 
+/** Re-stamp every stored cursor one version older than the kind that wrote
+ * it, whatever that version number actually is — VERSION-AGNOSTIC, on
+ * purpose. This used to be one hard-coded `REPLACE(cursor, 'v1|', 'v0|')`,
+ * which quietly stopped rewinding anything the day the last kind still
+ * pinned at v1 (`story`) moved off it (23 Sep 2026, HOLE ONE) — every real
+ * cursor by then read `v2|…` through `v8|…` and the literal match found
+ * nothing, so the two tests below would have passed for the wrong reason
+ * (nothing rewound because nothing needed to). Read back each cursor's own
+ * leading `v<N>|` and write `v0|` in its place instead, so the test keeps
+ * proving what it says regardless of which version any kind ships at. */
+function rewindEveryStoredCursor(): void {
+  const rows = db().prepare("SELECT kind, cursor FROM knowledge_ingest WHERE cursor IS NOT NULL").all() as {
+    kind: string
+    cursor: string
+  }[]
+  for (const row of rows) {
+    const rewound = row.cursor.replace(/^v\d+\|/, "v0|")
+    db().prepare("UPDATE knowledge_ingest SET cursor = ? WHERE kind = ?").run(rewound, row.kind)
+  }
+}
+
 describe("changing what a kind SAYS really does re-index what is already there", () => {
   it("a cursor written by an older text builder is not a position", async () => {
     await sweepUntilCaughtUp()
@@ -754,7 +775,7 @@ describe("changing what a kind SAYS really does re-index what is already there",
     for (const row of positions)
       expect(row.cursor, "a stored cursor must carry the text version that wrote it").toMatch(/^v\d+\|/)
 
-    db().exec("UPDATE knowledge_ingest SET cursor = REPLACE(cursor, 'v1|', 'v0|') WHERE cursor IS NOT NULL")
+    rewindEveryStoredCursor()
     db().exec("UPDATE knowledge_sources SET content_hash = 'stale'")
 
     const res = await call(IDS.staffUser, "POST /api/content/knowledge/sync")
@@ -797,7 +818,7 @@ describe("changing what a kind SAYS really does re-index what is already there",
 
     // The cursors go back a version. The HASHES ARE LEFT ALONE — that is the
     // whole difference from the test above.
-    db().exec("UPDATE knowledge_ingest SET cursor = REPLACE(cursor, 'v1|', 'v0|') WHERE cursor IS NOT NULL")
+    rewindEveryStoredCursor()
 
     const res = await call(IDS.staffUser, "POST /api/content/knowledge/sync")
     const { results } = (await res.json()) as {
@@ -1021,7 +1042,13 @@ function digest(text: string): string {
 // sweep's own hash-skip, once per row, self-healing (`nowACard` in
 // knowledge-ingest.ts) — rather than by walking the whole corpus back.
 const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
-  ticket: { version: 1, digest: "1e8c5c3262287da0" },
+  // v2: 23 Sep 2026 — HOLE ONE (an archived account's tickets stayed
+  // embedded and quotable): `retired` now also reads the account's own
+  // `archived_at`, off its own aliased `account_archived_at` column,
+  // separate from the ticket's own `h.archived_at`. Aurora's ruling: "yes,
+  // archived accounts should hide their tickets too." The bump re-decides
+  // every ticket already filed.
+  ticket: { version: 2, digest: "d6d2c6568b1f75cc" },
   // v2: "when we last spoke" is keyed on the CLOCK rather than on a retired
   // `held` status, so a client we saw in April no longer reads as last seen in
   // March. Every account already indexed says the old date until it is re-written.
@@ -1054,24 +1081,37 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // over the rare over-length legacy name still indexed whole.
   // v7: team migration 0116, 22 Sep 2026 — the account's own website joins
   // the contact line beside email and phone.
-  account: { version: 7, digest: "caf0b0d3cff10d17" },
+  // v8: 23 Sep 2026 — HOLE ONE. `retired` now also reads the account's OWN
+  // `archived_at` (0117), beside the existing `deactivated_at` — two
+  // independent put-away states on the same row, either one retires the
+  // source. Aurora's ruling: an archived account is "not visible anywhere."
+  account: { version: 8, digest: "4004d785b173a383" },
   // v2: same 21 Sep 2026 amendment as account: the title now clamps.
-  contact: { version: 2, digest: "56cf3ceab4e1746f" },
+  // v3: 23 Sep 2026 — HOLE ONE. A contact is filed under the COMPANY's
+  // compartment, so it is the company's own `archived_at` that retires it
+  // now, off its own aliased `company_archived_at`.
+  contact: { version: 3, digest: "b59d5ed48593fa2a" },
   // v2 (BUILD-5 §H, 18 Sep 2026): same change as account — `generatedOnly`
   // now also looks at `url`/`stage`/`stakeholders`/`processes`, not only the
   // four free-text paragraphs.
   // v3: same 21 Sep 2026 amendment as account: the title now clamps.
-  app: { version: 3, digest: "c6c542effb776d08" },
+  // v4: 23 Sep 2026 — HOLE ONE. An app built for an archived account now
+  // retires too, off its own aliased `account_archived_at`.
+  app: { version: 4, digest: "a349deff3a8edc94" },
   // v3: same 21 Sep 2026 amendment as account: the title now clamps. Worth
   // calling out here specifically: a process's own name is one R87's FORM
   // cap deliberately never covers, so this is one of the kinds where the
   // clamp is not just a legacy-row backstop.
-  process: { version: 3, digest: "8f4a3f084f631361" },
+  // v4: 23 Sep 2026 — HOLE ONE, off its own aliased `account_archived_at`.
+  process: { version: 4, digest: "cbc9dc7e05e5694f" },
   // v2: same 21 Sep 2026 amendment as account: the title now clamps.
-  sprint: { version: 2, digest: "a50bf568a60e9c7d" },
+  // v3: 23 Sep 2026 — HOLE ONE, off its own aliased `account_archived_at`.
+  sprint: { version: 3, digest: "ecae70869d6622e5" },
   // UNCHANGED by the 21 Sep 2026 amendment: I1 keeps a story's own title
   // whole, so this reader's text did not move.
-  story: { version: 1, digest: "234755039c3242c1" },
+  // v2: 23 Sep 2026 — HOLE ONE. This reader never retired a source at all;
+  // it gains its first reason, off its own aliased `account_archived_at`.
+  story: { version: 2, digest: "70bee08841217aff" },
   // v2: the summary says "already happened" / "still to come" from the start
   // time, where it used to quote the retired status column.
   // v3: a meeting that has not happened and carries no agenda, notes or
@@ -1098,9 +1138,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // carries, which is a column and not a word.
   // v6: R87 I1 (RULES.md), amended 21 Sep 2026: the title now clamps
   // through `clampTitle` when it is over TITLE_MAX_CHARS.
-  meeting: { version: 6, digest: "923d29f72c260a80" },
+  // v7: 23 Sep 2026 — HOLE ONE, off its own aliased `account_archived_at`.
+  meeting: { version: 7, digest: "d1415e0f6159ce5b" },
   // v3: same 21 Sep 2026 amendment as account: the title now clamps.
-  todo: { version: 3, digest: "8c20c83bd3ccd16b" },
+  // v4: 23 Sep 2026 — HOLE ONE. "NOTHING HERE RETIRES" above stops being
+  // true for one reason: a to-do for an archived account now retires, off
+  // its own aliased `account_archived_at`.
+  todo: { version: 4, digest: "1cfae64481ca6e51" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
   // the file and its digest covered every helper below the table. Bounding the
@@ -1115,7 +1159,9 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // and the version must not move. That this keeps happening to whichever kind is
   // declared last is worth knowing before reaching for a bump.
   // v2: same 21 Sep 2026 amendment as account: the title now clamps.
-  task: { version: 2, digest: "deb127c2603ff1d4" },
+  // v3: 23 Sep 2026 — HOLE ONE. This reader never retired a source at all;
+  // it gains its first reason, off its own aliased `account_archived_at`.
+  task: { version: 3, digest: "70cf856b2804878d" },
   // R47's three (1 Sep 2026). Every one starts at v1 because no row of them has
   // ever been indexed — there is nothing behind a cursor to leave saying the old
   // words.
@@ -1181,7 +1227,9 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // Same merge, same reason as `dropdown` above: `generatedOnly` moved the hash
   // and not the sentence, so the version holds at 1.
   // v2: same 21 Sep 2026 amendment as account: the title now clamps.
-  portal_login: { version: 2, digest: "45a3f3397b4ff71d" },
+  // v3: 23 Sep 2026 — HOLE ONE. A login at an archived account now retires
+  // too, off its own aliased `account_archived_at`.
+  portal_login: { version: 3, digest: "ea1dcf13adfee3f1" },
 }
 
 /** Everything in the sweep that is NOT inside a kind: the shared helpers each
@@ -1547,5 +1595,168 @@ describe("a colleague with no staff profile still holds a real, quotable fact �
       expect(row.generated_only, "no profile, no name variant worth noting — still a card").toBe(1)
       expect(row.chunk_count).toBe(0)
     }
+  })
+})
+
+/** The retire/revive state of one already-ingested source, read straight off the
+ * table `sweepKind` writes — the same oracle `sourceFor` reads, widened to the
+ * two columns that decide whether a row is citable (`deactivated_at`) and who
+ * put it away (`deactivator_id`, null for a machine retirement — see
+ * knowledge-ingest.ts's own `sweepKind` header on "RETIRED, BY WHOM?"). */
+function ingestState(table: string, rowId: string): { deactivatedAt: string | null; deactivatorId: string | null } {
+  const row = db()
+    .prepare(
+      "SELECT deactivated_at, deactivator_id FROM knowledge_sources WHERE origin_table = ? AND origin_row_id = ?"
+    )
+    .get(table, rowId) as { deactivated_at: string | null; deactivator_id: string | null } | undefined
+  expect(row, `nothing was ingested from ${table}/${rowId}`).toBeTruthy()
+  return { deactivatedAt: row!.deactivated_at, deactivatorId: row!.deactivator_id }
+}
+
+/** THE SAME REWALK A `textVersion` BUMP FORCES, done directly rather than by
+ * editing the shipped version number a second time in a test. `parseCursor`
+ * reads a stored cursor as null the moment its version does not match the
+ * kind's own — which is exactly what a fresh `cursor` column already is — so
+ * nulling it here is not a second mechanism, it is the one the sweep already
+ * has, invoked the way a deploy invokes it (and the way
+ * `scripts/knowledge-backfill.mjs` invokes it against a live environment).
+ *
+ * `last_run_at` IS BACKDATED TOO, same technique the account-rollup test
+ * above already uses and for the identical reason: `sweepKinds`' own
+ * `SYNC_PRESS_SKIP_RECENT_MS` guard skips an ordinary kind's read outright
+ * when its cursor is durably null AND it ran within the last two minutes —
+ * exactly what every sweep in THIS test file just did. Live, a real 15-minute
+ * cron tick is never that recent; a test calling the press door repeatedly in
+ * the same tick is, so it has to defeat the same guard the rollup test does. */
+function forceRewalk(...kinds: string[]): void {
+  const list = kinds.map((k) => `'${k}'`).join(", ")
+  db().exec(
+    `UPDATE knowledge_ingest SET cursor = NULL, last_run_at = '2020-01-01T00:00:00.000Z' WHERE kind IN (${list})`
+  )
+}
+
+describe("HOLE ONE — an archived account's material stops being ingested, and reverses (23 Sep 2026)", () => {
+  // Aurora's ruling, 22-23 Sep 2026: an archived account is "not visible
+  // anywhere", and asked directly whether that reaches a ticket, "yes,
+  // archived accounts should hide their tickets too." Before this change the
+  // ticket kind's own `retired` read only the TICKET's `archived_at`, never
+  // the account's, and account/contact/app/process/sprint/meeting/
+  // portal_login read only their OWN `deactivated_at` — story, todo and task
+  // never retired a source at all. So an archived company's whole world
+  // stayed embedded and quotable, not only its tickets.
+  const KINDS_AND_ROWS: [string, string][] = [
+    ["help", IDS.victimTicket],
+    ["accounts", IDS.victimAccount],
+    ["account_links", IDS.victimLink],
+    ["apps", IDS.victimApp],
+    ["processes", IDS.victimProcess],
+    ["sprints", "SPR_B"],
+    ["stories", "STO_B"],
+    ["meetings", "MTG_B"],
+    ["todos", "TD_B"],
+    ["tasks", "TSK_B"],
+  ]
+
+  it("FORWARD: an already-archived account's rows are read, not skipped, and filed retired — never live", async () => {
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = '${IDS.victimAccount}'`)
+    await sweepUntilCaughtUp()
+    for (const [table, id] of KINDS_AND_ROWS) {
+      const state = ingestState(table, id)
+      expect(
+        state.deactivatedAt,
+        `${table}/${id} was ingested live under an account archived before the sweep ever ran`
+      ).not.toBeNull()
+    }
+    // Citability follows the same column — an archived account's own
+    // material must not be the assistant's evidence for anything. Matched by
+    // TITLE, not kind: the shared spine fixture also seeds an unrelated,
+    // never-archived "Bergman Marine" account whose own citations legitimately
+    // still match a query naming "Bergman" and must not make this test lie.
+    const answer = await ask("What do we do for Bergman S.A.?")
+    expect(
+      answer.citations.some((c) => c.title.includes("Bergman S.A.")),
+      `the archived company must cite nothing about itself; got ${answer.citations.map((c) => `${c.kind}:${c.title}`).join(", ")}`
+    ).toBe(false)
+  })
+
+  it("BACKWARD: material embedded BEFORE the account was archived stops being citable once the sweep re-decides it", async () => {
+    // Live first — the ordinary, unarchived world.
+    await sweepUntilCaughtUp()
+    for (const [table, id] of KINDS_AND_ROWS) expect(ingestState(table, id).deactivatedAt).toBeNull()
+    const before = await ask("What do we do for Bergman S.A.?")
+    expect(before.found, "must be answerable before archiving").toBe(true)
+    expect(
+      before.citations.some((c) => c.title.includes("Bergman S.A.")),
+      `must cite the company before archiving; got ${before.citations.map((c) => `${c.kind}:${c.title}`).join(", ")}`
+    ).toBe(true)
+
+    // She archives the account. Nothing about the ticket/app/story/etc. rows
+    // themselves changed, so an ORDINARY sweep tick — cursor unmoved — would
+    // not revisit any of them; that is exactly the gap a `textVersion` bump
+    // (shipped on every kind here) and the backfill script both exist to
+    // close, forced here the same way a deploy forces it.
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = '${IDS.victimAccount}'`)
+    forceRewalk("ticket", "account", "contact", "app", "process", "sprint", "story", "meeting", "todo", "task")
+    await sweepUntilCaughtUp()
+
+    for (const [table, id] of KINDS_AND_ROWS) {
+      const state = ingestState(table, id)
+      expect(state.deactivatedAt, `${table}/${id} must retire once the sweep re-decides it`).not.toBeNull()
+      expect(state.deactivatorId, "a MACHINE retirement (never a person) — the un-archive path depends on this").toBeNull()
+    }
+    const after = await ask("What do we do for Bergman S.A.?")
+    expect(
+      after.citations.some((c) => c.title.includes("Bergman S.A.")),
+      `must no longer cite the archived company; got ${after.citations.map((c) => `${c.kind}:${c.title}`).join(", ")}`
+    ).toBe(false)
+  })
+
+  it("REVERSIBLE: un-archiving revives the source the next time the sweep visits it — no second mechanism", async () => {
+    await sweepUntilCaughtUp()
+    db().exec(`UPDATE accounts SET archived_at = '2026-09-23T00:00:00Z' WHERE id = '${IDS.victimAccount}'`)
+    forceRewalk("ticket", "account", "contact", "app", "process", "sprint", "story", "meeting", "todo", "task")
+    await sweepUntilCaughtUp()
+    expect(ingestState("help", IDS.victimTicket).deactivatedAt, "retired first, so revival is real").not.toBeNull()
+
+    // She un-archives. Aurora's own words: archiving is not a delete
+    // ("delated (only that we cnnot delete)"), so the row must come back —
+    // and it must come back through the SAME machine-retirement branch
+    // `sweepKind` already carries for every other kind of retirement this
+    // app makes on its own (a Google space re-shared, a ticket un-archived),
+    // never a bespoke "un-archive" code path of its own.
+    db().exec(`UPDATE accounts SET archived_at = NULL WHERE id = '${IDS.victimAccount}'`)
+    forceRewalk("ticket", "account", "contact", "app", "process", "sprint", "story", "meeting", "todo", "task")
+    await sweepUntilCaughtUp()
+
+    for (const [table, id] of KINDS_AND_ROWS) {
+      const state = ingestState(table, id)
+      expect(state.deactivatedAt, `${table}/${id} must be live again after un-archiving`).toBeNull()
+    }
+    const revived = await ask("What do we do for Bergman S.A.?")
+    expect(revived.found, "un-archiving must hand the material back").toBe(true)
+    expect(
+      revived.citations.some((c) => c.title.includes("Bergman S.A.")),
+      `must cite the company again; got ${revived.citations.map((c) => `${c.kind}:${c.title}`).join(", ")}`
+    ).toBe(true)
+  })
+
+  it("a deactivated (merely inactive) account does NOT retire the material HANGING OFF it — archived is the stronger, separate state", async () => {
+    // 0117: two independent nullable timestamps on the same accounts row.
+    // Inactive keeps everything under it reachable; only archived hides it.
+    // The ACCOUNT kind's own source is the one exception, and a pre-existing
+    // one: its `retired` has always read its OWN `deactivated_at` (nothing
+    // this change added), so the account's own rollup rightly retires — the
+    // nine kinds that merely POINT AT it (ticket, contact, app, process,
+    // sprint, story, meeting, todo, task) never read `deactivated_at` off the
+    // joined account, before or after this fix, and must stay live.
+    db().exec(`UPDATE accounts SET deactivated_at = '2026-09-23T00:00:00Z' WHERE id = '${IDS.victimAccount}'`)
+    await sweepUntilCaughtUp()
+    expect(
+      ingestState("accounts", IDS.victimAccount).deactivatedAt,
+      "the account's OWN source retires on its OWN deactivated_at — pre-existing, unrelated to this fix"
+    ).not.toBeNull()
+    for (const [table, id] of KINDS_AND_ROWS)
+      if (table !== "accounts")
+        expect(ingestState(table, id).deactivatedAt, `${table}/${id} must stay live — merely inactive, not archived`).toBeNull()
   })
 })

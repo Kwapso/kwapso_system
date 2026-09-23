@@ -4645,4 +4645,25 @@ export const SEED: Catalogue = {
    * des+archivar shape "Desactivar"/"Archivo" already carry. */
   "Reactivate": { de: "Reaktivieren", es: "Reactivar", ca: "Reactivar" },
   "Unarchive": { de: "Aus dem Archiv holen", es: "Desarchivar", ca: "Desarxivar" },
+
+  /* ACCOUNTS' THIRD VIEW, THE MAP (Aurora, 23 Sep 2026, verbatim: "for
+   * accounts/active add a map view"). Seeded here, not left to the
+   * generator, so TRANSLATION_CEILING stays at 0/0/0 (R44). The view-switch
+   * word matches the neighbouring "Gallery"/"List" entries' own register (a
+   * bare noun); the two missing-count sentences match "1 account matches"/
+   * "{count} accounts match" a few hundred lines up in this same file —
+   * "account(s)" reads as "Kunde"/"Kunden" in German there, and here, for
+   * the same reason: this screen's own rows are companies, not bank
+   * accounts. */
+  "Map": { de: "Karte", es: "Mapa", ca: "Mapa" },
+  "1 account has no country and is not on the map. It is in the list view.": {
+    de: "1 Kunde hat kein Land und ist nicht auf der Karte. Er ist in der Listenansicht.",
+    es: "1 cuenta no tiene país y no está en el mapa. Está en la vista de lista.",
+    ca: "1 compte no té país i no és al mapa. És a la vista de llista.",
+  },
+  "{count} accounts have no country and are not on the map. They are in the list view.": {
+    de: "{count} Kunden haben kein Land und sind nicht auf der Karte. Sie sind in der Listenansicht.",
+    es: "{count} cuentas no tienen país y no están en el mapa. Están en la vista de lista.",
+    ca: "{count} comptes no tenen país i no són al mapa. Són a la vista de llista.",
+  },
 }

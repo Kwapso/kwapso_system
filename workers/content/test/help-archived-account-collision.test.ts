@@ -30,6 +30,43 @@
 // column at the site of the join (see `ambiguous-join-columns.test.ts` in
 // workers/tenancy/test for the static census this file's own header explains
 // cannot reach this exact shape, and why it still exists).
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUND TWO — AURORA'S RULING, 23 Sep 2026, answering a question put to her
+// directly: "yes, archived accounts should hide their tickets too."
+//
+// The collision fix above only stopped SQLite refusing the statement; it said
+// nothing about what the statement should ANSWER, and the header note on the
+// first test below used to say so in as many words: "an archived account's
+// ticket stays fully reachable through the tickets list … flagged to the
+// owner rather than decided here." It has now been decided. This file is
+// extended rather than replaced — it already carries the one fixture this
+// proof needs (an archived account with a live ticket on it) and the real
+// SQLite database the fix has to prove itself against.
+//
+// THE FILTER IS `accountArchivedClause` (lib/help.ts), A SEPARATE CONDITION
+// FROM `archiveClause`, never merged into it — the ticket's own archived_at
+// (a fact about the TICKET) and the account's (a fact about the CLIENT) are
+// independent and both keep working on their own, proved by the second
+// describe block below (unchanged): archiving the account does not touch the
+// ticket's own `archived_at`.
+//
+// EVERY SURFACE A TICKET APPEARS ON THAT THIS SUITE CAN REACH THROUGH THE REAL
+// WORKER: the everyday list and its exact count (R16), the sub-tab facets
+// (`byAccount`), a single ticket looked up by id (the deep-link / generic
+// record query tool surface — `list_help_tickets` with an `id`, in
+// shared/workers/tool-catalog.ts, is the SAME door), the Dashboard tab
+// (`GET /help/dashboard`), and the triage queue (`GET /api/content/triage`,
+// which builds its own WHERE by hand rather than through `ticketWhere` and so
+// needed its own explicit `accountArchivedClause()` call — see triage.ts).
+//
+// AND THE TICKET THAT HAS NO ACCOUNT AT ALL (SCOPE ch.07: "220 of 221 seeded
+// historical requests are staff-raised" — the agency's own housekeeping)
+// must never be caught by a predicate about a company it was never raised
+// against. `ORPHAN_TICKET` below is seeded fresh in THIS file rather than in
+// spine-harness.ts, because the shared fixture's only ticket is the victim's
+// own — every describe block below reads it as the control proving the fix
+// is a FILTER and not a blanket "no tickets" refusal.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -59,6 +96,15 @@ const call = (route: string, body?: unknown) => {
   )
 }
 
+/** THE TICKET NOBODY RAISED AGAINST A CLIENT — the control this whole round
+ * turns on. If `accountArchivedClause` were ever widened to a bare
+ * `account_id IN (SELECT id FROM accounts WHERE archived_at IS NULL)` (no
+ * `OR account_id IS NULL` short-circuit), this ticket would vanish from every
+ * surface below exactly like the victim's, and every "does NOT come back"
+ * assertion would still pass — silently proving nothing. Every test that
+ * checks the victim's ticket is gone also checks this one is still there. */
+const ORPHAN_TICKET = "H_ORPHAN"
+
 beforeEach(() => {
   holder.db = buildSpineDb()
   // THE COLLISION, SEEDED ON PURPOSE — the victim's account is archived (0117)
@@ -73,6 +119,13 @@ beforeEach(() => {
        archiver_id = '${IDS.staffUser}', archiver_email = 'staff@kwapso.app', archiver_name = 'Staff'
      WHERE id = '${IDS.victimAccount}';`
   )
+  // THE ORPHAN — no account, raised by staff, old enough to sit past the
+  // triage line the same way the victim's does (workingDaysAgo(now, 3) from
+  // 2026-02-05 is comfortably past on any date this suite could run).
+  db().exec(
+    `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
+     VALUES ('${ORPHAN_TICKET}', 'Renew the SSL certificate on the staging box', 'new', 0, NULL, '2026-02-05', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
+  )
 })
 
 describe("a ticket door that replies with facets survives an archived account", () => {
@@ -83,12 +136,11 @@ describe("a ticket door that replies with facets survives an archived account", 
     const res = await call("POST /api/content/help/status", { id: IDS.victimTicket, status: "triaged" })
     expect(res.status, await res.clone().text()).toBe(200)
     const body = (await res.json()) as { byAccount?: { accountId: string }[] }
-    // THE FACET STILL NAMES THE ACCOUNT — proving the join resolved rather
-    // than merely proving the statement didn't throw. An archived account's
-    // ticket stays fully reachable through the tickets list (see the header
-    // note on what this repo does NOT yet do about that, flagged to the
-    // owner rather than decided here).
-    expect(body.byAccount?.some((a) => a.accountId === IDS.victimAccount)).toBe(true)
+    // AURORA'S RULING, 23 Sep 2026: archived accounts hide their tickets too.
+    // The facet no longer names the archived account — the join still
+    // resolves without throwing (this suite's own original proof still
+    // holds), it now simply has nothing of the victim's left to count.
+    expect(body.byAccount?.some((a) => a.accountId === IDS.victimAccount)).toBe(false)
   })
 
   it("POST /help/update — editing a ticket", async () => {
@@ -96,6 +148,13 @@ describe("a ticket door that replies with facets survives an archived account", 
       id: IDS.victimTicket,
       description: "Bergman S.A. cannot see the March invoice run, still",
     })
+    // THE WRITE STILL SUCCEEDS. Aurora's ruling was about VISIBILITY — the
+    // tickets list, its facets, the dashboard, triage and the generic query
+    // tool — never about locking staff out of housekeeping a ticket that
+    // happens to sit on a company that was archived after the fact. The
+    // mutation gate (`ticketFence`/`ticketOrThrow`) is untouched by this
+    // round; only the READ surfaces this file's second describe block below
+    // is about were changed.
     expect(res.status, await res.clone().text()).toBe(200)
   })
 
@@ -130,10 +189,73 @@ describe("the fix binds the predicate to the RIGHT table", () => {
     expect(row.archived_at).toBeNull()
   })
 
-  it("the everyday (live) view still returns the ticket of an archived account", async () => {
+  it("the everyday (live) view no longer returns the ticket of an archived account", async () => {
     const res = await call("GET /api/content/help?view=live")
     expect(res.status, await res.clone().text()).toBe(200)
     const body = (await res.json()) as { tickets?: { id: string }[] }
-    expect(body.tickets?.some((t) => t.id === IDS.victimTicket)).toBe(true)
+    // WAS `.toBe(true)` until Aurora's 23 Sep 2026 ruling — this line is the
+    // one the header's "flagged to the owner rather than decided here" note
+    // pointed at. It is decided now.
+    expect(body.tickets?.some((t) => t.id === IDS.victimTicket)).toBe(false)
+    // …AND THE ORPHAN, WHICH HAS NO ACCOUNT TO BE ARCHIVED, IS UNTOUCHED — the
+    // control that proves this is a filter over one company and not a wider
+    // regression.
+    expect(body.tickets?.some((t) => t.id === ORPHAN_TICKET)).toBe(true)
+  })
+})
+
+describe("Aurora's ruling, 23 Sep 2026 — an archived account hides its tickets everywhere one appears", () => {
+  it("the exact count (R16) drops with the row", async () => {
+    const res = await call("GET /api/content/help?view=live")
+    expect(res.status, await res.clone().text()).toBe(200)
+    const body = (await res.json()) as { total?: number; mineTotal?: number }
+    // Only the orphan is left once the victim's account is archived — the
+    // badge and the rows above answer the SAME question (R16), so this number
+    // and the previous test's row list can never disagree.
+    expect(body.total).toBe(1)
+  })
+
+  it("a single ticket lookup by id — the deep-link and generic-query-tool surface — comes back empty, not the ticket", async () => {
+    // `GET /api/content/help?id=<id>` is the exact door `list_help_tickets`
+    // (shared/workers/tool-catalog.ts) calls when an agent or MCP caller
+    // passes `id` — a by-id lookup is a LOOKUP, not a filtered page, so it has
+    // to ask the same question on its own rather than inherit an answer a
+    // list happened to give (`getTicket`, lib/help.ts).
+    const res = await call(`GET /api/content/help?id=${IDS.victimTicket}`)
+    expect(res.status, await res.clone().text()).toBe(200)
+    const body = (await res.json()) as { tickets?: { id: string }[] }
+    expect(body.tickets ?? []).toEqual([])
+  })
+
+  it("a single ticket lookup by id still works for a ticket with no account", async () => {
+    const res = await call(`GET /api/content/help?id=${ORPHAN_TICKET}`)
+    expect(res.status, await res.clone().text()).toBe(200)
+    const body = (await res.json()) as { tickets?: { id: string }[] }
+    expect(body.tickets?.map((t) => t.id)).toEqual([ORPHAN_TICKET])
+  })
+
+  it("the Dashboard tab (GET /help/dashboard) stops counting it", async () => {
+    const res = await call("GET /api/content/help/dashboard")
+    expect(res.status, await res.clone().text()).toBe(200)
+    const body = (await res.json()) as { matched?: number }
+    // `matched` is the whole population every panel on the tab was grouped
+    // over (readTicketDashboard's own note on the type) — the one number on
+    // the door that is honest about "nothing matched" without having to be
+    // inferred from which grouped arrays happen to come back empty. Only the
+    // orphan ticket is left to match.
+    expect(body.matched).toBe(1)
+  })
+
+  it("the triage queue stops listing it", async () => {
+    const res = await call("GET /api/content/triage")
+    expect(res.status, await res.clone().text()).toBe(200)
+    const body = (await res.json()) as { waiting?: { id: string }[]; total?: number }
+    expect(body.waiting?.some((t) => t.id === IDS.victimTicket)).toBe(false)
+    expect(body.total).toBe(1)
+    // …AND STILL LISTS THE ORPHAN — `needsTriage` (lib/triage.ts) carries no
+    // account fence at all by design (a client must never see the queue), so
+    // it had to grow its own explicit `accountArchivedClause()` call rather
+    // than inherit one through `ticketWhere`; this is the proof it did.
+    expect(body.waiting?.some((t) => t.id === ORPHAN_TICKET)).toBe(true)
   })
 })
