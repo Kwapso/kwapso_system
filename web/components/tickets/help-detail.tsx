@@ -694,7 +694,7 @@ export function HelpDetailScreen({
    * A ticket already answered comes back `alreadyResolved` and emails nobody —
    * R17 is the send guard, so a second press is not a second answer. */
   async function resolve(values: ResolveFormValues) {
-    const r = await content.resolveHelp(helpId, values.resolution)
+    const r = await content.resolveHelp(helpId, values.resolution, values.attachmentIds)
     invalidate(`help:${teamId}`)
     invalidate(`help-thread:${helpId}`)
     invalidate(recordActivityKey("help", helpId))

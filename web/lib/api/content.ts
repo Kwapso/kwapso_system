@@ -621,9 +621,9 @@ export const content = {
    * IS CLOSING (web/lib/send-hold.ts). See `replyHelp` below for the whole
    * argument; the same one applies here and matters more, because this door
    * emails the client. */
-  resolveHelp: (id: string, resolution: string, leaving?: boolean) =>
+  resolveHelp: (id: string, resolution: string, attachmentIds: string[] = [], leaving?: boolean) =>
     api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", {
-      ...post({ id, resolution }),
+      ...post({ id, resolution, attachmentIds }),
       keepalive: leaving === true,
     }),
   /** THE TICKET'S OWN CYCLE TIME / EFFORT / FLOW EFFICIENCY (`TicketMetrics`,

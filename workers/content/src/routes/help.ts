@@ -9,6 +9,8 @@
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { afterResponse } from "@shared/workers/parallel"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { d1Query, sqlString } from "@shared/workers/d1-rest"
+import { GuardError } from "@shared/workers/guard-error"
 import { MENTIONS_LIMIT, TICKET_ATTACHMENT_CAP } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -720,7 +722,7 @@ export async function postHelpReplyDelete(request: Request, env: Env): Promise<R
  *
  * Refused to a client login (R21), like every other status move on this module. */
 export async function postResolveHelp(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; resolution?: unknown }>(
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; resolution?: unknown; attachmentIds?: unknown }>(
     request,
     env,
     "help",
@@ -730,17 +732,43 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   const resolution = requireText(body.resolution, "Resolution", TEXT_LIMITS.long)
 
+  // R20: Positional validation of attachmentIds
+  if (!Array.isArray(body.attachmentIds)) {
+    throw new GuardError(400, "screenshot_required", "Attach a screenshot before closing.")
+  }
+  const attachmentIds: string[] = []
+  for (const item of body.attachmentIds) {
+    attachmentIds.push(requireText(item, "Attachment ID", TEXT_LIMITS.short))
+  }
+
+  // Require at least one attachment
+  if (attachmentIds.length === 0) {
+    throw new GuardError(400, "screenshot_required", "Attach a screenshot before closing.")
+  }
+
   const ticket = await getTicket(cfg, guard, scope, id)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+
+  // Verify that at least one attachment is an image on THIS ticket
+  const attachments = await d1Query<{ id: string; content_type: string | null }>(
+    cfg,
+    `SELECT id, content_type FROM help_attachments
+     WHERE ticket_id = ${sqlString(id)} AND id IN (${attachmentIds.map(sqlString).join(",")})
+     AND deactivated_at IS NULL`
+  )
+
+  const hasImage = attachments.some((a) => a.content_type?.startsWith("image/"))
+  if (!hasImage) {
+    throw new GuardError(400, "screenshot_required", "Attach a screenshot before closing.")
+  }
 
   // R17 IS THE SEND GUARD. Zero rows moved = already answered = nothing appended
   // and nobody emailed. A second press of a button is not a second answer.
   const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, "resolved")
   if (!moved) return json({ sent: false, alreadyResolved: true })
 
-  // A RESOLUTION CARRIES NO FILES OF ITS OWN — `[]`, matching the mentions
-  // list beside it: this door writes the closing sentence, never a file pick.
-  const { id: replyId } = await addReply(cfg, guard, scope, actor, id, resolution, [], [], false)
+  // Resolution reply carries the attachment IDs collected above
+  const { id: replyId } = await addReply(cfg, guard, scope, actor, id, resolution, [], attachmentIds, false)
   await publishChange(env, guard.teamId, "help_threads", replyId, "add", accountId ?? undefined)
   await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
   // Best-effort and last: a failed email must never fail the answer. It is on
