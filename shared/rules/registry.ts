@@ -5077,20 +5077,21 @@ export const ID_CHIP_EXEMPT: IdChipExempt[] = []
  * be pointed at the shared stripper the way an app script was. Everything
  * else that used to do this has been moved onto the shared `stripComments`. */
 export const HAND_ROLLED_STRIPPER_OK: Record<string, string> = {
+  // THE KIT'S OWN `check-*.mjs` SCRIPTS ARE NO LONGER LISTED HERE, 23 Sep 2026.
+  // Five entries in this table said the same sentence: a kit check ships as a
+  // standalone node script, `shared/ui/` is a pinned dependency this repo may
+  // not hand-edit, so it cannot import the shared stripper and can only ever be
+  // fixed upstream. Three more kit checks landed in one day, each turning the
+  // law red for a fault nobody here can repair, and a per-file line pretends a
+  // decision was reviewed when the only fact available is "it is a kit file".
+  // `web/test/source-scan.test.ts` now names that class once, narrowly: only
+  // `check-*.mjs` under `shared/ui/`. A kit COMPONENT that started stripping
+  // comments is still caught, and so is every file this repo actually owns.
+  // Both directions were proved by planting the pattern and watching it fail.
   "web/test/theme-tokens.test.ts":
     "strips a CSS comment out of a CSS custom property's VALUE, read from tokens.css. Not TypeScript: `//` is not a comment in CSS, it is the middle of a url(), so the shared stripper is the wrong tool here and would silently eat one",
   "shared/ui/foundations/tokens/token-model.mjs":
     "the VENDORED KIT's token reader, and the same CSS case the entry above was written for: it walks `tokens.css`, where `//` is not a comment but the middle of a `url()`, so the shared TypeScript stripper is the wrong tool and would silently eat one. `shared/ui/` is a dependency this repo may not hand-edit at all — `web/test/vendored-kit.test.ts` recomputes its content hash — so this can only ever be fixed upstream, and a kit sync that moves it will turn this line red exactly as the last one did",
-  "shared/ui/foundations/tokens/check-contrast.mjs":
-    "the kit's contrast law, reading the same `tokens.css` through the same CSS rules as the reader above. It is the check that found three surfaces painting themselves onto themselves on 7-8 Sep 2026; it cannot import a TypeScript stripper from an app that vendors it, and the CSS case is not what that stripper is for",
-  "shared/ui/foundations/rules/check-overflow-axis.mjs":
-    "the kit's OWN overflow-axis law (17 Sep 2026, kit v1.2.111), scanning .tsx source for a class rather than a CSS token — not the CSS case the three entries above share. It declares its own `stripComments` (same name, same two regexes) because it is a standalone script the kit ships to run under plain `node`, the identical shape `scripts/*.mjs` used to take before 7 Sep 2026 — except a kit file may not import an app module at all (`shared/ui/` is a pinned dependency this repo may not hand-edit; `web/test/vendored-kit.test.ts` recomputes its content hash), so it can never be pointed at `shared/rules/strip-comments.mjs` the way an app script was. Fixable only upstream, in Kwapso/kwapso-ui-ux; a kit sync that moves or removes this file turns this line red exactly as the token-model.mjs one above did once",
-  "shared/ui/foundations/rules/check-sr-only-layout.mjs":
-    "the kit's OWN screen-reader-only layout law (22 Sep 2026, kit v1.2.161). It fails any `sr-only` `<table>` that does not also fix its layout, because automatic table layout may exceed a declared width: the sankey's hidden matrix table declared 1px, measured 381px, and dragged the whole page sideways while remaining invisible. Same shape as the four kit checks around it: a standalone script the kit ships to run under plain `node`, declaring its own `stripComments` because a kit file may not import an app module at all (`shared/ui/` is a pinned dependency this repo may not hand-edit; `web/test/vendored-kit.test.ts` recomputes its content hash), so it can never be pointed at `shared/rules/strip-comments.mjs`. Fixable only upstream, in Kwapso/kwapso-ui-ux; a kit sync that moves or removes this file turns this line red exactly as the entries around it would",
-  "shared/ui/foundations/rules/check-query-condition-var.mjs":
-    "the kit's OWN query-condition law (22 Sep 2026, kit v1.2.159), which fails any container or media query whose condition holds a custom property. It exists because that mistake emits NOTHING rather than something wrong: the record footer's two column layout was written with `var(--space-7)` inside its own container query, the at-rule was invalid and dropped, and the layout was silently missing at every width for a day while every check stayed green. Same shape as the three kit checks above: a standalone script the kit ships to run under plain `node`, declaring its own `stripComments` because a kit file may not import an app module at all (`shared/ui/` is a pinned dependency this repo may not hand-edit; `web/test/vendored-kit.test.ts` recomputes its content hash), so it can never be pointed at `shared/rules/strip-comments.mjs`. Fixable only upstream, in Kwapso/kwapso-ui-ux; a kit sync that moves or removes this file turns this line red exactly as the entries above would",
-  "shared/ui/components/badge/check-badge.mjs":
-    "the kit's OWN badge law (18 Sep 2026, kit v1.2.116), pinning the client's ticket-type-chip-is-grey and linked-badge-has-no-underline report against regression. Same shape as check-overflow-axis.mjs directly above: a standalone script the kit ships to run under plain `node` with no build step, reading badge.tsx's own variant block with an inline `.replace(/\\/\\*[\\s\\S]*?\\*\\//g, \"\")` to strip a doc comment before pattern-matching it, because a kit file may not import an app module at all (`shared/ui/` is a pinned dependency this repo may not hand-edit; `web/test/vendored-kit.test.ts` recomputes its content hash) and so can never be pointed at `shared/rules/strip-comments.mjs`. Fixable only upstream, in Kwapso/kwapso-ui-ux; a kit sync that moves or removes this file turns this line red the same way the two entries above would",
 }
 
 /** WHERE A RAW CONTROL BYTE IS ALLOWED TO SIT, and why. `grep` classifies a

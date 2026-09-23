@@ -104,6 +104,19 @@ describe("the one walker every law reads source through", () => {
   })
 })
 
+/** THE VENDORED KIT'S OWN CHECK SCRIPTS, AS A CLASS, 23 Sep 2026. A kit check
+ * ships as a standalone node script; `shared/ui/` is a pinned dependency this
+ * repo may not hand-edit, so it cannot import `shared/rules/strip-comments.mjs`
+ * and can only ever be fixed upstream. Five hand entries in the table said that
+ * same sentence, three more kit checks landed in one day, and a per-file line
+ * pretends somebody reviewed a decision when the only fact is "it is a kit
+ * file". Narrow on purpose: only `check-*.mjs` under `shared/ui/`, so a kit
+ * COMPONENT that starts stripping comments is still caught, and so is every
+ * file this repo actually owns. Both directions proved by planting the pattern
+ * and watching each fail. Read by BOTH censuses below, declared once. */
+const kitCheckScript = (rel: string) =>
+  rel.startsWith("shared/ui/") && /(^|\/)check-[^/]*\.mjs$/.test(rel)
+
 // HAND_ROLLED_STRIPPER_OK moved to shared/rules/registry.ts, 14 Sep 2026
 // (RULES.md line 13's promise made true). Imported above.
 
@@ -186,7 +199,7 @@ describe("there is exactly one comment stripper", () => {
     const declared = everySourceOfOurs()
       .filter((f) => /(?:function|const)\s+stripComments\b/.test(f.source))
       .map((f) => f.rel)
-      .filter((rel) => !HAND_ROLLED_STRIPPER_OK[rel])
+      .filter((rel) => !HAND_ROLLED_STRIPPER_OK[rel] && !kitCheckScript(rel))
     expect(declared.length, "the scan found no declaration at all — it has gone blind").toBe(1)
     expect(declared).toEqual(["shared/rules/strip-comments.mjs"])
   })
@@ -249,10 +262,23 @@ describe("there is exactly one comment stripper", () => {
     // was outside the net by directory and by extension at the same time.
     const LINE_REGEX = "replace(/(^|[^:])" + "\\/\\/" + "[^\\n]*/gm"
     const BLOCK_REGEX = "/" + "\\/\\*[\\s\\S]*?\\*\\/" + "/g"
+    // THE VENDORED KIT'S OWN CHECK SCRIPTS ARE A CLASS, NOT SIX COINCIDENCES,
+    // 23 Sep 2026. Five of the six hand-written entries in the table were the
+    // same sentence: a kit check ships as a standalone node script, `shared/ui/`
+    // is a pinned dependency this repo may not hand-edit (`vendored-kit.test.ts`
+    // recomputes its content hash), so it CANNOT import `shared/rules/strip-
+    // comments.mjs` and can only ever be fixed upstream. Three new kit checks
+    // landed in one day and each turned this red for a fault nobody here can
+    // repair. A per-file entry there pretends somebody reviewed a decision, when
+    // the only decision available is "it is a kit file". So the class is named
+    // once, here, with its reason, and the table is left for the cases that
+    // genuinely differ: this repo's OWN files, where the law still bites on every
+    // one. The narrow shape matters: only `check-*.mjs` under `shared/ui/`, so a
+    // kit COMPONENT that started stripping comments would still be caught.
     const offenders = everySourceOfOurs()
       .filter((f) => f.source.includes(LINE_REGEX) || f.source.includes(BLOCK_REGEX))
       .map((f) => f.rel)
-      .filter((rel) => !HAND_ROLLED_STRIPPER_OK[rel])
+      .filter((rel) => !HAND_ROLLED_STRIPPER_OK[rel] && !kitCheckScript(rel))
     expect(
       offenders,
       `these re-type the shared stripper instead of importing it — every one of ` +
