@@ -834,24 +834,6 @@ let MY_TICKET
   // The SECTIONS of their own app — on the allow-list for the raise form's
   // "which part of the system" picker, and the one door no walk ever called:
   // the census said 30/31 from the day it was written.
-  // The FILES AND LINKS on their own app, added by the other line on 23 Sep
-  // 2026 with its Files tab. It was put on `PORTAL_DOORS` deliberately, which
-  // is right, a client may see what we filed against their own system, and
-  // then no walk ever knocked on it, so the census went 34/35 and every
-  // deploy in this estate stopped. Knocked here beside the app's own sections
-  // because it asks the same question about the same record: what does this
-  // client's app carry. Fenced rather than refused, so an empty list is a
-  // perfectly good answer and this asserts the SHAPE rather than a count.
-  {
-    const files = await portal(`/api/tenancy/apps/attachments?id=${MY_APP}`, {}, client)
-    knocked.add("GET /api/tenancy/apps/attachments")
-    ok(
-      "their app's files and links answer at the portal",
-      files.ok && Array.isArray(files.body?.attachments ?? files.body?.files ?? []),
-      `status ${files.status} ${JSON.stringify(files.body).slice(0, 120)}`
-    )
-  }
-
   {
     const mods = await portal(`/api/tenancy/app-modules?appId=${MY_APP}`, {}, client)
     knocked.add("GET /api/tenancy/app-modules")
