@@ -195,7 +195,10 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {
   new: "New",
   triaged: "Triaged",
-  scheduled: "Scheduled",
+  // B0383 — the owner's approved rename, "Scheduled" -> "To Do". The stored
+  // value stays `scheduled` (`HelpTicket["status"]`, workers/content/src/
+  // handlers/help.ts); only the word this map hands back moves.
+  scheduled: "To Do",
   in_progress: "In progress",
   ready: "Ready",
   resolved: "Resolved",

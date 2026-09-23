@@ -571,12 +571,13 @@ describe("Stories — the tab strip on a team with nothing in it, and the canary
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
   })
 
-  it("draws Now · Planned · Review · Completed · Backlog, and no All tab without the right", async () => {
+  it("draws Now · Planned · Review · Done · Backlog, and no All tab without the right", async () => {
     renderStories([])
     expect(await screen.findByRole("tab", { name: /Now/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Planned/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Review/ })).toBeTruthy()
-    expect(screen.getByRole("tab", { name: /Completed/ })).toBeTruthy()
+    // B0382 — "Completed" -> "Done" (the internal view key stays `completed`).
+    expect(screen.getByRole("tab", { name: /Done/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Backlog/ })).toBeTruthy()
     expect(screen.queryByRole("tab", { name: /^All$/ })).toBeNull()
   })

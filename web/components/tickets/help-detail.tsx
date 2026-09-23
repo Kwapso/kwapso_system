@@ -236,7 +236,8 @@ function helpStatusLabel(status: HelpStatus, t: (s: string) => string): string {
     case "triaged":
       return t("Triaged")
     case "scheduled":
-      return t("Scheduled")
+      // B0383 — "Scheduled" -> "To Do" (the stored value stays `scheduled`).
+      return t("To Do")
     case "in_progress":
       return t("In progress")
     case "ready":

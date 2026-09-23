@@ -269,7 +269,7 @@ export function EffortCard({
           2026 and EmptyGatedPanel's own default is plain. The forwarding prop
           this card carried for the tickets-only experiment had exactly one
           caller, which passed the value that is now the default. */}
-      <EmptyGatedPanel title={t("Effort")} count={formatCount(recordCount)} empty={false}>
+      <EmptyGatedPanel title={t("Time log")} count={formatCount(recordCount)} empty={false}>
         {rows === undefined ? (
           <Skeleton variant="list" lines={3} />
         ) : (
@@ -332,19 +332,21 @@ export function EffortCard({
                 </Card>
                 <Card variant="default">
                   <CardContent>
-                    {/* "Effort hours", not "Effort" — the title's own count is
+                    {/* "Hours logged", not "Time log" — the title's own count is
                         the record count now, so the tile answers a different
-                        question beside it rather than repeating the word. */}
+                        question beside it rather than repeating the word.
+                        B0386 (Effort -> Time log): this tile's own word moved
+                        with it, from "Effort hours". */}
                     <StatGrid
                       items={[
                         {
                           id: "effort",
-                          label: t("Effort hours"),
+                          label: t("Hours logged"),
                           value: hoursLabel(metrics.effortSeconds),
                         },
                       ]}
                       surface="bare"
-                      label={t("Effort hours")}
+                      label={t("Hours logged")}
                     />
                   </CardContent>
                 </Card>
@@ -392,7 +394,7 @@ export function EffortCard({
                 `"listitem"` keep the list semantics a plain `<div>` would
                 otherwise drop, since a `Separator` between `<li>` siblings is
                 not valid inside a `<ul>`. */}
-            <div role="list" aria-label={t("Effort")} data-slot="effort-log-rows" className="flex flex-col">
+            <div role="list" aria-label={t("Time log")} data-slot="effort-log-rows" className="flex flex-col">
               {rows.map((l, index) => {
                 const name = staffNameFromSnapshot(l.userName) || t("Someone who has left")
                 const editable = canEdit && !!l.endedAt && !l.discarded

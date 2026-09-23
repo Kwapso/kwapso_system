@@ -784,12 +784,12 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     api.metrics = FIXTURE_METRICS
     openStory()
     await screen.findByText("Cycle time")
-    // The title row itself: "Effort" then its own count, "1" — one WORK_LOG
+    // The title row itself: "Time log" then its own count, "1" — one WORK_LOG
     // fixture row — the same `<h3>{title}{count}</h3>` shape
     // `help-stakeholders.tsx`'s own "Stakeholders 4" register renders
     // through (`TicketSidePanel`).
-    const heading = await screen.findByRole("heading", { name: /^Effort/ })
-    expect(heading.textContent).toBe("Effort1")
+    const heading = await screen.findByRole("heading", { name: /^Time log/ })
+    expect(heading.textContent).toBe("Time log1")
   })
 
   it("reads 'Not started' and 'No time log' before any work is logged, with the record count beside the title", async () => {
@@ -802,14 +802,14 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     // The one WORK_LOG fixture row is still logged even though the metrics
     // door has nothing to say yet — the title's own count answers a
     // different question from the tiles now, and does so honestly.
-    const heading = await screen.findByRole("heading", { name: /^Effort/ })
-    expect(heading.textContent).toBe("Effort1")
+    const heading = await screen.findByRole("heading", { name: /^Time log/ })
+    expect(heading.textContent).toBe("Time log1")
   })
 
   // AMENDED, 22 Sep 2026 — Aurora, verbatim: "make the metrics cards inside
   // the container, like in the metrics artifact you did for me!" The three
   // lines are real `<StatGrid>` tiles now, and the middle one reads "Effort
-  // hours" (not "Effort") since the title's own count answers "Effort" on
+  // hours" (not "Time log") since the title's own count answers "Time log" on
   // its own now — the figure is said once, not twice.
   it("renders the door's own cycle time, effort hours and flow efficiency as stat tiles", async () => {
     api.story = story({})
@@ -817,7 +817,7 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     openStory()
     // 183600s = 51h = 2d 3h; 23400s = 6.5h; 41%.
     expect(await screen.findByText("2d 3h")).toBeTruthy()
-    expect(await screen.findByText("Effort hours")).toBeTruthy()
+    expect(await screen.findByText("Hours logged")).toBeTruthy()
     expect(await screen.findByText("41%")).toBeTruthy()
     // "6.5h" appears once now — the tile's own figure, the title carries the
     // record count instead of repeating it (B44 amended, 22 Sep 2026).
@@ -901,7 +901,7 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     // page did not simply fail to render).
     await screen.findByText("Phase and wave")
     expect(screen.queryByText("No time logged yet.")).toBeNull()
-    expect(screen.queryByRole("heading", { name: /^Effort/ })).toBeNull()
+    expect(screen.queryByRole("heading", { name: /^Time log/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
     // No Effort card at all on the page — not even an empty shell.
     expect(container.querySelector('[data-slot="effort-log-rows"]')).toBeNull()

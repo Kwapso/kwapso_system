@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 759 strings · 3 languages · 1539 of the entries below are hand-written seed.
+// 757 strings · 3 languages · 1537 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -116,7 +116,6 @@ export const CATALOGUE: Catalogue = {
   "Closed": { de: "Geschlossen", es: "Cerrado", ca: "Tancat" },
   "Companies": { de: "Unternehmen", es: "Empresas", ca: "Empreses" },
   "Complete": { de: "Abschließen", es: "Completar", ca: "Completar" },
-  "Completed": { de: "Abgeschlossen", es: "Completado", ca: "Completat" },
   "Connect": { de: "Verbinden", es: "Conectar", ca: "Connectar" },
   "Connected.": { de: "Verbunden.", es: "Conectado.", ca: "Connectat." },
   "Contact": { de: "Kontakt", es: "Contacto", ca: "Contacte" },
@@ -487,7 +486,6 @@ export const CATALOGUE: Catalogue = {
   "Save": { de: "Speichern", es: "Guardar", ca: "Desar" },
   "Save notes": { de: "Notizen speichern", es: "Guardar notas", ca: "Guardar notes" },
   "Say who does": { de: "Angeben, wer es macht", es: "Indicar quién lo hace", ca: "Dir qui ho fa" },
-  "Scheduled": { de: "Geplant", es: "Programado", ca: "Programat" },
   "Search accounts…": { de: "Konten durchsuchen…", es: "Buscar cuentas…", ca: "Cercar comptes…" },
   "Search meetings…": { de: "Meetings durchsuchen…", es: "Buscar reuniones…", ca: "Cercar reunions…" },
   "Search processes…": { de: "Prozesse durchsuchen…", es: "Buscar procesos…", ca: "Cercar processos…" },

@@ -561,7 +561,8 @@ function compareTasks(a: Task, b: Task, field: "priority" | "deadline", dir: "as
 const TASK_TABS: { value: TaskView; label: string; icon: string }[] = [
   { value: "overdue", label: "Overdue", icon: "warning" },
   { value: "planned", label: "Planned", icon: "clipboard-text" },
-  { value: "completed", label: "Completed", icon: "check" },
+  // B0382 — "Completed" -> "Done" (the internal view key stays `completed`).
+  { value: "completed", label: "Done", icon: "check" },
 ]
 
 /** THE FOURTH TAB — the door's status-agnostic `all` view, LAST in the strip
