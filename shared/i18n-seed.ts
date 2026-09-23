@@ -655,6 +655,11 @@ export const SEED: Catalogue = {
     
     
   },
+  "Added {date}": {
+    de: "Hinzugefügt {date}",
+    es: "Añadido {date}",
+    ca: "Afegit {date}",
+  },
   "Last edited {when}": {
     de: "Zuletzt bearbeitet {when}",
     es: "Última edición {when}",

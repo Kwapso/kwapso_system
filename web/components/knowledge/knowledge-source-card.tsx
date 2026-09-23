@@ -45,7 +45,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/ui/components/card/card"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
-import { formatRelative, type Translate } from "@shared/web/format"
+import { formatDate, formatRelative, type Translate } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
 
 import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shape"
@@ -161,11 +161,12 @@ export function KnowledgeSourceCard({
         {preview ? (
           <p className="text-muted-foreground text-xs">{preview}</p>
         ) : (
-          (source.updatedAt || source.createdAt) && (
+          source.createdAt && (
             <p className="text-muted-foreground text-xs">
-              {t("Last edited {when}", {
-                when: formatRelative(source.updatedAt ?? source.createdAt, t, lang),
-              })}
+              {t("Added {date}", { date: formatDate(source.createdAt, lang) })}
+              {source.updatedAt && source.updatedAt !== source.createdAt && (
+                <> · {t("Last edited {when}", { when: formatRelative(source.updatedAt, t, lang) })}</>
+              )}
             </p>
           )
         )}

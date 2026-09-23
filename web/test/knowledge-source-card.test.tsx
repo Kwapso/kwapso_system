@@ -85,13 +85,24 @@ describe("KnowledgeSourceCard — four facts, mark/title/kind/one meta line", ()
     expect(screen.queryByText("file")).toBeNull()
   })
 
-  it("shows the last-edited meta line when there is a date to show", () => {
+  it("shows the added date when there is a createdAt date", () => {
+    render(
+      <KnowledgeSourceCard
+        source={makeSource({ createdAt: "2026-09-01T00:00:00.000Z", updatedAt: null })}
+        onOpen={noop}
+      />
+    )
+    expect(screen.getByText(/Added/)).toBeTruthy()
+  })
+
+  it("shows both added date and last edited when updatedAt differs from createdAt", () => {
     render(
       <KnowledgeSourceCard
         source={makeSource({ updatedAt: "2026-09-10T00:00:00.000Z", createdAt: "2026-09-01T00:00:00.000Z" })}
         onOpen={noop}
       />
     )
+    expect(screen.getByText(/Added/)).toBeTruthy()
     expect(screen.getByText(/Last edited/)).toBeTruthy()
   })
 
