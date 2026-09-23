@@ -33,9 +33,15 @@ import { CaretRight } from "@shared/ui/foundations/icons"
 
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+
+import { tenancy } from "@/lib/api"
+import { appsKey } from "@/lib/live-resources"
+import { invalidate, useCached } from "@shared/web/store"
+import { AppStakeholdersSheet } from "@/components/apps/app-stakeholders-sheet"
 
 type Side = {
   id: string
@@ -83,6 +89,8 @@ function Group({
   empty,
   narrowed,
   mainLabel,
+  onEdit,
+  editLabel,
 }: {
   title: string
   people: Side[]
@@ -93,32 +101,66 @@ function Group({
    * both front doors (owner ruling, 2026-09-07). */
   narrowed: boolean
   mainLabel: string
+  /** T3849 — the client's own ask: an editor reachable from this tab, not
+   * only the app's whole edit form. Present on the client's own side alone
+   * (see `StakeholdersPanel`'s own header); `undefined` on "Ours", which
+   * keeps the read-only shape this side has always had. */
+  onEdit?: () => void
+  editLabel?: string
 }) {
   return (
     <section className="flex flex-col gap-2">
-      {/* R108, 22 Sep 2026: the same eyebrow every record section title now
-          shares (`text-micro text-muted-foreground uppercase`), never its
-          own `text-sm font-medium`. See `TicketSidePanel`'s own header
-          (`web/components/tickets/ticket-detail-body.tsx`). */}
-      <h2 className="text-micro text-muted-foreground uppercase">{title}</h2>
       {people.length === 0 ? (
         /* R62 — ONE REGISTER, BOTH ZEROS (client, 2026-09-09). The narrowed
            half was an `EmptyLine`, one grey line beside the full register its
-           own sibling branch drew. No act on either: who is on a system is set
-           on the system's own form, so this panel has no add button for
-           `filtered` to subtract — what it fixes here is the LOOK.
+           own sibling branch drew.
+           R88 — WITH AN EDITOR, THE EMPTY STATE'S OWN "Add the first" IS THE
+           ONLY DOOR, so the header above draws nothing while this side is
+           empty (its own `<h2>` moves inside the `onEdit` branch below).
+           Without one ("Ours", or a side nobody may edit), who is on a
+           system is still set on the app's own form, so the header stays and
+           no button appears here for `filtered` to subtract.
            NO CARD ANY MORE, 22 SEP 2026 — her ruling over the A0013 Stakeholders
            tab: "the empty collection now. We need to get rid of the card
            background." `CollectionEmptyState` carries its own `--space-6` inset
            (collection-frame.tsx), so the wrapping `bg-surface-panel` div is
            dropped rather than repainted. */
-        <CollectionEmptyState filtered={narrowed} title={empty} filteredTitle={empty} />
+        <>
+          {/* The header hides only for the genuinely-empty, at-rest case an
+              editor is offered for (R88) — a SEARCH that narrows this side to
+              zero still shows the title, the same as "Ours" always does,
+              because `CollectionEmptyState` itself withdraws the create
+              button while `filtered`, so there is no second door to guard
+              against here. */}
+          {!(onEdit && !narrowed) && (
+            <h2 className="text-micro text-muted-foreground uppercase">{title}</h2>
+          )}
+          <CollectionEmptyState
+            filtered={narrowed}
+            title={empty}
+            filteredTitle={empty}
+            onCreate={onEdit}
+            createLabel={editLabel}
+          />
+        </>
       ) : (
-        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-          {people.map((p) => (
-            <PersonRow key={p.id} p={p} mainLabel={mainLabel} />
-          ))}
-        </ul>
+        <>
+          {/* R108, 22 Sep 2026: the same eyebrow every record section title now
+              shares (`text-micro text-muted-foreground uppercase`), never its
+              own `text-sm font-medium`. See `TicketSidePanel`'s own header
+              (`web/components/tickets/ticket-detail-body.tsx`).
+              R100 — the pen centres against the title's own line box, on an
+              `items-center` row. */}
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-micro text-muted-foreground uppercase">{title}</h2>
+            {onEdit && <EditPenButton onClick={onEdit} label={editLabel ?? title} />}
+          </div>
+          <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+            {people.map((p) => (
+              <PersonRow key={p.id} p={p} mainLabel={mainLabel} />
+            ))}
+          </ul>
+        </>
       )}
     </section>
   )
@@ -131,6 +173,11 @@ export function StakeholdersPanel({
   memberPhotos,
   contactNames,
   host,
+  appId,
+  appName,
+  teamId,
+  accountId,
+  canEdit,
 }: {
   staff: { userId: string; isLead: boolean }[]
   stakeholders: { contactId: string; isMain: boolean }[]
@@ -141,9 +188,38 @@ export function StakeholdersPanel({
    * "Somebody" on the screen this replaces. */
   contactNames: Map<string, string>
   host: { base: string }
+  /** T3849 — who to save an edit against, and where its live patch lands
+   * (`appsKey`, the same key the app record itself reads). */
+  appId: string
+  /** required on every `updateApp` call (R20) — the sheet has to carry the
+   * app's REAL, current name along, never a placeholder, or a save here
+   * would silently rename the app. */
+  appName: string
+  teamId: string
+  /** null on one of our own systems, which has no client to have contacts at
+   * — the same gate `AppFormDialog` reads this off of. No editor is offered
+   * without one: there is nobody to add. */
+  accountId: string | null
+  /** the same right the app's own Edit action gates on (`processes:update`) —
+   * the client's own instruction for this door. */
+  canEdit: boolean
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [query, setQuery] = React.useState("")
+  const [editOpen, setEditOpen] = React.useState(false)
+  const canEditTheirs = canEdit && accountId !== null
+  // THE CLIENT'S OWN CONTACTS, the same account-detail read
+  // `AppFormDialog`'s own stakeholder checklist reads off `clientId` — R56's
+  // dedupe means a second component reading the identical key buys nothing
+  // extra, it is not a second request. Gated on `canEditTheirs`, not merely
+  // `accountId`: a reader has no door this list would ever feed, so there is
+  // nothing here worth a read for them.
+  const contactsQ = useCached(canEditTheirs && accountId ? `account-detail:${accountId}` : null, () =>
+    tenancy.accountDetail(accountId as string)
+  )
+  const contacts = (contactsQ.data?.links ?? [])
+    .filter((l) => l.active)
+    .map((l) => ({ id: l.personAccountId, name: l.personName }))
   // A CONTACT IS AN ACCOUNTS ROW (there is no contacts table), so their record
   // is at the accounts address — which is where the account screen sends an
   // individual too, so both routes reach the same screen.
@@ -215,8 +291,23 @@ export function StakeholdersPanel({
               : t("Nobody from the client's side is on this yet.")
           }
           mainLabel={t("Main")}
+          onEdit={canEditTheirs ? () => setEditOpen(true) : undefined}
+          editLabel={t("Edit stakeholders")}
         />
       </div>
+      {canEditTheirs && (
+        <AppStakeholdersSheet
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          appId={appId}
+          appName={appName}
+          lang={lang}
+          contacts={contacts}
+          initialStakeholderContactIds={stakeholders.map((s) => s.contactId)}
+          initialMainStakeholderContactId={stakeholders.find((s) => s.isMain)?.contactId ?? ""}
+          onSaved={() => invalidate(appsKey(teamId))}
+        />
+      )}
     </div>
   )
 }

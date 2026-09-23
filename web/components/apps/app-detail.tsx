@@ -776,6 +776,11 @@ export function AppDetailScreen({
                 memberPhotos={memberPhotos}
                 contactNames={contactNames}
                 host={host}
+                appId={appId}
+                appName={app.name}
+                teamId={teamId}
+                accountId={app.accountId}
+                canEdit={canEdit}
               />
             )
           if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />

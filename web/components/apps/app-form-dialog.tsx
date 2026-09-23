@@ -24,11 +24,9 @@
 
 import * as React from "react"
 
-import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
-import { Label } from "@shared/ui/components/label/label"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
@@ -46,7 +44,7 @@ import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
-import { RecordMark } from "@shared/web/record-mark"
+import { AppStakeholdersFields } from "@/components/apps/app-stakeholders-fields"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue, safeSrc } from "@shared/web/rich-text"
@@ -131,21 +129,6 @@ const leadField = {
   label: "Team lead",
   required: false,
 }
-const stakeholderField = {
-  ...defaultFieldConfig,
-  label: "Their contacts",
-  required: false,
-}
-const mainStakeholderField = {
-  ...defaultFieldConfig,
-  label: "Main stakeholder",
-  required: false,
-}
-
-/** The word for nobody. A Select cannot hold an empty string as a value, so the
- * absence has to be spelled — the same sentinel the ticket form uses. */
-const NOBODY = "__none__"
-
 /** The team's App stage vocabulary, newest answer first: the rows somebody has
  * curated on the Dropdown values screen, and the eight the agency already uses
  * as the fallback while that read is in flight or a team has retired the lot.
@@ -605,67 +588,21 @@ export function AppFormDialog({
         </Field>
       )}
       {/* THEIR CONTACTS (8.5), from the client's own contacts. Absent entirely on
-          one of our own systems, which has no client to have contacts at. */}
+          one of our own systems, which has no client to have contacts at.
+          Shared with the Stakeholders tab's own "Edit stakeholders" sheet —
+          see app-stakeholders-fields.tsx's own header. */}
       {clientId && (
-        <Field config={stakeholderField} shape="group" htmlFor="app-stakeholders" className={fieldSpacing}>
-          <div className="flex flex-col gap-2" id="app-stakeholders">
-            {contacts.length === 0 ? null : (
-              sortedOptions(contacts, lang, (c) => c.name).map((c) => (
-                <Label key={c.id} className="flex">
-                  <Checkbox
-                    checked={values.stakeholderContactIds.includes(c.id)}
-                    onCheckedChange={(ch) =>
-                      setValues((s) => ({
-                        ...s,
-                        stakeholderContactIds:
-                          ch === true
-                            ? [...s.stakeholderContactIds, c.id]
-                            : s.stakeholderContactIds.filter((x) => x !== c.id),
-                      }))
-                    }
-                    disabled={busy}
-                  />
-                  {/* A CONTACT IS A PERSON (R35's "round" shape) — the same face
-                      the Main stakeholder picker below draws them with. No photo
-                      comes through `listAccountLinks` today, so this falls back
-                      to their initial like every unphotographed person.
-                      `size="choice"` — see the staff checklist's own `RecordMark`
-                      comment above: the client called `row` (36px) "too big" on
-                      this exact pair of checklists a second time, so both now
-                      draw the 24px checklist size instead. */}
-                  <RecordMark name={c.name} shape="round" size="choice" />
-                  {c.name}
-                </Label>
-              ))
-            )}
-          </div>
-        </Field>
-      )}
-      {values.stakeholderContactIds.length > 0 && (
-        <Field config={mainStakeholderField} htmlFor="app-main-stakeholder" className={fieldSpacing}>
-          <RecordPicker
-            id="app-main-stakeholder"
-            value={mainHolder || NOBODY}
-            onChange={(v) =>
-              setValues((s) => ({ ...s, mainStakeholderContactId: v === NOBODY ? "" : v }))
-            }
-            // A CONTACT IS A PERSON (R35's "round" shape), the same face
-            // `StakeholdersPanel` already draws them with on the app's own
-            // Stakeholders tab — no photo comes through `listAccountLinks`
-            // today, so this falls back to their initial the way every
-            // unphotographed person does, never to a client/company square.
-            // `face: true` (R90) is what actually asks for that fallback —
-            // `shape` alone names the BOX, not whether one is drawn at all.
-            options={sortedOptions(contacts, lang, (c) => c.name)
-              .filter((c) => values.stakeholderContactIds.includes(c.id))
-              .map((c) => ({ value: c.id, label: c.name, shape: "round" as const, face: true }))}
-            emptyOption={{ value: NOBODY, label: t("Not said") }}
-            placeholder={t("Not said")}
-            searchPlaceholder={t("Search contacts…")}
-            emptyText={t("Nobody here matched.")}
-            disabled={busy}
-          />
-        </Field>
+        <AppStakeholdersFields
+          contacts={contacts}
+          lang={lang}
+          busy={busy}
+          stakeholderContactIds={values.stakeholderContactIds}
+          onStakeholderContactIdsChange={(ids) => setValues((s) => ({ ...s, stakeholderContactIds: ids }))}
+          mainStakeholderContactId={mainHolder}
+          onMainStakeholderContactIdChange={(v) =>
+            setValues((s) => ({ ...s, mainStakeholderContactId: v }))
+          }
+        />
       )}
     </FormShellDialog>
   )

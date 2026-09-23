@@ -1144,6 +1144,7 @@ export const SEED: Catalogue = {
   "Do it now": { de: "Sofort erledigen", es: "Hazlo ya", ca: "Fes-ho ja"},
   "Edit app": { de: "App bearbeiten", es: "Editar app", ca: "Editar app"},
   "Edit process": { de: "Prozess bearbeiten", es: "Editar proceso", ca: "Editar procés"},
+  "Edit stakeholders": { de: "Stakeholder bearbeiten", es: "Editar partes interesadas", ca: "Editar grups interessats"},
   "Edit step": { de: "Schritt bearbeiten", es: "Editar paso", ca: "Editar pas"},
   "Edit story": { de: "Aufgabe bearbeiten", es: "Editar historia", ca: "Editar història"},
   "Edit this account": { de: "Diesen Kunden bearbeiten", es: "Editar esta cuenta", ca: "Editar aquest compte"},
@@ -3331,6 +3332,7 @@ export const SEED: Catalogue = {
    * "unzufrieden / neutral / zufrieden", which is a survey talking, and this is
    * one question at the bottom of a request somebody raised. */
   "Stages": { de: "Phasen", es: "Etapas", ca: "Etapes"},
+  "Stakeholders updated.": { de: "Stakeholder aktualisiert.", es: "Partes interesadas actualizadas.", ca: "Grups interessats actualitzats."},
   "Reopened": { de: "Wieder geöffnet", es: "Reabierto", ca: "Reobert"},
   "New": { de: "Neu", es: "Nuevo", ca: "Nou"},
   /* The compact day count on a stage row. A letter rather than the word, so a
