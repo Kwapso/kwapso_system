@@ -110,6 +110,28 @@
 // had it open and then switches tab falls back to gallery rather than the
 // view switch pointing at an option that is no longer on the list.
 //
+// ── A REAL GOOGLE MAP, NOT THE KIT'S PLATE — Aurora's ruling, 23 Sep 2026 ────
+//
+// Her review of the map view above, verbatim: "ok but, there's no actual map
+// lol, how do we get a google map there? remove the side panel, when i click
+// in one i want a slight little overlay card with name and loogo and full
+// adress (including ountry) then if i click there it takes me to detail
+// screen." And, choosing between the options laid out for her: "build with
+// the google maps api." The kit's own `Map` (quoted above) still supplies
+// the loading/error/empty chrome and the plate's own frame — R39 — but its
+// `pins`/`items`/`missingLabel` percentage-plate contract is gone from this
+// screen: `google-account-map.tsx`'s `<GoogleAccountsMap>` is the
+// application's own renderer, handed to the kit's `children` slot exactly as
+// that component's header anticipates, and it draws a real, pannable Google
+// Map with a marker per account. THE LIST IS GONE (her own words, "remove
+// the side panel") — `mapPlacement.pins` still carries every placeable
+// account and `mapPlacement.missingCount` still carries an honest count of
+// who is not, but there is no second `items` array beside it any more, and
+// nothing here builds one. `account-map.ts`'s own header has the full
+// account of what turns an address into a position (a geocoded `lat`/`lng`
+// when one is stored, the same country-centroid fallback as before when it
+// is not) and exactly where that stops at an unminted migration.
+//
 // ── THE STRIP BECOMES STATUS, 16 SEP 2026 — "keep active, inactive, and all" ─
 //
 // Second client ruling, same evening as the Settings › Team split above it in
@@ -180,7 +202,6 @@ import * as React from "react"
 
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
-import { Map } from "@shared/ui/components/map/map"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Plus, SquaresFour, ListBullets, MapTrifold } from "@shared/ui/foundations/icons"
 
@@ -217,6 +238,7 @@ import type { Can } from "@/lib/perms"
 import type { Account, TeamMember } from "@shared/types"
 import type { Vars } from "@shared/i18n"
 import { placeAccountsOnMap } from "@/components/accounts/account-map"
+import { GoogleAccountsMap } from "@/components/accounts/google-account-map"
 
 // `vars?` widened in, matching `contacts-screen.tsx`'s own `Translate` one
 // module over — needed here now because the map view's missing-count
@@ -510,6 +532,20 @@ export function AccountsScreen({
   const showMapView = accountTab === "active"
   const effectiveView = view === "map" && !showMapView ? "gallery" : view
 
+  // THE MAP'S OWN SCRIPT URL — asked for only when the map is actually the
+  // body on screen (the same "don't build what nobody reads" the table/
+  // gallery split and `mapPlacement` below already keep), and cached under a
+  // fixed key rather than one keyed by team: `GOOGLE_MAPS_BROWSER_KEY` is a
+  // per-DEPLOY setting (`workers/tenancy/src/env.ts`), not a per-team one, so
+  // every team asks the identical question and the one cache entry serves
+  // them all (R56). `undefined` while this hook has not resolved yet reads as
+  // "still asking" to `<GoogleAccountsMap>`; `{ scriptUrl: null }` once
+  // resolved and the key is unset reads as "nothing to connect" — the map's
+  // own honest empty register, never a broken plate.
+  const mapsConfigQ = useCached(effectiveView === "map" ? "maps-config" : null, () =>
+    tenancy.mapsConfig()
+  )
+
   const accountsBadge = formatCount(total)
   const accountTabs = [
     {
@@ -692,21 +728,14 @@ export function AccountsScreen({
             // and the gallery above both read `config` from.
             const tunedRecipe = withDataDrivenCollection(recipe, shaped)
             const config = tunedRecipe.collection as CollectionConfig
-            // THE MAP'S OWN TWO ARRAYS — built off `rows` (the raw `Account[]`
-            // page, not `shaped`): `placeAccountsOnMap` (`./account-map.ts`)
-            // wants `country` and `active` off the real row, not the JSX
-            // `shaped` has already turned them into. Computed only when the
-            // map is actually the body on screen — the same "don't build what
-            // nobody reads" the table/gallery split above already keeps.
+            // THE MAP'S OWN PINS — built off `rows` (the raw `Account[]` page,
+            // not `shaped`): `placeAccountsOnMap` (`./account-map.ts`) wants
+            // `country`/`logoUrl`/`street`/`postalCode`/`city` off the real
+            // row, not the JSX `shaped` has already turned them into.
+            // Computed only when the map is actually the body on screen — the
+            // same "don't build what nobody reads" the table/gallery split
+            // above already keeps.
             const mapPlacement = effectiveView === "map" ? placeAccountsOnMap(rows) : null
-            const mapMissingLabel =
-              mapPlacement === null || mapPlacement.missingCount === 0
-                ? null
-                : mapPlacement.missingCount === 1
-                  ? t("1 account has no country and is not on the map. It is in the list view.")
-                  : t("{count} accounts have no country and are not on the map. They are in the list view.", {
-                      count: mapPlacement.missingCount,
-                    })
             return (
               <CollectionCreateActionProvider
                 action={
@@ -732,23 +761,20 @@ export function AccountsScreen({
                     rowLabel={(row) => row.nameText}
                   />
                 ) : effectiveView === "map" && mapPlacement !== null ? (
-                  // THE KIT'S OWN MAP, AS SPECIFIED — a muted plate the app
-                  // never draws tiles or a projection onto (that is the
-                  // component's own job to refuse), `items` carrying EVERY
-                  // row on the page so the list never loses an account the
-                  // plate could not place, and `missingLabel` saying so in
-                  // words rather than dropping it — the artifact's own three
-                  // rules, quoted in `shared/ui/components/map/map.tsx`'s own
-                  // header. Opening a pin or a row calls the SAME `onIntent`
-                  // the table's `onRowClick` already does, above — a map pin
-                  // is a `<button>`, not a real anchor (R37 is the table and
-                  // gallery's law, not a plain kit button's), so the soft-nav
-                  // dispatcher is the correct door here, not `<InAppLink>`.
-                  <Map
-                    items={mapPlacement.items}
+                  // A REAL GOOGLE MAP, HER RULING (this file's own header,
+                  // "A REAL GOOGLE MAP, NOT THE KIT'S PLATE"). No side list —
+                  // `mapPlacement.pins` is the only thing fed in; a marker
+                  // click opens the overlay card, and the card's own click
+                  // calls the SAME `onIntent` the table's `onRowClick` above
+                  // already does — a map pin, like the kit's own, is not a
+                  // real anchor (R37 is the table and gallery's law).
+                  <GoogleAccountsMap
                     pins={mapPlacement.pins}
-                    missingLabel={mapMissingLabel}
-                    onSelectItem={(id) => onIntent({ kind: "open", module: "accounts", id })}
+                    missingCount={mapPlacement.missingCount}
+                    totalCount={mapPlacement.totalCount}
+                    scriptUrl={mapsConfigQ.data?.scriptUrl}
+                    t={t}
+                    onOpenAccount={(id) => onIntent({ kind: "open", module: "accounts", id })}
                   />
                 ) : (
                   accountGalleryBody({

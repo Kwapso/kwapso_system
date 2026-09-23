@@ -50,6 +50,8 @@ const BERGMAN: Account = {
   accountManagerId: null,
   active: true,
   archived: false,
+  lat: null,
+  lng: null,
   createdAt: "2026-08-18T09:00:00.000Z",
   createdByName: null,
   updatedAt: null,

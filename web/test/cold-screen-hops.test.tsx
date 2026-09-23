@@ -229,6 +229,8 @@ const account: Account = {
   accountManagerId: null,
   active: true,
   archived: false,
+  lat: null,
+  lng: null,
   createdAt: "2026-01-01T00:00:00.000Z",
 }
 

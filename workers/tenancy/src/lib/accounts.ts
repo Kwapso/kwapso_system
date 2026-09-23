@@ -31,6 +31,8 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
+import { addressChanged, geocodeAddress, type GeocodeAddressFields } from "./geocode"
+import type { Env } from "../env"
 
 type AccountRow = {
   id: string
@@ -69,6 +71,12 @@ type AccountRow = {
    * (her INACTIVE, unchanged). See `accountsWhere`'s own header for the
    * predicate every ordinary read applies. */
   archived_at: string | null
+  /** 0118, the geocoded position, best-effort, set at write time by
+   * `./geocode.ts`'s `geocodeAddress`. `NULL` on either is the honest "no
+   * position" state; see `Account.lat`/`Account.lng` (shared/types.ts) for
+   * the full account. */
+  lat: number | null
+  lng: number | null
   created_at: string
   creator_name: string | null
   updated_at: string | null
@@ -175,6 +183,7 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
   account_manager_user_id,
   deactivated_at,
   archived_at,
+  lat, lng,
   created_at, creator_name, updated_at, editor_name,
   ${LINKED_COMPANY("(SELECT c.name FROM accounts c WHERE c.id = l.account_id)")} AS company_name,
   ${LINKED_COMPANY("l.relationship")} AS relationship,
@@ -337,6 +346,13 @@ function toAccount(r: AccountRow, scope: AccountScope, sight?: ContactSight): Ac
     // state it carried before, never a guess. See `accountsWhere`'s header
     // for the predicate every ordinary read applies.
     archived: r.archived_at != null,
+    // THE GEOCODED POSITION (0118), nobody's to withhold. Unlike
+    // `accountManagerId`/`commercialsVisible` above, this is not our own
+    // record ABOUT the account, it is a derived fact of the account's own
+    // address, so it rides out to a client login exactly as staff see it,
+    // see `Account.lat`/`Account.lng` (shared/types.ts).
+    lat: r.lat,
+    lng: r.lng,
     createdAt: r.created_at,
     createdByName: ours ? null : r.creator_name,
     updatedAt: r.updated_at,
@@ -924,6 +940,7 @@ export async function createAccount(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
+  env: Pick<Env, "GOOGLE_MAPS_GEOCODE_KEY">,
   input: {
     accountType: "entity" | "individual"
     name: string
@@ -961,6 +978,23 @@ export async function createAccount(
 
   const id = ulid()
   const now = new Date().toISOString()
+
+  // 0118, GEOCODE, BEST EFFORT, BEFORE THE INSERT BELOW. Always attempted on
+  // a create (there is no "before" address to compare against, every create
+  // is the address's first appearance), and its failure can NEVER stop this
+  // function: `geocodeAddress` never throws (its own header lists every
+  // reason it might come back `null`), so `position` is `null` on no key, no
+  // address, a network failure or an address Google could not resolve, and
+  // the INSERT two lines down runs exactly the same either way, proved by
+  // workers/tenancy/test/accounts-geocode.test.ts, "the geocode never blocks
+  // a write".
+  const position = await geocodeAddress(env, {
+    street: input.street ?? null,
+    postalCode: input.postalCode ?? null,
+    city: input.city ?? null,
+    country: input.country ?? null,
+  })
+
   const row = {
     id,
     account_type: input.accountType,
@@ -981,6 +1015,8 @@ export async function createAccount(
     locale: input.locale ?? null,
     timezone: input.timezone ?? null,
     account_manager_user_id: input.accountManagerUserId ?? null,
+    lat: position?.lat ?? null,
+    lng: position?.lng ?? null,
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,
@@ -1071,6 +1107,7 @@ export async function updateAccount(
   scope: AccountScope,
   actor: Actor,
   id: string,
+  env: Pick<Env, "GOOGLE_MAPS_GEOCODE_KEY">,
   input: {
     name: string
     email?: Patch
@@ -1134,6 +1171,41 @@ export async function updateAccount(
     accountManagerUserId: keep(input.accountManagerUserId, before.account_manager_user_id),
   }
 
+  // 0118, RE-GEOCODE ONLY WHEN IT IS WORTH IT. The four address fields the
+  // geocoder reads (`addressChanged`, ./geocode.ts) are compared against what
+  // is ALREADY STORED, and a network call is spent only when at least one of
+  // them actually moved: an edit to the name, the currency, the logo, or any
+  // of the other twenty-odd fields this door patches costs nothing extra
+  // here, and neither does saving the SAME address back unchanged.
+  //
+  // WHEN THE ADDRESS DID CHANGE, a stale position is worth less than an
+  // honest "not geocoded": `geocodeAddress` never throws (its own header has
+  // every reason it might answer `null`, no key, no network, an address
+  // Google cannot resolve), and on EVERY one of those `lat`/`lng` are set to
+  // `null` rather than left at the OLD position under a NEW address, which
+  // would be silently wrong rather than honestly absent. The write itself
+  // still always completes either way, proved by
+  // workers/tenancy/test/accounts-geocode.test.ts, "the geocode never blocks
+  // a write".
+  const addressPatch: GeocodeAddressFields = {
+    street: next.street,
+    postalCode: next.postalCode,
+    city: next.city,
+    country: next.country,
+  }
+  let lat = before.lat
+  let lng = before.lng
+  if (
+    addressChanged(
+      { street: before.street, postalCode: before.postal_code, city: before.city, country: before.country },
+      addressPatch
+    )
+  ) {
+    const position = await geocodeAddress(env, addressPatch)
+    lat = position?.lat ?? null
+    lng = position?.lng ?? null
+  }
+
   const changed = await refusingDuplicate(REFERENCE_TAKEN, () =>
     d1Query<{ id: string }>(
       cfg,
@@ -1141,6 +1213,7 @@ export async function updateAccount(
       `UPDATE accounts SET name = ?, email = ?, phone = ?, street = ?, postal_code = ?, city = ?,
          country = ?, industry = ?, website = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
          locale = ?, timezone = ?, account_manager_user_id = ?, commercials_visible = ?, alt_names = ?, name_narrows_alone = ?,
+         lat = ?, lng = ?,
          ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
       [
@@ -1166,6 +1239,8 @@ export async function updateAccount(
         input.nameNarrowsAlone === undefined
           ? before.name_narrows_alone
           : NARROWS_ALONE_COLUMN[input.nameNarrowsAlone],
+        lat,
+        lng,
         ...audit.params,
         ...fence.params,
         id,

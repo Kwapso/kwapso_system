@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-108 laws, 104 resolved to at least one check file, 4 unresolved.
+109 laws, 105 resolved to at least one check file, 4 unresolved.
 
 ## Architecture (28)
 
@@ -39,7 +39,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 | R99 | enforced | `no-close-while-timer-runs` | `web/test/no-close-while-timer-runs.test.ts`<br>`web/test/story-detail.test.tsx`<br>`web/test/task-sheet.test.tsx`<br>`web/test/ticket-close-moved-to-top.test.tsx` |
 
-## UI (71)
+## UI (72)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -114,6 +114,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R106 | enforced | `footer-band-home` | *unresolved — see below* |
 | R107 | enforced | `effort-tiles` | *unresolved — see below* |
 | R108 | enforced | `section-title-one-style` | `web/test/section-title-one-style.test.ts` |
+| R109 | enforced | `content-inset` | `web/test/content-inset.test.ts` |
 
 ## Workflow (2)
 

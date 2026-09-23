@@ -1132,7 +1132,7 @@ describe("a portal grant on a nested company does not climb to its parent", () =
     const actor2 = { id: IDS.staffUser, email: "staff@kwapso.app", name: "Staff" }
 
     // A person who belongs to the CHILD company, the way a site manager does.
-    const nils = await createAccount(cfg2, guard2, { kind: "staff" }, actor2, {
+    const nils = await createAccount(cfg2, guard2, { kind: "staff" }, actor2, {}, {
       accountType: "individual",
       name: "Nils Ekberg",
     })

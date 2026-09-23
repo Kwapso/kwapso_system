@@ -5592,6 +5592,7 @@ describe("RULES — the laws of the base", () => {
       "footer-band-home", // R106: web/test/footer-on-the-edge.test.ts + web/test/task-sheet.test.tsx, ScreenFooterSlot mounted exactly once per record page, the sheet's own stripe footer outside its scroller, record-above-latest-activity on a one-column footer; RECORD_FOOTER_SLOT_EXEMPT names shared/web/screen-engine/screen-renderer.tsx
       "effort-tiles", // R107: web/test/effort-card.test.tsx's existing cases, the three-column gap-4 grid, the tiles' own Card default, the log rows' no-fill plain list, and the one-Separator-between-rows shape
       "section-title-one-style", // R108: web/test/section-title-one-style.test.ts, a tripwire over TicketSidePanel/EmptyGatedPanel's own canonical title lines, plus a census over web/components + web-portal/components for a literal <h2>/<h3>/<h4> carrying both text-sm and font-medium (the old shape), or named in SECTION_TITLE_EXEMPT
+      "content-inset", // R109: web/test/content-inset.test.ts — the router-derived screen registry (collection-content.tsx/module-content.tsx/deep-link-screen.tsx's own @/components imports), censused for the pane-escape signature or named in CONTENT_INSET_EXEMPT, plus three structural assertions on app-shell.tsx's single ScreenShell mount and shared/ui's SHELL_CONTENT_INSET_X/DENSITY_BODY/screen-shell-stack wiring
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

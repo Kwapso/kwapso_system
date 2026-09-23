@@ -94,4 +94,58 @@ export type Env = {
    * mention can never drift away from data-ops' pin. */
   AGENT_MODEL?: string
   AGENT_NO_DAILY_CAP?: string
+
+  /** GOOGLE MAPS — the browser-side JavaScript API key that draws the real map
+   * on the accounts screen (Aurora's ruling, 23 Sep 2026: "build with the
+   * google maps api", replacing the kit's own tile-less plate). NOT secret
+   * the way every other value in this section is: once the map loads, this
+   * key is visible in the browser's own network tab, the same way it would
+   * be in any product built on this API. The fence that actually matters is
+   * the Google Cloud Console's own HTTP referrer restriction, scoped to this
+   * app's own origins, with the Maps JavaScript API enabled and billed on
+   * that project alone — not keeping the value out of a response, which
+   * cannot be done and is not the control. Set with `wrangler secret put`
+   * anyway, matching `GOOGLE_CLIENT_ID` above: neither value is ever
+   * committed, and one habit for every Google credential here is one fewer
+   * thing to remember.
+   *
+   * Read by exactly one door, `routes/maps-config.ts`'s `getMapsConfig`
+   * (`GET /api/tenancy/config/maps`), which hands the browser a ready-to-use
+   * SCRIPT URL rather than the bare key spelled anywhere in the front end's
+   * own source — the same shape `workers/auth/src/lib/google.ts`'s
+   * `buildGoogleStart` already uses for "Continue with Google": the
+   * credential is composed into a URL server-side, once, in one place.
+   *
+   * UNSET = the map view's own honest empty register ("Connect Google Maps
+   * to see accounts here"), never a broken plate and never a crash — see
+   * `web/components/accounts/google-account-map.tsx`. */
+  GOOGLE_MAPS_BROWSER_KEY?: string
+
+  /** GOOGLE MAPS, the SERVER-SIDE Geocoding API key, migration 0118's own
+   * write half: `workers/tenancy/src/lib/geocode.ts`'s `geocodeAddress`,
+   * called from `lib/accounts.ts`'s `createAccount`/`updateAccount`, turns a
+   * stored `street`/`postalCode`/`city`/`country` into `{lat, lng}` under
+   * this key, once, at write time.
+   *
+   * A DIFFERENT CREDENTIAL FROM `GOOGLE_MAPS_BROWSER_KEY` ABOVE, ON PURPOSE.
+   * That one is HTTP-referrer-restricted and safe to expose to a browser,
+   * while this one is a plain server secret, never sent to a browser at
+   * all: a Geocoding API call from the browser would need the Geocoding API
+   * enabled on the SAME key the map's tiles use, widening what a leaked
+   * browser key could spend on somebody else's behalf, for no benefit over
+   * the identical lookup done once, server-side
+   * (`web/components/accounts/account-map.ts`'s own header has the full
+   * argument). Google's own guidance is that a server key and a browser key
+   * should never be the same credential wearing two different restrictions,
+   * and `geocode.ts` never reads `GOOGLE_MAPS_BROWSER_KEY`, nor does this
+   * door read `GOOGLE_MAPS_GEOCODE_KEY`, proved by
+   * `workers/tenancy/test/accounts-geocode.test.ts`, "the two Google Maps
+   * keys never cross".
+   *
+   * UNSET = geocoding is simply not offered on this environment: every write
+   * still succeeds, `lat`/`lng` stay `NULL`, and the map falls back to a
+   * country centroid, the same honest degrade an absent
+   * `GOOGLE_MAPS_BROWSER_KEY` already gives the plate itself. Set with
+   * `wrangler secret put`, matching `GOOGLE_MAPS_BROWSER_KEY` above. */
+  GOOGLE_MAPS_GEOCODE_KEY?: string
 }

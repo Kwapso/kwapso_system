@@ -459,6 +459,12 @@ export const tenancy = {
       body: JSON.stringify({ key, title, description }),
     }),
 
+  /** The browser's ready-to-use Google Maps script URL for the accounts map
+   * view, or `{ scriptUrl: null }` when `GOOGLE_MAPS_BROWSER_KEY` is unset on
+   * this environment — the map's own honest degraded state, not an error.
+   * Any member; see `workers/tenancy/src/routes/maps-config.ts`. */
+  mapsConfig: () => api<{ scriptUrl: string | null }>("/api/tenancy/config/maps"),
+
   /* ---- the customer spine: accounts, their people, their logins ---- */
 
   /** R14: a PAGE of accounts (a GROWING collection) — hand `cursor` back from the

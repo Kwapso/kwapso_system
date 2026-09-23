@@ -409,7 +409,7 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
   // that it names a current staff member (requireStaffMember's own header).
   const accountManagerUserId = optionalText(body.accountManagerUserId, "Account manager", TEXT_LIMITS.short)
   if (accountManagerUserId) await requireStaffMember(env, cfg, guard, accountManagerUserId)
-  const id = await createAccount(cfg, guard, scope, actor, {
+  const id = await createAccount(cfg, guard, scope, actor, env, {
     accountType,
     name,
     parentAccountId: optionalText(body.parentAccountId, "Parent", TEXT_LIMITS.short),
@@ -546,7 +546,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     logoUrl: typeof patch.logoUrl === "string" ? patch.logoUrl : undefined,
     coverUrl: typeof patch.coverUrl === "string" ? patch.coverUrl : undefined,
   })
-  const { supersededUrls } = await updateAccount(cfg, guard, scope, actor, id, {
+  const { supersededUrls } = await updateAccount(cfg, guard, scope, actor, id, env, {
     name,
     ...patch,
     ...(stored.logoUrl !== undefined ? { logoUrl: stored.logoUrl } : {}),

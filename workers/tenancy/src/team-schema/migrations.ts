@@ -8260,6 +8260,66 @@ ALTER TABLE accounts ADD COLUMN archiver_email TEXT;
 ALTER TABLE accounts ADD COLUMN archiver_name TEXT;
 `,
   },
+  {
+    // AN ACCOUNT GETS A POSITION. Aurora's ruling, 23 Sep 2026, over the map
+    // view she asked for the same day and got the same day: "build with the
+    // google maps api", and the moment it drew every pin at its COUNTRY'S
+    // own centroid, the problem she meant this migration to answer: "ten of
+    // the fourteen active clients are in Austria and would all land on one
+    // point." A real map needs a real position per account, not a shared
+    // guess standing in for every company inside one country.
+    //
+    // TWO NULLABLE REAL COLUMNS, THE SMALLEST SHAPE THAT ANSWERS IT: `lat`
+    // and `lng`, plain floats, no separate "geocoded at" timestamp and no
+    // separate "geocode failed" flag. `NULL` on both IS the honest "not
+    // geocoded yet, or the address could not be resolved" state, exactly the
+    // signal `web/components/accounts/account-map.ts`'s own fallback (a
+    // country centroid, ringed so several accounts sharing one country stay
+    // individually clickable) already treats a missing position as. A third
+    // state would be a second answer to the one question `NULL` already
+    // answers, the same argument 0042 made for killing the free-text
+    // `status` column beside `deactivated_at`.
+    //
+    // NEVER BACKFILLED HERE. A migration runs inside the team-schema runner,
+    // synchronously, with no network call and no per-row external service:
+    // geocoding an existing account's address is a write, and the runner is
+    // not the place for one (see workers/tenancy/src/lib/geocode.ts's own
+    // header for why a geocode is bounded, best-effort, and never allowed to
+    // block or fail anything it rides alongside). Every row this migration
+    // touches is therefore born with `lat`/`lng` both `NULL`, exactly as a
+    // brand-new nullable column always is, and:
+    //
+    //   • GOING FORWARD, `workers/tenancy/src/lib/accounts.ts`'s
+    //     `createAccount`/`updateAccount` geocode best-effort at write time,
+    //     under the server-side `GOOGLE_MAPS_GEOCODE_KEY` (env.ts), never
+    //     the browser's own `GOOGLE_MAPS_BROWSER_KEY`, a deliberately
+    //     separate credential (Google's own guidance: a server key and a
+    //     browser key should never be the same credential wearing two
+    //     different restrictions).
+    //   • FOR THE ACCOUNTS THAT PREDATE THIS COLUMN, a ONE-TIME maintenance
+    //     script (`scripts/backfill-account-geocode.mjs`, the same size call
+    //     `backfill-ticket-raisers.mjs` already made for its own one-time
+    //     job) reads every ungeocoded row and fills it in, same key, same
+    //     formula, no second implementation of what "geocode this account"
+    //     means.
+    //
+    // shared/types.ts's `Account` gains the matching `lat: number | null` /
+    // `lng: number | null` fields the same round.
+    //
+    // NUMBERED 0118, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0117 is the highest version on both the
+    // local tree and `origin/main` as of 23 Sep 2026, so 0118 is the next
+    // free number, agreed with the session owning `scripts/
+    // glide-accounts-sync.mjs`, `glide/` and the contacts split, which holds
+    // this same number on its own side of a two-line estate (CLAUDE.md,
+    // "team migration numbers are read, never recalled").
+    version: "0118_an_account_gets_a_position",
+    sql: `
+ALTER TABLE accounts ADD COLUMN lat REAL;
+ALTER TABLE accounts ADD COLUMN lng REAL;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

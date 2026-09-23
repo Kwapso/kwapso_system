@@ -97,6 +97,9 @@
 //                                             could make its own next mistake quiet)
 //   POST /api/tenancy/config/automations/override -> a team's own name/description for one
 //                                             automation (teams:update; same reason as the switch)
+//   GET  /api/tenancy/config/maps          -> the browser's ready-to-use Google Maps script URL,
+//                                             or `{ scriptUrl: null }` when GOOGLE_MAPS_BROWSER_KEY
+//                                             is unset (any member; routes/maps-config.ts)
 //   GET  /api/tenancy/waves/phase-day-defaults -> the team's own default days per phase type,
 //                                             any member who may read `work`
 //   POST /api/tenancy/waves/phase-day-defaults -> set one or more of them (work:update)
@@ -182,6 +185,7 @@ import {
   postRevokeInvite,
 } from "./routes/invites"
 import { getAutomations, getScreens, postAutomation, postAutomationOverride, postScreen } from "./routes/config"
+import { getMapsConfig } from "./routes/maps-config"
 import {
   getAccountDetail,
   getAccounts,
@@ -341,6 +345,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/tenancy/config/automations": { handler: getAutomations, kind: "read" },
   "POST /api/tenancy/config/automations": { handler: postAutomation, kind: "mutation" },
   "POST /api/tenancy/config/automations/override": { handler: postAutomationOverride, kind: "mutation" },
+  "GET /api/tenancy/config/maps": { handler: getMapsConfig, kind: "read" },
   "GET /api/tenancy/selectable": { handler: getSelectable, kind: "read" },
   "GET /api/tenancy/selectable/export": { handler: getSelectableExport, kind: "read" },
   "POST /api/tenancy/selectable": { handler: postCreateSelectable, kind: "mutation" },

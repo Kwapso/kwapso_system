@@ -60,7 +60,39 @@
      this file.
    · Numbers are tabular and never drop — "we are at three of seven" is the
      sentence a client repeats back — and they go through `formatNumber`, so
-     a document in Arabic, Urdu or Persian gets its own numerals.
+     a document in Arabic, Urdu or Persian gets its own numerals. THIS BULLET
+     IS NOW `stages`-ONLY TOO, SINCE 23 SEP 2026 (second ruling that day,
+     reviewing kit v1.2.164): "remove the numbers inside (they are not
+     numbered) is either check or empty." `variant="steps"` (chapter 15's
+     rail, both orientations) no longer calls `formatNumber` from either mark
+     at all — a reached stage (done or current) draws the `CheckFat` tick, a
+     stage still ahead draws nothing. The sentence a client repeats back is
+     still true of `stages`' hero pills, which keep their numbers unchanged;
+     it stopped being true of the small circular MARK the moment she ruled it
+     was never a numbered thing to begin with.
+   · THE CURRENT STEP'S LABEL IS UNDERLINED — `variant="steps"` ONLY, ADDED
+     23 SEP 2026, THE SAME DAY AS THE BULLET ABOVE, IMMEDIATELY AFTER IT. NOT
+     PART OF HER RULING'S OWN WORDS: "remove the numbers inside (they are not
+     numbered) is either check or empty" is about what the MARK contains,
+     nothing more, and taking the number out is correct on its own terms —
+     these stages are not numbered things, and a digit implied an order that
+     does not exist. But taking it out left `isDone` and `isCurrent` drawing
+     the identical fill AND the identical glyph, so a ladder whose whole job
+     is to say where a record stands could no longer say it to a sighted
+     reader glancing at the row — a regression she did not ask for and would
+     have noticed within a minute. So this bullet exists to close that gap
+     without reopening hers: `underline underline-offset-[0.1875rem]
+     decoration-hair-strong` on the current step's LABEL ONLY, never the
+     mark. Not a colour — `--hair-strong` is the same neutral ink-hairline
+     token `button.tsx`'s text-link variant and `article-body.tsx`'s in-copy
+     links already underline with ("ink, underlined, never coloured"), not a
+     new one bound for this file. Not a number. THE MARK ITSELF IS
+     UNTOUCHED BY THIS BULLET — it stays exactly what the bullet above
+     leaves it, a tick on the ink fill or an empty grey circle; the
+     underline is the row's only added signal. DO NOT DELETE THIS AS
+     LEFTOVER DECORATION: it is the one thing standing between this ladder
+     and a current step nobody can find at a glance. `check-status-stepper.
+     mjs` §6 pins it exactly so a later "cleanup" cannot drop it quietly.
 
    THE SEVEN-STAGE CASE AT MOBILE WIDTH — WHAT IT DOES AND WHY
    The kit answers this itself and the answer is NOT a media query: "over
@@ -228,11 +260,21 @@ function plainNumber(value: number): string {
  *                      `--surface-idle` with `--ink-disabled`. `steps` (the
  *                      chapter-15 rail, both orientations) draws its MARK
  *                      differently since 23 Sep 2026 — done and current share
- *                      one ink fill (`--surface-inverse`/`--ink-on-inverse`),
- *                      told apart by the tick-vs-number glyph and the
- *                      current mark's own extra weight; only later stays
- *                      grey. See the `steps` mark's own render-site comment
- *                      for Aurora's ruling and the full argument.
+ *                      one ink fill (`--surface-inverse`/`--ink-on-inverse`)
+ *                      AND, since her second ruling that same day ("remove
+ *                      the numbers inside … is either check or empty"), the
+ *                      same glyph too: both draw the `CheckFat` tick, never a
+ *                      number. A later mark draws neither fill nor glyph — an
+ *                      empty grey circle. Done and current are no longer told
+ *                      apart by anything the MARK itself draws; the LABEL
+ *                      carries the signal instead — the current step's label
+ *                      is underlined (`decoration-hair-strong`, added the
+ *                      same day once removing the number left no visible
+ *                      mark of position at all), plus the current mark and
+ *                      label's own extra weight, `aria-current`, and the
+ *                      row's own reached-before-later ordering. See the
+ *                      `steps` mark's own render-site comment for both
+ *                      rulings, the underline, and the full argument.
  *  2. hover          — a pressable stage takes one defined step from its own
  *                      fill: `--surface-quiet` for done and later,
  *                      `--btn-primary-hover` for the mango current pill. A
@@ -268,10 +310,14 @@ function plainNumber(value: number): string {
  *  9. selected       — the current stage IS the selected one, `aria-current=
  *                      "step"` on every variant. `stages` still draws it with
  *                      the mango fill and charcoal label chapter 23 specifies;
- *                      `steps`' own MARK no longer carries an accent for this
- *                      (23 Sep 2026 — see above), so "selected" there reads
- *                      through the mark's ink fill plus its glyph and weight,
- *                      not through colour.
+ *                      `steps`' own MARK no longer carries an accent for this,
+ *                      nor (since 23 Sep 2026's second ruling) a distinct
+ *                      glyph — done and current share both the ink fill and
+ *                      the tick, so "selected" there reads through
+ *                      `aria-current`, the LABEL's underline (added the same
+ *                      day so the row still has a visible mark of position),
+ *                      and the current mark's extra weight — not through
+ *                      colour and not through the mark's own content.
  * 10. read-only      — every stepper without `onStageSelect` is read-only,
  *                      and that is the default. The stages become spans, so
  *                      there are no tab stops that do nothing.
@@ -373,37 +419,54 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   data-slot="status-stepper-mark"
                   className={cn(
                     markClasses,
-                    /* AURORA, 23 SEP 2026, VERBATIM: "on ticket stages, mark
-                       the active and past in black, only future are gray."
-                       See the horizontal `steps` block below for the full
-                       argument (this vertical wizard rail draws the identical
-                       mark, never wired to a real call site as of this pass,
-                       so it is fixed in step rather than left to drift the
-                       day something does call it). `isDone` and `isCurrent`
-                       now share the one ink fill; the checkmark-vs-number
-                       glyph is what still says which is which. */
+                    /* AURORA, 23 SEP 2026, VERBATIM (first ruling that day):
+                       "on ticket stages, mark the active and past in black,
+                       only future are gray." See the horizontal `steps` block
+                       below for the full argument (this vertical wizard rail
+                       draws the identical mark, never wired to a real call
+                       site as of this pass, so it is fixed in step rather
+                       than left to drift the day something does call it).
+                       `isDone` and `isCurrent` share the one ink fill; that
+                       part of the first ruling stands.
+
+                       AURORA, 23 SEP 2026, VERBATIM (SECOND RULING, LATER THE
+                       SAME DAY, reviewing this fill as shipped in kit
+                       v1.2.164): "remove the numbers inside (they are not
+                       numbered) is either check or empty." The first ruling
+                       left the current mark's NUMBER in place on the ink
+                       fill, and the previous pass argued a reader could still
+                       tell current from done by the tick-vs-number glyph. She
+                       removed that argument: the stages are not numbered
+                       things, so a mark is either a check or it is empty. See
+                       the horizontal block's own comment for the full
+                       argument and what survives once the glyph can no
+                       longer say it either. */
                     (isDone || isCurrent) && "bg-surface-inverse text-ink-on-inverse",
                     // The current mark alone keeps the extra weight it always
                     // had — the smallest non-colour mark of "you are here"
-                    // once the fill can no longer say it.
+                    // once neither the fill nor the glyph can say it.
                     isCurrent && "font-[var(--font-weight-medium)]",
                     !isDone && !isCurrent && "bg-surface-lift text-ink-tertiary shadow-[var(--hairline)]",
                   )}
                 >
-                  {isDone ? (
+                  {isDone || isCurrent ? (
                     <>
-                      <span className="sr-only">{doneLabel}</span>
+                      {isDone ? <span className="sr-only">{doneLabel}</span> : null}
                       <CheckFat size={16} aria-hidden="true" />
                     </>
-                  ) : (
-                    formatNumber(index + 1)
-                  )}
+                  ) : null}
                 </span>
                 <span
                   data-slot="status-stepper-label"
                   className={cn(
                     "min-w-0 truncate text-caption",
-                    isCurrent && "font-[var(--font-weight-medium)]",
+                    // The underline — see the horizontal steps rail's own
+                    // render-site comment, below, for the full argument. The
+                    // identical `markClasses` mark this rail shares with the
+                    // horizontal one keeps its glyph untouched; only this
+                    // label gains the signal.
+                    isCurrent &&
+                      "font-[var(--font-weight-medium)] underline underline-offset-[0.1875rem] decoration-hair-strong",
                     state === "later" ? "text-ink-tertiary" : "text-foreground",
                   )}
                 >
@@ -481,8 +544,9 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                 data-slot="status-stepper-mark"
                 className={cn(
                   markClasses,
-                  /* AURORA, 23 SEP 2026, VERBATIM: "on ticket stages, mark
-                     the active and past in black, only future are gray."
+                  /* AURORA, 23 SEP 2026, VERBATIM (first ruling that day):
+                     "on ticket stages, mark the active and past in black,
+                     only future are gray."
 
                      THIS RAIL IS THE TICKET LADDER (`web/components/tickets/
                      ticket-stages.tsx`, this app's own `variant="steps"
@@ -495,8 +559,7 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                      ink circle with a tick, a later stage took a grey circle
                      with its number, and the current stage alone took a
                      MANGO circle with its number — the one accent in the
-                     view, which is exactly what her ruling is asking to
-                     stop.
+                     view, which is exactly what her ruling asked to stop.
 
                      THE APP LANE ALSO TRIED, AND REJECTED, A LOCAL FIX:
                      rebinding `--surface-brand`/`--ink-on-accent` from the
@@ -507,60 +570,105 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                      `--warning`. That is why this is a kit change and not an
                      app-side rebind.
 
-                     THE FIX: `isCurrent` now takes the SAME ink fill `isDone`
-                     already takes — `--surface-inverse` / `--ink-on-inverse`,
-                     the token pair the vertical wizard rail's own mark has
-                     used from the start. A later stage is untouched, still
-                     `--surface-idle` / `--ink-disabled`. Two readings survive
-                     where three stood before: reached (ink) and not yet
-                     reached (grey) — which is her sentence exactly, "the
-                     active and past in black, only future are gray."
+                     THE FIRST FIX (v1.2.164): `isCurrent` took the SAME ink
+                     fill `isDone` already took — `--surface-inverse` /
+                     `--ink-on-inverse` — while the current mark kept drawing
+                     its own NUMBER rather than the tick `isDone` draws. Two
+                     fill readings replaced three, and the pass argued a
+                     reader could still tell current from done by the
+                     tick-to-number boundary: the current mark was the first
+                     ink circle still showing a number, structurally the same
+                     way a reader finds today's date on a calendar by finding
+                     the boundary between the crossed-off days and the ones
+                     still blank.
 
-                     A READER STILL SEES WHERE THEY ARE without a third
-                     colour, on THREE surviving, non-colour signals, none of
-                     them invented for this fix: (1) the mark's own CONTENT —
-                     a done stage draws the tick glyph, the current stage is
-                     the first mark still drawing a NUMBER, so the tick-to-
-                     number boundary in the row IS the position, structurally,
-                     the same way a reader finds today's date on a calendar by
-                     finding the boundary between the crossed-off days and the
-                     ones still blank; (2) `aria-current="step"` on the
-                     pressable/static stage below, unchanged; (3) weight — the
-                     current mark and its label both kept the
+                     AURORA, 23 SEP 2026, VERBATIM (SECOND RULING, LATER THE
+                     SAME DAY, reviewing that fill as shipped in kit v1.2.164):
+                     "remove the numbers inside (they are not numbered) is
+                     either check or empty." She removed the tick-to-number
+                     argument by name: the stages are not numbered things, so
+                     a mark is either a check or it is empty.
+
+                     THE SECOND FIX (this pass): `isCurrent` now draws the
+                     SAME GLYPH `isDone` draws — the `CheckFat` tick — instead
+                     of `formatNumber(index + 1)`. A later mark draws nothing
+                     at all (an empty circle), where it used to draw its own
+                     number. No branch in this mark calls `formatNumber`
+                     anymore; `check-status-stepper.mjs` pins that it cannot
+                     come back. The ink-vs-grey fill from the first fix is
+                     untouched — this pass only removes what was still inside
+                     the fill.
+
+                     WHAT A READER HAS LEFT, NOW THAT NEITHER THE FILL NOR THE
+                     GLYPH TELLS DONE FROM CURRENT: (1) the LABEL'S underline
+                     — added in the SAME pass this comment describes, once the
+                     honest read below was filed and the answer came back "yes,
+                     add the smallest one, on the label, not the mark" — see
+                     the law block's own bullet, above, for why it exists and
+                     why it must not be deleted as decoration; (2) weight —
+                     the current mark and its label both keep the
                      `font-[var(--font-weight-medium)]` they already carried,
-                     so the current stage still reads slightly heavier than a
-                     done stage's tick or a later stage's grey number. Nothing
-                     new was invented here: this fix REMOVES the accent and
-                     keeps every signal that survives without one.
+                     so the current stage reads slightly heavier than a done
+                     stage's tick or a later stage's empty circle; (3)
+                     `aria-current="step"` on the pressable/static stage
+                     below, unchanged, which is what a screen reader still
+                     reports; (4) position — the row is ordered and
+                     contiguous (done, done, …, current, later, later…), so
+                     the LAST filled (ink) mark in reading order is
+                     structurally the current one, the same way it was before,
+                     just without a glyph that names it directly. Before the
+                     underline, (2) and (4) alone read as faint to a sighted
+                     user at a glance — weight at 12px/16px is a subtle
+                     difference, and "the last one" requires scanning the row
+                     rather than reading one mark; that gap is why (1) exists.
+                     The MARK itself still says nothing beyond fill and glyph
+                     — this file's own TEN STATES block, item 1, and
+                     GAPS-CE STP-2/3 record the same honest read this comment
+                     does.
 
                      SCOPE — checked against every variant and orientation
-                     this file draws, not only this one:
-                       · `steps` / horizontal (this block) — CHANGED. The
-                         ticket ladder, plus every other kit caller of
+                     this file draws, not only this one, the same way the
+                     first fix was:
+                       · `steps` / horizontal (this block) — CHANGED (twice
+                         now: the ink fill, then the glyph). The ticket
+                         ladder, plus every other kit caller of
                          `variant="steps"` with no explicit orientation
                          (`import-wizard.tsx`, `run-steps.tsx`, `import.tsx`'s
                          own rail) — same mark, same fix, so the rail does not
                          draw one rule on the ticket screen and a different
                          one inside an import dialog.
                        · `steps` / vertical (the wizard rail, above) —
-                         CHANGED, for the same reason: it is the identical
-                         `markClasses` fill logic, laid out in a column rather
-                         than a row, and leaving it on mango would mean the
-                         same "current step" concept reads two different ways
-                         depending only on which way the rail is drawn.
+                         CHANGED, for the same reason both times: it is the
+                         identical `markClasses` fill and glyph logic, laid
+                         out in a column rather than a row, and leaving it
+                         numbered would mean the same "current step" concept
+                         reads two different ways depending only on which way
+                         the rail is drawn.
                        · `stages` (chapter 23's hero row of pills, this file's
-                         OTHER drawing, at the very bottom) — LEFT ALONE. It
-                         has no separate mark at all; the whole PILL is the
-                         position indicator, and colouring the current pill IS
-                         the drawing chapter 23 specifies ("current takes
-                         mango with a charcoal label"), ruled and measured
-                         under GAPS-CONTRAST §2 row 8 (see that block, below).
-                         Her ruling names "ticket stages" and the app's own
-                         reasoning names "the MARK, the small circle beside
-                         each label" — a structure `stages` does not have — so
-                         nothing here reaches it; `record-detail.tsx`'s own
-                         progression header and `import-proposal.tsx` both
-                         call `variant="stages"` and are unaffected. */
+                         OTHER drawing, at the very bottom) — LEFT ALONE, both
+                         times. It has no separate mark at all; the whole PILL
+                         is the position indicator, and colouring the current
+                         pill IS the drawing chapter 23 specifies ("current
+                         takes mango with a charcoal label"), ruled and
+                         measured under GAPS-CONTRAST §2 row 8 (see that
+                         block, below). Neither of her two rulings that day
+                         names it — the first names "ticket stages" and "the
+                         MARK, the small circle beside each label" (a
+                         structure `stages` does not have); the second reviews
+                         "the stage ladder that shipped as kit v1.2.164",
+                         which was this mark alone. FLAGGED, NOT ACTED ON: the
+                         `stages` pill DOES draw a number for every stage,
+                         done and later included (`formatNumber(index + 1)` in
+                         the `inner` block below), which is the same kind of
+                         mark her second ruling's words ("the stages are not
+                         numbered things") could plausibly also describe. This
+                         pass leaves it alone on the letter of both rulings —
+                         "ticket stages" and "the stage ladder that shipped as
+                         kit v1.2.164" both name this mark, not the hero row —
+                         and files that question back to her rather than
+                         acting on it; `record-detail.tsx`'s own progression
+                         header and `import-proposal.tsx` both call
+                         `variant="stages"` and are unaffected either way. */
                   (isDone || isCurrent) && "bg-surface-inverse text-ink-on-inverse",
                   // The current mark alone keeps the extra weight it always
                   // had — the smallest non-colour mark of "you are here" once
@@ -581,14 +689,12 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   !isDone && !isCurrent && "bg-surface-lift text-ink-tertiary shadow-[var(--hairline)]",
                 )}
               >
-                {isDone ? (
+                {isDone || isCurrent ? (
                   <>
-                    <span className="sr-only">{doneLabel}</span>
+                    {isDone ? <span className="sr-only">{doneLabel}</span> : null}
                     <CheckFat size={16} aria-hidden="true" />
                   </>
-                ) : (
-                  formatNumber(index + 1)
-                )}
+                ) : null}
               </span>
             );
 
@@ -614,7 +720,21 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   data-slot="status-stepper-label"
                   className={cn(
                     "block w-full truncate pe-[var(--space-2h)] text-caption",
-                    isCurrent && "font-[var(--font-weight-medium)]",
+                    /* THE UNDERLINE — added THIS pass, not her ruling's own
+                       words. See the mark's comment above for the full
+                       argument: removing the number left the row with no
+                       visible mark of position at all, which she did not ask
+                       for and would have noticed. This is the smallest
+                       non-colour, non-number signal on offer, the kit's own
+                       "ink, underlined, never coloured" idiom (the same
+                       `decoration-hair-strong` / `underline-offset-
+                       [0.1875rem]` pair `button.tsx`'s text-link variant and
+                       `article-body.tsx`'s in-copy links already use) rather
+                       than an invented one. Label only — the mark stays
+                       exactly what her ruling leaves it, a tick on ink or an
+                       empty grey circle, nothing added there. */
+                    isCurrent &&
+                      "font-[var(--font-weight-medium)] underline underline-offset-[0.1875rem] decoration-hair-strong",
                     state === "later" ? "text-ink-tertiary" : "text-foreground",
                   )}
                 >

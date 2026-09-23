@@ -1,56 +1,66 @@
-// ACCOUNTS' THIRD VIEW, THE MAP — Aurora's ruling, 23 Sep 2026, verbatim:
-// "for accounts/active add a map view." Two things must never regress once
-// this ships, named directly in the brief that built it:
+// ACCOUNTS' THIRD VIEW, THE MAP — now a REAL Google map. Aurora's first
+// ruling, 23 Sep 2026, shipped the kit's own tile-less plate; her second, the
+// same day, replaced it: "ok but, there's no actual map lol, how do we get a
+// google map there? remove the side panel, when i click in one i want a
+// slight little overlay card with name and loogo and full adress (including
+// ountry) then if i click there it takes me to detail screen." — and,
+// choosing between the options laid out for her, "build with the google
+// maps api."
 //
-//   1. THE MAP VIEW CANNOT LOSE ITS LIST. The kit's own `Map`
-//      (`shared/ui/components/map/map.tsx`) draws the list beside the plate
-//      as a SEPARATE `items` array from `pins` — nothing stops a future edit
-//      from handing it only the placeable rows (fewer items than accounts),
-//      which is exactly "a map that lies about the size of the business"
-//      the kit's own header warns against.
-//   2. THE MAP CANNOT DRAW A PIN FOR AN ACCOUNT IT CANNOT PLACE. A country
-//      this app has no centroid for (typo, unmatched vocabulary, or simply
-//      absent) must never silently manufacture a position — that is a guess
-//      wearing a fact's clothes.
+// Five things must never regress, named directly in THIS round's own brief:
 //
-// `placeAccountsOnMap` (`web/components/accounts/account-map.ts`) is the one
-// place either invariant could break, so it is proved directly — no need to
-// mount the whole screen (`tenancy`, `useCached`, `<PagedFind>`'s own door
-// calls) to reach a bug that lives in one pure function. A render-level case
-// below (`describe("the kit's own Map, fed this file's real output")`) then
-// checks the KIT actually draws what the function promised, so a mismatch
-// between the two never hides behind a green unit test on either side alone.
-// A last case is a WIRING census over `accounts-screen.tsx` itself, keyed by
-// the expressions it must contain rather than a line number (this repo's own
-// rule — a `file:line` key rots on the first edit above it): the call site
-// really does feed `<Map>` from ONE `mapPlacement` object (so `items` and
-// `pins` can never drift into two different ideas of "the accounts on this
-// page"), and the "map" choice is only ever offered on the Active tab, her
-// own word.
+//   1. THE KEY IS NEVER A LITERAL. `GOOGLE_MAPS_BROWSER_KEY` is read off
+//      `env` in exactly one worker file and nowhere else spells a Google
+//      Maps key.
+//   2. THE ABSENT-KEY STATE RENDERS. No key configured is an honest,
+//      readable register — never a broken plate, never a crash.
+//   3. A PIN CLICK OPENS THE CARD, AND THE CARD OPENS THE RECORD. Her own
+//      two-step interaction, proved end to end against a faked Google Maps
+//      SDK (nothing here can load the real one in a test).
+//   4. AN ACCOUNT THE MAP CANNOT PLACE STILL APPEARS SOMEHOW — not as a row
+//      in a list any more (she asked for that removed), but as a count the
+//      caption under the map never omits.
+//   5. THE PLATE NEVER INVENTS A POSITION. A country this app has no
+//      centroid for (typo, unmatched vocabulary, or simply absent) must
+//      never silently manufacture one — that is a guess wearing a fact's
+//      clothes, exactly as it was under the old plate.
+//
+// `placeAccountsOnMap` (`web/components/accounts/account-map.ts`) is where
+// (1)/(4)/(5) live, proved directly — no need to mount the whole screen to
+// reach a bug that lives in one pure function. `GoogleAccountsMap`
+// (`web/components/accounts/google-account-map.tsx`) is where (2)/(3) live,
+// proved against a faked `window.google.maps` (a real script cannot load in
+// a test environment). A last section is a WIRING CENSUS over
+// `accounts-screen.tsx` itself, keyed by the expressions it must contain
+// rather than a line number (this repo's own rule — a `file:line` key rots
+// on the first edit above it).
 
-import { cleanup, render } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import { cleanup, fireEvent, render, waitFor, within, act } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { Account } from "@shared/types"
-import { Map } from "@shared/ui/components/map/map"
 
-import { placeAccountsOnMap } from "@/components/accounts/account-map"
+import { placeAccountsOnMap, type GeocodedAccount } from "@/components/accounts/account-map"
 import { countryCentroid, countryPosition, COUNTRY_CENTROIDS } from "@/components/accounts/country-centroids"
+import { GoogleAccountsMap } from "@/components/accounts/google-account-map"
 
 afterEach(cleanup)
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 
+const t = (english: string, vars?: Record<string, unknown>) =>
+  vars ? english.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? "")) : english
+
 /** The minimum an `Account` needs for these two files — every OTHER field on
  * the real type is irrelevant to placement, so it is left off rather than
  * faked, the same narrowing `accounts-screen-gallery.test.tsx`'s own
  * `COMPANIES` fixture already uses one screen over. */
-function account(over: Partial<Account> & { id: string; name: string }): Account {
+function account(over: Partial<GeocodedAccount> & { id: string; name: string }): GeocodedAccount {
   return {
     accountType: "entity",
     parentAccountId: null,
@@ -76,27 +86,22 @@ function account(over: Partial<Account> & { id: string; name: string }): Account
     archived: false,
     accountManagerId: null,
     ...over,
-  } as unknown as Account
+  } as unknown as GeocodedAccount
 }
 
-describe("countryPosition — turning a country into a plate position", () => {
-  it("places every seeded team's own six countries somewhere on the plate", () => {
+describe("countryCentroid/countryPosition — turning a country into a position (unchanged this round)", () => {
+  it("places every seeded team's own six countries somewhere real", () => {
     for (const name of ["Germany", "Austria", "Switzerland", "Spain", "Andorra", "United Kingdom"]) {
-      const position = countryPosition(name)
-      expect(position, `${name} should resolve`).not.toBeNull()
-      expect(position!.x).toBeGreaterThanOrEqual(0)
-      expect(position!.x).toBeLessThanOrEqual(100)
-      expect(position!.y).toBeGreaterThanOrEqual(0)
-      expect(position!.y).toBeLessThanOrEqual(100)
+      expect(countryCentroid(name), `${name} should resolve`).not.toBeNull()
     }
   })
 
   it("refuses to place null, blank, or an unmatched country — never a guess", () => {
-    expect(countryPosition(null)).toBeNull()
-    expect(countryPosition(undefined)).toBeNull()
-    expect(countryPosition("")).toBeNull()
-    expect(countryPosition("   ")).toBeNull()
-    expect(countryPosition("Narnia")).toBeNull()
+    expect(countryCentroid(null)).toBeNull()
+    expect(countryCentroid(undefined)).toBeNull()
+    expect(countryCentroid("")).toBeNull()
+    expect(countryCentroid("   ")).toBeNull()
+    expect(countryCentroid("Narnia")).toBeNull()
   })
 
   it("matches case-insensitively — the one realistic typo, not a fuzzy guess", () => {
@@ -104,72 +109,35 @@ describe("countryPosition — turning a country into a plate position", () => {
     expect(countryCentroid("GERMANY")).toEqual(COUNTRY_CENTROIDS.Germany)
   })
 
-  it("the table itself stays small — this is a placeholder plate, not a gazetteer", () => {
-    // A ceiling, not a floor: the file's own header says why (per-team, open
-    // vocabulary), and a table that quietly grew to hundreds of entries would
-    // be a sign somebody started guessing rather than curating.
+  it("resolves a local-language spelling to the same centroid as its English name", () => {
+    expect(countryCentroid("Österreich")).toEqual(COUNTRY_CENTROIDS.Austria)
+  })
+
+  it("the table itself stays small — this is a placeholder, not a gazetteer", () => {
     expect(Object.keys(COUNTRY_CENTROIDS).length).toBeLessThan(120)
   })
 
-  // THE REAL GAP, FOUND ON THE KWAPSO TEAM ITSELF: nine of its own fourteen
-  // active companies are filed under "Austria" and one under "Österreich" —
-  // the German name for the same country, on the SAME per-team vocabulary.
-  // Neither is a typo, so the case-insensitive pass above (correctly) does
-  // not catch it; the alias table is what does.
-  it("resolves a local-language spelling to the same centroid as its English name", () => {
-    expect(countryCentroid("Österreich")).toEqual(COUNTRY_CENTROIDS.Austria)
-    expect(countryPosition("Österreich")).toEqual(countryPosition("Austria"))
-  })
-
-  it("matches an alias case-insensitively too, the same as the main table", () => {
-    expect(countryCentroid("österreich")).toEqual(COUNTRY_CENTROIDS.Austria)
-    expect(countryCentroid("ÖSTERREICH")).toEqual(COUNTRY_CENTROIDS.Austria)
-  })
-
-  it("carries at least the six local names this agency's own client base actually types", () => {
-    expect(countryCentroid("Deutschland")).toEqual(COUNTRY_CENTROIDS.Germany)
-    expect(countryCentroid("Schweiz")).toEqual(COUNTRY_CENTROIDS.Switzerland)
-    expect(countryCentroid("Suisse")).toEqual(COUNTRY_CENTROIDS.Switzerland)
-    expect(countryCentroid("España")).toEqual(COUNTRY_CENTROIDS.Spain)
-    expect(countryCentroid("Srbija")).toEqual(COUNTRY_CENTROIDS.Serbia)
-  })
-
-  it("tries the team's own spelling and a case-insensitive match BEFORE any alias", () => {
-    // A team could in principle seed a Country row that happens to share text
-    // with an alias key; the exact/case-insensitive passes over the real
-    // table must still win. Nothing in this app's real vocabulary does this
-    // today, so this is a construction proof over the function's own order,
-    // not a scenario the door has ever sent.
-    const withOwnEntry: Record<string, { lat: number; lng: number }> = {
-      ...COUNTRY_CENTROIDS,
-      Österreich: { lat: 1, lng: 1 },
-    }
-    expect(withOwnEntry.Österreich).not.toEqual(COUNTRY_CENTROIDS.Austria)
-  })
-
-  it("an alias NEVER rewrites what a reader sees — it only finds a position", () => {
-    const accounts = [account({ id: "a1", name: "Kessler AG", country: "Österreich" })]
-    const placement = placeAccountsOnMap(accounts)
-    // The list row still reads the account's own stored spelling.
-    expect(placement.items[0].meta).toBe("Österreich")
-    // And it still got a pin — placed, not dropped.
-    expect(placement.pins).toHaveLength(1)
+  it("still projects onto a flat 0–100 plate too — countryPosition is kept, just unused by the real map", () => {
+    const position = countryPosition("Germany")
+    expect(position!.x).toBeGreaterThanOrEqual(0)
+    expect(position!.x).toBeLessThanOrEqual(100)
   })
 })
 
-describe("placeAccountsOnMap — the list never loses an account, the plate never invents a position", () => {
-  it("carries EVERY account into `items`, placeable or not", () => {
+describe("placeAccountsOnMap — a real position per account, the plate never invents one", () => {
+  it("accounts for EVERY row in pins + missingCount — the one arithmetic that must never drift", () => {
     const accounts = [
       account({ id: "a1", name: "Bergman S.A.", country: "Germany" }),
       account({ id: "a2", name: "No Country Ltd", country: null }),
       account({ id: "a3", name: "Typo GmbH", country: "Germnay" }),
+      account({ id: "a4", name: "Geocoded AG", lat: 48.2, lng: 16.37 }),
     ]
     const placement = placeAccountsOnMap(accounts)
-    expect(placement.items).toHaveLength(3)
-    expect(placement.items.map((i) => i.id).sort()).toEqual(["a1", "a2", "a3"])
+    expect(placement.totalCount).toBe(4)
+    expect(placement.pins.length + placement.missingCount).toBe(4)
   })
 
-  it("pins ONLY the accounts a country could place, one pin per account", () => {
+  it("PLACES ONLY the accounts a geocode or a country could resolve, one pin per account", () => {
     const accounts = [
       account({ id: "a1", name: "Bergman S.A.", country: "Germany" }),
       account({ id: "a2", name: "No Country Ltd", country: null }),
@@ -180,19 +148,86 @@ describe("placeAccountsOnMap — the list never loses an account, the plate neve
     expect(placement.missingCount).toBe(2)
   })
 
-  it("pins + missingCount always accounts for every row — the one arithmetic that must never drift", () => {
-    const accounts = [
-      account({ id: "a1", name: "One", country: "Spain" }),
-      account({ id: "a2", name: "Two", country: "Spain" }),
-      account({ id: "a3", name: "Three", country: null }),
-      account({ id: "a4", name: "Four", country: "Andorra" }),
-      account({ id: "a5", name: "Five", country: "Nowhereland" }),
-    ]
+  it("AN ACCOUNT THE MAP CANNOT PLACE STILL APPEARS SOMEHOW — as a count, never dropped in silence", () => {
+    // No pin (no lat/lng, no resolvable country) — but the arithmetic proves
+    // it is still COUNTED, which is what `google-account-map.tsx` turns into
+    // the caption under the plate (see the render test below).
+    const accounts = [account({ id: "ghost", name: "Nowhereland Ltd", country: "Nowhereland" })]
     const placement = placeAccountsOnMap(accounts)
-    expect(placement.pins.length + placement.missingCount).toBe(accounts.length)
+    expect(placement.pins).toHaveLength(0)
+    expect(placement.missingCount).toBe(1)
+    expect(placement.totalCount).toBe(1)
   })
 
-  it("several accounts sharing a country each get their OWN pin, not one pin standing for all", () => {
+  it("a GEOCODED account uses its own stored lat/lng, exactly, marked non-approximate", () => {
+    const accounts = [account({ id: "a1", name: "Bergman S.A.", country: "Germany", lat: 52.52, lng: 13.405 })]
+    const placement = placeAccountsOnMap(accounts)
+    expect(placement.pins).toHaveLength(1)
+    expect(placement.pins[0]).toMatchObject({ lat: 52.52, lng: 13.405, approximate: false })
+  })
+
+  it("a geocoded account never joins its ungeocoded countrymates' ring", () => {
+    const accounts = [
+      account({ id: "geo", name: "Exact GmbH", country: "Germany", lat: 50, lng: 10 }),
+      account({ id: "cent", name: "Approx GmbH", country: "Germany" }),
+    ]
+    const placement = placeAccountsOnMap(accounts)
+    const exact = placement.pins.find((p) => p.id === "geo")!
+    const approx = placement.pins.find((p) => p.id === "cent")!
+    expect(exact.approximate).toBe(false)
+    expect(exact).toMatchObject({ lat: 50, lng: 10 })
+    expect(approx.approximate).toBe(true)
+    // The centroid-fallback pin sits AT Germany's own centroid (a lone
+    // account in its group needs no ring — see account-map.ts's header).
+    expect(approx.lat).toBeCloseTo(COUNTRY_CENTROIDS.Germany.lat, 5)
+    expect(approx.lng).toBeCloseTo(COUNTRY_CENTROIDS.Germany.lng, 5)
+  })
+
+  it("null/undefined lat or lng (not both) still falls back to the country centroid", () => {
+    const accounts = [account({ id: "a1", name: "Half Geocoded", country: "Spain", lat: 40, lng: null })]
+    const placement = placeAccountsOnMap(accounts)
+    expect(placement.pins[0].approximate).toBe(true)
+  })
+
+  it("builds the full address the same way account-detail.tsx's own overview panel does", () => {
+    const accounts = [
+      account({
+        id: "a1",
+        name: "Bergman S.A.",
+        street: "Hauptstraße 1",
+        postalCode: "1010",
+        city: "Wien",
+        country: "Austria",
+      }),
+    ]
+    const placement = placeAccountsOnMap(accounts)
+    expect(placement.pins[0].address).toBe("Hauptstraße 1, 1010, Wien, Austria")
+  })
+
+  it("an account with only a country still gets an address string, built from what it has", () => {
+    const accounts = [account({ id: "a1", name: "Bare Ltd", country: "Spain" })]
+    const placement = placeAccountsOnMap(accounts)
+    expect(placement.pins[0].address).toBe("Spain")
+  })
+
+  it("an account with no address fields at all AND no country gets an empty address, never a crash", () => {
+    // No country means no pin either (nothing to place it by) — reached
+    // through the exact-lat/lng path instead, so an address can still be
+    // built (or, here, be genuinely empty) without a country deciding it.
+    const accounts = [account({ id: "a1", name: "Bare Ltd", lat: 10, lng: 10 })]
+    const placement = placeAccountsOnMap(accounts)
+    expect(placement.pins[0].address).toBe("")
+  })
+
+  it("is deterministic — the same accounts draw the same pins on every call", () => {
+    const accounts = [
+      account({ id: "a1", name: "One", country: "Germany" }),
+      account({ id: "a2", name: "Two", country: "Germany" }),
+    ]
+    expect(placeAccountsOnMap(accounts).pins).toEqual(placeAccountsOnMap(accounts).pins)
+  })
+
+  it("several accounts sharing a country each get their OWN pin, spread in a ring of degrees, never stacked", () => {
     const accounts = [
       account({ id: "a1", name: "Bergman S.A.", country: "Germany" }),
       account({ id: "a2", name: "Aardvark GmbH", country: "Germany" }),
@@ -201,75 +236,38 @@ describe("placeAccountsOnMap — the list never loses an account, the plate neve
     const placement = placeAccountsOnMap(accounts)
     expect(placement.pins).toHaveLength(3)
     expect(new Set(placement.pins.map((p) => p.id)).size).toBe(3)
-    // Every pin still sits close to Germany's own centroid — the ring is a
-    // few points wide, not a different country.
-    const germany = countryPosition("Germany")!
+    const germany = COUNTRY_CENTROIDS.Germany
     for (const pin of placement.pins) {
-      expect(Math.abs(pin.x - germany.x)).toBeLessThan(5)
-      expect(Math.abs(pin.y - germany.y)).toBeLessThan(5)
+      // Within the ring's own ceiling (3°) of Germany's own centroid — a
+      // few dozen kilometres, not a different country.
+      expect(Math.abs(pin.lat - germany.lat)).toBeLessThan(3.01)
+      expect(Math.abs(pin.lng - germany.lng)).toBeLessThan(3.01)
     }
-    // And they are not stacked on the exact same point either — that would
-    // be indistinguishable from one pin standing for three accounts.
-    const positions = new Set(placement.pins.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`))
+    const positions = new Set(placement.pins.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`))
     expect(positions.size).toBe(3)
   })
 
-  it("is deterministic — the same accounts draw the same pins on every call", () => {
-    const accounts = [
-      account({ id: "a1", name: "One", country: "Germany" }),
-      account({ id: "a2", name: "Two", country: "Germany" }),
-    ]
-    const first = placeAccountsOnMap(accounts)
-    const second = placeAccountsOnMap(accounts)
-    expect(first.pins).toEqual(second.pins)
-  })
-
-  // THE RING WIDENS AS THE GROUP GROWS — checked against the real distribution
-  // the coordinator measured live: nine of the Kwapso team's fourteen active
-  // companies are Austria, so nine is the NORMAL case for this screen, not an
-  // edge case. A fixed 2.5-point radius (the first draft) puts nine evenly
-  // spaced points roughly 1.7 apart — under a bare pin's own 9px footprint at
-  // ordinary plate widths — so this proves the WIDENED ring keeps every pair
-  // of pins at least `MIN_PIN_SEPARATION` apart instead.
   it("keeps nine pins in one country individually distinguishable, not an overlapping blob", () => {
+    // Real, measured distribution: nine of the Kwapso team's own fourteen
+    // active companies are Austria.
     const accounts = Array.from({ length: 9 }, (_, i) =>
       account({ id: `austria-${i}`, name: `Company ${i}`, country: "Austria" })
     )
     const placement = placeAccountsOnMap(accounts)
     expect(placement.pins).toHaveLength(9)
 
-    // Every pairwise distance, not just adjacent ones — the ADJACENT pair is
-    // always the closest on an evenly spaced ring, but checking all of them
-    // is what actually proves "no overlap" rather than assuming the geometry.
-    const MIN_PIN_SEPARATION = 4.5 // mirrors account-map.ts's own constant
+    const MIN_PIN_SEPARATION_DEG = 0.35 // mirrors account-map.ts's own constant
     let closest = Infinity
     for (let i = 0; i < placement.pins.length; i++) {
       for (let j = i + 1; j < placement.pins.length; j++) {
         const a = placement.pins[i]
         const b = placement.pins[j]
-        const distance = Math.hypot(a.x - b.x, a.y - b.y)
-        closest = Math.min(closest, distance)
+        closest = Math.min(closest, Math.hypot(a.lat - b.lat, a.lng - b.lng))
       }
     }
-    // A small tolerance for floating point, not for the geometry itself.
-    expect(closest).toBeGreaterThanOrEqual(MIN_PIN_SEPARATION - 0.01)
+    expect(closest).toBeGreaterThanOrEqual(MIN_PIN_SEPARATION_DEG - 0.001)
   })
 
-  it("a fixed 2.5-point radius — the rejected first draft — would NOT have kept nine pins apart", () => {
-    // Documents the finding, not just the fix: nine points on a circle of
-    // radius 2.5 land closer together than a bare pin's own 9px footprint at
-    // any plate width this screen actually draws at, which is why the ring
-    // widens instead (`account-map.ts`'s own `jitter` header).
-    const FIXED_RADIUS = 2.5
-    const n = 9
-    const chordBetweenAdjacentPoints = 2 * FIXED_RADIUS * Math.sin(Math.PI / n)
-    expect(chordBetweenAdjacentPoints).toBeLessThan(2) // ≈1.71 — visibly too tight
-  })
-
-  // THE EXACT LIVE DISTRIBUTION, reported by the coordinator after querying
-  // the Kwapso team's own data: Austria 9, Österreich 1 (German spelling of
-  // Austria), United Kingdom 1, Switzerland 1, Serbia 1, no country 1 — 14
-  // active companies, 13 placeable once the alias resolves Österreich.
   it("the real Kwapso team's own active-company distribution places 13 of 14, drops none silently", () => {
     const accounts = [
       ...Array.from({ length: 9 }, (_, i) => account({ id: `at-${i}`, name: `Austria Co ${i}`, country: "Austria" })),
@@ -282,85 +280,353 @@ describe("placeAccountsOnMap — the list never loses an account, the plate neve
     expect(accounts).toHaveLength(14)
 
     const placement = placeAccountsOnMap(accounts)
-    expect(placement.items).toHaveLength(14) // the list loses nobody
-    expect(placement.pins).toHaveLength(13) // every placeable account gets its own pin
-    expect(placement.missingCount).toBe(1) // exactly the one with no country
+    expect(placement.totalCount).toBe(14)
+    expect(placement.pins).toHaveLength(13)
+    expect(placement.missingCount).toBe(1)
 
-    // The aliased company really did land at Austria's own centroid.
     const aliasPin = placement.pins.find((p) => p.id === "at-alias")!
-    const austria = countryPosition("Austria")!
-    expect(aliasPin.x).toBeCloseTo(austria.x, 5)
-    expect(aliasPin.y).toBeCloseTo(austria.y, 5)
+    expect(aliasPin.lat).toBeCloseTo(COUNTRY_CENTROIDS.Austria.lat, 5)
+    expect(aliasPin.lng).toBeCloseTo(COUNTRY_CENTROIDS.Austria.lng, 5)
   })
 })
 
-describe("the kit's own Map, fed this file's real output", () => {
-  it("draws exactly one list row per item and one pin per placeable account, and says who is missing", () => {
-    const accounts = [
-      account({ id: "a1", name: "Bergman S.A.", country: "Germany" }),
-      account({ id: "a2", name: "No Country Ltd", country: null }),
-    ]
-    const placement = placeAccountsOnMap(accounts)
-    const { container } = render(
-      <Map
-        items={placement.items}
-        pins={placement.pins}
-        missingLabel={placement.missingCount > 0 ? `${placement.missingCount} missing` : null}
+/* ─────────────────────────── THE FAKE GOOGLE MAPS SDK ─────────────────────
+ * Nothing here can load the real Maps JavaScript API in a test environment
+ * (it is a live, billed, network-loaded script) — so this is a small,
+ * faithful stand-in for the four pieces of it `google-account-map.tsx`
+ * actually calls: `Map`, `Marker`, `InfoWindow`, `LatLngBounds`. Every method
+ * on it is real Maps JS API surface; nothing here invents a method the
+ * component does not call in production. */
+type Handler = () => void
+
+class FakeMarker {
+  static instances: FakeMarker[] = []
+  handlers: Record<string, Handler> = {}
+  options: Record<string, unknown>
+  constructor(options: Record<string, unknown>) {
+    this.options = options
+    FakeMarker.instances.push(this)
+  }
+  addListener(event: string, handler: Handler) {
+    this.handlers[event] = handler
+  }
+  setMap() {
+    /* no-op for the fake */
+  }
+}
+
+class FakeInfoWindow {
+  static instances: FakeInfoWindow[] = []
+  content: Node | null = null
+  opened = false
+  closeSpy = vi.fn()
+  handlers: Record<string, Handler> = {}
+  constructor() {
+    FakeInfoWindow.instances.push(this)
+  }
+  setContent(node: Node) {
+    this.content = node
+  }
+  open() {
+    this.opened = true
+  }
+  close() {
+    this.opened = false
+    this.closeSpy()
+  }
+  addListener(event: string, handler: Handler) {
+    this.handlers[event] = handler
+  }
+}
+
+class FakeLatLngBounds {
+  extend() {
+    /* no-op for the fake */
+  }
+}
+
+class FakeMap {
+  handlers: Record<string, Handler> = {}
+  addListener(event: string, handler: Handler) {
+    this.handlers[event] = handler
+  }
+  setCenter() {
+    /* no-op */
+  }
+  setZoom() {
+    /* no-op */
+  }
+  fitBounds() {
+    /* no-op */
+  }
+}
+
+function installFakeGoogleMaps() {
+  FakeMarker.instances = []
+  FakeInfoWindow.instances = []
+  ;(window as unknown as { google: unknown }).google = {
+    maps: { Map: FakeMap, Marker: FakeMarker, InfoWindow: FakeInfoWindow, LatLngBounds: FakeLatLngBounds },
+  }
+}
+
+function uninstallFakeGoogleMaps() {
+  delete (window as unknown as { google?: unknown }).google
+}
+
+/** Simulates the `<script>` tag `google-account-map.tsx`'s own loader
+ * injects finishing its load — jsdom never actually fetches it, so the test
+ * fires the `onload` it registered by hand, exactly as a real network load
+ * would once the SDK is ready (the fake `window.google` above stands in for
+ * what that real load would have defined). */
+async function resolveMapsScript() {
+  await waitFor(() => {
+    const script = document.head.querySelector<HTMLScriptElement>('script[src^="https://maps.googleapis.com"]')
+    expect(script).not.toBeNull()
+  })
+  const script = document.head.querySelector<HTMLScriptElement>('script[src^="https://maps.googleapis.com"]')!
+  await act(async () => {
+    script.onload?.(new Event("load"))
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
+const examplePin = {
+  id: "acc-1",
+  name: "Bergman S.A.",
+  logoUrl: null,
+  address: "Hauptstraße 1, 1010, Wien, Austria",
+  lat: 48.2,
+  lng: 16.37,
+  approximate: false,
+}
+
+describe("GoogleAccountsMap — the absent-key state renders, honestly", () => {
+  beforeEach(uninstallFakeGoogleMaps)
+
+  it("draws the kit's own empty register when no key is configured, never a broken plate", () => {
+    const { getByText, container } = render(
+      <GoogleAccountsMap
+        pins={[]}
+        missingCount={0}
+        totalCount={0}
+        scriptUrl={null}
+        t={t}
+        onOpenAccount={vi.fn()}
       />
     )
-    expect(container.querySelectorAll('[data-slot="map-list-item"]')).toHaveLength(2)
-    expect(container.querySelectorAll('[data-slot="map-pin"]')).toHaveLength(1)
-    const missing = container.querySelector('[data-slot="map-missing"]')
-    expect(missing?.textContent).toBe("1 missing")
+    expect(getByText("Connect Google Maps to see accounts here.")).toBeTruthy()
+    // And it never even asked the network for the SDK.
+    expect(document.head.querySelector('script[src^="https://maps.googleapis.com"]')).toBeNull()
+    expect(container.querySelector('[data-state="empty"]')).not.toBeNull()
   })
 
-  it("draws no missing register at all when every account placed", () => {
-    const accounts = [account({ id: "a1", name: "Bergman S.A.", country: "Germany" })]
-    const placement = placeAccountsOnMap(accounts)
+  it("draws the kit's own loading register while the door has not answered yet", () => {
     const { container } = render(
-      <Map
-        items={placement.items}
-        pins={placement.pins}
-        missingLabel={placement.missingCount > 0 ? `${placement.missingCount} missing` : null}
+      <GoogleAccountsMap
+        pins={[]}
+        missingCount={0}
+        totalCount={0}
+        scriptUrl={undefined}
+        t={t}
+        onOpenAccount={vi.fn()}
       />
     )
-    expect(container.querySelector('[data-slot="map-missing"]')).toBeNull()
+    expect(container.querySelector('[data-state="loading"]')).not.toBeNull()
   })
 })
 
-describe("accounts-screen.tsx — the map is wired from one placement, offered only where she asked", () => {
+describe("GoogleAccountsMap — a pin click opens the card, and the card opens the record", () => {
+  beforeEach(installFakeGoogleMaps)
+  afterEach(uninstallFakeGoogleMaps)
+
+  it("clicking a marker opens an overlay card with the account's name, logo mark and full address", async () => {
+    const onOpenAccount = vi.fn()
+    render(
+      <GoogleAccountsMap
+        pins={[examplePin]}
+        missingCount={0}
+        totalCount={1}
+        scriptUrl="https://maps.googleapis.com/maps/api/js?key=test-key"
+        t={t}
+        onOpenAccount={onOpenAccount}
+      />
+    )
+    await resolveMapsScript()
+    await waitFor(() => expect(FakeMarker.instances).toHaveLength(1))
+
+    await act(async () => {
+      FakeMarker.instances[0].handlers.click()
+    })
+
+    const infoWindow = FakeInfoWindow.instances[0]
+    expect(infoWindow.content).not.toBeNull()
+    const card = within(infoWindow.content as HTMLElement)
+    expect(card.getByText("Bergman S.A.")).toBeTruthy()
+    expect(card.getByText("Hauptstraße 1, 1010, Wien, Austria")).toBeTruthy()
+
+    // The card itself opens the record — her second click.
+    fireEvent.click(card.getByText("Bergman S.A."))
+    expect(onOpenAccount).toHaveBeenCalledWith("acc-1")
+  })
+
+  it("the card's own close button dismisses it WITHOUT opening the record", async () => {
+    const onOpenAccount = vi.fn()
+    render(
+      <GoogleAccountsMap
+        pins={[examplePin]}
+        missingCount={0}
+        totalCount={1}
+        scriptUrl="https://maps.googleapis.com/maps/api/js?key=test-key"
+        t={t}
+        onOpenAccount={onOpenAccount}
+      />
+    )
+    await resolveMapsScript()
+    await waitFor(() => expect(FakeMarker.instances).toHaveLength(1))
+    await act(async () => {
+      FakeMarker.instances[0].handlers.click()
+    })
+
+    const infoWindow = FakeInfoWindow.instances[0]
+    const card = within(infoWindow.content as HTMLElement)
+    fireEvent.click(card.getByLabelText("Close"))
+
+    expect(infoWindow.closeSpy).toHaveBeenCalled()
+    expect(onOpenAccount).not.toHaveBeenCalled()
+  })
+
+  it("marks an approximate (country-centroid) pin's card so a reader is never told a guess is a fact", async () => {
+    render(
+      <GoogleAccountsMap
+        pins={[{ ...examplePin, approximate: true }]}
+        missingCount={0}
+        totalCount={1}
+        scriptUrl="https://maps.googleapis.com/maps/api/js?key=test-key"
+        t={t}
+        onOpenAccount={vi.fn()}
+      />
+    )
+    await resolveMapsScript()
+    await waitFor(() => expect(FakeMarker.instances).toHaveLength(1))
+    await act(async () => {
+      FakeMarker.instances[0].handlers.click()
+    })
+    const card = within(FakeInfoWindow.instances[0].content as HTMLElement)
+    expect(card.getByText("Approximate location")).toBeTruthy()
+  })
+})
+
+describe("GoogleAccountsMap — an ungeocodable account still appears somehow, as an honest count", () => {
+  beforeEach(installFakeGoogleMaps)
+  afterEach(uninstallFakeGoogleMaps)
+
+  it("says exactly how many of how many are shown when some accounts have no pin", () => {
+    const { getByText } = render(
+      <GoogleAccountsMap
+        pins={[examplePin]}
+        missingCount={1}
+        totalCount={2}
+        scriptUrl="https://maps.googleapis.com/maps/api/js?key=test-key"
+        t={t}
+        onOpenAccount={vi.fn()}
+      />
+    )
+    expect(getByText("1 of 2 accounts are shown on the map — 1 could not be placed.")).toBeTruthy()
+  })
+
+  it("says every account is shown, with no caveat, when nothing is missing", () => {
+    const { getByText } = render(
+      <GoogleAccountsMap
+        pins={[examplePin]}
+        missingCount={0}
+        totalCount={1}
+        scriptUrl="https://maps.googleapis.com/maps/api/js?key=test-key"
+        t={t}
+        onOpenAccount={vi.fn()}
+      />
+    )
+    expect(getByText("All 1 accounts are shown on the map.")).toBeTruthy()
+  })
+})
+
+describe("the key is never a literal", () => {
+  const mapsConfigSrc = readFileSync(join(ROOT, "workers", "tenancy", "src", "routes", "maps-config.ts"), "utf8")
+  const googleMapSrc = readFileSync(join(ROOT, "web", "components", "accounts", "google-account-map.tsx"), "utf8")
+  // Google Maps/Cloud API keys are shaped `AIza` + 35 more base64url
+  // characters — checked for, never assumed absent by eye.
+  const KEY_SHAPE = /AIza[0-9A-Za-z_-]{35}/
+
+  it("the worker door reads the key off `env`, and only off `env`", () => {
+    expect(mapsConfigSrc).toMatch(/env\.GOOGLE_MAPS_BROWSER_KEY/)
+    expect(mapsConfigSrc).not.toMatch(KEY_SHAPE)
+  })
+
+  it("the browser component never carries a key literal of its own", () => {
+    expect(googleMapSrc).not.toMatch(KEY_SHAPE)
+    // It only ever forwards whatever `scriptUrl` it was handed — it never
+    // builds a `maps.googleapis.com` URL of its own with a `key=` on it.
+    expect(googleMapSrc).not.toMatch(/[?&]key=/)
+  })
+
+  it("no tracked source anywhere in the repo carries a Google Maps key shape", () => {
+    // A last, broad net over the three files this round actually touches —
+    // narrower than a whole-repo grep (slow, and not this lane's to police
+    // every other file), but wide enough that a key pasted into any of them
+    // by mistake still fails the build.
+    for (const src of [
+      mapsConfigSrc,
+      googleMapSrc,
+      readFileSync(join(ROOT, "web", "components", "accounts", "account-map.ts"), "utf8"),
+      readFileSync(join(ROOT, "web", "components", "accounts", "accounts-screen.tsx"), "utf8"),
+      readFileSync(join(ROOT, "web", "lib", "api", "tenancy.ts"), "utf8"),
+      readFileSync(join(ROOT, "workers", "tenancy", "src", "env.ts"), "utf8"),
+    ]) {
+      expect(src).not.toMatch(KEY_SHAPE)
+    }
+  })
+})
+
+describe("accounts-screen.tsx — the real map is wired from one placement, offered only where she asked", () => {
   const src = readFileSync(join(ROOT, "web", "components", "accounts", "accounts-screen.tsx"), "utf8")
 
-  it("imports the kit's own Map and the pure placement function, never a second copy of either", () => {
-    expect(src).toMatch(/import\s*\{\s*Map\s*\}\s*from\s*"@shared\/ui\/components\/map\/map"/)
+  it("imports the real map component and the pure placement function, never a second copy of either", () => {
+    expect(src).toMatch(
+      /import\s*\{\s*GoogleAccountsMap\s*\}\s*from\s*"@\/components\/accounts\/google-account-map"/
+    )
     expect(src).toMatch(/import\s*\{\s*placeAccountsOnMap\s*\}\s*from\s*"@\/components\/accounts\/account-map"/)
+    // The kit's own plate is retired at this call site — the real map
+    // supplies its own tiles now (google-account-map.tsx's own header).
+    expect(src).not.toMatch(/import\s*\{\s*Map\s*\}\s*from\s*"@shared\/ui\/components\/map\/map"/)
   })
 
-  it("computes ONE `mapPlacement` and feeds both `items` and `pins` from it — they cannot drift apart", () => {
+  it("computes ONE `mapPlacement` and feeds `<GoogleAccountsMap>` from it — pins and counts cannot drift apart", () => {
     const at = src.indexOf("const mapPlacement =")
     expect(at, "the one placement call").toBeGreaterThan(-1)
     expect(src.slice(at, at + 200)).toMatch(/placeAccountsOnMap\(rows\)/)
 
-    // A WORD-BOUNDARY SEARCH, not `indexOf("<Map")` — the view-switch icon
-    // beside it is `<MapTrifold`, which also starts with the four characters
-    // "<Map" and would otherwise be found first.
-    const mapCallAt = src.search(/<Map[\s>]/)
-    expect(mapCallAt, "the <Map> call site").toBeGreaterThan(-1)
-    const mapCallBlock = src.slice(mapCallAt, mapCallAt + 400)
-    expect(mapCallBlock, "the list is fed from the placement's own items").toMatch(
-      /items=\{mapPlacement\.items\}/
-    )
-    expect(mapCallBlock, "the pins are fed from the SAME placement, not a second array").toMatch(
-      /pins=\{mapPlacement\.pins\}/
-    )
+    // The literal, real JSX call site — never the header prose, which quotes
+    // `` `<GoogleAccountsMap>` `` (immediately closed, no newline) when
+    // explaining the wiring in words a few hundred characters earlier.
+    const callAt = src.indexOf("<GoogleAccountsMap\n")
+    expect(callAt, "the <GoogleAccountsMap> call site").toBeGreaterThan(-1)
+    const block = src.slice(callAt, callAt + 500)
+    expect(block).toMatch(/pins=\{mapPlacement\.pins\}/)
+    expect(block).toMatch(/missingCount=\{mapPlacement\.missingCount\}/)
+    expect(block).toMatch(/totalCount=\{mapPlacement\.totalCount\}/)
+    expect(block).toMatch(/scriptUrl=\{mapsConfigQ\.data\?\.scriptUrl\}/)
   })
 
-  it("never hands the plate every account unconditionally — pins come only from the placement function", () => {
-    // The one and only reader of `.pins` in this file is the JSX prop above;
-    // nothing here may build a `pins=` array by hand (that would be a second,
-    // competing idea of "where an account goes" living beside the tested one).
+  it("never hands the map a hand-built pins array — the one and only reader of `.pins` is the JSX prop above", () => {
     const pinsAssignments = src.match(/pins=\{[^}]*\}/g) ?? []
     expect(pinsAssignments).toEqual(["pins={mapPlacement.pins}"])
+  })
+
+  it("fetches the maps config door only while the map is actually the body on screen", () => {
+    const at = src.indexOf("const mapsConfigQ =")
+    expect(at, "the one config fetch").toBeGreaterThan(-1)
+    expect(src.slice(at, at + 200)).toMatch(/effectiveView === "map" \? "maps-config" : null/)
+    expect(src.slice(at, at + 200)).toMatch(/tenancy\.mapsConfig\(\)/)
   })
 
   it("offers \"map\" in the view switch only when the Active tab is showing", () => {

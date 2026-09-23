@@ -55,7 +55,7 @@ describe("the hierarchy: unlimited depth, but never a loop", () => {
     let parent: string = IDS.victimAccount
     const chain: string[] = []
     for (let i = 0; i < 6; i++) {
-      parent = await createAccount(cfg, guard, staff, actor, {
+      parent = await createAccount(cfg, guard, staff, actor, {}, {
         accountType: "entity",
         name: `Level ${i}`,
         parentAccountId: parent,
@@ -78,7 +78,7 @@ describe("the hierarchy: unlimited depth, but never a loop", () => {
     expect(parentOf(IDS.victimAccount)).toBeNull()
 
     // …and a longer ring, three levels down, is refused just the same.
-    const deep = await createAccount(cfg, guard, staff, actor, {
+    const deep = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "entity",
       name: "Deep",
       parentAccountId: IDS.victimChild,
@@ -167,7 +167,7 @@ describe("the hierarchy: unlimited depth, but never a loop", () => {
 
 describe("reference codes are labels, never identifiers", () => {
   it("lets two accounts have no code, but never the same one", async () => {
-    await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "One", code: "BERG" })
+    await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "One", code: "BERG" })
     // The partial unique index is the race guard: the SECOND writer loses at the
     // database, not at an application check two statements earlier.
     //
@@ -176,11 +176,11 @@ describe("reference codes are labels, never identifiers", () => {
     // a green test agreeing with a 500. A duplicate reference is a TYPO, and a
     // typo must come back as an answer (R20).
     await expect(
-      createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Two", code: "BERG" })
+      createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Two", code: "BERG" })
     ).rejects.toMatchObject({ status: 409, code: "duplicate" })
     // …while the many code-less rows coexist happily (that's what partial buys).
-    await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Three" })
-    await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Four" })
+    await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Three" })
+    await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Four" })
     const codeless = db().prepare("SELECT COUNT(*) n FROM accounts WHERE code IS NULL").get() as { n: number }
     expect(codeless.n).toBeGreaterThan(3)
   })
@@ -558,7 +558,7 @@ describe("contacts", () => {
     expect(marta?.personLogoUrl).toBe("/media/accounts/marta.jpg")
     // …and a contact with no photograph says so rather than inventing one — the
     // screen's fallback to an initial depends on the null being honest.
-    const ana = await createAccount(cfg, guard, staff, actor, { accountType: "individual", name: "Ana" })
+    const ana = await createAccount(cfg, guard, staff, actor, {}, { accountType: "individual", name: "Ana" })
     await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
     expect(
       (await listAccountLinks(cfg, guard, staff, IDS.victimAccount)).find((l) => l.personAccountId === ana)
@@ -637,15 +637,15 @@ describe("contacts", () => {
 // the counts are exact regardless of what else the harness seeds.
 describe("an individual linked as a contact is not a peer account (Aurora, 19 Sep 2026, amended 20 Sep 2026)", () => {
   async function seed() {
-    const company = await createAccount(cfg, guard, staff, actor, {
+    const company = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "entity",
       name: "Smoketest Co",
     })
-    const standalone = await createAccount(cfg, guard, staff, actor, {
+    const standalone = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Smoketest Solo",
     })
-    const contact = await createAccount(cfg, guard, staff, actor, {
+    const contact = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Smoketest Contact",
     })
@@ -724,7 +724,7 @@ describe("what the detail's tabs badge (R16)", () => {
 
     // A second contact moves the count — and it is a COUNT, never links.length
     // (which a hard-capped list would silently cap).
-    const ana = await createAccount(cfg, guard, staff, actor, { accountType: "individual", name: "Ana" })
+    const ana = await createAccount(cfg, guard, staff, actor, {}, { accountType: "individual", name: "Ana" })
     await linkPerson(cfg, guard, staff, actor, {
       accountId: IDS.victimAccount,
       personAccountId: ana,
@@ -767,7 +767,7 @@ describe("granting a login: the person is picked off the account, never typed in
   }
 
   it("resolves the person's OWN email to their platform account", async () => {
-    const ana = await createAccount(cfg, guard, staff, actor, {
+    const ana = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Ana",
       email: "nadia@bergman.example", // a CLIENT: a platform account, not a team member
@@ -805,7 +805,7 @@ describe("granting a login: the person is picked off the account, never typed in
   })
 
   it("refuses plainly when the person has no email, or has never signed in", async () => {
-    const noEmail = await createAccount(cfg, guard, staff, actor, {
+    const noEmail = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Nadia",
     })
@@ -813,7 +813,7 @@ describe("granting a login: the person is picked off the account, never typed in
     expect(blank.status).toBe(400)
     expect(blank.text).toContain("Add an email address to Nadia")
 
-    const stranger = await createAccount(cfg, guard, staff, actor, {
+    const stranger = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Iker",
       email: "iker@nowhere.example",
@@ -832,7 +832,7 @@ describe("granting a login: the person is picked off the account, never typed in
     // team" about the very person it had made a member. Who is a client is
     // PRESENCE of a portal_users row, live or revoked (lib/members.ts's own
     // doctrine), and the staff refusal now stands behind that presence.
-    const ana = await createAccount(cfg, guard, staff, actor, {
+    const ana = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Enrolled Client",
       email: "nadia@bergman.example",
@@ -866,7 +866,7 @@ describe("granting a login: the person is picked off the account, never typed in
   })
 
   it("a staff member with no client history is still refused, with the staff sentence", async () => {
-    const colleague = await createAccount(cfg, guard, staff, actor, {
+    const colleague = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "A Colleague",
       email: "staff2@kwapso.example",
@@ -913,7 +913,7 @@ describe("the paged list (R14/R16)", () => {
     // individual — standalone or linked — so a page of PEOPLE could never
     // page this list any more. Companies are what pages it.
     for (let i = 0; i < 60; i++)
-      await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: `Company ${i}` })
+      await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: `Company ${i}` })
 
     const first = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
     expect(first.rows).toHaveLength(50)
@@ -969,7 +969,7 @@ describe("standing in ONE company at a time", () => {
   it("…but never climbs past the company they belong to", async () => {
     // Put Bergman under a holding group. The contact belongs to Bergman, not to
     // the group — inheriting upward would hand them the whole family.
-    const holding = await createAccount(cfg, guard, staff, actor, {
+    const holding = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "entity",
       name: "Bergman Holding",
     })
@@ -1058,7 +1058,7 @@ describe("standing in ONE company at a time", () => {
   it("a freelancer with no company still sees themselves", async () => {
     // Their own row IS the world (SCOPE ch.03). Without the fallback the fence
     // would resolve to nothing and lock out the person it exists to protect.
-    const solo = await createAccount(cfg, guard, staff, actor, {
+    const solo = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "individual",
       name: "Solo Trader",
     })
@@ -1085,7 +1085,7 @@ describe("the reference code", () => {
   // 2026-08-31 ruling: CONSONANTS, not letters. "Padelbase" -> PDLB is the
   // client's own example.
   it("is the first four consonants of the name, uppercased", async () => {
-    const id = await createAccount(cfg, guard, staff, actor, {
+    const id = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "entity",
       name: "Padelbase",
     })
@@ -1096,9 +1096,9 @@ describe("the reference code", () => {
     // Bergman, Bergmann and Bergmark all reduce to the same four consonants
     // (B, R, G, M) once the vowels are stripped, exactly the way the old
     // by-letters scheme collided on their first four letters.
-    const first = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Bergman S.A." })
-    const second = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Bergmann GmbH" })
-    const third = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Bergmark Oy" })
+    const first = await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Bergman S.A." })
+    const second = await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Bergmann GmbH" })
+    const third = await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Bergmark Oy" })
     expect(codeOf(first)).toBe("BRGM")
     expect(codeOf(second)).toBe("BRGM2")
     expect(codeOf(third)).toBe("BRGM3")
@@ -1107,12 +1107,12 @@ describe("the reference code", () => {
   it("fewer than four consonants pads with the name's own vowels, in order", async () => {
     // "Iowa" has exactly one consonant (W) — the fallback fills the rest from
     // the vowels I, O, A in the order they appear, "use what there is".
-    const id = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Iowa" })
+    const id = await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Iowa" })
     expect(codeOf(id)).toBe("WIOA")
   })
 
   it("punctuation and accents are not part of it", async () => {
-    const id = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Ñ&Co Ltd" })
+    const id = await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "Ñ&Co Ltd" })
     // The tilde is stripped to its base letter, the ampersand is not a letter,
     // and the O is a vowel — stripped from the four consonants (N, C, L, T)
     // the same as any other vowel.
@@ -1120,12 +1120,12 @@ describe("the reference code", () => {
   })
 
   it("a name with nothing usable in it mints nothing — the row still lands", async () => {
-    const id = await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "!!!" })
+    const id = await createAccount(cfg, guard, staff, actor, {}, { accountType: "entity", name: "!!!" })
     expect(codeOf(id)).toBeNull()
   })
 
   it("a caller who DOES supply one still gets theirs (the importer carries legacy codes)", async () => {
-    const id = await createAccount(cfg, guard, staff, actor, {
+    const id = await createAccount(cfg, guard, staff, actor, {}, {
       accountType: "entity",
       name: "Bergman S.A.",
       code: "LEGACY1",

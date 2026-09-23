@@ -1449,6 +1449,27 @@ export type Account = {
    * 2026, verbatim: "archived are not visible anywhere … archived however
    * are completley invisible." */
   archived: boolean
+  /** THE ACCOUNT'S GEOCODED POSITION (migration 0118). Set best-effort, at
+   * write time, from the stored address (`street`/`postalCode`/`city`/
+   * `country`) by `workers/tenancy/src/lib/geocode.ts`'s `geocodeAddress`,
+   * called from `createAccount`/`updateAccount`
+   * (`workers/tenancy/src/lib/accounts.ts`), under the server-side
+   * `GOOGLE_MAPS_GEOCODE_KEY`, never the browser's own
+   * `GOOGLE_MAPS_BROWSER_KEY`, a deliberately separate credential (see
+   * `env.ts`'s own header on each).
+   *
+   * `null` on either is the ONE honest "no position" state, meaning not
+   * geocoded yet, no address on file, or Google's own service could not
+   * resolve it, and it is exactly the signal
+   * `web/components/accounts/account-map.ts`'s `placeAccountsOnMap` already
+   * reads a missing position as: it falls back to the account's own country
+   * centroid, ringed so several accounts sharing one country stay
+   * individually clickable rather than stacking into one blob. Geocoding
+   * never blocks or fails the write itself, a failed lookup simply leaves
+   * both fields `null`, the same posture the knowledge base's embeddings and
+   * the nightly growth alarm already take. */
+  lat: number | null
+  lng: number | null
   /** the audit block, for the detail Overview tab (the same shape every record
    * shows — see TeamRole). */
   createdAt?: string | null

@@ -381,6 +381,10 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   // 0117 — her stronger, independent state; default false (never archived)
   // like every fixture that predates it, overridable through `over`.
   archived: false,
+  // 0118, no geocoded position by default (the honest "not geocoded yet"
+  // state), overridable through `over`.
+  lat: null,
+  lng: null,
   ...over,
 })
 

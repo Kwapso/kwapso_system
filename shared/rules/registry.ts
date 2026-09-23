@@ -939,6 +939,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "section-title-one-style",
     status: "enforced",
   },
+  {
+    id: "R109",
+    dimension: "ui",
+    law: "EVERY SCREEN CARRIES THE APP'S CONTENT INSET, AND NO SCREEN GETS ITS OWN NUMBER. Aurora's ruling, 23 Sep 2026, verbatim, over the accounts screen: \"there's no margin form the left. make sure you implement the margins everywhere, and i dont have to review it one by one. makeit rule.\" The inset a screen's content sits inside of is a SHELL DEFAULT, not a per-screen choice: `shared/ui/compositions/templates/screen-shell.tsx`'s own `SHELL_CONTENT_INSET_X` (`px-[var(--space-6)]`, 24px) is spent by `DENSITY_BODY` on the pane's own inner stack (`[data-slot=\"screen-shell-stack\"]`, the direct child of `[data-slot=\"screen-shell-body\"]` every comment in this codebase calls \"the pane\"), and `web/components/shell/app-shell.tsx` mounts that one `ScreenShell` unconditionally, so every module this app renders — list or detail, recipe-driven or host-composed, top-level (`/accounts`) or team-scoped (`/t/<team>/accounts`) — inherits the same 24px left/right inset for free, the identical number `SHELL_CONTENT_INSET_X` names everywhere it is read. A screen cannot ADD this inset (there is nothing to add), it can only CANCEL it, by reaching past the pane's own padded edge — the app's one sanctioned way to do that on purpose is the record footer band's own `-mx-[var(--pane-inset-x…)]` / `-mx-[var(--pane-escape-x…)]` escape, always paired with a matching padding put back — so the law is a NEGATIVE census over the app's own screen registry: no screen's host file may carry that escape, or a blunt equivalent (`w-screen`, `100vw`), without a reasoned, rot-checked exemption. CHECKED, `web/test/content-inset.test.ts`: (i) the screen registry is DERIVED, never hand-listed — every `Screen`/`Collection`/`Detail*` component imported from `@/components/…` inside the app's own three module dispatchers (`web/components/deep-link/collection-content.tsx`, `module-content.tsx`, `deep-link-screen.tsx`), so a module added to either dispatcher tomorrow is in the registry the day it ships, with nobody remembering to list it; (ii) every registry file is censused for the escape signature, or named in `CONTENT_INSET_EXEMPT`, keyed by `{file, contains}`, the offending line's own text, never a line number, rot-checked both ways; (iii) three structural assertions prove the inset-bearing element itself, rather than trusting inheritance on faith: `app-shell.tsx` mounts exactly one, unconditional `<ScreenShell>`; `shared/ui`'s `SHELL_CONTENT_INSET_X` is pinned to `px-[var(--space-6)]` and BOTH `DENSITY_BODY` density variants (`comfortable`, `calm`) spend it; and the element carrying `data-slot=\"screen-shell-stack\"` spends `DENSITY_BODY[density]` in its own `className`. Measured live against staging before this law shipped (1440×842 and 760×900 with the rail collapsed): Accounts, Tickets, Backlog and a ticket record all already read the identical 24px left inset — no live defect was reproducible on the accounts screen that session, across every view (gallery/list/map), every status tab, every account-detail tab, the accounts module settings page, Contacts and Inputs, cold load, soft navigation and both widths — so no accounts source file was changed; this law exists so a FUTURE screen cannot regress the same complaint she would otherwise have to file again, screen by screen.",
+    why: "THE CENSUS IS NEGATIVE, NOT POSITIVE, BECAUSE THE ARCHITECTURE MAKES A POSITIVE ONE MEANINGLESS. An ordinary screen writes NOTHING about its own left inset — it inherits `SHELL_CONTENT_INSET_X` from `ScreenShell`'s own stack the moment it renders as `{children}`, the same way every screen inherits the page width R29 already guards. Requiring each of the thirty-plus registry files to literally repeat a padding class they do not need and must never set (R29's own `one-page-width` law forbids a second page-level container the identical way) would be asking for a duplicate of a shared seam, exactly what CLAUDE.md's `stay lean` directive refuses — and it would still not prove the inset reaches the screen, since a screen could carry the class and STILL sit outside the padded pane if something upstream stopped wrapping it in `ScreenShell`. So the law's three parts do three different, complementary jobs instead: the structural assertions (iii) prove the shared mechanism is real and unconditional, once, at its one true source; the negative census (ii) proves no screen fights it; and the derived registry (i) is what stops a brand-new module from being invisible to either.",
+    checkId: "content-inset",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -5061,6 +5069,31 @@ export interface IdChipExempt {
  * Nothing left to name here; the list stays empty until a new finding earns
  * a line. */
 export const ID_CHIP_EXEMPT: IdChipExempt[] = []
+
+// ── content-inset (R109) ─────────────────────────────────────────────────────
+
+/** A still-open content-inset finding — a screen's own host file that reaches
+ * past the pane's padded edge and legitimately needs to (the record footer
+ * band's own shape), reported rather than fixed here so the debt is visible.
+ * Keyed by `{file, contains}`, the offending line's own text, never a line
+ * number, the same shape `IdChipExempt` already takes, and rot-checked both
+ * ways by `web/test/content-inset.test.ts`: a stale entry (the line no
+ * longer matches) fails the build exactly as an unexempt finding does. */
+export interface ContentInsetExempt {
+  file: string
+  contains: string
+  why: string
+}
+
+/** EMPTY ON PURPOSE, 23 Sep 2026. No screen's own host file currently reaches
+ * past the shell's inset — the app's one sanctioned full-bleed escape
+ * (`-mx-[var(--pane-inset-x…)]` / `-mx-[var(--pane-escape-x…)]`) is spent
+ * only inside the vendored kit itself (`shared/ui/compositions/templates/
+ * screen-shell.tsx`, the record footer band's own mechanism), never by an
+ * app-side screen component, so there is nothing to name yet. The list stays
+ * empty until a screen genuinely earns one — the same discipline
+ * `ID_CHIP_EXEMPT` above holds. */
+export const CONTENT_INSET_EXEMPT: ContentInsetExempt[] = []
 
 // ── source-scan (the law machinery's own guard) ─────────────────────────────
 
