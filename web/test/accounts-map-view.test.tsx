@@ -42,8 +42,6 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { Account } from "@shared/types"
-
 import { placeAccountsOnMap, type GeocodedAccount } from "@/components/accounts/account-map"
 import { countryCentroid, countryPosition, COUNTRY_CENTROIDS } from "@/components/accounts/country-centroids"
 import { GoogleAccountsMap } from "@/components/accounts/google-account-map"
