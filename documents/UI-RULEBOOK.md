@@ -43,7 +43,7 @@ the concrete implementation, and its evidence.
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B49)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
-- [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
+- [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S8)
 - [9. Mobile](#9-mobile) (M1 to M6)
 - [10. Copy](#10-copy) (W1 to W15)
 - [11. Record type glyphs](#11-record-type-glyphs) (G1 to G6)
@@ -8827,6 +8827,49 @@ a screen's own choice.
 
 **Law.** None registered.
 
+### S8: every screen carries the app's content inset, and none gets its own number
+
+**The ruling.** Aurora, verbatim, 23 Sep 2026, over the accounts screen: *"there's no
+margin form the left. make sure you implement the margins everywhere, and i dont have to
+review it one by one. makeit rule."*
+
+**The mechanism.** The inset a screen's content sits inside of is a SHELL DEFAULT, not a
+per-screen choice: `shared/ui/compositions/templates/screen-shell.tsx`'s own
+`SHELL_CONTENT_INSET_X` (`px-[var(--space-6)]`, 24px) is spent by `DENSITY_BODY` on the
+pane's own inner stack (`[data-slot="screen-shell-stack"]`), and
+`web/components/shell/app-shell.tsx` mounts that one `ScreenShell` unconditionally, so
+every module the app renders (list or detail, recipe-driven or host-composed, top-level or
+team-scoped) inherits the identical 24px left/right inset for free. A screen cannot ADD
+this inset, there is nothing to add, it can only CANCEL it, by reaching past the pane's own
+padded edge: the app's one sanctioned way to do that on purpose is the record footer band's
+own `-mx-[var(--pane-inset-x…)]` / `-mx-[var(--pane-escape-x…)]` escape, always paired with
+a matching padding put back.
+
+**What it costs.** Nothing on an ordinary screen: the inset is inherited the moment a
+screen renders as `{children}` inside `ScreenShell`, so a screen writes nothing to get it
+and must write nothing to keep it. What it forbids is a screen's own host file reaching
+past the pane's padded edge, or a blunt equivalent (`w-screen`, `100vw`), without a
+reasoned, rot-checked exemption named in `CONTENT_INSET_EXEMPT`
+(`shared/rules/registry.ts`), empty today, since no screen has yet earned one.
+
+**Status: ruled and enforced, 23 Sep 2026.** Measured live against staging before this law
+shipped (1440×842 and 760×900, rail collapsed): Accounts, Tickets, Backlog and a ticket
+record already read the identical 24px left inset, across every view, every tab and both
+widths, so no accounts source file needed changing; the law exists so a future screen
+cannot regress the same complaint.
+
+**Law.** [R109](../RULES.md) (`content-inset`), three parts, `web/test/content-inset.test.ts`:
+(i) the screen registry is derived, never hand-listed, from every `Screen`/`Collection`/
+`Detail*` component the app's own three module dispatchers import
+(`web/components/deep-link/collection-content.tsx`, `module-content.tsx`,
+`deep-link-screen.tsx`); (ii) every registry file is censused for the escape signature, or
+named in `CONTENT_INSET_EXEMPT`, keyed by `{file, contains}`, the offending line's own
+text, rot-checked both ways; (iii) three structural assertions prove the inset-bearing
+element itself rather than trusting inheritance on faith: one unconditional `<ScreenShell>`
+mount, `SHELL_CONTENT_INSET_X` pinned to `px-[var(--space-6)]` and spent by both
+`DENSITY_BODY` densities, and the `screen-shell-stack` element spending
+`DENSITY_BODY[density]`.
+
 ---
 
 ## 9. Mobile
@@ -10385,7 +10428,7 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**267 rules.**
+**268 rules.**
 
 | Section | Rules |
 |---|---|
@@ -10396,7 +10439,7 @@ the last of these, verbatim: *"Validated."*
 | 5. Buttons and actions | B1 to B49 (49) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
-| 8. Spacing and the scale setting | S1 to S7 (7) |
+| 8. Spacing and the scale setting | S1 to S8 (8) |
 | 9. Mobile | M1 to M6 (6) |
 | 10. Copy | W1 to W15 (15) |
 | 11. Record type glyphs | G1 to G6 (6) |
@@ -10447,7 +10490,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R102 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R103 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 | R104 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R105 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
 | R106 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R107 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) |
-| R108 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | | |
+| R108 | [L43](#l43-the-no-containers-experiment-grouped-sections-lose-their-box-in-the-tickets-module-first) | R109 | [S8](#s8-every-screen-carries-the-apps-content-inset-and-none-gets-its-own-number) |
 
 ### The seven files that carry most of it
 

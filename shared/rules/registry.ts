@@ -2781,6 +2781,16 @@ export const SUBTITLE_OK: Record<string, string> = {
     "you a six-digit code…\" / \"Enter the code we sent to {email}.\") — a pre-auth flow's own instruction " +
     "for the form directly below it, the same inline-FormShell-subtitle shape `onboarding/page.tsx` above " +
     "already covers, on the portal's own sign-in screen rather than the agency's.",
+  "web/components/accounts/google-account-map.tsx":
+    "AccountMapCard's own `<CardTitle>{pin.name}</CardTitle>` followed by a `<p>` carrying the account's " +
+    "address - not an explanatory sentence about what the card is for, the shape this law removes, but a " +
+    "FACT the record itself carries, the same job an address line does on a contact row or a detail " +
+    "screen's own field list, never treated as a subtitle there. It exists because she asked for it by " +
+    "name (this file's own header, her ruling: \"a slight little overlay card with name and loogo and " +
+    "full adress (including ountry)\"), and the map draws no side list any more (her own instruction, the " +
+    "same header), so this card is the ONLY place a reader ever sees which address an account resolved " +
+    "to. Folding it into the heading would make one line carry two different facts and blow past R87's " +
+    "title-length ceiling on a real address; deleting it contradicts the ruling that put it there.",
 }
 
 /** R67 — THE FILES THAT STILL DRAW A TITLED SECTION ON THE BARE PAGE GROUND,
@@ -2892,6 +2902,8 @@ export const PAPER_ON_PURPOSE: Record<string, string> = {
     "the \"How did we do?\" ask - a row of faces and nothing else, a control cluster the reader presses rather than a region they read. It is also the one thing on the portal's ticket page that appears only after the work is finished, so it has to read as an object arriving rather than as part of the page's structure.",
   "web-portal/components/home-screen.tsx":
     "the TimeGivenBack tile - a single metric link tile to /impact, routed through the kit's own Card (21 Sep 2026 audit, replacing a hand-rolled bg-surface-panel box). Aurora's own words, reused from the identical Effort-tile ruling: \"this is a metric, like in kit\" - the same register web/components/work/effort-card.tsx's three tiles already read, a per-record object a reader presses rather than a page region they read.",
+  "web/components/accounts/google-account-map.tsx":
+    "AccountMapCard, the pin's own overlay - a NOT-A-SECTION. It renders into the map SDK's own InfoWindow (a React root mounted on a DOM node Google Maps owns, outside this app's own tree), a floating preview of one account's name, logo and address that closes on a click elsewhere. Not a page region a reader scans, an object the map hands over on demand, the same reading ticket-screen.tsx's two cards and the portal's ticket-rating row already earn. The plate itself (KitMap, the map surface below it) is not a candidate: its own paper frame is the kit's composition (R39), not an app-side Card mount, and is out of this census's reach.",
   // ── shared/web/ ─────────────────────────────────────────────────────────
   // "shared/web/appearance-tab-preview.tsx" stood here — the Appearance tab's
   // live preview of the shell — until 22 Sep 2026, when Aurora's ruling

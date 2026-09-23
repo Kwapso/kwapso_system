@@ -2239,7 +2239,7 @@
   "{n} times a year",
   "{position} of {total}",
   "{priced} of {total} steps priced",
-  "{shown} of {total} accounts are shown on the map — {missing} could not be placed.",
+  "{shown} of {total} accounts are shown on the map. {missing} could not be placed.",
   "{skipped} of {total} row(s) will be skipped",
   "{title} (not in use)",
   "× a month",

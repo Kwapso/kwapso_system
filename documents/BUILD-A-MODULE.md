@@ -1370,6 +1370,15 @@ again, which is the only property that matters here.
   goes in `SECTION_TITLE_EXEMPT`, keyed by `{file, expression}`, only when
   the heading genuinely describes something other than a single record's own
   section.
+- **R109 `content-inset`**: your screen owes nothing here, its 24px left/right
+  inset (`SHELL_CONTENT_INSET_X`) is inherited for free the moment it renders
+  inside `ScreenShell`, so add no padding of your own and set no width that
+  reaches past the pane's own edge. The one sanctioned escape is the record
+  footer band's own paired `-mx-[var(--pane-inset-x…)]`/`-mx-[var(--pane-escape-x…)]`
+  margin, always matched by padding put back; anything else that reaches past
+  the pane's padded edge (or a blunt `w-screen`/`100vw`) needs a reasoned,
+  rot-checked line in `CONTENT_INSET_EXEMPT`. The census is
+  `web/test/content-inset.test.ts`.
 
 **The words** (the ones that catch every new module, every time)
 

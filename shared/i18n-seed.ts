@@ -4655,5 +4655,21 @@ export const SEED: Catalogue = {
    * "account(s)" reads as "Kunde"/"Kunden" in German there, and here, for
    * the same reason: this screen's own rows are companies, not bank
    * accounts. */
-  "Map": { de: "Karte", es: "Mapa", ca: "Mapa" }
+  "Map": { de: "Karte", es: "Mapa", ca: "Mapa" },
+  /* THE ACCOUNTS MAP, 23 Sep 2026. Her ruling, "for accounts/active add a map
+   * view", then "build with the google maps api". Seven strings landed with the
+   * map and none was answered, which put German over its own ceiling. Translated
+   * by hand rather than raising it. "Accounts" is Kunden, Cuentas and Comptes,
+   * the vocabulary block at the top of this file, so every sentence here uses
+   * those words rather than a second name for the same record. The two counting
+   * sentences keep their placeholders in the same order as the English, because
+   * the door fills them by name and a reordered sentence would still read. */
+  "All {total} accounts are shown on the map.": { de: "Alle {total} Kunden sind auf der Karte zu sehen.", es: "Las {total} cuentas se muestran en el mapa.", ca: "Els {total} comptes es mostren al mapa." },
+  "{shown} of {total} accounts are shown on the map. {missing} could not be placed.": { de: "{shown} von {total} Kunden sind auf der Karte zu sehen. {missing} konnten nicht verortet werden.", es: "{shown} de {total} cuentas se muestran en el mapa. {missing} no se han podido ubicar.", ca: "{shown} de {total} comptes es mostren al mapa. {missing} no s'han pogut ubicar." },
+  "Approximate location": { de: "Ungefährer Standort", es: "Ubicación aproximada", ca: "Ubicació aproximada" },
+  "Connect Google Maps to see accounts here.": { de: "Verbinden Sie Google Maps, um Kunden hier zu sehen.", es: "Conecta Google Maps para ver las cuentas aquí.", ca: "Connecta Google Maps per veure els comptes aquí." },
+  "Loading map…": { de: "Karte wird geladen…", es: "Cargando el mapa…", ca: "S'està carregant el mapa…" },
+  "No address on file": { de: "Keine Adresse hinterlegt", es: "Sin dirección registrada", ca: "Sense adreça registrada" },
+  "The map could not be loaded.": { de: "Die Karte konnte nicht geladen werden.", es: "No se ha podido cargar el mapa.", ca: "No s'ha pogut carregar el mapa." },
+
 }

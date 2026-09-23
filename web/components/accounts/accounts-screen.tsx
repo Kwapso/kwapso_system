@@ -500,9 +500,6 @@ export function AccountsScreen({
   const activeTotal =
     total !== undefined && inactiveTotalQ.data !== undefined ? total - inactiveTotalQ.data : undefined
 
-  if (accountsQ.error) return <Skeleton variant="list" lines={4} />
-  const loaded = accountsQ.data === undefined ? null : accountsQ.data
-
   // ACTIVE · INACTIVE · ARCHIVED · ALL, BY STATUS — client ruling, 16 Sep
   // 2026, verbatim: "For account status, let's keep active, inactive, and
   // all." Replaced the entity-type Companies/All pair (this file's header
@@ -518,17 +515,21 @@ export function AccountsScreen({
   // excluded from All (the door's own default, `AccountFilters.archived`
   // unset), which Inactive is NOT. This is the one place in the app an
   // archived account is ever listed, and the one door back to it.
+  //
+  // HOISTED ABOVE THE ERROR RETURN, 23 Sep 2026 — `accountTab`/`showMapView`/
+  // `effectiveView` used to sit below `if (accountsQ.error) return …`, and
+  // `mapsConfigQ`'s own `useCached` call sat with them: a real conditional
+  // hook, not the check's known nested-function blind spot (there is no
+  // nested function here to misread — this is the component's own top-level
+  // body, and the early return sits directly above a bare `useCached` call).
+  // On a render where the accounts query holds an error, React never called
+  // this hook; on the next render, if the error cleared, it would — a hook
+  // count that changes between renders on the same mount is exactly what
+  // "rendered fewer hooks than expected" crashes on. None of these three
+  // consts reads `accountsQ.data` (only `tab`, `view` and each other), so
+  // hoisting them costs nothing and the behaviour is unchanged.
   const accountTab =
     tab === "archived" ? "archived" : tab === "all" ? "all" : tab === "inactive" ? "inactive" : "active"
-
-  // MAP, ACTIVE ONLY — her ruling names "accounts/active", not the other
-  // three tabs, and the map has never been asked to draw inactive/archived
-  // pins beside active ones. DERIVED rather than a second piece of state: a
-  // reader who picked "map" and then switched to Inactive sees gallery (the
-  // switch itself only ever OFFERS map on Active, below), and switching back
-  // to Active without a remount reads `view` unchanged and draws the map
-  // again — no effect, no stale flag to reset, just what the tab allows this
-  // render.
   const showMapView = accountTab === "active"
   const effectiveView = view === "map" && !showMapView ? "gallery" : view
 
@@ -545,6 +546,9 @@ export function AccountsScreen({
   const mapsConfigQ = useCached(effectiveView === "map" ? "maps-config" : null, () =>
     tenancy.mapsConfig()
   )
+
+  if (accountsQ.error) return <Skeleton variant="list" lines={4} />
+  const loaded = accountsQ.data === undefined ? null : accountsQ.data
 
   const accountsBadge = formatCount(total)
   const accountTabs = [

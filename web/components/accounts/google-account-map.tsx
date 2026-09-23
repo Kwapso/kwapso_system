@@ -337,7 +337,7 @@ export function GoogleAccountsMap({
       ? null
       : missingCount === 0
         ? t("All {total} accounts are shown on the map.", { total: totalCount })
-        : t("{shown} of {total} accounts are shown on the map — {missing} could not be placed.", {
+        : t("{shown} of {total} accounts are shown on the map. {missing} could not be placed.", {
             shown: totalCount - missingCount,
             total: totalCount,
             missing: missingCount,

@@ -530,7 +530,7 @@ describe("GoogleAccountsMap — an ungeocodable account still appears somehow, a
         onOpenAccount={vi.fn()}
       />
     )
-    expect(getByText("1 of 2 accounts are shown on the map — 1 could not be placed.")).toBeTruthy()
+    expect(getByText("1 of 2 accounts are shown on the map. 1 could not be placed.")).toBeTruthy()
   })
 
   it("says every account is shown, with no caveat, when nothing is missing", () => {
