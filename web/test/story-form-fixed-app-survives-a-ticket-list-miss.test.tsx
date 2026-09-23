@@ -36,7 +36,7 @@ const APP_A = "APP_A"
 const APP_B = "APP_B"
 
 function renderWithFixedAppAndNoMatchingTicket() {
-  const onSubmit = vi.fn(async () => undefined)
+  const onSubmit = vi.fn(async (_values: Record<string, unknown>) => undefined)
   render(
     <StoryFormDialog
       open
