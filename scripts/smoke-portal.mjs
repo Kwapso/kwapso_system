@@ -97,6 +97,10 @@ const FIX = {
   theirTodo: "PORTAL SMOKE · something we need from the other company",
   myFile: "PORTAL SMOKE · their handover",
   theirFile: "PORTAL SMOKE · another company's handover",
+  // WHAT AN APP SHOWS FOR ITSELF (T3850) — the Files tab, fenced not refused,
+  // read at the portal like `app-modules` beside it.
+  myAppFile: "PORTAL SMOKE · a file on their system",
+  theirAppFile: "PORTAL SMOKE · a file on another system",
   comment: "PORTAL SMOKE · a client's note on the map",
 }
 
@@ -654,6 +658,26 @@ async function deliverable(title, appId) {
 const MY_FILE = await deliverable(FIX.myFile, MY_APP)
 const THEIR_FILE = await deliverable(FIX.theirFile, THEIR_APP)
 
+/** WHAT AN APP SHOWS FOR ITSELF (T3850) — a link on each app's own Files tab.
+ * Fenced, not refused: unlike a deliverable there is no visibility switch to
+ * hold it back, the account (and app) fence is the whole story. */
+async function appAttachment(appId, label) {
+  const files = await agency(`/api/tenancy/apps/attachments?id=${appId}`, {}, staffCookie)
+  const hit = (files.body?.attachments ?? []).find((a) => a.label === label)
+  if (hit) return hit
+  const made = await agencyPost(
+    "/api/tenancy/apps/attachments",
+    { id: appId, kind: "link", label, url: "https://example.com/portal-smoke/app-file" },
+    staffCookie
+  )
+  if (!made.ok) stop(`could not attach ${label} to the app`, JSON.stringify(made.body).slice(0, 200))
+  const again = (made.body?.attachments ?? []).find((a) => a.label === label)
+  if (!again?.id) stop(`attached ${label} but could not read it back`)
+  return again
+}
+const MY_APP_FILE = await appAttachment(MY_APP, FIX.myAppFile)
+const THEIR_APP_FILE = await appAttachment(THEIR_APP, FIX.theirAppFile)
+
 /** Show or hide one, as staff. The one door SCOPE's condition lives on. */
 const setVisible = (id, appId, visible) =>
   agencyPost("/api/content/deliverables/visibility", { id, appId, visible }, staffCookie)
@@ -669,7 +693,7 @@ const setVisible = (id, appId, visible) =>
   const hidden = await setVisible(MY_FILE.id, MY_APP, false)
   if (!hidden.ok) stop("could not hide the client's handover", JSON.stringify(hidden.body).slice(0, 200))
 }
-ok("the world exists: two companies, each with a system, a map, a ticket, a to-do and a handover", true)
+ok("the world exists: two companies, each with a system, a map, a ticket, a to-do, a handover and a filed link", true)
 
 // THE BAIT IS REAL — proved from the account that should see it, before a single
 // negative is asked. A negative check is worth nothing if there is nothing to find.
@@ -681,6 +705,11 @@ ok("the world exists: two companies, each with a system, a map, a ticket, a to-d
   const shelf = await agency(`/api/content/deliverables?appId=${THEIR_APP}`, {}, staffCookie)
   const theirs = (shelf.body?.deliverables ?? []).find((d) => d.id === THEIR_FILE.id)
   ok("bait: the other company's handover is SHARED with them", Boolean(theirs?.visibleToClientAt), JSON.stringify(theirs).slice(0, 160))
+  const theirAppFiles = await agency(`/api/tenancy/apps/attachments?id=${THEIR_APP}`, {}, staffCookie)
+  ok(
+    "bait: staff can see the other company's app file",
+    (theirAppFiles.body?.attachments ?? []).some((a) => a.id === THEIR_APP_FILE.id)
+  )
 }
 
 /* ============================================================================ *
@@ -812,6 +841,18 @@ let MY_TICKET
       "their app's sections answer at the portal",
       mods.ok && Array.isArray(mods.body?.modules),
       `status ${mods.status} ${JSON.stringify(mods.body).slice(0, 120)}`
+    )
+  }
+
+  // WHAT THEIR APP SHOWS FOR ITSELF (T3850) — the Files tab, one app-scoped
+  // door along from the sections above, fenced the same way (account + app
+  // scope, never refused).
+  {
+    const files = await portal(`/api/tenancy/apps/attachments?id=${MY_APP}`, {}, client)
+    ok(
+      "their app's files answer at the portal",
+      files.ok && (files.body?.attachments ?? []).some((a) => a.id === MY_APP_FILE.id),
+      `status ${files.status} ${JSON.stringify(files.body).slice(0, 120)}`
     )
   }
 
@@ -1100,6 +1141,19 @@ section("the account fence")
     "asking for the other company's value answers about nobody",
     !dump.includes(THEIRS) && !dump.includes(FIX.theirApp),
     dump.slice(0, 200)
+  )
+
+  // WHAT THE OTHER SYSTEM SHOWS FOR ITSELF (T3850) — fenced, not refused: the
+  // door answers rather than 404ing (it takes no app-ownership check of its
+  // own, the account+app scope on the read is the whole fence), so what is
+  // proved is that the bait is absent from the answer, not that the door
+  // itself was ever asked "does this app exist".
+  const theirAppFiles = await portal(`/api/tenancy/apps/attachments?id=${THEIR_APP}`, {}, client)
+  const filesDump = JSON.stringify(theirAppFiles.body ?? {})
+  ok(
+    "the other company's app files answer about nobody",
+    theirAppFiles.status === 404 || !filesDump.includes(THEIR_APP_FILE.id),
+    filesDump.slice(0, 200)
   )
 }
 
