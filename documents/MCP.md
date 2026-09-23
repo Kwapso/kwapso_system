@@ -131,8 +131,8 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 64 of the 189 tools answer on a GET (counted from the live
-  catalogue, 21 Sep 2026), and 188 of the doors in the
+- **Read** — 65 of the 193 tools answer on a GET (counted from the live
+  catalogue, 23 Sep 2026), and 192 of the doors in the
   census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
@@ -210,7 +210,11 @@ Today it covers:
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_impact`,
     `list_story_attachments`, `add_story_link`, `update_story_attachment`,
-    `remove_story_attachment`, `get_app_impact`. The list also
+    `remove_story_attachment`, `get_app_impact`. What an app shows for itself
+    (T3850): `list_app_attachments`, `add_app_link`, `update_app_attachment`,
+    `remove_app_attachment` — the same shape one table along, fenced by the
+    caller's account set on the read; the three writes refuse a portal caller.
+    The list also
     held `list_internal_rates`, `read_margin` and `list_role_rates` until they
     were removed on 10 Sep 2026 with the internal rate tables they read, and
     `list_account_rates` until an hour later, when the client retired the account
@@ -276,7 +280,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **281 doors, 212 with a tool, 69 with a written reason**, the
+  red build. Today: **285 doors, 216 with a tool, 69 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -829,6 +833,14 @@ Today it covers:
      it cannot send the replacement BYTES for a file, which are a base64 data URL
      up to 10 MB. A file is swapped from the screen by the person holding the
      right one.
+   - **`add_app_link` takes `label` and `url`, not `kind` or `fileDataUrl`.** The
+     ticket and story doors' line, a worker along (T3850): the tool forwards `kind`
+     as the constant `"link"`, so the door's contract is honoured whole, and a
+     file on an app is a base64 data URL up to 10 MB, uploaded from the screen by
+     the person holding it.
+   - **`update_app_attachment` takes `label` and `url`, not `fileDataUrl`.** The
+     door beside `add_app_link`: it renames anything on an app and repoints a
+     link, both prose, and cannot send the replacement bytes for a file.
    - **`agent_chat` takes `message`, not `files`.** Attaching up to 8 CSVs of 5 MB each
      is up to 40 MB on the same surface — and the capability is already here in a
      better machine shape: `start_import` → `add_import_file` → `plan_import` →

@@ -49,22 +49,10 @@ export function optionalDate(value: unknown, field: string): string | null {
   return v
 }
 
-/** Allow only safe link schemes (http / https / mailto).
- *
- * A `javascript:` / `data:` / `vbscript:` URL stored on a record is a
- * stored-XSS payload the moment a reader clicks it. Learning has carried this
- * rule privately since its first commit; the internal modules store links too (a
- * post's permalink, a brand asset's home), so it is here
- * where all of them can reach it. Anything unrecognised is dropped rather than
- * refused — a link is optional, and losing a bad one costs nothing.
- */
-export function safeExternalLink(url: unknown): string | null {
-  const v = typeof url === "string" ? url.trim() : ""
-  if (!v) return null
-  try {
-    const u = new URL(v, "https://x.invalid")
-    return ["http:", "https:", "mailto:"].includes(u.protocol) ? v : null
-  } catch {
-    return null
-  }
-}
+/** MOVED TO `shared/workers/validate.ts` (T3850) — an app's own attachment
+ * links needed the identical check from a worker this file cannot be
+ * imported into, and a boundary validator two workers both need belongs in
+ * `shared/`. Re-exported here so this file's five existing call sites (brand
+ * assets, staff, deliverables, help, stories) keep the import path they
+ * already have. */
+export { safeExternalLink } from "@shared/workers/validate"

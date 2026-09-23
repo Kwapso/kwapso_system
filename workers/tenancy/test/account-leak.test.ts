@@ -541,6 +541,37 @@ const BURGLARIES: Burglary[] = [
     honest: () => req("POST /api/tenancy/apps/active", { id: IDS.victimApp, active: false }),
     expect: "refused",
   },
+  // WHAT THE APP SHOWS FOR ITSELF (T3850) — the Files tab. Fenced, not
+  // refused, on the READ (a client reads their own apps' files in the
+  // portal's Impact accordion); every WRITE refuses a portal caller outright.
+  {
+    route: "GET /api/tenancy/apps/attachments",
+    why: "read the files and links filed against the victim's system",
+    attack: () => req("GET /api/tenancy/apps/attachments", undefined, `?id=${IDS.victimApp}`),
+    honest: () => req("GET /api/tenancy/apps/attachments", undefined, `?id=${IDS.victimApp}`),
+    expect: "nothing",
+  },
+  {
+    route: "POST /api/tenancy/apps/attachments",
+    why: "attach a link to the victim's app",
+    attack: () => req("POST /api/tenancy/apps/attachments", { id: IDS.victimApp, kind: "link", label: "Mole", url: "https://mole.example" }),
+    honest: () => req("POST /api/tenancy/apps/attachments", { id: IDS.victimApp, kind: "link", label: "New link", url: "https://bergman.example/new" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/apps/attachments/update",
+    why: "rename or repoint the file already filed against the victim's app",
+    attack: () => req("POST /api/tenancy/apps/attachments/update", { id: IDS.victimApp, attachmentId: IDS.victimAppAttachment, label: "Owned" }),
+    honest: () => req("POST /api/tenancy/apps/attachments/update", { id: IDS.victimApp, attachmentId: IDS.victimAppAttachment, label: "Bergman floor plan" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/apps/attachments/remove",
+    why: "take the file off the victim's app, destroying the record of what was sent",
+    attack: () => req("POST /api/tenancy/apps/attachments/remove", { id: IDS.victimApp, attachmentId: IDS.victimAppAttachment }),
+    honest: () => req("POST /api/tenancy/apps/attachments/remove", { id: IDS.victimApp, attachmentId: IDS.victimAppAttachment }),
+    expect: "refused",
+  },
   {
     route: "GET /api/tenancy/app-modules",
     why: "list every module in the team — the internal structure of every client's system",
@@ -818,6 +849,7 @@ function snapshot(db: DatabaseSync): string {
       "account_links",
       "portal_users",
       "apps",
+      "app_attachments",
       "processes",
       "process_versions",
       "process_steps",

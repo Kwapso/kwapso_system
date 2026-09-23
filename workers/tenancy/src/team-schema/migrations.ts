@@ -8260,6 +8260,52 @@ ALTER TABLE accounts ADD COLUMN archiver_email TEXT;
 ALTER TABLE accounts ADD COLUMN archiver_name TEXT;
 `,
   },
+  {
+    // AN APP GETS A FILES TAB (T3850) — the owner's ask: "I don't see any tab
+    // where I can store important files related to an app, sent by the
+    // client, a screenshot from a meeting, or a document of different
+    // logics, inside the app details screen." The client's own decision: a
+    // Files tab on every app, holding files AND links, visible to the
+    // client in their portal.
+    //
+    // `story_attachments` (migration 0045) ONE TABLE ALONG, and copied
+    // deliberately rather than reused: an attachment belongs to exactly one
+    // parent record, and a shared table would need a polymorphic
+    // (parent_table, parent_id) pair no fence in this base is shaped to
+    // clause over. Same columns, same shape, same reasons — see that
+    // table's own header for `kind` deciding only how `url` is read, and
+    // deactivate-never-delete keeping the audit block.
+    //
+    // NO PORTAL WRITE DOOR. The client's ask says the client can SEE this;
+    // it does not say the client attaches to it the way they attach to a
+    // ticket. Reads are fenced through the app's own account (and app)
+    // scope so a client sees their own apps' files in the portal's Impact
+    // accordion; every write refuses a portal caller at the door (R21),
+    // same shape `story_attachments` already has for the identical reason
+    // (an app is the agency's own record of what we built, not a client's
+    // to author).
+    //
+    // NUMBERED 0118, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0117 is the highest version on both the
+    // local tree and `origin/main` as of 23 Sep 2026, so 0118 is the next
+    // free number.
+    version: "0118_an_app_gets_a_files_tab",
+    sql: `
+CREATE TABLE IF NOT EXISTS app_attachments (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  kind TEXT NOT NULL CHECK (kind IN ('file', 'link')),
+  label TEXT NOT NULL,
+  url TEXT NOT NULL,
+  content_type TEXT,
+  size_bytes INTEGER,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_app_attachments_app ON app_attachments (app_id);
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

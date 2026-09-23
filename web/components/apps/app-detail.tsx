@@ -50,6 +50,7 @@ import {
 } from "@/components/work/work-panels"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { softNavigate } from "@/lib/nav"
+import { AppAttachmentsPanel } from "@/components/apps/app-attachments"
 import { DeliverablesPanel } from "@/components/apps/deliverables-panel"
 import { KnowledgeScreen } from "@/components/knowledge/knowledge-screen"
 import { AppMoneyPanel } from "@/components/apps/app-money-panel"
@@ -142,6 +143,9 @@ export function AppDetailScreen({
   // total the tab's own toolbar badges, from `shared/record-counts.ts`'s new
   // `knowledge-app` entry.
   const knowledgeTotal = useCachedValue<number | null>(totalKey("knowledge-app", appId))
+  // WHAT THE APP SHOWS FOR ITSELF (T3850) — the Files tab's own exact total,
+  // from `shared/record-counts.ts`'s `files-app` entry.
+  const filesTotal = useCachedValue<number | null>(totalKey("files-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "update")
@@ -518,6 +522,20 @@ export function AppDetailScreen({
             },
           ]
         : []),
+      // IMPORTANT MATERIAL ABOUT THIS SYSTEM (T3850) — the owner's ask: "I
+      // don't see any tab where I can store important files related to an
+      // app, sent by the client, a screenshot from a meeting, or a document
+      // of different logics." No extra gate beyond being on this screen at
+      // all (`processes:read`, same as every other tab here) — the write
+      // actions inside the panel are what `canEdit` (`processes:update`)
+      // decides.
+      {
+        value: "files",
+        label: t("Files"),
+        icon: "paperclip",
+        badge: formatCount(filesTotal),
+        badgeVariant: "" as const,
+      },
       // WHAT IT GIVES BACK (8.13) — hours, and what those hours are worth at the
       // rate of the role that used to spend them. Not a collection and so not
       // counted; see RECORD_TAB_COUNT_EXCEPTIONS.
@@ -767,6 +785,7 @@ export function AppDetailScreen({
               />
             )
           if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
+          if (panel.value === "files") return <AppAttachmentsPanel appId={appId} canEdit={canEdit} />
           if (panel.value === "stakeholders")
             return (
               <StakeholdersPanel

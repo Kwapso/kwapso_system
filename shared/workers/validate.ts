@@ -254,3 +254,26 @@ export function parseStringArray(json: string | null): string[] {
     return []
   }
 }
+
+/** Allow only safe link schemes (http / https / mailto).
+ *
+ * A `javascript:` / `data:` / `vbscript:` URL stored on a record is a
+ * stored-XSS payload the moment a reader clicks it. MOVED HERE FROM
+ * `workers/content/src/lib/internal-fields.ts` (T3850), which still
+ * re-exports it for its own five call sites — an app's own attachment links
+ * (`workers/tenancy/src/lib/app-attachments.ts`) needed the identical check
+ * from a WORKER `internal-fields.ts` cannot be imported into, and a boundary
+ * validator two workers both need belongs in `shared/workers/`, not
+ * duplicated. Anything unrecognised is dropped rather than refused — a link
+ * is optional, and losing a bad one costs nothing.
+ */
+export function safeExternalLink(url: unknown): string | null {
+  const v = typeof url === "string" ? url.trim() : ""
+  if (!v) return null
+  try {
+    const u = new URL(v, "https://x.invalid")
+    return ["http:", "https:", "mailto:"].includes(u.protocol) ? v : null
+  } catch {
+    return null
+  }
+}

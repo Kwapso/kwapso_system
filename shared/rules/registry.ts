@@ -3354,6 +3354,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "accountScopeClause",
     why: "the whole App → Process → Step chain, and the value drilled through it. Every table here carries `account_id` so the fence is the SAME clause the accounts list uses, with no join to forget — and every exported reader takes the caller's AccountScope, which the burglar suite (workers/tenancy/test/account-leak.test.ts) then tries the handle of. A map names how a client's own people work; another client's map is as far out of bounds as their account row.",
   },
+  "workers/tenancy/src/lib/app-attachments.ts": {
+    fence: "appAttachmentFence",
+    why: "what an app shows for itself (T3850), and the fence is the APP's own — `appAttachmentFence` wraps the SAME two clauses `appsWhere` (processes.ts) applies to the apps list itself, the account fence AND the app restriction beside it, expressed as a subquery so it rides the same WHERE as the rows and the count. It has to be here rather than merely be safe by accident: a file is the one thing on an app this base now lets a CLIENT read that it does not also let them write, so it is worth naming that the read and the (refused) write are being decided from two directions.",
+  },
   "workers/content/src/lib/deliverables-client.ts": {
     fence: "accountScopeClause",
     why: "what we handed over, as the CLIENT sees it. A file of its own, holding nothing else: the staff readers live in `deliverables.ts` and are reachable from no portal door, because this list is keyed by FILE and the one time it described a file rather than a function (`help.ts`) the leak was one function along. Two fences ride one clause here and neither is optional — `accountScopeClause` on the account the write copied off the app, AND `visible_to_client_at IS NOT NULL`, the owner's 18 Aug 2026 ruling that a deliverable is the client's only once somebody marks it so. A row on the right account that nobody shared is as absent as one belonging to somebody else, and the COUNT is taken over the same clause so the heading cannot advertise material the list withholds.",
@@ -4554,6 +4558,12 @@ export const STORED_FILES: {
     field: "StoryAttachment.url",
     shownIn: "web/components/records/record-attachments.tsx",
     why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for. Same panel as the ticket's; `work/story-attachments.tsx` is the story's door and copy",
+  },
+  {
+    writtenIn: "workers/tenancy/src/routes/app-attachments.ts",
+    field: "AppAttachment.url",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what an app shows for itself (T3850) — the Files tab. Same shared panel as the ticket's and the story's; `apps/app-attachments.tsx` is the app's own door and copy, and passes `fix` (the door refuses a portal caller outright, so the 'may a client fix somebody else's file' question never reaches a client here)",
   },
   {
     writtenIn: "workers/content/src/routes/todos.ts",

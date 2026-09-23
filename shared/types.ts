@@ -953,6 +953,26 @@ export type StoryAttachment = {
   addedByName: string | null
 }
 
+/** ONE THING AN APP SHOWS FOR ITSELF (T3850) — a file in the shared media
+ * bucket, or a link somebody pasted, the same shape `StoryAttachment` has one
+ * table along and for the same reasons: "here is the thing I mean" is one
+ * act, and `kind` decides only how `url` is read. No `addedByIsClient`
+ * (`HelpAttachment`'s own field, R54): every write door refuses a portal
+ * caller, so `addedByName` is always a colleague's. */
+export type AppAttachment = {
+  id: string
+  appId: string
+  kind: "file" | "link"
+  /** what a person reads in the list — the file's name, or the link's label */
+  label: string
+  /** the file's key inside the shared media bucket, or the link's URL */
+  url: string
+  contentType: string | null
+  sizeBytes: number | null
+  createdAt: string
+  addedByName: string | null
+}
+
 /** ONE FILE ON ONE REPLY (team migration 0105, `help_attachments.help_thread_id`)
  * — the client's own shape for it, 18 Sep 2026: "each message can have images
  * or files". Deliberately leaner than `HelpAttachment` (the ticket-wide list's

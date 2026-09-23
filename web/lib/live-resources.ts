@@ -788,6 +788,14 @@ export function brandAssetsKey(teamId: string): string {
 export function storyAttachmentsKey(storyId: string): string {
   return `story-attachments:${storyId}`
 }
+/** WHAT AN APP SHOWS FOR ITSELF (T3850) — the files and links on its own
+ * Files tab. Written here for the same reason `storyAttachmentsKey` is: the
+ * `app_attachments` TEAM_RESOURCES entry below (`lib`, must not import a
+ * component) is what NAMES this key so a colleague's upload reaches every
+ * open Files tab, and it can only carry a key it can itself declare. */
+export function appAttachmentsKey(appId: string): string {
+  return `app-attachments:${appId}`
+}
 /** …AND THE TICKET'S, for the same reason and after the same bug.
  *
  * This lived in `web/components/tickets/help-attachments.tsx` and carried a comment
@@ -2140,6 +2148,23 @@ export const TEAM_RESOURCES: Record<
     // …and the relationship map's picture of anything standing beside this
     // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
     slicePrefix: RECORD_MAP_PREFIX,
+  },
+  // WHAT AN APP SHOWS FOR ITSELF (T3850) — the files and links on its own
+  // Files tab. Same shape as `deliverables`, immediately above, and for the
+  // identical reason: an attachment has no list and no screen of its own, it
+  // is only ever read on the app it belongs to, so the APP is the one row a
+  // listener can act on and the ping carries the app's id, never the
+  // attachment's own.
+  app_attachments: {
+    key: (t) => appsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.apps().then((r) => r.apps.find((a) => a.id === id) ?? null),
+    fetchList: (t) => listFetch.apps(t),
+    deps: (_t, appId) => [
+      appAttachmentsKey(appId),
+      `total:${appAttachmentsKey(appId)}`,
+      ...recordCountDeps("app_attachments"),
+    ],
   },
   // APPS — row-level live now that they have a list and a record screen of their
   // own. Like the staff profiles above, an app has no by-id read door (it is

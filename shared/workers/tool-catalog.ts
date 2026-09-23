@@ -2211,6 +2211,51 @@ export const SHARED_TOOLS: SharedTool[] = [
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the app "${str(i, "name")}"` },
   },
+  // WHAT AN APP SHOWS FOR ITSELF (T3850) — the Files tab. Same shape as
+  // `list_story_attachments`/`add_story_link`/etc., one worker along: the
+  // door reads are fenced by the caller's account set (a client-scoped
+  // token reaches its own apps' files here, same as `list_apps`); the three
+  // writes refuse a portal caller outright.
+  {
+    name: "list_app_attachments",
+    summary: "The files and links on one app (`id`): each `kind`, `label` and `url`, plus `total`.",
+    detail: "The files and links on one app, by `id` — what was filed against it: a screenshot, a document, something the client sent. `attachments` carries each one's `kind` ('file' or 'link'), its `label`, and the `url` to open it; `total` is how many there are.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/apps/attachments",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `List what's filed against app ${str(i, "id")}` },
+  },
+  {
+    name: "add_app_link",
+    summary: "Attach a LINK to an app: `id`, `label`, `url`.",
+    detail: "Attach a LINK to an app: `id` is the app, `label` what a person reads, `url` where it goes. An app holds several. Files are attached from the app rather than here — this tool sends `kind` as 'link' and never uploads bytes, the same NARROWED_BODY_FIELDS reason `add_story_link` and `add_help_link` do.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/attachments",
+    schema: obj({ id: S, label: S, url: S }, ["id", "label", "url"]),
+    buildBody: (i) => ({ id: str(i, "id"), kind: "link", label: str(i, "label"), url: str(i, "url") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Attach "${str(i, "label")}" to app ${str(i, "id")}` },
+  },
+  {
+    name: "update_app_attachment",
+    summary: "Fix an attachment on an app: `id` is the app, `attachmentId` the row. `label` renames; `url` re-points a link (the old row is kept, deactivated).",
+    detail: "Fix one that is already on an app: `id` is the app, `attachmentId` the one to fix (from `list_app_attachments`). Send `label` to rename it. Send `url` to point a LINK somewhere else — the old row is kept and deactivated, so a replaced link stays in the app's history and stops being listed. A FILE's bytes are swapped from the app rather than here; renaming a file works fine from here. Answers with the app's remaining `attachments` and their `total`.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/attachments/update",
+    schema: obj({ id: S, attachmentId: S, label: S, url: S }, ["id", "attachmentId"]),
+    buildBody: (i) => ({
+      id: str(i, "id"), attachmentId: str(i, "attachmentId"),
+      ...(str(i, "label") ? { label: str(i, "label") } : {}),
+      ...(str(i, "url") ? { url: str(i, "url") } : {}),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Fix attachment ${str(i, "attachmentId")} on app ${str(i, "id")}` },
+  },
+  {
+    name: "remove_app_attachment",
+    summary: "Take a file or link off an app: `id` is the app, `attachmentId` the attachment. Nothing is deleted; it stops being listed.",
+    detail: "Take a file or a link off an app: `id` is the app, `attachmentId` the one to remove (from list_app_attachments). Nothing is deleted, the row keeps its history and the file stays where it was stored; it simply stops being listed.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/attachments/remove",
+    schema: obj({ id: S, attachmentId: S }, ["id", "attachmentId"]),
+    buildBody: (i) => ({ id: str(i, "id"), attachmentId: str(i, "attachmentId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Take an attachment off app ${str(i, "id")}` },
+  },
   // WHAT WE HANDED OVER ON AN APP — its own module, so a token whose role opens
   // apps does not automatically reach the handover shelf, and one that reaches
   // the shelf does not automatically edit the app. Internal: like the brand

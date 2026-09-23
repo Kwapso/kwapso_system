@@ -56,6 +56,7 @@ import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, impact as impactApi, support, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { ErrorPanel } from "@/components/error-panel"
+import { AppFiles } from "@/components/app-files"
 import { PortalEmpty } from "@/components/portal-empty"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import type { PortalReady } from "@/components/portal-shell"
@@ -176,6 +177,11 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
   const { data, loading, refresh } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   const [openProcessId, setOpenProcessId] = React.useState<string | null>(null)
   const [raising, setRaising] = React.useState(false)
+  // WHICH APPS ARE EXPANDED (T3850) — controlled, so `AppFiles` below can stay
+  // lazy the same way `ProcessConversation` already is one level down: a
+  // client with six systems should not pay for six file reads before opening
+  // one.
+  const [openAppIds, setOpenAppIds] = React.useState<string[]>([])
 
   async function raise(input: { description: string; appId?: string; moduleId?: string }) {
     await support.raise(input)
@@ -333,7 +339,7 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
             `AccordionItem` below is stripped back to `bg-transparent`/
             `rounded-none`/no inset, so the hairline between two rows is the
             `Separator` sitting between them, not a box edge. */}
-        <Accordion type="multiple">
+        <Accordion type="multiple" value={openAppIds} onValueChange={setOpenAppIds}>
           {data.apps.map((app, appIndex) => (
             <React.Fragment key={app.appId}>
               {appIndex > 0 && <Separator />}
@@ -347,6 +353,13 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent>
+                  {/* FILES ON THIS SYSTEM (T3850) — above the processes: what
+                      was filed against the app is a fact about the app, not
+                      about how it was mapped. */}
+                  <div className="flex flex-col gap-2 pb-4">
+                    <p className="text-muted-foreground text-sm font-medium">{t("Files")}</p>
+                    <AppFiles appId={app.appId} open={openAppIds.includes(app.appId)} />
+                  </div>
                   <Accordion type="multiple" className="pl-2">
                     {app.processes.map((process, processIndex) => (
                       <React.Fragment key={process.processId}>

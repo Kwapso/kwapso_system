@@ -8,11 +8,14 @@
 //
 // The nine reclaiming call sites all sit on a REPLACE-or-CLEAR path: a column
 // that held one `/media/…` path and now holds another, which leaves the first
-// object referenced by nothing. Four fields look like they belong beside them
+// object referenced by nothing. Five fields look like they belong beside them
 // and do not, because they have no replace path at all:
 //
 //   help_attachments.url    never UPDATEd — only `deactivated_at` (remove) and
-//   story_attachments.url   `label` (rename). Taking an attachment off is an
+//   story_attachments.url   `label` (rename). `replace*Attachment` (story, app)
+//   app_attachments.url     INSERTs a new row and deactivates the old rather
+//                           than UPDATEing `url` in place — see either lib's
+//                           own header on why. Taking an attachment off is an
 //                           ARCHIVE, and archiving reclaims nothing on purpose
 //                           (setBrandAssetActive says why: a restored record
 //                           whose file 404s is worse than an orphan).
@@ -20,8 +23,8 @@
 //   tasks.file_url          `COALESCE(?, file_url)` / on INSERT, so a second
 //                           write cannot supersede a first.
 //
-// So there is no fifth, sixth, seventh or eighth site to add here: every column
-// that HAS a replace path already has one. The bytes those four hold are freed
+// So there is no sixth, seventh or eighth site to add here: every column
+// that HAS a replace path already has one. The bytes those five hold are freed
 // by the periodic orphan sweep — delete what nothing points at any more, on a
 // schedule — which is the owner's own choice over delete-on-archive, and lives
 // with the errors/housekeeping work rather than here.
