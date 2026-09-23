@@ -205,7 +205,7 @@ import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Plus, SquaresFour, ListBullets, MapTrifold } from "@shared/ui/foundations/icons"
 
-import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { defaultTabsConfig, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 import {
   CollectionCreateActionProvider,
   CollectionFrame,
@@ -218,6 +218,7 @@ import { useCached } from "@shared/web/store"
 import { sortedOptions } from "@shared/web/sorted-options"
 import type { Language } from "@shared/i18n"
 
+import { AccountsDashboard } from "@/components/accounts/accounts-dashboard"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
@@ -230,6 +231,7 @@ import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { shapeAccountsList } from "@/components/deep-link/shape"
 import { assignableMembers } from "@/lib/members"
+import { CONCEPT_ICON } from "@/lib/pages"
 import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { accountsKey, totalKey } from "@/lib/live-resources"
@@ -528,8 +530,25 @@ export function AccountsScreen({
   // "rendered fewer hooks than expected" crashes on. None of these three
   // consts reads `accountsQ.data` (only `tab`, `view` and each other), so
   // hoisting them costs nothing and the behaviour is unchanged.
+  // DASHBOARD LEADS THE STRIP AND IS NOW THE DEFAULT (her ruling, 23 Sep
+  // 2026: "make it te 1st tab (dhasbaprd always first card)") — the same
+  // "first tab is the default" rule Tickets' own Dashboard tab already
+  // stands on (`web/test/default-tab-is-first.test.ts`, and see
+  // `accountTabs` below). ACTIVE keeps its own word rather than falling
+  // through to it: an old link or bookmark carrying no `tab` at all used to
+  // land on Active and now lands on Dashboard, so Active is spelled out here
+  // exactly like the other three rather than left as "whatever is not one of
+  // them".
   const accountTab =
-    tab === "archived" ? "archived" : tab === "all" ? "all" : tab === "inactive" ? "inactive" : "active"
+    tab === "archived"
+      ? "archived"
+      : tab === "all"
+        ? "all"
+        : tab === "inactive"
+          ? "inactive"
+          : tab === "active"
+            ? "active"
+            : "dashboard"
   const showMapView = accountTab === "active"
   const effectiveView = view === "map" && !showMapView ? "gallery" : view
 
@@ -552,6 +571,28 @@ export function AccountsScreen({
 
   const accountsBadge = formatCount(total)
   const accountTabs = [
+    /* DASHBOARD, FIRST — her ruling, 23 Sep 2026, over a struck-down design:
+       "implement dashbaprd for clients, make it te 1st tab (dhasbaprd always
+       first card)." The same place Tickets' own Dashboard tab holds on its
+       strip (`tickets-collection.tsx`'s own header: "TRIAGE FIRST since
+       2026-09-06" is the one exception on THAT screen, and Dashboard is the
+       one before it) — so the two screens agree rather than silently
+       drifting into two different answers to "where does Dashboard sit".
+       NO BADGE, for the identical R16 reason every other Dashboard tab in
+       this app carries none: it is not a narrower slice of the collection
+       counted on the tabs beside it, it is a view of all of it. The icon is
+       the same glyph Tickets' own Dashboard tab wears
+       (`CONCEPT_ICON.dashboard`), spelled out here because `TAB_ICONS`
+       (shared/web/screen-engine/tabs-view.tsx) has no "dashboard" entry of
+       its own to win over it — see that table's own header for why a named
+       entry always would. */
+    {
+      value: "dashboard",
+      label: t("Dashboard"),
+      icon: CONCEPT_ICON.dashboard,
+      badge: "",
+      badgeVariant: "" as const,
+    },
     {
       value: "active",
       label: t("Active"),
@@ -621,6 +662,34 @@ export function AccountsScreen({
           this screen happened to already agree with. */}
       <div className="flex flex-col gap-[var(--heading-strip-gap)]">
         <CollectionHeading sectionKey="accounts" total={total} action={<ModuleSettingsGear teamId={teamId} segment="accounts" />} />
+        {/* THE STRIP IS DRAWN ONCE, OUTSIDE `<PagedFind>` — the same shape
+            `tickets-collection.tsx` draws its own Dashboard tab from (that
+            file's own header explains why: a strip that only ever narrowed a
+            paged find had nowhere to put a tab that draws no toolbar and asks
+            no `q`/facet at all). `<PagedFind>` used to own this strip through
+            its own `tabs` prop; it still can for the three tabs that ARE the
+            accounts list, but Dashboard is not one of the list's own
+            narrowings — it is a different body entirely — so the strip moved
+            up a level where both bodies can sit under it. */}
+        <div className="flex flex-col">
+          {renderFolderTabs({
+            config: { ...defaultTabsConfig, tabs: accountTabs },
+            value: accountTab,
+            // DASHBOARD IS DEFAULT NOW (her ruling), so a press back onto it
+            // omits `tab` from the URL entirely — the same "default tab has
+            // no query param" shape this screen has always kept, now pointed
+            // at the new default instead of the old one.
+            onValueChange: (v) => go(sectionPath, v === "dashboard" ? {} : { tab: v }),
+          })}
+          {accountTab === "dashboard" ? (
+            /* THE DASHBOARD — its own component (`accounts-dashboard.tsx`),
+               same reasoning `tickets-dashboard.tsx` gives for its own
+               branch: NOT inside a `<CollectionCard>`. Every other branch on
+               this strip is one card holding one collection; this branch is
+               its own small panels, and a card around panels that paint
+               nothing of their own (R67) would be a card around nothing. */
+            <AccountsDashboard teamId={teamId} lang={lang} />
+          ) : (
         <PagedFind<Account>
           listKey={accountsKey(teamId)}
           placeholder={t("Search accounts…")}
@@ -678,15 +747,6 @@ export function AccountsScreen({
               .accounts({ ...query, cursor })
               .then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor, total: r.total }))
           }
-          tabs={{
-            config: { ...defaultTabsConfig, tabs: accountTabs },
-            value: accountTab,
-            // "active" IS DEFAULT (her ruling), so a press back onto it omits
-            // `tab` from the URL entirely — the same "default tab has no
-            // query param" shape the retired Companies tab used, now pointed
-            // at the new default instead of the old one.
-            onValueChange: (v) => go(sectionPath, v === "active" ? {} : { tab: v }),
-          }}
           view={{
             views: [
               { value: "gallery", label: t("Gallery"), icon: <SquaresFour className="size-4" /> },
@@ -798,7 +858,10 @@ export function AccountsScreen({
             )
           }}
         </PagedFind>
+          )}
+        </div>
       </div>
     </CountedAbove>
   )
 }
+

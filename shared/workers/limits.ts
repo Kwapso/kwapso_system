@@ -444,6 +444,17 @@ export const KNOWLEDGE_KIND_FACET_CAP = 100
  * a chart nobody was going to read to the end of anyway. */
 export const TICKET_DASHBOARD_GROUP_CAP = 100
 
+/** THE ACCOUNTS DASHBOARD'S OWN GROUP CAP (R14) — the Dashboard tab's two
+ * grouped reads, by country and by arrival month, over the ACTIVE company
+ * book. A country a client is in and a month a client arrived in are both
+ * open-ended in principle (a team could in theory sell into a hundred
+ * countries, or run for a hundred years of months), so the reads are bounded
+ * here the same way `TICKET_DASHBOARD_GROUP_CAP` bounds its own five —
+ * legible and bounded are the same ceiling. Smaller today's real shape (four
+ * countries, ~45 months) leaves a wide margin, and a team large enough to
+ * fill it has outgrown a bar chart anyway. */
+export const ACCOUNTS_DASHBOARD_GROUP_CAP = 100
+
 /** Files AND links one ticket may carry (CHECKLIST 5.10). "Several" is the ask,
  * from both front doors; a ceiling turns "several" into something a list can be
  * read to the end of and a count can be trusted. */

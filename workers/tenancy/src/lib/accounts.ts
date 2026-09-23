@@ -26,7 +26,7 @@ import {
 import { countCollection } from "@shared/workers/count"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
+import { ACCOUNTS_DASHBOARD_GROUP_CAP, EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "@shared/types"
@@ -739,6 +739,104 @@ export async function listAccounts(
     individualTotal,
     individualPortalTotal,
   }
+}
+
+/** THE ACCOUNTS DASHBOARD — her ruling, 23 Sep 2026: "implement dashbaprd for
+ * clients, make it te 1st tab … do not sdd the sections what you do not know
+ * yet, nor the cities, nor how lon its been, nor can reach the portal." Three
+ * questions survived her strike-through, and this is all three, in one round
+ * trip, counted by the database rather than tallied over a loaded page —
+ * `readTicketDashboard` one worker over is the shape this follows.
+ *
+ * ACTIVE, EVERYWHERE ON THIS TAB — her own emphasis, so the fence below is
+ * unconditional: never inactive, never archived. And a COMPANY, never a
+ * person: `account_type = 'entity'` is the same partition
+ * `accountsWhere`'s own untyped branch draws for the everyday Accounts
+ * list, and it is what makes the door's own count agree with what she
+ * counted by hand on the live team (fourteen, entities only) — a read that
+ * also counted standalone contacts would not.
+ *
+ * BY COUNTRY, NOT BY TOWN — she struck the town breakdown by name, so the
+ * grouping stops at the vocabulary the accounts form itself offers
+ * (`country`, the team's own "Country" list) and never reads `city`. A row
+ * with no country set is silently outside both `countryCount` and
+ * `byCountry`: she also struck "anything about missing or empty fields", so
+ * this door does not count them, name them, or say how many there were —
+ * the same silence `accountsWhere`'s own filters keep about a blank field
+ * they do not ask about.
+ *
+ * WHEN THEY ARRIVED, BY MONTH, NEVER CAPPED TO A WINDOW — unlike the ticket
+ * dashboard's twelve-month trend, an account's own `created_at` is not a
+ * question about the recent run, it is the whole relationship (her own
+ * example ran from early 2023), so nothing here narrows the calendar the way
+ * `CLOSURE_TREND_MONTHS` narrows the ticket one. `ACCOUNTS_DASHBOARD_GROUP_CAP`
+ * bounds the read the ordinary R14 way instead — a hundred months is eight
+ * years of one bar each, which is the ceiling past which a bar chart has
+ * stopped being one anyway (see that constant's own header).
+ *
+ * NO PORTAL DOOR, NO CITY, NO TENURE, NO MISSING-FIELD READOUT — the fourth
+ * strike, "how long its been" and "can reach the portal", is not a filter
+ * this function drops, it is a QUESTION THIS FUNCTION NEVER ASKS: there is no
+ * read here of `portal_users` and no arithmetic over `created_at` against
+ * today's date. Building either would be inventing a fifth panel she did not
+ * ask for, on a screen whose whole brief was "do not add the sections what
+ * you do not know yet". */
+export type AccountsDashboard = {
+  /** the small row of figures at the top — R16 exact counts, the same
+   * `countCollection` seam every other badge in the app is counted through. */
+  activeCount: number
+  countryCount: number
+  /** one row per country an active company names, busiest first — a country
+   * nobody set is not a row here (see this function's own header). */
+  byCountry: { country: string; n: number }[]
+  /** one row per calendar month an active company was created in, oldest
+   * first, every month in range even where the true count is one — the same
+   * "no dropped bucket" reading `readTicketDashboard`'s own trend keeps,
+   * except this one never PICKS a range in the first place. */
+  arrivals: { month: string; n: number }[]
+}
+
+export async function readAccountsDashboard(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope
+): Promise<AccountsDashboard> {
+  const fence = accountScopeClause(scope, "id")
+  const base = where([fence.sql, "account_type = 'entity'", "deactivated_at IS NULL", "archived_at IS NULL"])
+  const params = [...fence.params]
+  const cap = ACCOUNTS_DASHBOARD_GROUP_CAP
+  // A COUNTRY NOBODY SET IS NOT A ROW — both country reads add the identical
+  // extra clause on top of the shared active-company fence above, so the
+  // header count and the bars beneath it can never disagree about which rows
+  // they are asking about.
+  const knownCountry = `${base} AND country IS NOT NULL AND TRIM(country) <> ''`
+
+  const [activeCount, countryCount, byCountry, arrivals] = await Promise.all([
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${base}`, params),
+    countCollection(
+      cfg,
+      guard.databaseId,
+      `SELECT DISTINCT country FROM accounts${knownCountry}`,
+      params
+    ),
+    d1Query<{ country: string; n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT country, COUNT(*) AS n FROM accounts${knownCountry}
+        GROUP BY country ORDER BY n DESC LIMIT ${cap}`,
+      params
+    ),
+    // BOUNDED BY GROUPING (R14) — at most `cap` distinct months, said above.
+    d1Query<{ month: string; n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT strftime('%Y-%m', created_at) AS month, COUNT(*) AS n FROM accounts${base}
+        GROUP BY month ORDER BY month ASC LIMIT ${cap}`,
+      params
+    ),
+  ])
+
+  return { activeCount, countryCount, byCountry, arrivals }
 }
 
 /** Every account this caller may see — NARROWED the same way the list narrows —

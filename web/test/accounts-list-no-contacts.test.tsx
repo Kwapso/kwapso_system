@@ -116,7 +116,15 @@ function draw() {
       lang="en"
       go={go}
       sectionPath="/t/team/accounts"
-      tab={undefined}
+      // "active" NAMED EXPLICITLY, NOT LEFT `undefined` (23 Sep 2026) — the
+      // Accounts screen gained a Dashboard tab that now LEADS the strip and
+      // is the screen's own default (her ruling: "dhasbaprd always first
+      // card", `web/test/accounts-dashboard-tab.test.ts`), so an unset `tab`
+      // renders the Dashboard rather than the list this file is about. This
+      // test's whole point is the LIST body's contact-exclusion shape, not
+      // which tab a bare visit lands on — that question has its own test
+      // now — so it asks for the list tab directly.
+      tab="active"
       accountsQ={{ data: ROWS, error: undefined }}
       membersQ={{ data: MEMBERS }}
       total={ROWS.length}

@@ -24,6 +24,7 @@
 //   GET  /api/tenancy/accounts             -> the caller's accounts (paged, ?q= &type= &cursor=)
 //   GET  /api/tenancy/accounts/export      -> the caller's accounts as a full-field CSV
 //   GET  /api/tenancy/accounts/detail      -> one account + its people + its logins (?id)
+//   GET  /api/tenancy/accounts/dashboard   -> the Dashboard tab's three grouped reads over active companies
 //   POST /api/tenancy/accounts             -> create an account (company or person)
 //   POST /api/tenancy/accounts/update      -> edit an account's own fields
 //   POST /api/tenancy/accounts/parent      -> move it under another (loop-refused)
@@ -189,6 +190,7 @@ import { getMapsConfig } from "./routes/maps-config"
 import {
   getAccountDetail,
   getAccounts,
+  getAccountsDashboard,
   getAccountsExport,
   getPortalContext,
   getPortalUsers,
@@ -297,6 +299,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/tenancy/accounts": { handler: getAccounts, kind: "read" },
   "GET /api/tenancy/accounts/export": { handler: getAccountsExport, kind: "read" },
   "GET /api/tenancy/accounts/detail": { handler: getAccountDetail, kind: "read" },
+  "GET /api/tenancy/accounts/dashboard": { handler: getAccountsDashboard, kind: "read" },
   "POST /api/tenancy/accounts": { handler: postCreateAccount, kind: "mutation" },
   "POST /api/tenancy/accounts/update": { handler: postUpdateAccount, kind: "mutation" },
   "POST /api/tenancy/accounts/parent": { handler: postAccountParent, kind: "mutation" },

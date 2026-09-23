@@ -39,6 +39,7 @@ import {
   listPortalUsers,
   countPortalUsers,
   portalStandings,
+  readAccountsDashboard,
   switchPortalAccount,
   setAccountActive,
   setAccountArchived,
@@ -229,6 +230,21 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
     // rows come back through (R16).
     individualPortalTotal: page.individualPortalTotal,
   })
+}
+
+/** GET /api/tenancy/accounts/dashboard — the Accounts screen's Dashboard tab,
+ * her three surviving questions in one round trip (`readAccountsDashboard`'s
+ * own header carries the whole account of what she struck and why). Gated
+ * exactly like the list door it sits beside — reading a count of the same
+ * rows asks no more of the caller than reading the rows themselves — and
+ * scoped the identical way, so a portal caller sees their own fenced world's
+ * figures rather than being refused a door the list door already opens for
+ * them. No `contactSight` here: the tab counts COMPANIES only, a question
+ * `contacts:read` has never gated. */
+export async function getAccountsDashboard(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "accounts", "read")
+  const scope = await accountScope(cfg, guard)
+  return json(await readAccountsDashboard(cfg, guard, scope))
 }
 
 /** The filters an accounts read accepts, parsed ONCE — the list door and the

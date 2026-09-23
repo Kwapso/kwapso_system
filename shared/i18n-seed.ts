@@ -3228,6 +3228,35 @@ export const SEED: Catalogue = {
     es: "No se ha podido cargar el panel.",
     ca: "No s'ha pogut carregar el tauler.",
   },
+  /* THE ACCOUNTS SCREEN'S OWN DASHBOARD TAB (23 Sep 2026), hand-translated
+     rather than left to the generated catalogue: seven short sentences over
+     the same tab, better done together than machine-translated one at a
+     time. "Account(s)" follows this file's own established word per
+     language — German settled on "Konto/Konten" for a NEW/EMPTY account
+     ("New account" → "Neues Konto" below), which these match. */
+  "active accounts": { de: "aktive Konten", es: "cuentas activas", ca: "comptes actius" },
+  "countries": { de: "Länder", es: "países", ca: "països" },
+  "No country is set on an active account yet.": {
+    de: "Für kein aktives Konto ist bisher ein Land hinterlegt.",
+    es: "Ninguna cuenta activa tiene un país indicado todavía.",
+    ca: "Cap compte actiu té encara un país indicat.",
+  },
+  "When they arrived": { de: "Wann sie dazukamen", es: "Cuándo llegaron", ca: "Quan van arribar" },
+  "Nothing has arrived yet.": {
+    de: "Es ist noch nichts hinzugekommen.",
+    es: "Todavía no ha llegado nada.",
+    ca: "Encara no ha arribat res.",
+  },
+  "No active accounts yet.": {
+    de: "Noch keine aktiven Konten.",
+    es: "Todavía no hay cuentas activas.",
+    ca: "Encara no hi ha comptes actius.",
+  },
+  "Add your first account and its figures will show here.": {
+    de: "Legen Sie Ihr erstes Konto an, und die Zahlen erscheinen hier.",
+    es: "Añade tu primera cuenta y sus cifras aparecerán aquí.",
+    ca: "Afegeix el teu primer compte i les xifres apareixeran aquí.",
+  },
   /* A CORRECTION, NOT A NEW STRING. The generated catalogue answered "Type"
      with "Eingeben", the VERB, "to type on a keyboard", which is what a
      machine does with a one-word English string that is two different words.

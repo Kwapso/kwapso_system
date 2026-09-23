@@ -946,6 +946,22 @@ export function accountsKey(teamId: string): string {
   return `accounts:${teamId}`
 }
 
+/** THE ACCOUNTS SCREEN'S DASHBOARD TAB — one entry per team, no filters riding
+ * along (unlike `helpDashboardKey`'s own, this tab has no toolbar to spend a
+ * second key on — her ruling struck the sections that would have needed one).
+ *
+ * A DERIVED cache, so it is dropped and re-read rather than patched — there is
+ * no row in it to patch, the same reasoning `helpDashboardKey`'s own header
+ * gives. Dropped by the `accounts` collection's own `slicePrefix` below rather
+ * than named in its `deps`, because an account created, activated, deactivated,
+ * archived or moved to another country is precisely when every figure on this
+ * tab stops being true, and the ping that says so carries a row id this key
+ * does not carry. */
+const ACCOUNTS_DASHBOARD_PREFIX = "accounts-dashboard:"
+export function accountsDashboardKey(teamId: string): string {
+  return `${ACCOUNTS_DASHBOARD_PREFIX}${teamId}`
+}
+
 /** EVERY COMPANY, for the pickers that sell to one (a wave's client). Its own
  * key because the accounts list is PAGED and its page one is newest-first —
  * which is how the wave form's client picker offered 107 contacts and could
@@ -1658,7 +1674,9 @@ export const TEAM_RESOURCES: Record<
     deps: (t, id) => [accountKey(id), `activity:record:accounts:${id}`, companiesKey(t)],
     // …and the relationship map's picture of anything standing beside this
     // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
-    slicePrefix: RECORD_MAP_PREFIX,
+    // …AND THE DASHBOARD TAB'S OWN FAMILY (23 Sep 2026) — a derived cache with
+    // no row of its own to patch, see `accountsDashboardKey`'s own header.
+    slicePrefix: [ACCOUNTS_DASHBOARD_PREFIX, RECORD_MAP_PREFIX],
   },
   account_links: {
     key: (t) => accountsKey(t),

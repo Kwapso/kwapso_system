@@ -50,6 +50,19 @@ import type { SavingsView } from "@shared/workers/savings"
 import { api, enc, listQuery, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
 
+/** THE ACCOUNTS DASHBOARD, exactly as `readAccountsDashboard`
+ * (workers/tenancy/src/lib/accounts.ts) hands it back — three grouped reads
+ * over the ACTIVE company book in one round trip, every one of them counted
+ * by the database and none of them tallied here off a loaded page. Its own
+ * header carries the whole account of what her 23 Sep 2026 ruling struck
+ * (the town breakdown, tenure, missing fields, portal reach) and why. */
+export type AccountsDashboard = {
+  activeCount: number
+  countryCount: number
+  byCountry: { country: string; n: number }[]
+  arrivals: { month: string; n: number }[]
+}
+
 export const tenancy = {
   /** After onboarding: accept waiting invites OR create the personal team. */
   bootstrap: () =>
@@ -533,6 +546,11 @@ export const tenancy = {
   /** One account opened: the record, its parent, its people, its logins, and the
    * two exact totals its tabs badge. */
   accountDetail: (id: string) => api<AccountDetail>(`/api/tenancy/accounts/detail?id=${enc(id)}`),
+
+  /** THE ACCOUNTS SCREEN'S DASHBOARD TAB — no toolbar, no facets, no search
+   * (the same reasoning `content.helpDashboard`'s own header gives: there is
+   * nothing on this tab for a browser to sieve). */
+  accountsDashboard: () => api<AccountsDashboard>("/api/tenancy/accounts/dashboard"),
 
   /** ONE account row (the row-level live re-pull). A 404 means it's genuinely gone
    * — anything else propagates, so a network blip never drops a row off a list. */

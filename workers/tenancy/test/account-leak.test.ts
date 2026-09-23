@@ -328,6 +328,19 @@ const BURGLARIES: Burglary[] = [
     expect: "refused",
   },
   {
+    // THE DASHBOARD TAB (23 Sep 2026) — no `id`, no `q`, nothing to narrow: it
+    // always answers over the CALLER'S OWN fence, so the honest attack is the
+    // same bare request as the plain list's own first burglary above. The
+    // response is pure counts, a country word and a month string — never an id
+    // or a name — so the fence has to do ALL the work here rather than sharing
+    // it with "there was nothing to print anyway".
+    route: "GET /api/tenancy/accounts/dashboard",
+    why: "read the team's aggregate figures and see whether the victim's book rides along in them",
+    attack: () => req("GET /api/tenancy/accounts/dashboard"),
+    honest: () => req("GET /api/tenancy/accounts/dashboard"),
+    expect: "nothing",
+  },
+  {
     route: "POST /api/tenancy/accounts",
     why: "hang a new row under the victim, then read the victim through it",
     attack: () =>

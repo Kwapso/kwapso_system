@@ -218,6 +218,16 @@ export const TAB_ICONS: Record<string, IconName> = {
   active: "check-circle",
   inactive: "prohibit",
   archived: "archive",
+  // THE ACCOUNTS SCREEN'S OWN DASHBOARD TAB (23 Sep 2026, her ruling: "make
+  // it te 1st tab"). Tickets' own Dashboard tab (`tickets-collection.tsx`)
+  // passes `value: DASHBOARD`, a named constant this census's regex cannot
+  // see (it only reads literal `value: "…"` strings), which is why that
+  // screen never needed a line here. Accounts spells its tab values as
+  // literals like every other entry on its own strip, so this line is what
+  // this census asks for — the same glyph `CONCEPT_ICON.dashboard`
+  // (web/lib/pages.ts) already draws, so the two screens' Dashboard tabs
+  // agree rather than drifting into two icons for one concept.
+  dashboard: "chart-donut",
   week: "calendar-dot",
   calendar: "calendar-blank",
   // THE MEETINGS STRIP'S MIDDLE TAB (client ruling, 2026-09-09: "tabs for
