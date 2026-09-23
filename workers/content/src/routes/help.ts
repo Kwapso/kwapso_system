@@ -10,7 +10,7 @@ import { fail, json, pagedJson } from "@shared/workers/http"
 import { afterResponse } from "@shared/workers/parallel"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { d1Query, sqlString } from "@shared/workers/d1-rest"
-import { GuardError } from "@shared/workers/guard-error"
+import { GuardError } from "@shared/workers/gating"
 import { MENTIONS_LIMIT, TICKET_ATTACHMENT_CAP } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -752,6 +752,7 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
   // Verify that at least one attachment is an image on THIS ticket
   const attachments = await d1Query<{ id: string; content_type: string | null }>(
     cfg,
+    guard.databaseId,
     `SELECT id, content_type FROM help_attachments
      WHERE ticket_id = ${sqlString(id)} AND id IN (${attachmentIds.map(sqlString).join(",")})
      AND deactivated_at IS NULL`

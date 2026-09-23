@@ -961,11 +961,10 @@ export function HelpDetailScreen({
   }
 
   async function reopenTicket() {
-    const r = await content.setHelpStatus(helpId, "in_progress")
+    await content.setHelpStatus(helpId, "in_progress")
     invalidate(`help:${teamId}`)
     invalidate(`help:one:${helpId}`)
     invalidate(recordActivityKey("help", helpId))
-    toast.success(r.alreadyResolved ? t("Already reopened.") : t("Reopened."))
   }
 
   /** THE TRIAGE QUEUE'S OWN DECISION, MADE FROM THE HEAD — Aurora's ruling,
@@ -1396,7 +1395,7 @@ export function HelpDetailScreen({
               action: t("Reopen"),
               run: () =>
                 runReopen(
-                  () => void reopenTicket(),
+                  () => reopenTicket(),
                   t("Reopened."),
                   t("Couldn't reopen that ticket.")
                 ),
