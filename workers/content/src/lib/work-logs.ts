@@ -71,10 +71,24 @@ export const WORK_LOG_TARGETS: Record<string, { label: string; account: string; 
 /** THE KIND EVERY MEETING LOG CARRIES (CHECKLIST 9.3) — "those logs are marked
  * as meeting time, and any figure can be shown with or without them".
  *
- * `kind` is free text on purpose (a team names its own kinds of work), so this
- * is a convention rather than an enum — but it is a convention with exactly one
- * writer and one reader, both of which import this constant, which is what makes
- * "with or without meeting time" a filter and not a guess about a string. */
+ * IT HAS NO READER LEFT, AND IT IS STILL WRITTEN. 24 Sep 2026: `logWhere`'s
+ * "with or without meeting time" filter now asks `target_table` (NOT NULL on
+ * every row) instead of this string, and the transcript capture's own
+ * de-duplication guard now matches on target + person instead of carrying it
+ * too. So what is left is ONE WRITER AND NOTHING THAT READS IT.
+ *
+ * WHY IT IS STILL WRITTEN ANYWAY. Three things have to be true before the
+ * constant itself can go, and only the first two are done:
+ *   1. the filter moved off it — DONE, `logWhere` above;
+ *   2. the de-dup guard moved off it — DONE, `meetings.ts`'s capture;
+ *   3. THE ROWS ALREADY IN THE DATABASE. Team migration 0122 deliberately
+ *      SPARES `target_table = 'meetings' AND kind = 'Meeting'`, because a person
+ *      could have typed that word on a meeting themselves and no column tells
+ *      the two apart. Those rows are harmless while this literal is still what
+ *      wrote them; they become an unexplained word in a column nothing writes
+ *      the moment this constant goes.
+ * Aurora decides step 3. Until then the capture keeps stamping it, which costs
+ * nothing and keeps the old and new rows consistent with each other. */
 export const MEETING_LOG_KIND = "Meeting"
 
 /** How long a timer may run before Monday morning offers to do something about
@@ -210,9 +224,11 @@ export type LogFilter = {
   /** "mine" narrows to the caller — the everyday "what have I done today". */
   scope?: "mine" | "all"
   /** WITH OR WITHOUT MEETING TIME (CHECKLIST 9.3). "exclude" drops every log
-   * marked as a meeting, "only" keeps nothing else, and absent means all of it.
+   * against a meeting, "only" keeps nothing else, and absent means all of it.
    * It rides the list AND the two totals beside it, so the hours under a
-   * filtered list are the hours OF that list (R16). */
+   * filtered list are the hours OF that list (R16).
+   *
+   * IT READS `target_table` NOW, NOT `kind` (24 Sep 2026). See `logWhere`. */
   meetingTime?: "exclude" | "only"
   /** THE SEARCH BOX (R14: the door answers, never the loaded page) — who logged
    * it, or what it was against. Matched against the caller's own name and the
@@ -276,16 +292,30 @@ function logWhere(
   // audit — who binned a runaway timer, and when — and nothing else reads them.
   const parts = ["w.discarded_at IS NULL"]
   const params: string[] = []
-  // 9.3 — the one place the convention is read, matching the one place it is
-  // written. A log with no kind at all is not meeting time, which is why the
-  // "exclude" arm has to say so: `kind <> 'Meeting'` alone would silently drop
-  // every log whose kind is NULL, which is most of them.
+  // 9.3 — WITH OR WITHOUT MEETING TIME, ASKED OF `target_table` (24 Sep 2026).
+  //
+  // It used to read the free-text `kind` column against `MEETING_LOG_KIND`, a
+  // CONVENTION with one writer and one reader. That was the honest shape while
+  // the kind was the only thing saying a log came from a meeting — and it is
+  // the wrong shape now that Aurora has ruled the kind of work IS the related
+  // record type (23 Sep 2026) and wiped the hand-typed words (24 Sep, team
+  // migration 0122).
+  //
+  // `target_table` IS NOT NULL ON EVERY ROW, which is why the awkward arm has
+  // gone: `kind <> 'Meeting'` alone would have silently dropped every log whose
+  // kind was NULL (most of them), so "exclude" had to carry `kind IS NULL OR`
+  // with it. A NOT NULL column needs no such apology, and the predicate now
+  // says exactly what a reader thinks it says.
+  //
+  // TWO BEHAVIOURS CHANGE, AND BOTH ARE CORRECTIONS. An hour somebody
+  // hand-logged against a meeting was never "meeting time" before (no kind, so
+  // `exclude` kept it) and is now. A story somebody had typed the word
+  // "Meeting" on WAS excluded and no longer is. Neither was ever what this
+  // filter meant.
   if (filter.meetingTime === "exclude") {
-    parts.push("(w.kind IS NULL OR w.kind <> ?)")
-    params.push(MEETING_LOG_KIND)
+    parts.push("w.target_table <> 'meetings'")
   } else if (filter.meetingTime === "only") {
-    parts.push("w.kind = ?")
-    params.push(MEETING_LOG_KIND)
+    parts.push("w.target_table = 'meetings'")
   }
   if (filter.scope === "mine") {
     parts.push("w.user_id = ?")
@@ -414,7 +444,7 @@ export async function countWorkLogs(
  * came from, so the total above the list and the rows inside it are one question
  * (R16).
  *
- * FIVE READS, and each is bounded at both ends:
+ * FOUR READS, and each is bounded at both ends:
  *   • the count and the exact seconds, through `countWorkLogs` — no second way
  *     to count anything, so the badge and this header can never disagree;
  *   • HOW MANY PEOPLE, through the same bounded seam every other collection count
@@ -422,10 +452,20 @@ export async function countWorkLogs(
  *     is the top `WORK_LOG_GROUP_CAP` and its length is a CEILING: a record
  *     worked on by eighty people answered "50" for ever, with nothing saying it
  *     had stopped, which is exactly the failure R16 names first;
- *   • BY PERSON and BY KIND OF WORK: grouped, ordered by size, `WORK_LOG_GROUP_CAP`
- *     rows each (R14). A team has tens of people and a dropdown has tens of
- *     words, so the cap is a ceiling on a pathological row rather than a real
- *     limit — and a cap is what makes that a fact rather than a hope;
+ *   • BY PERSON: grouped, ordered by size, `WORK_LOG_GROUP_CAP` rows (R14). A
+ *     team has tens of people, so the cap is a ceiling on a pathological row
+ *     rather than a real limit — and a cap is what makes that a fact rather
+ *     than a hope.
+ *
+ *     THERE WAS A SECOND GROUPING BESIDE IT, BY KIND OF WORK, AND IT IS GONE
+ *     (24 Sep 2026). It grouped the free-text `kind` column, which Aurora
+ *     retired: the kind of work is the RELATED RECORD TYPE now (23 Sep), the
+ *     hand-typed words are wiped (team migration 0122), and the one card that
+ *     drew this breakdown — "Hours by kind of work" on a record's own Logs
+ *     panel — was deleted the same round, because on ONE record that split can
+ *     only ever have a single bar. Nothing else ever read it, so the read went
+ *     with the reader rather than being left to run on every story, ticket,
+ *     task and meeting page in the app for nobody;
  *   • WEEK BY WEEK, over the SAME eight windows Home draws, through the same
  *     `pulseWeekStarts`. Reused rather than restated because "which Monday opens
  *     this week" written twice is two definitions that drift at a year boundary
@@ -456,7 +496,7 @@ export async function summariseWorkLogs(
     weekParams.push(start.toISOString(), end.toISOString())
   })
 
-  const [counts, peopleTotal, people, kinds, weekRows] = await Promise.all([
+  const [counts, peopleTotal, people, weekRows] = await Promise.all([
     countWorkLogs(cfg, guard, filter),
     // HOW MANY PEOPLE, exactly — one row per distinct person, counted through the
     // one bounded seam (R16). The same WHERE as everything else here, so the
@@ -473,17 +513,6 @@ export async function summariseWorkLogs(
       `SELECT w.user_id, MAX(w.user_name) AS user_name, SUM(w.seconds) AS s
          FROM work_logs w WHERE ${where.sql}
         GROUP BY w.user_id ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
-      where.params
-    ),
-    d1Query<{ kind: string | null; s: number | null }>(
-      cfg,
-      guard.databaseId,
-      // A log with no kind is its own bucket rather than a dropped row: most time
-      // is logged without one, and a chart that quietly omitted it would be a
-      // picture of the minority.
-      `SELECT w.kind, SUM(w.seconds) AS s
-         FROM work_logs w WHERE ${where.sql}
-        GROUP BY w.kind ORDER BY s DESC LIMIT ${WORK_LOG_GROUP_CAP}`, // R14 hard cap
       where.params
     ),
     d1Query<Record<string, number | null>>(
@@ -508,10 +537,6 @@ export async function summariseWorkLogs(
     people: people.map((r) => ({
       userId: r.user_id,
       userName: r.user_name ?? null,
-      seconds: Math.max(0, Math.round(r.s ?? 0)),
-    })),
-    kinds: kinds.map((r) => ({
-      kind: r.kind ?? null,
       seconds: Math.max(0, Math.round(r.s ?? 0)),
     })),
     weeks: starts.map((start, i) => ({

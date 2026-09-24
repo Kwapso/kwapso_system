@@ -519,6 +519,90 @@ describe("secondsBetween", () => {
   })
 })
 
+// ── WITH OR WITHOUT MEETING TIME (CHECKLIST 9.3), RE-POINTED ────────────────
+//
+// Aurora ruled on 23 Sep 2026 that the kind of work IS the related record type,
+// and on 24 Sep that the hand-typed words in `work_logs.kind` are to be wiped
+// (team migration 0122). This filter used to read that column against
+// `MEETING_LOG_KIND`; it reads `target_table` now, which is NOT NULL on every
+// row.
+//
+// THE FILTER HAD NO TEST AT ALL BEFORE THIS. `grep -rn "meetingTime"
+// workers/content/test` came back empty on 24 Sep 2026, so a door parameter
+// that rides the list AND both totals beside it (R16) was enforced by nobody —
+// which is exactly the shape that lets a re-point land green and wrong. The
+// cases below are written against the NEW meaning and would have failed on the
+// old one, which is the point of them.
+describe("with or without meeting time, asked of the related record type", () => {
+  /** A meeting to log against, plus one log on it and one on a story. The rows
+   * go in directly rather than through a door, so what is asserted is what the
+   * predicate sees. */
+  async function twoKindsOfHour(storyKind: string | null, meetingKind: string | null) {
+    const storyId = await addStory("Dispatch rewrite")
+    db().exec(`
+      INSERT INTO meetings (id, title, starts_at, created_at, creator_id)
+        VALUES ('M1', 'Kickoff', '2026-03-01T09:00:00.000Z', '2026-03-01', '${IDS.staffUser}');
+    `)
+    const row = (id: string, table: string, target: string, kind: string | null) =>
+      db()
+        .prepare(
+          `INSERT INTO work_logs (id, target_table, target_id, user_id, user_name, kind,
+             started_at, ended_at, seconds, created_at, creator_id)
+           VALUES (?, ?, ?, ?, 'Alex', ?, '2026-03-01T10:00:00.000Z', '2026-03-01T11:00:00.000Z', 3600, '2026-03-01', ?)`
+        )
+        .run(id, table, target, IDS.staffUser, kind, IDS.staffUser)
+    row("L-STORY", "stories", storyId, storyKind)
+    row("L-MEETING", "meetings", "M1", meetingKind)
+  }
+
+  const idsWith = async (query: string) => {
+    const res = await call(IDS.staffUser, "GET /api/content/work-logs", undefined, query)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { logs: { id: string }[]; totalSeconds: number }
+    return { ids: body.logs.map((l) => l.id).sort(), seconds: body.totalSeconds }
+  }
+
+  it("'only' keeps the hours against a MEETING, whatever the old kind column says", async () => {
+    // The meeting's log carries NO kind — an hour somebody logged by hand on a
+    // meeting. Under the old predicate (`kind = 'Meeting'`) it was not meeting
+    // time; it plainly is.
+    await twoKindsOfHour(null, null)
+    const only = await idsWith("?meetingTime=only")
+    expect(only.ids).toEqual(["L-MEETING"])
+    // R16 — the total under a filtered list is the total OF that list.
+    expect(only.seconds).toBe(3600)
+  })
+
+  it("'exclude' drops the hours against a meeting and keeps everything else", async () => {
+    await twoKindsOfHour(null, null)
+    const without = await idsWith("?meetingTime=exclude")
+    expect(without.ids).toEqual(["L-STORY"])
+    expect(without.seconds).toBe(3600)
+  })
+
+  it("a story somebody had typed 'Meeting' on is NOT meeting time", async () => {
+    // The old predicate excluded this row; it was never meeting time, and the
+    // word is being wiped from rows exactly like it (migration 0122).
+    await twoKindsOfHour("Meeting", null)
+    expect((await idsWith("?meetingTime=exclude")).ids).toEqual(["L-STORY"])
+    expect((await idsWith("?meetingTime=only")).ids).toEqual(["L-MEETING"])
+  })
+
+  it("keeps a log with no kind at all on the 'exclude' side, as it always had to", async () => {
+    // The old predicate needed `kind IS NULL OR kind <> 'Meeting'` to manage
+    // this, because most logged time carries no kind. A NOT NULL column needs no
+    // such apology; this case pins that the simplification kept the behaviour.
+    await twoKindsOfHour(null, "Meeting")
+    expect((await idsWith("?meetingTime=exclude")).ids).toEqual(["L-STORY"])
+  })
+
+  it("absent means ALL of it — a mistyped value lands in everything, never in nothing", async () => {
+    await twoKindsOfHour(null, null)
+    expect((await idsWith("")).ids).toEqual(["L-MEETING", "L-STORY"])
+    expect((await idsWith("?meetingTime=banana")).ids).toEqual(["L-MEETING", "L-STORY"])
+  })
+})
+
 // R21, behaviourally — the derived scan proves every door SAYS refusePortalCaller;
 // this proves one MEANS it, against a real client login holding every right.
 describe("a client login cannot reach time at all", () => {

@@ -10289,6 +10289,22 @@ meeting its a meeting, etc"*. **Status: built.**
    (`web/components/meetings/meeting-detail.tsx`), owned by another lane;
    `web/test/logs-dashboard.test.tsx` pins that it is the ONLY one left.
 
+2b. **"Wipe them" (2026-09-24).** Asked what to do with the words people had
+   already typed into "Kind of work" before it became automatic, she ruled:
+   *"wipe them"*. Team migration **0122** clears them, backing every one up first
+   in `work_log_kinds_backup` (restorable with one statement, safe to run twice,
+   touches nothing else). **One set is spared on purpose:** `target_table =
+   'meetings' AND kind = 'Meeting'`. That literal is what the transcript capture
+   stamps, and a person could have typed the same word on a meeting themselves,
+   so no column tells them apart. Sparing costs a handful of invisible words;
+   wiping cost the capture's de-duplication guard 18.25 hours across 21 work logs
+   nobody worked, once already. `target_table` is the discriminator everywhere
+   else, so a hand-typed "Meeting" on a story IS wiped. **The two readers moved
+   off the column the same day:** the "with or without meeting time" filter now
+   asks `target_table` (NOT NULL, so the awkward `kind IS NULL OR ...` arm is
+   gone), and the capture's guard now matches target + person, which is tighter,
+   not looser. The constant itself stays until Aurora rules on the spared rows.
+
 3. **"Kind of work" is the related record type, and nobody types it.** It now means what the
    time was logged AGAINST: Story, Ticket, Task or Meeting (`work_logs.target_table`, NOT NULL
    on every row). The free-text `kind` text box is gone from the log form and the correction

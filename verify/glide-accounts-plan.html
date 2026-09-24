@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glide import plan</title>
+<style>
+  :root {
+    --background:#FFFEF9; --foreground:#1A1918; --card:#FFFEF9; --muted:#FAF9F7;
+    --border:rgba(26,25,24,.08); --ink-secondary:#4a4946; --ink-tertiary:#5f5d59;
+    --hair-strong:rgba(26,25,24,.20); --accent:#8a5a2b;
+    --ok-bg:#e9f3ea; --ok-border:#5a9a63; --ok-ink:#2f5c37;
+    --warn-bg:#fff4e0; --warn-border:#d9a441; --warn-ink:#6b4a12;
+    --gap-bg:#fbeaea; --gap-border:#c46a6a; --gap-ink:#7a2f2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background:#141310; --foreground:#FFFEF9; --card:#26241F; --muted:#2F2D28;
+      --border:rgba(255,254,249,.12); --ink-secondary:#d5d1c9; --ink-tertiary:#bdb9b1;
+      --hair-strong:rgba(255,254,249,.24); --accent:#d3ac74;
+      --ok-bg:#16261a; --ok-border:#3f7a4a; --ok-ink:#9fd0a8;
+      --warn-bg:#2e2610; --warn-border:#8a6a2a; --warn-ink:#e9c887;
+      --gap-bg:#2c1717; --gap-border:#8a3f3f; --gap-ink:#e8a5a5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --background:#141310; --foreground:#FFFEF9; --card:#26241F; --muted:#2F2D28;
+    --border:rgba(255,254,249,.12); --ink-secondary:#d5d1c9; --ink-tertiary:#bdb9b1;
+    --hair-strong:rgba(255,254,249,.24); --accent:#d3ac74;
+    --ok-bg:#16261a; --ok-border:#3f7a4a; --ok-ink:#9fd0a8;
+    --warn-bg:#2e2610; --warn-border:#8a6a2a; --warn-ink:#e9c887;
+    --gap-bg:#2c1717; --gap-border:#8a3f3f; --gap-ink:#e8a5a5;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:40px 16px 100px; background:var(--background); color:var(--foreground);
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-weight:300; line-height:1.55;
+  }
+  .wrap { max-width:960px; margin:0 auto; }
+  h1 { font-size:26px; font-weight:500; letter-spacing:-.02em; margin:0 0 6px; }
+  .sub { color:var(--ink-tertiary); font-size:14px; margin:0 0 28px; }
+  .scores { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 32px; }
+  .score { flex:1 1 180px; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--muted); }
+  .score b { display:block; font-size:30px; font-weight:500; letter-spacing:-.02em; line-height:1.1; }
+  .score span { font-size:13px; color:var(--ink-secondary); }
+  .score.ok b { color:var(--ok-border); }
+  .score.warn b { color:var(--warn-border); }
+  .score.gap b { color:var(--gap-border); }
+  h2 { font-size:17px; font-weight:500; margin:36px 0 4px; letter-spacing:-.01em; }
+  h2 .pill { font-size:12px; font-weight:400; border-radius:999px; padding:2px 9px; margin-left:8px; vertical-align:2px; }
+  .pill.ok { background:var(--ok-bg); border:1px solid var(--ok-border); color:var(--ok-ink); }
+  .pill.warn { background:var(--warn-bg); border:1px solid var(--warn-border); color:var(--warn-ink); }
+  .pill.gap { background:var(--gap-bg); border:1px solid var(--gap-border); color:var(--gap-ink); }
+  .lede { color:var(--ink-secondary); font-size:14px; margin:0 0 14px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.06em;
+       color:var(--ink-tertiary); padding:0 10px 8px 0; border-bottom:1px solid var(--hair-strong); }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid var(--border); vertical-align:top; }
+  td.mono, th.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:var(--ink-tertiary); }
+  td.note { color:var(--ink-secondary); font-size:13px; }
+  .arrow { color:var(--ink-tertiary); }
+  .box { border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px;
+         background:var(--muted); padding:14px 16px; margin:28px 0; font-size:14px; }
+  .box b { font-weight:500; }
+  .ask { border-left-color:var(--warn-border); background:var(--warn-bg); color:var(--warn-ink); }
+  .ask a { color:inherit; }
+  ol { padding-left:20px; margin:8px 0 0; }
+  li { margin:6px 0; }
+  .id { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--ink-tertiary); margin-top:2px; }
+  td.c { text-align:center; font-size:13px; }
+  .nil { color:var(--ink-tertiary); opacity:.5; }
+  .y { color:var(--ok-border); }
+  @media (max-width:620px) {
+    td.mono, th.mono { display:none; }
+    .id { font-size:10px; word-break:break-all; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Glide import &mdash; what I'm about to do</h1>
+  <p class="sub">Accounts only. 22 Sep 2026 &middot; staging &middot; nothing has been written yet.</p>
+
+  <div class="scores">
+    <div class="score ok"><b>20</b><span>matched by name &mdash; we keep our ID and update the fields</span></div>
+    <div class="score"><b>0</b><span>in Glide but missing here &mdash; nothing to create</span></div>
+    <div class="score warn"><b>4</b><span>here but not in Glide &mdash; to be archived</span></div>
+  </div>
+
+  <h2>1 &middot; The 20 that match <span class="pill ok">keep ID, update</span></h2>
+  <p class="lede">Every Glide customer already exists here. Their IDs do not change. Blank means Glide has nothing in that column.</p>
+  <table>
+    <tr><th>Account</th><th class="c">Website</th><th class="c">Created on</th><th class="c">Created by</th><th class="c">Last edited</th><th class="c">Edited by</th></tr>
+    <tr><td><b>196+</b><div class="id">01KZXBST6MRJ6YX4AMC76BK6VC</div></td><td class="c"><span class="y">yes</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-13</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Amstella</b><div class="id">01KZXBT09VCBGNZNDHXE75YXEV</div></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2025-09-03</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-05-25</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Assecuranz</b><div class="id">01KZXBT4JDV1NCVRE3PH8SG1KH</div></td><td class="c"><span class="y">yes</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-13</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>aWs</b><div class="id">01KZXBTBSBA4D0Y6TZWQ3XZHEX</div></td><td class="c"><span class="y">yes</span></td><td class="c">2025-09-08</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-13</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Cardenal Reig</b><div class="id">01KZXBSWFRZQ5GQCPVBQRAMKMT</div></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-06</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Confia</b><div class="id">01KZXBT5T6CVY065QVW9M2S47G</div></td><td class="c"><span class="y">yes</span></td><td class="c">2024-01-01</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-08-12</td><td class="c">Alex</td></tr>
+    <tr><td><b>DEMO</b><div class="id">01KZXBSRRD56Z826S8DEHBNRQW</div></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Etzi Haus</b><div class="id">01KZXBSP5A5BXA5V6SYT7XPHNR</div></td><td class="c"><span class="y">yes</span></td><td class="c">2025-12-11</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-13</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>FluClinic</b><div class="id">01KZXBT88GFJM8XFDCT441RNSC</div></td><td class="c"><span class="y">yes</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-05-11</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>HOGO</b><div class="id">01KZXBT9H8S89FGQ6Y91RS1Y3P</div></td><td class="c"><span class="y">yes</span></td><td class="c">2024-07-15</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-08-12</td><td class="c">Alex</td></tr>
+    <tr><td><b>Institut Vividus</b><div class="id">01KZXBSY29XXR4FQ89BAFZYTF6</div></td><td class="c"><span class="y">yes</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-06</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Kwapso</b><div class="id">01KZXBT7455DHK88KPV3YB1XWQ</div></td><td class="c"><span class="y">yes</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-06</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Looom</b><div class="id">01KZXBT3H261CG2Z4Z7B1E9XWC</div></td><td class="c"><span class="y">yes</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-05-01</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Ontime Logistics</b><div class="id">01KZXBT2F059GXQ5EBM83520R9</div></td><td class="c"><span class="y">yes</span></td><td class="c">2026-06-17</td><td class="c">Alex</td><td class="c">2026-07-21</td><td class="c">Aurora</td></tr>
+    <tr><td><b>Padelbase</b><div class="id">01KZXBSQH1T9ZG4WZPF3YTE3NA</div></td><td class="c"><span class="y">yes</span></td><td class="c">2024-12-02</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-08-12</td><td class="c">Alex</td></tr>
+    <tr><td><b>Pickl</b><div class="id">01KZXBSVCJCSAE29C2QN27DBGG</div></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-05-04</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>PLATINUM</b><div class="id">01KZXBTAJXJXE3J1GYX7MFYYXB</div></td><td class="c"><span class="y">yes</span></td><td class="c">2026-08-10</td><td class="c">Alex</td><td class="c">2026-08-10</td><td class="c">Alex</td></tr>
+    <tr><td><b>re-green</b><div class="id">01KZXBSZ6446CYAFHY3QF5F2RM</div></td><td class="c"><span class="y">yes</span></td><td class="c">2025-10-21</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-04-28</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>Safety4You</b><div class="id">01KZXBT1F0QZY7KMPKQ94TZ8SK</div></td><td class="c"><span class="y">yes</span></td><td class="c">2023-01-01</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2026-03-06</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+    <tr><td><b>VU Solutions</b><div class="id">01KZXBTD023E2NJNJ3YZRWCQQB</div></td><td class="c"><span class="y">yes</span></td><td class="c">2025-05-09</td><td class="c"><span class="nil">&mdash;</span></td><td class="c">2025-05-09</td><td class="c"><span class="nil">&mdash;</span></td></tr>
+  </table>
+
+  <h2>2 &middot; The 4 to archive <span class="pill warn">not in Glide</span></h2>
+  <p class="lede">Archived, not deleted &mdash; they vanish from every screen but nothing that points at them breaks.</p>
+  <table>
+    <tr><th>Account</th><th class="c">Code</th></tr>
+    <tr><td><b>Marianne Trading</b><div class="id">01M0B0Q9QWNQM2GKX52GH4FZFX</div></td><td class="c">MARI</td></tr>
+    <tr><td><b>Bergmann GmbH</b><div class="id">01M07Z8PY0EWVHQY9CFBMC7TX5</div></td><td class="c">BERG2</td></tr>
+    <tr><td><b>Bergman S.A.</b><div class="id">01M07Z8HXPT8CQ6QJ8YFXCPCAX</div></td><td class="c">BERG</td></tr>
+    <tr><td><b>Aurora Boralis</b><div class="id">01KZZKRQ5Z7VFM3HAVTT226BGP</div></td><td class="c">&mdash;</td></tr>
+  </table>
+
+  <h2>3 &middot; What you already decided</h2>
+  <div class="box">
+    <ul>
+      <li>Keep the IDs that already exist here. Update in place, never recreate.</li>
+      <li>Anything not in Glide gets archived, not deleted.</li>
+      <li>Overwrite the created/edited dates and authors with Glide's.</li>
+      <li>Add a website field. Nothing else.</li>
+      <li>Do not touch people &mdash; contacts get their own pass later.</li>
+    </ul>
+  </div>
+
+  <h2>4 &middot; Three things I need before I write</h2>
+  <div class="box ask">
+    <ol>
+      <li><b>DEMO.</b> It exists in Glide, so your rule keeps it &mdash; but the Glide row is completely empty and the name says test. Archive it too, or leave it?</li>
+      <li><b>The blank dates.</b> Only 11 of the 20 carry a "created on" in Glide, and only 2 carry a "created by". If I overwrite with a blank, those records lose the date they have now. My plan is to leave the current value where Glide is empty, and overwrite only where Glide has something. Say if you want it the other way.</li>
+      <li><b>Website is missing on 4:</b> Amstella, Cardenal Reig, DEMO and Pickl. Glide has nothing for them, so they stay blank.</li>
+    </ol>
+  </div>
+
+  <h2>5 &middot; One note</h2>
+  <div class="box">The account you linked me, Max Mustermann, is a <b>person</b>, not a company &mdash; so it is in the group we are leaving alone entirely this round.</div>
+
+</div>
+</body>
+</html>

@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 735 strings · 3 languages · 1594 of the entries below are hand-written seed.
+// 734 strings · 3 languages · 1597 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -84,7 +84,6 @@ export const CATALOGUE: Catalogue = {
   "Asked, and emailed to them.": { de: "Nachgefragt und per E-Mail an sie verschickt.", es: "Preguntado y enviado por correo electrónico a ellos.", ca: "Demanat, i enviat per correu electrònic." },
   "Assistant": { de: "Assistent", es: "Asistente", ca: "Assistent" },
   "Assistant usage": { de: "Nutzung des Assistenten", es: "Uso del asistente", ca: "Ús de l'assistent" },
-  "Attached to the entry": { de: "an den Eintrag angehängt", es: "Adjunto a la entrada", ca: "Adjunt a l'entrada" },
   "Back": { de: "Zurück", es: "Atrás", ca: "Enrere" },
   "Baseline": { de: "Ausgangswert", es: "Línea base", ca: "Línia base" },
   "Being worked on": { de: "In Bearbeitung", es: "En proceso", ca: "En procés" },

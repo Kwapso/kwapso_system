@@ -8534,6 +8534,126 @@ UPDATE meeting_notes_backup
  WHERE merged_at IS NULL;
 `,
   },
+  {
+    // THE HAND-TYPED KINDS OF WORK ARE WIPED. Aurora's ruling, 24 Sep 2026,
+    // verbatim: "wipe them".
+    //
+    // The day before, she ruled that the kind of work is AUTOMATIC -- "on logs
+    // this kind of work shoudl not be manual, but automatic to where it was
+    // created: if it was creted in a story its stories, in a ticket its a
+    // ticke, in a meeting its a meeting, etc" -- and the free-text box came off
+    // the log form and the correction sheet the same round. That left the words
+    // people had already typed sitting in `work_logs.kind`, shown on no screen
+    // and asked for by nothing. This is the data half: she was asked whether to
+    // keep them, and said to wipe them.
+    //
+    // ── WHAT IS SPARED, AND WHY IT CANNOT BE TOLD APART BY THE COLUMN ───────
+    //
+    // The column has exactly TWO writers, and only one of them is a person:
+    //
+    //   * the TRANSCRIPT CAPTURE (`workers/content/src/lib/meetings.ts`) stamps
+    //     the literal `MEETING_LOG_KIND` ('Meeting') on one log per staff
+    //     attendee, always with `target_table = 'meetings'`;
+    //   * the three write doors, from a request body -- which until 23 Sep 2026
+    //     carried whatever somebody typed into a text box whose placeholder was
+    //     "Development, design, project management...", and still carries
+    //     whatever an MCP caller passes to `start_timer` or `log_time`.
+    //
+    // SO 'Meeting' IS NOT A SIGNATURE. A person could type the word themselves,
+    // and on a MEETING they could: `<WorkLogsPanel targetTable="meetings">`
+    // (meeting-detail.tsx) opens the same log dialog with the meeting fixed as
+    // the target, and that dialog carried the free-text box like every other.
+    // `target_table` is the discriminator everywhere else -- a hand-typed
+    // 'Meeting' on a story, a ticket or a task is distinguishable and IS wiped
+    // -- but `target_table = 'meetings' AND kind = 'Meeting'` is a genuinely
+    // AMBIGUOUS SET, and no column in this table separates a captured row from
+    // a person who typed the same word on the same kind of record.
+    //
+    // IT IS SPARED WHOLE, and the asymmetry is the argument. Sparing costs a
+    // handful of invisible words on meeting logs. Wiping costs the capture's
+    // own de-duplication guard, which matches on `kind = 'Meeting'`: a guard
+    // that stops matching lets a re-capture write the hours again, and that
+    // exact failure added 18.25 hours across 21 work logs that nobody worked on
+    // 2026-08-31 (the incident is written up beside the guard itself). The
+    // `meetingTime` filter reads the same literal.
+    //
+    // AND IT IS SPARED EVEN THOUGH BOTH READERS MOVE OFF IT THIS ROUND. The
+    // filter is re-pointed at `target_table = 'meetings'` and the guard drops
+    // its `AND kind = ?` in the same change -- but a migration runs BEFORE the
+    // content worker that carries those two edits is deployed (OPERATIONS.md's
+    // own order: tenancy, then migrate-teams, then content). In that window the
+    // OLD code is live and still reading the literal. A migration that wiped it
+    // would open the 18.25-hour window by construction, for the length of one
+    // deploy.
+    //
+    // THE BACKUP COMES FIRST, AND IT IS RESTORABLE -- `meeting_notes_backup`
+    // one migration above is the shape, and this is the same discipline:
+    // `work_log_kinds_backup` holds one row per log whose kind is being
+    // cleared, the word EXACTLY as stored, the target table it sat on, and when
+    // it was copied. Restoring is one statement:
+    //
+    //   UPDATE work_logs SET kind =
+    //     (SELECT b.kind FROM work_log_kinds_backup b WHERE b.work_log_id = work_logs.id)
+    //    WHERE id IN (SELECT work_log_id FROM work_log_kinds_backup);
+    //
+    // Nothing below ever deletes from it. Deactivate-never-delete, applied to a
+    // value rather than a row.
+    //
+    // NOTHING ELSE CHANGES. The COLUMN stays (0115 dropped `billable` outright;
+    // this does not, because the capture still writes here and the constant is
+    // still the thing the filter will be moved off), no index is touched
+    // (`idx_work_logs_live` names `kind` in its column list and is unaffected
+    // by a value going NULL), and no other table is read or written.
+    //
+    // IDEMPOTENT, AND THE MARKER IS WHAT MAKES IT SO -- 0121's own idiom, one
+    // migration up. `cleared_at` on the backup row is the record of "this one
+    // has already been wiped": the INSERT skips a log already backed up AND
+    // skips any row whose kind is now NULL, and the UPDATE only touches rows
+    // whose backup says `cleared_at IS NULL`, setting it in the same breath.
+    // Run it twice and the second run moves zero rows in all three statements.
+    //
+    // NUMBERED 0122, read live rather than recalled (CLAUDE.md, "team migration
+    // numbers are read, never recalled"): `git fetch origin`, then the tail of
+    // this file on that ref -- 0121 is the highest version on BOTH `origin/main`
+    // and this working tree as of 24 Sep 2026, and the manager reports 0121 as
+    // applied on both staging teams. Two lines mint against one estate; if 0122
+    // lands under a different name first, this renumbers behind it.
+    version: "0122_hand_typed_work_log_kinds_are_wiped",
+    sql: `
+CREATE TABLE IF NOT EXISTS work_log_kinds_backup (
+  work_log_id TEXT PRIMARY KEY REFERENCES work_logs(id),
+  kind TEXT NOT NULL,
+  target_table TEXT NOT NULL,
+  saved_at TEXT NOT NULL,
+  cleared_at TEXT
+);
+
+-- THE BACKUP. Every log carrying a kind EXCEPT the ambiguous meeting set --
+-- see the header for why 'Meeting' on a meeting cannot be told from a captured
+-- row, and why the safe reading of an ambiguity is to keep it. An empty string
+-- is backed up like any other value: it is not the constant, so it goes, and
+-- backing it up is what makes the wipe fully reversible.
+-- Only once: a second run finds the kind already NULL and inserts nothing.
+INSERT INTO work_log_kinds_backup (work_log_id, kind, target_table, saved_at, cleared_at)
+SELECT w.id, w.kind, w.target_table, datetime('now'), NULL
+  FROM work_logs w
+ WHERE w.kind IS NOT NULL
+   AND NOT (w.target_table = 'meetings' AND w.kind = 'Meeting')
+   AND NOT EXISTS (SELECT 1 FROM work_log_kinds_backup b WHERE b.work_log_id = w.id);
+
+-- THE WIPE, driven entirely by the backup table, so nothing can be cleared
+-- that was not copied first.
+UPDATE work_logs
+   SET kind = NULL
+ WHERE id IN (SELECT work_log_id FROM work_log_kinds_backup WHERE cleared_at IS NULL);
+
+-- AND THE MARKER, in the same run, so the UPDATE above can never fire twice on
+-- one log.
+UPDATE work_log_kinds_backup
+   SET cleared_at = datetime('now')
+ WHERE cleared_at IS NULL;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

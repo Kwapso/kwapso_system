@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contacts split plan</title>
+<style>
+  :root {
+    --background:#FFFEF9; --foreground:#1A1918; --card:#FFFEF9; --muted:#FAF9F7;
+    --border:rgba(26,25,24,.08); --ink-secondary:#4a4946; --ink-tertiary:#5f5d59;
+    --hair-strong:rgba(26,25,24,.20); --accent:#8a5a2b;
+    --ok-bg:#e9f3ea; --ok-border:#5a9a63; --ok-ink:#2f5c37;
+    --warn-bg:#fff4e0; --warn-border:#d9a441; --warn-ink:#6b4a12;
+    --gap-bg:#fbeaea; --gap-border:#c46a6a; --gap-ink:#7a2f2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background:#141310; --foreground:#FFFEF9; --card:#26241F; --muted:#2F2D28;
+      --border:rgba(255,254,249,.12); --ink-secondary:#d5d1c9; --ink-tertiary:#bdb9b1;
+      --hair-strong:rgba(255,254,249,.24); --accent:#d3ac74;
+      --ok-bg:#16261a; --ok-border:#3f7a4a; --ok-ink:#9fd0a8;
+      --warn-bg:#2e2610; --warn-border:#8a6a2a; --warn-ink:#e9c887;
+      --gap-bg:#2c1717; --gap-border:#8a3f3f; --gap-ink:#e8a5a5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --background:#141310; --foreground:#FFFEF9; --card:#26241F; --muted:#2F2D28;
+    --border:rgba(255,254,249,.12); --ink-secondary:#d5d1c9; --ink-tertiary:#bdb9b1;
+    --hair-strong:rgba(255,254,249,.24); --accent:#d3ac74;
+    --ok-bg:#16261a; --ok-border:#3f7a4a; --ok-ink:#9fd0a8;
+    --warn-bg:#2e2610; --warn-border:#8a6a2a; --warn-ink:#e9c887;
+    --gap-bg:#2c1717; --gap-border:#8a3f3f; --gap-ink:#e8a5a5;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:40px 16px 100px; background:var(--background); color:var(--foreground);
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-weight:300; line-height:1.55;
+  }
+  .wrap { max-width:960px; margin:0 auto; }
+  h1 { font-size:26px; font-weight:500; letter-spacing:-.02em; margin:0 0 6px; }
+  .sub { color:var(--ink-tertiary); font-size:14px; margin:0 0 28px; }
+  .scores { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 32px; }
+  .score { flex:1 1 180px; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--muted); }
+  .score b { display:block; font-size:30px; font-weight:500; letter-spacing:-.02em; line-height:1.1; }
+  .score span { font-size:13px; color:var(--ink-secondary); }
+  .score.ok b { color:var(--ok-border); }
+  .score.warn b { color:var(--warn-border); }
+  .score.gap b { color:var(--gap-border); }
+  h2 { font-size:17px; font-weight:500; margin:36px 0 4px; letter-spacing:-.01em; }
+  h2 .pill { font-size:12px; font-weight:400; border-radius:999px; padding:2px 9px; margin-left:8px; vertical-align:2px; }
+  .pill.ok { background:var(--ok-bg); border:1px solid var(--ok-border); color:var(--ok-ink); }
+  .pill.warn { background:var(--warn-bg); border:1px solid var(--warn-border); color:var(--warn-ink); }
+  .pill.gap { background:var(--gap-bg); border:1px solid var(--gap-border); color:var(--gap-ink); }
+  .lede { color:var(--ink-secondary); font-size:14px; margin:0 0 14px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.06em;
+       color:var(--ink-tertiary); padding:0 10px 8px 0; border-bottom:1px solid var(--hair-strong); }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid var(--border); vertical-align:top; }
+  td.mono, th.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:var(--ink-tertiary); }
+  td.note { color:var(--ink-secondary); font-size:13px; }
+  .arrow { color:var(--ink-tertiary); }
+  .box { border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px;
+         background:var(--muted); padding:14px 16px; margin:28px 0; font-size:14px; }
+  .box b { font-weight:500; }
+  .ask { border-left-color:var(--warn-border); background:var(--warn-bg); color:var(--warn-ink); }
+  .ask a { color:inherit; }
+  ul { padding-left:20px; margin:8px 0 0; }
+  ol { padding-left:20px; margin:8px 0 0; }
+  li { margin:6px 0; }
+  .id { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:var(--ink-tertiary); margin-top:2px; }
+  td.c { text-align:center; font-size:13px; }
+  .nil { color:var(--ink-tertiary); opacity:.5; }
+  .y { color:var(--ok-border); }
+  @media (max-width:620px) {
+    td.mono, th.mono { display:none; }
+    .id { font-size:10px; word-break:break-all; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Moving contacts out of accounts</h1>
+  <p class="sub">A plan, not a change. 22 Sep 2026 &middot; nothing has been written.</p>
+
+  <div class="scores">
+    <div class="score ok"><b>110</b><span>people move to a new table of their own</span></div>
+    <div class="score ok"><b>24</b><span>companies stay where they are</span></div>
+    <div class="score warn"><b>5</b><span>relations that have to be rebuilt to follow them</span></div>
+  </div>
+
+  <h2>1 &middot; What changes</h2>
+  <div class="box">
+    <ul>
+      <li>Today one table holds both companies and people, told apart by a flag.</li>
+      <li>People move to their own table. Companies stay put.</li>
+      <li><b>Every ID stays the same.</b> Nothing is renumbered, so nothing that points at a person has to be found and rewritten by hand.</li>
+      <li>The table that records which people work with which companies is untouched, which is what keeps one person able to sit at two companies.</li>
+    </ul>
+  </div>
+
+  <h2>2 &middot; The five relations that follow them <span class="pill warn">the real work</span></h2>
+  <p class="lede">Everything else in the database points at a <b>company</b> and does not move. Only these five point at a <b>person</b>.</p>
+  <table>
+    <tr><th>What it records</th><th class="c">Rows today</th></tr>
+    <tr><td>Which people work with which companies</td><td class="c">91</td></tr>
+    <tr><td>Who raised each ticket</td><td class="c">1,794</td></tr>
+    <tr><td>Stakeholders on an app</td><td class="c">5</td></tr>
+    <tr><td>Which person a client login belongs to</td><td class="c">0</td></tr>
+    <tr><td>A to-do assigned to a contact</td><td class="c">0</td></tr>
+  </table>
+  <div class="box ask">
+    <b>The tickets one is the problem.</b> 1,794 tickets record who raised them. That link has to be rebuilt, and the tickets table has 39 columns built up over 117 separate changes. Rebuilding it means reproducing all of that exactly. This is the single riskiest step and it is where I will go slowest.
+  </div>
+
+  <h2>3 &middot; Why this cannot be quiet</h2>
+  <div class="box">
+    The database <b>enforces</b> these links, so they cannot simply be re-pointed. For each of the five, the only way is: build a new table, copy every row across, delete the old one, rename the new one into its place. That is a real operation on live data, done five times. It will be careful and it will be reversible. It will not be invisible, and I would rather tell you that now than discover it halfway through.
+  </div>
+
+  <h2>4 &middot; What keeps working <span class="pill ok">checked, not assumed</span></h2>
+  <p class="lede">Three people sit at two companies each today. All three keep both.</p>
+  <table>
+    <tr><th>Person</th><th>Companies</th></tr>
+    <tr><td>Marta Ruiz</td><td>Bergman S.A. + Bergmann GmbH</td></tr>
+    <tr><td>Alaap Kanchwala (portal test 1)</td><td>Confia + Amstella</td></tr>
+    <tr><td>Test client</td><td>Kwapso + 196+</td></tr>
+  </table>
+  <div class="box">
+    This is the capability you protected when you ruled twice that people and companies share one table. It survives because it was never the shared table doing that job &mdash; it is the separate link table, and that one is not moving.
+  </div>
+
+  <h2>5 &middot; The order</h2>
+  <ol>
+    <li><b>The other lane goes first.</b> They are adding your new <b>archived</b> state to accounts. That lands before I touch anything, so a state change and a table split are never in flight together.</li>
+    <li><b>The move.</b> New contacts table carrying both states (inactive and archived), 110 people copied across, the five relations rebuilt, then the people removed from the old table.</li>
+    <li><b>The code.</b> Around 78 files currently ask "is this row a person or a company?" and each has to ask the right table instead.</li>
+    <li><b>The counts.</b> Every badge and number that counts people or companies has to count against the right table. This is the easiest thing to get silently wrong &mdash; a wrong count looks perfectly normal.</li>
+    <li><b>Proof.</b> Every relation read back and compared against what it said before the move, then deployed to staging.</li>
+  </ol>
+
+  <h2>6 &middot; How it is undone</h2>
+  <div class="box">
+    A full snapshot of every affected table is written before the first change, exactly as the accounts import did, with a one-command restore. At every step the old data still exists until the new data has been read back and proved correct.
+  </div>
+
+  <h2>7 &middot; What I need from you</h2>
+  <div class="box ask">
+    Nothing to decide today. Read this and tell me to go, or tell me what looks wrong. The one thing I would ask you to think about: <b>this undoes a decision you made twice</b>, and the reason you gave then &mdash; one person at two companies &mdash; is preserved. If there was a second reason you had in mind, now is the moment to say it.
+  </div>
+
+</div>
+</body>
+</html>

@@ -1115,6 +1115,22 @@ export async function captureTranscript(
   // logged again, whatever else has been reset. `logsWritten` counts what the
   // database actually accepted rather than how many people were in the room —
   // a re-capture honestly reports zero.
+  //
+  // AND THE GUARD NO LONGER CARRIES `kind` (24 Sep 2026). It used to read
+  // `AND kind = 'Meeting'` as a fourth term, which made the free-text column
+  // load-bearing for a correctness property it has no business holding: the
+  // identity of "this person's time on this meeting" is TARGET + PERSON, and
+  // those three terms already say it. The fourth term was strictly weaker than
+  // the other three — it could only ever let a row through that the first three
+  // had matched — so dropping it makes the guard tighter, not looser: an hour
+  // somebody hand-logged against this meeting now blocks a capture from adding
+  // a second one for the same person, where before it did not.
+  //
+  // THAT IS WHY TEAM MIGRATION 0122 SPARES THE MEETING ROWS ANYWAY. The
+  // migration runs BEFORE this file is deployed (OPERATIONS.md's order:
+  // tenancy, migrate-teams, then content), so for the length of one deploy the
+  // OLD guard is live and still reading the literal. A wipe that took it would
+  // open the 18.25-hour window above by construction.
   const staff = await ourStaffAmong(env, guard.teamId, event.attendees.map((a) => a.email))
   const endsAt = meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString()
   const seconds = Math.max(0, Math.round((Date.parse(endsAt) - Date.parse(meeting.startsAt)) / 1000))
@@ -1129,7 +1145,7 @@ SELECT ${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlS
  WHERE NOT EXISTS (
    SELECT 1 FROM work_logs
     WHERE target_table = 'meetings' AND target_id = ${sqlString(id)}
-      AND user_id = ${sqlString(person.userId)} AND kind = ${sqlString(MEETING_LOG_KIND)}
+      AND user_id = ${sqlString(person.userId)}
  )
 RETURNING id`
     )

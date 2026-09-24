@@ -2170,6 +2170,40 @@ had been folded into its agenda.
   itself.
 
 
+### work_log_kinds_backup. KEEP (BUILT 2026-09-24, per-team, team migration `0122_hand_typed_work_log_kinds_are_wiped`). THE KINDS OF WORK PEOPLE TYPED, BEFORE THEY WERE WIPED
+
+One row per work log whose `kind` was cleared: `work_log_id`, the `kind` exactly
+as stored, the `target_table` it sat on, `saved_at`, and `cleared_at` once that
+log had actually been wiped.
+
+- **It exists because Aurora ruled the words away, and a ruling is not a reason
+  to lose them.** She made the kind of work automatic on 23 Sep 2026 ("on logs
+  this kind of work shoudl not be manual, but automatic to where it was
+  created"), which left the hand-typed words showing on no screen, and then ruled
+  on them the next day: "wipe them". The column and its schema stay; only the
+  hand-typed VALUES go. Deactivate-never-delete, applied to a value rather than a
+  row.
+- **It is the undo.** One statement against this table puts every word back:
+  `UPDATE work_logs SET kind = (SELECT b.kind FROM work_log_kinds_backup b WHERE
+  b.work_log_id = work_logs.id) WHERE id IN (SELECT work_log_id FROM
+  work_log_kinds_backup)`. Nothing in the migration ever deletes from it.
+- **ONE SET IS SPARED AND IS DELIBERATELY NOT IN HERE: `target_table = 'meetings'
+  AND kind = 'Meeting'`.** That literal is `MEETING_LOG_KIND`, which the
+  transcript capture stamps on every meeting log it writes; but a person could
+  type the same word themselves on a meeting (the meeting's own Logs panel opens
+  the log dialog with the meeting fixed as the target), so no column in
+  `work_logs` tells a captured row from a hand-typed one. The ambiguity is
+  resolved by the asymmetry: sparing costs a handful of invisible words, wiping
+  costs the capture's own de-duplication guard, and a guard that stops matching
+  let a re-capture add 18.25 hours across 21 work logs that nobody worked on
+  2026-08-31. `target_table` IS the discriminator everywhere else, so a
+  hand-typed "Meeting" on a story, a ticket or a task is wiped like any other
+  word.
+- **`cleared_at` is what makes the migration re-runnable.** The wipe only touches
+  logs whose backup row says `cleared_at IS NULL`, and sets it in the same run,
+  so a second run moves zero rows and a word somebody deliberately puts back
+  afterwards is never wiped again.
+
 ### brand_assets + meeting_purposes + staff_profiles. KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`). THE AGENCY'S OWN HOUSEKEEPING
 
 **A fourth table, `staff_certificates`, was built the same day and DROPPED on

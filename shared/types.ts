@@ -2839,9 +2839,12 @@ export type WorkLogSummary = {
    * what a bar chart can show. `userName` is the snapshot on the row, so time
    * logged by somebody since removed from the team still has a name on it. */
   people: { userId: string; userName: string | null; seconds: number }[]
-  /** what kind of work it was, biggest first. `null` is the real bucket for time
-   * logged without a kind, which is most of it — not a dropped row. */
-  kinds: { kind: string | null; seconds: number }[]
+  // `kinds` STOOD HERE — a breakdown of the free-text `kind` column, biggest
+  // first. Aurora retired that column's hand-typed words on 24 Sep 2026 ("wipe
+  // them") after ruling the day before that the kind of work is the RELATED
+  // RECORD TYPE; the one card that drew this went with it, and the door's own
+  // read went with the card. The TEAM-WIDE split by related type is
+  // `LogsDashboard.targets` above.
   /** the last eight weeks, oldest first — the SAME eight windows Home draws, so
    * two screens can never be looking at two different Mondays. */
   weeks: PulseWeek[]

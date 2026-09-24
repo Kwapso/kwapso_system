@@ -579,6 +579,47 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
     expect(meetingLogs()[0].id, "and it is the original row, not a replacement").toBe(before[0].id)
     expect(again.logsWritten, "an honest zero, not the size of the room").toBe(0)
   })
+
+  // ── THE GUARD STOPPED CARRYING THE FREE-TEXT `kind` (24 Sep 2026) ─────────
+  //
+  // It used to read four terms: target table, target id, person, AND
+  // `kind = 'Meeting'`. That made a free-text column load-bearing for a
+  // correctness property it has no business holding — and Aurora has just ruled
+  // that column's hand-typed words are to be wiped (team migration 0122). The
+  // identity of "this person's time on this meeting" is TARGET + PERSON, and
+  // three terms already say it.
+  //
+  // DROPPING THE FOURTH TERM MAKES THE GUARD TIGHTER, NOT LOOSER, because it
+  // could only ever let through a row the first three had already matched. This
+  // is that difference, stated as behaviour: an hour somebody logged BY HAND
+  // against this meeting now blocks the capture from adding a second one for the
+  // same person. Under the old four-term guard it did not, because a hand-logged
+  // row carries no kind.
+  it("does not log a second hour for somebody who already logged one by hand", async () => {
+    const id = await sweepCalendar()
+    const mine = meetingLogs()
+    expect(mine, "nothing is logged before the transcript is read").toHaveLength(0)
+
+    // An hour the person wrote down themselves, on this meeting, with NO kind —
+    // exactly what the log form produces now that the free-text box is gone.
+    db()
+      .prepare(
+        `INSERT INTO work_logs (id, target_table, target_id, user_id, user_name, kind,
+           started_at, ended_at, seconds, created_at, creator_id)
+         VALUES ('BY-HAND', 'meetings', ?, ?, 'Alex', NULL,
+           '2026-04-01T09:00:00.000Z', '2026-04-01T10:00:00.000Z', 3600, '2026-04-01', ?)`
+      )
+      .run(id, IDS.staffUser, IDS.staffUser)
+
+    const out = await readTranscript(id)
+    expect(out.captured, "the transcript is still read and stored").toBe(true)
+    expect(
+      meetingLogs(),
+      "the capture added a second hour for a person who had already logged one by hand"
+    ).toHaveLength(1)
+    expect(meetingLogs()[0].id, "and it left the hand-written row alone").toBe("BY-HAND")
+    expect(out.logsWritten, "an honest zero").toBe(0)
+  })
 })
 
 /* ───── a transcript that was still being written when we first read it ───── */

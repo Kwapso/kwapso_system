@@ -20,8 +20,7 @@
 //               meeting is still to come), Google Calendar, the edit pen and
 //               the overflow menu.
 //   MAIN        Agenda, inline-editable until the end passes; then what was
-//               actually said, faded rather than boxed; then the files hanging
-//               off the calendar entry.
+//               actually said, faded rather than boxed.
 //   SIDE        Attendees, Location (in person only), Time log, Connections.
 //   FOOTER      the kit's ink band: Latest activity, and who made this and
 //               when.
@@ -31,6 +30,33 @@
 // list of Google facts goes with it — they were the same section under two
 // names. Every one of those fields is still on the row and still mirrored by
 // the sweep; this is a screen deciding what it shows.
+//
+// AND SO IS "ATTACHED TO THE ENTRY", 24 Sep 2026. It was kept for one round on
+// a flagged judgement — the files hanging off a calendar entry had no other
+// door in this app — and she was asked directly and struck it: "kill that
+// completely". Same shape as Notes: `meetings.google_attachments_json` is
+// untouched, the sweep still rewrites it on every pass, and the door still
+// maps it into `Meeting.googleAttachments`, which nothing on either front door
+// now draws.
+//
+// WHAT A PERSON CAN STILL REACH, so the cost of that is written down where the
+// next reader meets it rather than in a chat log:
+//   · THE TRANSCRIPT, always — "What was said" carries its own "Open the
+//     document" link, and on most meetings the transcript IS one of those
+//     attachments (`transcriptFoundBy: "attachment"` means it was found on the
+//     entry's own attachment list).
+//   · ANY ATTACHED FILE THE KNOWLEDGE SWEEP HAS INGESTED, through CONNECTIONS.
+//     A Drive file swept into the knowledge base carries the calendar event's
+//     id, and `record-map.ts` joins `knowledge_sources.event_id` to
+//     `meetings.google_event_id` under the relation "came out of" — so it is a
+//     node on this record's own map, with a link.
+//   · EVERYTHING ELSE, one click away, through the GOOGLE CALENDAR button in
+//     this record's own title: the entry itself lists its attachments. That is
+//     the honest answer for a file nobody has swept — a Drive doc in a folder
+//     the team never shared, or a non-Drive URL — which is the one class that
+//     genuinely lost its in-app route.
+// Nothing is lost from the DATA either way: the list is still on the row, so
+// restoring the section is a render, not a re-sync.
 //
 // THE AGENDA LEADS, and that is the whole argument for this module existing.
 // Somebody opening a meeting from six months ago is not looking for who
@@ -177,7 +203,11 @@ import { useRecordCounts } from "@/lib/use-record-counts"
 // Every URL bound to an attribute goes through the seam, Google's included —
 // see the note in google-source-dialog.tsx for why "it came from Google" is not
 // a reason to skip it.
-import { richTextValue, safeHref, safeSrc } from "@shared/web/rich-text"
+// NO `safeSrc` — its one reader here was the attachment row's own Google file
+// icon, and the attachments section is removed (24 Sep 2026, her "kill that
+// completely"). `safeHref` stays: the transcript link, the two title links and
+// the Maps link all go through it.
+import { richTextValue, safeHref } from "@shared/web/rich-text"
 import { useLanguage } from "@shared/web/language"
 
 /** WHEN THE MEETING IS OVER, in milliseconds — the instant the agenda stops
@@ -579,61 +609,6 @@ export function MeetingTranscriptSection({
           {t("The document was found but we couldn't read any words out of it. Open it in Google to read it there.")}
         </p>
       )}
-    </section>
-  )
-}
-
-/** FILES HANGING OFF THE CALENDAR ENTRY — the agenda doc, the deck, and the
- * one the transcript lane turns on. It lived on the retired calendar TAB, and
- * it is kept on the one page rather than dropped with that tab because it is
- * the only door in this app to those documents: a link nothing renders is the
- * R40 shape ("everything working except the last step"), and although these
- * are Google's own URLs rather than bytes in our bucket, losing the only way
- * to them is the same loss to a reader.
- *
- * KEPT ON A JUDGEMENT, AND FLAGGED AS ONE. Her one-page brief names the head,
- * two main-column sections and four side sections and does not mention
- * attachments either way. Dropping a door silently is the worse of the two
- * mistakes, so this stays, under the transcript, where the same kind of
- * material already sits — to be struck the moment she says so.
- *
- * NOT EXPORTED, and that is a decision rather than an oversight. Its three
- * siblings in this file are exported because something outside really names
- * them — the agenda section and the transcript section are mounted by their
- * own suites with a clock or a read injected, the location section the same —
- * and this one is not: it takes a meeting and draws a list, with no boundary
- * worth mounting on its own. An export nobody imports is a contract nobody
- * agreed to (`web/test/dead-exports.test.ts`), so it stays private, and
- * finding it a consumer it does not need would be the wrong way round. */
-function MeetingAttachmentsSection({
-  meeting,
-}: {
-  meeting: Pick<Meeting, "googleAttachments">
-}) {
-  const { t } = useLanguage()
-  if (meeting.googleAttachments.length === 0) return null
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-micro text-muted-foreground uppercase">{t("Attached to the entry")}</h2>
-      <div className="flex flex-col">
-        {meeting.googleAttachments.map((a) => (
-          <a
-            key={a.fileId || a.url || a.title}
-            href={safeHref(a.url)}
-            target="_blank"
-            rel="noreferrer noopener"
-            // A row rule inside one section: an inset hairline, not a border
-            // (kit §2.7 — web/test/kit-conformance.test.ts).
-            className="hover:bg-muted/50 flex items-center gap-2 p-3 text-sm shadow-[var(--hairline-under)] last:shadow-none"
-          >
-            {a.iconUrl && (
-              <img src={safeSrc(a.iconUrl)} alt="" width={16} height={16} className="shrink-0" />
-            )}
-            <span className="min-w-0 flex-1 truncate">{a.title || a.fileId}</span>
-            <ArrowSquareOut className="text-muted-foreground size-3 shrink-0" aria-hidden />
-          </a>
-        ))}
-      </div>
     </section>
   )
 }
@@ -1158,7 +1133,6 @@ export function MeetingDetailScreen({
         meeting={item}
         read={transcriptQ.data}
       />
-      <MeetingAttachmentsSection meeting={item} />
     </div>
   )
 
@@ -1647,9 +1621,12 @@ export function MeetingDetailScreen({
  *     the meeting is over (`meetingHasEnded`).
  *   · WHO WAS INVITED became the side column's ATTENDEES section — her word,
  *     settled — drawn as `PersonCard` chips (R104) instead of a row list.
- *   · ATTACHED TO THE ENTRY became `MeetingAttachmentsSection`, kept in the
- *     main column under the transcript; that component's own comment says why
- *     it was kept rather than dropped, and flags the judgement.
+ *   · ATTACHED TO THE ENTRY was kept for one round, under the transcript, as a
+ *     flagged judgement — it was the only route in the app to a calendar
+ *     entry's own Drive files. Aurora struck it on 24 Sep 2026, asked
+ *     directly: "kill that completely". A UI removal only: the list still
+ *     rides the row (`meetings.google_attachments_json`, rewritten by every
+ *     sweep) and the door still hands it back.
  *   · THE FACTS THAT RARELY CHANGE — where, time zone, organiser, repeats,
  *     rooms, and the "read from your calendar" stamp — are STRUCK, with the
  *     Details section they were a second copy of ("do not include section

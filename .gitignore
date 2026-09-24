@@ -203,3 +203,5 @@ glide/backup-accounts-*.json
 glide/backup-accounts-*.sql
 
 glide/backup-contacts-purge-*.json
+
+glide/backup-apps-*.json

@@ -281,6 +281,41 @@ describe("the side column is her four sections, in her order, and no Details", (
     expect([...at].sort((a, b) => a - b), "and in her order").toEqual(at)
   })
 
+  it("ATTACHED TO THE ENTRY is struck too — no section, no component, no render", () => {
+    // Aurora, 24 Sep 2026, asked directly whether to keep the one route in the
+    // app to a calendar entry's own Drive files: "kill that completely". It
+    // had survived one round on a flagged judgement, which is exactly why this
+    // is asserted rather than assumed — a section kept on a judgement is a
+    // section somebody will re-add on the same judgement.
+    expect(src, "the component is deleted, not merely unmounted").not.toMatch(
+      /function MeetingAttachmentsSection\b/
+    )
+    expect(src, "…and nothing renders it").not.toMatch(/<MeetingAttachmentsSection\b/)
+    expect(src, "…and no screen reads the attachment list any more").not.toMatch(
+      /googleAttachments/
+    )
+    expect(src, "the file icon's own url seam has no reader left either").not.toMatch(
+      /\bsafeSrc\b/
+    )
+  })
+
+  it("…but the DATA behind it is untouched: the column, the sweep and the door all stand", () => {
+    // The distinction her Notes ruling already drew, applied again: a UI
+    // removal is not a data removal, and a screen that stops drawing something
+    // must not take the row with it.
+    expect(
+      read("workers/tenancy/src/team-schema/migrations.ts"),
+      "the column is still declared"
+    ).toMatch(/ALTER TABLE meetings ADD COLUMN google_attachments_json TEXT;/)
+    const door = read("workers/content/src/lib/meetings.ts")
+    expect(door, "the sweep still rewrites it on every pass").toMatch(
+      /google_attachments_json = \$\{sqlString\(JSON\.stringify\(event\.attachments\)\)\}/
+    )
+    expect(door, "and the door still hands it back on the row").toMatch(
+      /googleAttachments: readJsonList<MeetingAttachment>\(r\.google_attachments_json\)/
+    )
+  })
+
   it("the Details section is struck outright — no OverviewList anywhere on the page", () => {
     expect(src, "her ruling: \"do not include section details (its unecessry)\"").not.toMatch(
       /OverviewList/
