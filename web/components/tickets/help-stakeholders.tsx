@@ -196,6 +196,7 @@ function StakeholderTile({
   title,
   secondary,
   action,
+  external,
 }: {
   dataSlot: string
   picture?: string | null
@@ -208,6 +209,13 @@ function StakeholderTile({
   title: React.ReactNode
   secondary?: React.ReactNode
   action?: React.ReactNode
+  /** ARE THEY FROM OUTSIDE — handed straight to `PersonCard`'s own
+   * `external` (Aurora, 23 Sep 2026: "external photos (from contacts) gray
+   * scale. keep staff nirmal."). Only the raiser can ever be a client
+   * contact on this panel; the loop is always ours (admins/mentions/added
+   * colleagues), so this stays `undefined` there and the default (colour)
+   * applies. */
+  external?: boolean
 }) {
   return (
     <div data-slot={dataSlot} className="flex flex-col gap-2">
@@ -226,6 +234,7 @@ function StakeholderTile({
           markName={markName}
           title={title}
           secondary={secondary}
+          external={external}
         />
       </div>
     </div>
@@ -239,6 +248,7 @@ export function HelpStakeholders({
    * can be corrected (through `help-form-dialog.tsx` now, not here). */
   raisedByContactId,
   raisedByContactName,
+  raiserIsClient,
 }: {
   stakeholders: HelpStakeholder[]
   /** ACCEPTED, UNUSED — see this file's header ("THE EDIT PEN IS GONE"). The
@@ -247,6 +257,14 @@ export function HelpStakeholders({
   accountId?: string | null
   raisedByContactId?: string | null
   raisedByContactName?: string | null
+  /** `help.raiser_is_client` — whoever actually typed the ticket in was a
+   * client LOGIN, not one of ours. Read a line away from
+   * `raisedByContactName` on `help-detail.tsx`'s own conversation bubble
+   * (`external: Boolean(ticket.raisedByContactName) || ticket.raiserIsClient`)
+   * and carried here so the Raised-by chip greys the same photograph the
+   * thread already greys, for the same reason (R111 photo, 23 Sep 2026
+   * "external photos (from contacts) gray scale"). */
+  raiserIsClient?: boolean | null
   /** ACCEPTED, UNUSED — same note. Editing moved to `help-form-dialog.tsx`. */
   canEditRaisedBy?: boolean
   /** ACCEPTED, UNUSED — same note. */
@@ -267,6 +285,15 @@ export function HelpStakeholders({
     raisedByContactName ||
     (raiser ? (raiser.origin === "raiser" ? raiser.name : staffNameFromSnapshot(raiser.name)) || raiser.email : null)
   const raiserPicture = raisedByContactName ? null : raiser?.imageUrl
+
+  // R111 (photo beats initials) + "external photos (from contacts) gray
+  // scale" (Aurora, 23 Sep 2026): the SAME two-way check
+  // `help-detail.tsx`'s own conversation bubble makes a line away from
+  // `raiserIsClient`, carried here — a named contact (`raisedByContactName`
+  // set) is always external, and so is a client LOGIN who typed the ticket
+  // in themselves (`raiserIsClient`). A colleague raising it on the
+  // client's behalf greys nothing.
+  const raiserExternal = Boolean(raisedByContactName) || Boolean(raiserIsClient)
 
   return (
     <div className="flex flex-col gap-[var(--space-3)]">
@@ -292,6 +319,7 @@ export function HelpStakeholders({
               markName={raiserName ?? undefined}
               chip={<span className="text-micro text-muted-foreground uppercase">{t("Raised by")}</span>}
               title={<CardTitle className="text-sm">{raiserName}</CardTitle>}
+              external={raiserExternal}
             />
           )}
           {/* ON THE LOOP — ONE HORIZONTAL, WRAPPING ROW OF FACE+NAME CHIPS (client,

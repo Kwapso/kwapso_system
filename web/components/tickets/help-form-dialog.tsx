@@ -1095,7 +1095,16 @@ export function HelpFormDialog({
    * as before this prop existed. */
   const raisedByFace: SelectFace | undefined = (() => {
     const chosen = contactOptions.find((c) => c.value === raisedByValue)
-    return chosen ? { src: chosen.picture ?? undefined, name: chosen.label } : undefined
+    // GREY, BECAUSE A CONTACT IS EXTERNAL BY CONSTRUCTION — Aurora, 23 Sep
+    // 2026: "external photos (from contacts) gray scale. keep staff nirmal."
+    // `contactOptions` IS the client's own people, off the account's detail
+    // door, which is the one thing this field is for (`contactField`), so the
+    // flag is a constant here rather than a fact any option has to carry. Kit
+    // v1.2.166's `SelectFace.external` puts it on the face rather than on the
+    // item, which is what makes this line enough: the trigger reads the same
+    // face through the kit's own registry, so the chosen contact stays grey
+    // once the list shuts instead of turning colour on close.
+    return chosen ? { src: chosen.picture ?? undefined, name: chosen.label, external: true } : undefined
   })()
   /** Demanded once there is somebody to name — see `contactField`. A ticket with
    * no client, or a client with no contacts on file, has no possible answer and
@@ -1121,6 +1130,10 @@ export function HelpFormDialog({
   const assigneeFace: SelectFace | undefined = (() => {
     if (values.assigneeId === NONE) return undefined
     const chosen = assigneeMembers?.find((m) => m.id === values.assigneeId)
+    // NO `external` HERE, AND THAT IS THE DECISION RATHER THAN THE OMISSION:
+    // an assignee comes off `assignableMembers` (web/lib/members.ts), which
+    // drops every client login by construction, so this list is ours alone
+    // and a grey face here would be a false statement about a colleague.
     return chosen ? { src: chosen.photo ?? undefined, name: chosen.name } : undefined
   })()
 
@@ -1756,7 +1769,14 @@ export function HelpFormDialog({
                 sorting the row's own options can never move the
                 preselection. */}
             {sortedOptions(contactOptions, lang, (c) => c.label).map((c) => (
-              <SelectItem key={c.value} value={c.value} face={{ src: c.picture ?? undefined, name: c.label }}>
+              <SelectItem
+                key={c.value}
+                value={c.value}
+                /* External by construction — see `raisedByFace` above. The
+                   open list and the trigger must agree, or a contact would
+                   be grey in one and in colour in the other. */
+                face={{ src: c.picture ?? undefined, name: c.label, external: true }}
+              >
                 {c.hint ? `${c.label}: ${c.hint}` : c.label}
               </SelectItem>
             ))}

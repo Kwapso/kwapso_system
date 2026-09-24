@@ -16,5 +16,83 @@
     "where": "shared/web/attachment-preview.tsx",
     "what": "fit=\"contain\"",
     "why": "The one picture in this app that IS the content rather than a mark standing for it. Every other picture the fill-not-fit ruling governs is a logo, a face or a brand lockup with the record's name written beside it, where a crop costs the edges of an identity the word already carries. This is a FILE somebody attached to a ticket — a screenshot of the thing that is broken — and the well is 16/9 while an attachment is not, so a portrait screenshot cropped to it shows a band from the middle and hides the error message at the top, which is the reason the file was attached. Nothing on screen tells the reader that happened, because a crop looks exactly like a picture that was always that shape. The app already carries this exact argument for this exact file in OBJECT_FIT_OK (R60, web/test/an-image-fills.test.ts); this entry is the same ruling said to the kit's own law, which arrived with v1.2.75 and reads the same two spellings R60 reads. Both rot-check, so the day this preview stops containing, both entries go red together and both get deleted. Flagged for the client rather than assumed: her 2026-09-09 ruling was made over marks in select components and filters, and this is the one site in the app it does not obviously describe. Delete both the day she says it does."
+  },
+  {
+    "law": "boxes",
+    "where": "shared/web/appearance-pill-group.tsx",
+    "what": "--hairline)",
+    "why": "TWO STROKES, TWO REASONS, one `what` because they are spelled identically. (1) THE OPTION PILL'S OWN EDGE, a SELECTION CONTROL — §2.7 names \"form fields and selection controls\" as the two places a hairline is allowed at all, and this group is a radio set drawn as pills: one of them is the answer and the others are not. It has no paper step to fall back on, either, which is the mechanical half of the argument — the pill paints `bg-background` and the appearance panel it stands in paints `bg-background`, so the stroke is not decorating a step, it IS the only thing saying a pressable option is there. (2) `SpineSwatch`, a 14px colour SAMPLE of the spine fill, which is the kit's own class-E reading: a pale swatch on pale paper has no edge of its own, and the same argument is already recorded upstream for compositions/screens/brand.tsx's 32px twin and settings.tsx's own 14px one. Neither is a box around a container: §2.8 removes the outline a card draws to say \"I am a card\", and neither of these is a card."
+  },
+  {
+    "law": "boxes",
+    "where": "shared/web/appearance-pill-group.tsx",
+    "what": "--hairline-ink",
+    "why": "THE SELECTED PILL'S RING — override 33's own 1px ink mark, the identical treatment every option card in this same Appearance panel already carries, so a pressed pill and a ringed card read as one state rather than two. It REPLACES the resting hairline rather than stacking with it (one inset shadow, that file's own note). §2.8's class C: removing a visible selection state is an accessibility regression, not a simplification, and the standing question about focus and selection strokes is one only the client may settle — she has not been asked yet."
+  },
+  {
+    "law": "boxes",
+    "where": "shared/web/staff-pill-picker.tsx",
+    "what": "--hairline)",
+    "why": "THE SAME CONTROL, ONE FILE OVER — `pillClass` is `appearance-pill-group.tsx`'s own class string, reused unchanged and saying so in its own comment, precisely so a staff pill and an appearance pill read as the same control at a glance. The argument is that file's entry above, clause (1): a selection control on a ground that offers it no paper step. Two entries rather than one shared line because the rot check is per file, and the day either file stops drawing this the other's licence should not survive it."
+  },
+  {
+    "law": "boxes",
+    "where": "shared/web/staff-pill-picker.tsx",
+    "what": "--hairline-ink",
+    "why": "THE SELECTED STAFF PILL'S RING — `appearance-pill-group.tsx`'s own `--hairline-ink` mark, reused for the same reason and carrying the same §2.8 class C argument: it is the only thing on the pill that says which person is picked once the fill is the same on every option."
+  },
+  {
+    "law": "boxes",
+    "where": "shared/web/notes-editor/notes-editor.tsx",
+    "what": "--hairline-strong",
+    "why": "THE EDITOR'S OWN FIELD EDGE, §2.8 class D. A rich-text note is a FORM CONTROL — §2.7's first blessed place — and this stroke is on `data-focus-shell`, the box that exists so the ring lands on the shape a reader sees rather than on the bare contenteditable inside it. The file's own note records what happened the last time this was drawn on the inner node instead: three of its four sides were clipped by the shell's `overflow-hidden` and the surviving sliver read as \"a black line separating from the toolbar\", which the client reported. Taking the stroke off altogether would leave an unmarked rectangle of paper that nothing says is typeable."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/knowledge/google-scope-dialog.tsx",
+    "what": "--primary",
+    "why": "THE PICKED MODE CARD'S RING, §2.8 class C — drawn ONLY on the chosen card and never at rest, with the paper step (`--surface-panel` → `--muted`) kept beside it rather than replaced by it. The file's own comment states why the step alone was not enough: a move between two adjacent quiet tones is a weak signal for the one decision this dialog exists to take. It also records the fault a real border had here, which is worth keeping: a border sits inside the box, so picking a card used to shift its own words 1px in and 1px down, while an inset shadow paints over the padding and moves nothing."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/knowledge/google-source-dialog.tsx",
+    "what": "--primary",
+    "why": "THE PICKED KIND CARD AND THE PICKED SHELF CARD, §2.8 class C — the same ring, the same argument and the same paper step as `google-scope-dialog.tsx`'s mode cards above, which this dialog is deliberately a twin of. Two sites, one entry, because they are one decision asked twice in one flow."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/knowledge/google-source-dialog.tsx",
+    "what": "--hairline)",
+    "why": "A 32px DRIVE THUMBNAIL'S OWN EDGE — and this is the one entry in this file that is an OPEN QUESTION rather than a settled class. By shape it is a stroke closing around a container; what is inside it is a picture Google rendered, not a surface this system paints, so off-beige-on-off-beige leaves a light thumbnail with no edge at all and it bleeds into the dialog. THAT IS EXACTLY THE `web-embed` CASE the kit left standing as `A?` when §2.8 shipped on 23 Sep 2026 (see the kit's own foundations/rules/exemptions.json, components/web-embed/web-embed.tsx) — same shape, same argument, one repo down. Filed here so the two move together: the day the client answers the web-embed question, this entry gets the same answer and is deleted or kept with her."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/process/process-map.tsx",
+    "what": "*",
+    "why": "THE PROCESS DIAGRAM'S SIX TONE STROKES, AND THEY ARE A CLASS §2.8 DOES NOT HAVE A LETTER FOR — flagged to the manager rather than filed under a letter it does not fit. The law's four exceptions are a separator (B), a focus or selection affordance (C), a form control's edge (D) and a stroke that IS the object (E). None describes this. Each step box carries a stroke whose COLOUR is the information: `--hairline` for a step that did not move, a 50% success mix for faster, `--hairline-error` for slower, a 50% info mix for new, and the neutral one again at 60% opacity for gone. The fill beside it is a 5% wash (`bg-success/5`, `bg-destructive/5`), which is under the contrast law's own boundary floor on its own — the stroke is what carries the meaning to a reader, not what decorates it. Removing it does not simplify the diagram, it deletes the comparison the screen exists to make. THE KIT ALREADY DRAWS THIS SHAPE AND ARGUED IT THE SAME WAY: flowchart.tsx's own nodes reach for the same inset strokes \"used AS shading, not a literal outline property\", and the kit's own unsaved-changes-bar (a `--warning`-tinted four-edge stroke on a container) is the second half of the same unnamed class, left standing as `A?` for the same reason. Proposed name: a TONED stroke — a four-edge stroke around a container whose colour is the information, as against class A's neutral outline whose only message is \"here is a box\"."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/shell/timer-bar.tsx",
+    "what": "--hairline-error",
+    "why": "A RUNAWAY TIMER'S EDGE — the second site of the same unnamed class `process-map.tsx`'s entry above proposes (a TONED stroke: the colour is the information). It is drawn only when `timer.runaway` is true, beside `text-destructive` on the same node, and what it says is \"this timer has been running far longer than anything should\" — a warning about a record, not an outline around a container. The identical shape and the identical argument as the kit's own unsaved-changes-bar, which §2.8 left standing as `A?`. If the client rules that a toned stroke is a box like any other, these three sites (here, process-map, the kit's bar) go together."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/records/icon-picker.tsx",
+    "what": "--primary",
+    "why": "THE PICKED ICON CELL'S RING, §2.8 class C — the same mango inset the Google dialogs' option cards draw, and the file says so: the picker is a grid of 36px cells whose only difference once one is chosen is `bg-accent`, a 5% wash, which cannot carry \"this is the one\" on its own at that size."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/records/record-calendar.tsx",
+    "what": "--hairline-ink",
+    "why": "TODAY'S OWN MARK on a month-grid day chip, §2.8 class E — the stroke IS the mark, not a box around a container: it rides the day's dot alongside the `inverse` tone and says which square is today. The kit makes the identical call for the identical shape in components/date-picker/date-picker.tsx's `data-[today=true]` ring, which its own exemption classes E for the same reason. Nothing is contained by it."
+  },
+  {
+    "law": "boxes",
+    "where": "web/components/records/record-picker.tsx",
+    "what": "*",
+    "why": "THREE STROKES IN ONE FILE, TWO CLASSES, ONE ENTRY because two of them are spelled identically. (1) THE PICKER SHELL'S OWN FIELD EDGE, §2.8 class D, at both strengths — `--hair-strong` at rest and the weaker `--hair` once the control is disabled, which is `input.tsx`'s own split, copied deliberately so a picker a form has locked reads as locked the same way a text field does. A picker IS a field; §2.7 blesses it by name. (2) THE SUGGESTED CHIP'S EDGE, §2.8 class C — `offering` is an AI suggestion the reader has not accepted, a third selection state beside chosen (`inverse` fill) and ordinary (`secondary` fill), and the edge is the only thing that distinguishes it on a `ghost` chip that paints no fill at all. The file's own note records the second reason it is an inset shadow rather than a border: a 1px border would push that chip taller than the two beside it."
   }
 ]

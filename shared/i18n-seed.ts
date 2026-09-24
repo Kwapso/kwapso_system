@@ -57,23 +57,23 @@ export const SEED: Catalogue = {
   Process: { de: "Prozess", es: "Proceso", ca: "Procés" },
   Meetings: { de: "Termine", es: "Reuniones", ca: "Reunions" },
   Meeting: { de: "Termin", es: "Reunión", ca: "Reunió" },
-  // "Work logs" stays — it is still the word on every record's own tab
-  // (story/task/meeting/ticket detail). Only the RAIL destination renamed,
-  // provisionally, to "Hours" (R85, the client's one-word rail law, 17 Sep
-  // 2026); see the comment beside its `time` entry in web/lib/pages.ts for
-  // the alternatives still awaiting her pick.
-  "Work logs": { de: "Zeiterfassung", es: "Registros de tiempo", ca: "Registres de temps" },
+  // "WORK LOGS" STOOD HERE AND IS GONE — Aurora, 23 Sep 2026, "word is logs
+  // only". Nothing in either front door says it any more (the Home tile, the
+  // Logs module and the section on a story, a ticket and a task all say
+  // "Logs"; the glossary term is "Log"), so `npm run lang` pruned the row as
+  // an orphan. The comment stays for one release as the record of why a
+  // long-lived seed row disappeared.
   // AMENDED AGAIN 21 Sep 2026: Aurora's own words, "no, we said we call taht
   // effort niside ticket or story, no?" Reverts the round 28 rename above.
-  // Only the STORY and TICKET record's own panel/tab say this; task and
-  // meeting detail keep "Work logs" above; the rail entry stays "Hours".
-  // See documents/UI-RULEBOOK.md row B27 item 12.
   //
-  // SUPERSEDED AGAIN, 22 Sep 2026 (B0386, the owner's approved rename): the
+  // SUPERSEDED, 22 Sep 2026 (B0386, the owner's approved rename): the
   // per-record card's own title (`web/components/work/effort-card.tsx`,
-  // "Effort") moves to "Time log" — see that string's own seed entry below.
-  // This nav-level "Work logs" destination (the team-wide list, `/time`) is
-  // a different screen and is untouched.
+  // "Effort") moved to "Time log".
+  //
+  // AND SUPERSEDED AGAIN, 23 Sep 2026 — Aurora, "word is logs only". B0386 is
+  // REVERSED: the card says "Logs", the Home tile says "Logs", the rail says
+  // "Logs" and the glossary term is "Log". "Hours" below is a rail word from a
+  // different round and is left alone; nothing in the Logs module reads it.
   Hours: { de: "Stunden", es: "Horas", ca: "Hores" },
   // RENAMED FROM "Knowledge base" — R85, the same ruling: "'Knowledge Base':
   // reduce it to 'Knowledge'." The route (/knowledge) and every identifier
@@ -1099,7 +1099,6 @@ export const SEED: Catalogue = {
   "Couldn't save the account.": { de: "Der Kunde konnte nicht gespeichert werden.", es: "No se pudo guardar la cuenta.", ca: "No s'ha pogut desar el compte."},
   "Couldn't save the app.": { de: "Die App konnte nicht gespeichert werden.", es: "No se pudo guardar la app.", ca: "No s'ha pogut desar l'app."},
   "Couldn't save the meeting.": { de: "Der Termin konnte nicht gespeichert werden.", es: "No se pudo guardar la reunión.", ca: "No s'ha pogut desar la reunió."},
-  "Couldn't save the notes.": { de: "Die Notizen konnten nicht gespeichert werden.", es: "No se pudieron guardar las notas.", ca: "No s'han pogut desar les notes."},
   "Couldn't save the profile.": { de: "Das Profil konnte nicht gespeichert werden.", es: "No se pudo guardar el perfil.", ca: "No s'ha pogut desar el perfil."},
   "Couldn't save the role.": { de: "Die Rolle konnte nicht gespeichert werden.", es: "No se pudo guardar el rol.", ca: "No s'ha pogut desar el rol."},
   "Couldn't save the source.": { de: "Die Quelle konnte nicht gespeichert werden.", es: "No se pudo guardar la fuente.", ca: "No s'ha pogut desar la font."},
@@ -1154,7 +1153,6 @@ export const SEED: Catalogue = {
   "Edit this role": { de: "Diese Rolle bearbeiten", es: "Editar este rol", ca: "Editar aquest rol"},
   "Edit this ticket": { de: "Dieses Ticket bearbeiten", es: "Editar este ticket", ca: "Editar aquest ticket"},
   "Entries": { de: "Einträge", es: "Entradas", ca: "Entrades"},
-  "Every entry here is the same kind of work.": { de: "Jeder Eintrag hier ist dieselbe Art von Arbeit.", es: "Cada entrada aquí es el mismo tipo de trabajo.", ca: "Cada entrada d'aquí és el mateix tipus de feina."},
   "Every ticket a client raises shows here while it is being worked on.": { de: "Jedes Ticket, das ein Kunde stellt, wird hier angezeigt, während es bearbeitet wird.", es: "Cada ticket que un cliente plantea aparece aquí mientras se está trabajando en él.", ca: "Tot ticket que presenta un client es mostra aquí mentre s'hi està treballant."},
   "Expand": { de: "Ausklappen", es: "Expandir", ca: "Expandir"},
   "Filed.": { de: "Abgelegt.", es: "Registrado.", ca: "Registrat."},
@@ -1164,7 +1162,6 @@ export const SEED: Catalogue = {
   "Take {label} off this app?": { de: "„{label}“ von diesem System entfernen?", es: "¿Quitar «{label}» de esta app?", ca: "Vols treure «{label}» d'aquesta app?"},
   "Fix what was written down. The change is kept in the record's history, with your name on it.": { de: "Korrigieren Sie, was festgehalten wurde. Die Änderung bleibt im Verlauf des Datensatzes stehen, mit Ihrem Namen daran.", es: "Corrige lo que se anotó. El cambio queda en el historial del registro, con tu nombre.", ca: "Corregeix el que es va anotar. El canvi queda a l'historial del registre, amb el teu nom."},
   "For work already finished. Say when it started and when it stopped, we work out the rest.": { de: "Für Arbeit, die bereits erledigt ist. Sagen Sie, wann sie begann und wann sie endete, den Rest rechnen wir aus.", es: "Para trabajo ya terminado. Di cuándo empezó y cuándo terminó, del resto nos encargamos.", ca: "Per a feina ja acabada. Digues quan va començar i quan va acabar, la resta la calculem nosaltres."},
-  "Hours by kind of work": { de: "Stunden nach Art der Arbeit", es: "Horas por tipo de trabajo", ca: "Hores per tipus de feina"},
   "Hours by person": { de: "Stunden nach Person", es: "Horas por persona", ca: "Hores per persona"},
   "Hours logged": { de: "Erfasste Stunden", es: "Horas registradas", ca: "Hores registrades"},
   "Important": { de: "Wichtig", es: "Importante", ca: "Important"},
@@ -1257,7 +1254,6 @@ export const SEED: Catalogue = {
   "Save to Gmail drafts": { de: "In Gmail-Entwürfe speichern", es: "Guardar en borradores de Gmail", ca: "Desar als esborranys de Gmail"},
   "Saved.": { de: "Gespeichert.", es: "Guardado.", ca: "Desat."},
   "Saving…": { de: "Wird gespeichert…", es: "Guardando…", ca: "Desant…"},
-  "Say what kind an entry is when you log it, and the split shows here.": { de: "Sagen Sie beim Erfassen, welche Art ein Eintrag ist, dann erscheint die Aufteilung hier.", es: "Di de qué tipo es cada registro al anotarlo y el reparto aparecerá aquí.", ca: "Digues de quin tipus és cada registre en anotar-lo i el repartiment apareixerà aquí."},
   "Search apps…": { de: "Apps durchsuchen…", es: "Buscar apps…", ca: "Cercar apps…"},
   "Search companies…": { de: "Unternehmen durchsuchen…", es: "Buscar empresas…", ca: "Cercar empreses…"},
   "Search departments…": { de: "Abteilungen durchsuchen…", es: "Buscar departamentos…", ca: "Cercar departaments…"},
@@ -1353,7 +1349,6 @@ export const SEED: Catalogue = {
   "Working…": { de: "Wird bearbeitet…", es: "Trabajando…", ca: "Treballant…"},
   "Write a profile": { de: "Ein Profil schreiben", es: "Escribir un perfil", ca: "Escriure un perfil"},
   "Write it again": { de: "Neu schreiben", es: "Escribirlo otra vez", ca: "Tornar-ho a escriure"},
-  "Write up what was decided while it is still fresh, the notes are the part worth keeping.": { de: "Halten Sie fest, was entschieden wurde, solange es frisch ist, die Notizen sind der Teil, der bleibt.", es: "Anota lo que se decidió mientras lo tienes fresco; las notas son la parte que merece la pena guardar.", ca: "Anota el que s'ha decidit mentre encara ho tens fresc; les notes són la part que val la pena guardar."},
   "Writing…": { de: "Wird geschrieben…", es: "Escribiendo…", ca: "Escrivint…"},
   "You're not in a team": { de: "Sie sind in keinem Team", es: "No estás en ningún equipo", ca: "No ets a cap equip"},
   "e.g. Question": { de: "z. B. Frage", es: "p. ej. Pregunta", ca: "p. ex. Pregunta"},
@@ -1877,6 +1872,7 @@ export const SEED: Catalogue = {
     es: "Elige lo que {brand} puede leer",
     ca: "Tria el que {brand} pot llegir",
   },
+  "Clear all": { de: "Alle löschen", es: "Borrar todo", ca: "Esborra-ho tot" },
   "Clear filters": { de: "Filter löschen", es: "Borrar filtros", ca: "Esborra filtres" },
   "Compare": { de: "Vergleichen", es: "Comparar", ca: "Comparar" },
   "Connect a process": {
@@ -2517,6 +2513,7 @@ export const SEED: Catalogue = {
   // its own. Written by hand at the same commit as the English, so the
   // translation ceiling (R44) never rises.
   "Show less": { de: "Weniger anzeigen", es: "Mostrar menos", ca: "Mostra menys" },
+  "Show {count}": { de: "{count} anzeigen", es: "Mostrar {count}", ca: "Mostra {count}" },
   "Show {count} more": { de: "{count} weitere anzeigen", es: "Mostrar {count} más", ca: "Mostra {count} més" },
   "Use the address your account is registered to.": {
     de: "Verwenden Sie die Adresse, unter der Ihr Kunde registriert ist.",
@@ -2728,6 +2725,7 @@ export const SEED: Catalogue = {
     es: "{count} a la semana",
     ca: "{count} a la setmana",
   },
+  "{what} +{count}": { de: "{what} +{count}", es: "{what} +{count}", ca: "{what} +{count}" },
   "{count} a year": { de: "{count} pro Jahr", es: "{count} al año", ca: "{count} a l'any" },
   "{count} results": {
     de: "{count} Ergebnisse",
@@ -2989,12 +2987,6 @@ export const SEED: Catalogue = {
   },
   /* The long one says what WOULD fill it, in two clauses: what Google has to
    * say for an artefact to arrive, and the three fields that show here anyway. */
-  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The account, the system and the reason we met show here too, once they are set.":
-    {
-      de: "E-Mails, Chatverläufe und Mitschriften gehören zu einem Gespräch, wenn Google sagt, zu welchem Termin sie gehören. Kunde, System und der Grund des Treffens erscheinen hier ebenfalls, sobald sie gesetzt sind.",
-      es: "Los correos, los chats y las transcripciones se unen a una llamada cuando Google dice a qué evento pertenecen. La cuenta, el sistema y el motivo de la reunión también aparecen aquí, una vez definidos.",
-      ca: "Els correus, els xats i les transcripcions s'uneixen a una trucada quan Google diu a quin esdeveniment pertanyen. El compte, el sistema i el motiu de la reunió també apareixen aquí, un cop definits.",
-    },
   "This meeting doesn't have a map to draw.": {
     de: "Für dieses Meeting gibt es keine Karte.",
     es: "Esta reunión no tiene un mapa que dibujar.",
@@ -3253,14 +3245,11 @@ export const SEED: Catalogue = {
      time. "Account(s)" follows this file's own established word per
      language — German settled on "Konto/Konten" for a NEW/EMPTY account
      ("New account" → "Neues Konto" below), which these match. */
-  "active accounts": { de: "aktive Konten", es: "cuentas activas", ca: "comptes actius" },
-  "countries": { de: "Länder", es: "países", ca: "països" },
   "No country is set on an active account yet.": {
     de: "Für kein aktives Konto ist bisher ein Land hinterlegt.",
     es: "Ninguna cuenta activa tiene un país indicado todavía.",
     ca: "Cap compte actiu té encara un país indicat.",
   },
-  "When they arrived": { de: "Wann sie dazukamen", es: "Cuándo llegaron", ca: "Quan van arribar" },
   "Nothing has arrived yet.": {
     de: "Es ist noch nichts hinzugekommen.",
     es: "Todavía no ha llegado nada.",
@@ -3275,6 +3264,68 @@ export const SEED: Catalogue = {
     de: "Legen Sie Ihr erstes Konto an, und die Zahlen erscheinen hier.",
     es: "Añade tu primera cuenta y sus cifras aparecerán aquí.",
     ca: "Afegeix el teu primer compte i les xifres apareixeran aquí.",
+  },
+  /* HER SECOND PASS OVER THE SAME TAB, 23 Sep 2026 — the figures row gained
+     the median tenure, the country split became a donut whose value is behind
+     a hover, and the arrivals bars became a line whose hover names WHO. Ten
+     new sentences, hand-written here in all three in the same change that adds
+     them, so R44's ceiling does not move.
+
+     TWO WORDS DECIDED ONCE, FOR ALL THREE. "Tenure" is how long a client has
+     been ours, and no language here has a one-word noun for it that a manager
+     would use, so each says the plain thing: the MIDDLE duration. And "the
+     book" is the active account book this whole tab is counted over, which is
+     `Bestand` / `cartera` — the word each language already uses for a set of
+     clients held, never a literal "Buch"/"libro". */
+  "Active accounts": { de: "Aktive Konten", es: "Cuentas activas", ca: "Comptes actius" },
+  "Countries": { de: "Länder", es: "Países", ca: "Països" },
+  "Median tenure": {
+    de: "Median der Dauer",
+    es: "Antigüedad mediana",
+    ca: "Antiguitat mediana",
+  },
+  "{count} months": { de: "{count} Monate", es: "{count} meses", ca: "{count} mesos" },
+  "No answer yet": {
+    de: "Noch keine Antwort",
+    es: "Todavía sin respuesta",
+    ca: "Encara sense resposta",
+  },
+  /* The donut slice's own readout: the count and its share, in that order,
+     and both holes must survive intact in every language. */
+  "{count} accounts, {percent}% of the book": {
+    de: "{count} Konten, {percent}% des Bestands",
+    es: "{count} cuentas, {percent}% de la cartera",
+    ca: "{count} comptes, {percent}% de la cartera",
+  },
+  "How long we have had them": {
+    de: "Wie lange wir sie schon haben",
+    es: "Cuánto tiempo hace que las tenemos",
+    ca: "Quant de temps fa que les tenim",
+  },
+  /* The line's own accessible name, read instead of the picture. */
+  "How long we have had them, month by month": {
+    de: "Wie lange wir sie schon haben, Monat für Monat",
+    es: "Cuánto tiempo hace que las tenemos, mes a mes",
+    ca: "Quant de temps fa que les tenim, mes a mes",
+  },
+  "{count} arrived": {
+    de: "{count} hinzugekommen",
+    es: "{count} llegaron",
+    ca: "{count} van arribar",
+  },
+  "and {count} more": { de: "und {count} weitere", es: "y {count} más", ca: "i {count} més" },
+  /* THE INDUSTRY SPLIT, BESIDE THE COUNTRY ONE (her later ruling the same day:
+     "add metric industry (side of where they are , so in the same row country
+     & industry)"). The section title is a QUESTION because its neighbour is
+     one — "Where they are" and "Industry" would be two registers on one row —
+     and every language here asks it the same plain way. The FIELD is still
+     called Industry wherever a person sets one, so nothing here is a second
+     word for the thing itself. */
+  "What they do": { de: "Was sie machen", es: "A qué se dedican", ca: "A què es dediquen" },
+  "No industry is set on an active account yet.": {
+    de: "Für kein aktives Konto ist bisher eine Branche hinterlegt.",
+    es: "Ninguna cuenta activa tiene un sector indicado todavía.",
+    ca: "Cap compte actiu té encara un sector indicat.",
   },
   /* A CORRECTION, NOT A NEW STRING. The generated catalogue answered "Type"
      with "Eingeben", the VERB, "to type on a keyboard", which is what a
@@ -3471,6 +3522,44 @@ export const SEED: Catalogue = {
   "Any {what}": { de: "Alle {what}", es: "Cualquier {what}", ca: "Qualsevol {what}" },
   "Archive this ticket?": { de: "Dieses Ticket archivieren?", es: "¿Archivar este ticket?", ca: "Vols arxivar aquest tiquet?" },
   "Archive {name}?": { de: "„{name}“ archivieren?", es: "¿Archivar «{name}»?", ca: "Vols arxivar «{name}»?" },
+  // MIGRATION 0123 — her ARCHIVED, the state that takes everything under it.
+  // The words have to say that, in every language, or the warning is a
+  // different promise from the one the door keeps.
+  "Archive {name} and everything on it?": {
+    de: "„{name}“ und alles darauf archivieren?",
+    es: "¿Archivar «{name}» y todo lo que contiene?",
+    ca: "Vols arxivar «{name}» i tot el que conté?",
+  },
+  "Archive with everything on it": {
+    de: "Mit allem darauf archivieren",
+    es: "Archivar con todo lo que contiene",
+    ca: "Arxiva amb tot el que conté",
+  },
+  "Restore with everything on it": {
+    de: "Mit allem darauf wiederherstellen",
+    es: "Restaurar con todo lo que contiene",
+    ca: "Restaura amb tot el que conté",
+  },
+  "App archived, with everything on it.": {
+    de: "App archiviert, mit allem darauf.",
+    es: "Aplicación archivada, con todo lo que contiene.",
+    ca: "Aplicació arxivada, amb tot el que conté.",
+  },
+  "App restored, with everything on it.": {
+    de: "App wiederhergestellt, mit allem darauf.",
+    es: "Aplicación restaurada, con todo lo que contiene.",
+    ca: "Aplicació restaurada, amb tot el que conté.",
+  },
+  "Nothing is archived yet.": {
+    de: "Es ist noch nichts archiviert.",
+    es: "Todavía no hay nada archivado.",
+    ca: "Encara no hi ha res arxivat.",
+  },
+  "The app and everything on it, its tickets, meetings, tasks, to-dos, stories, phases, waves and process maps, stop showing anywhere. Nothing is deleted and the time logged against any of it is untouched. Restoring the app brings all of it back.": {
+    de: "Die App und alles darauf, ihre Tickets, Meetings, Aufgaben, To-dos, Stories, Phasen, Wellen und Prozesskarten, werden nirgendwo mehr angezeigt. Nichts wird gelöscht, und die darauf erfasste Zeit bleibt unberührt. Wenn du die App wiederherstellst, kommt alles zurück.",
+    es: "La aplicación y todo lo que contiene, sus tickets, reuniones, tareas, pendientes, historias, fases, oleadas y mapas de proceso, dejan de aparecer en cualquier sitio. No se borra nada y el tiempo registrado sobre cualquiera de ellos queda intacto. Al restaurar la aplicación vuelve todo.",
+    ca: "L'aplicació i tot el que conté, els seus tiquets, reunions, tasques, pendents, històries, fases, onades i mapes de procés, deixen d'aparèixer enlloc. No s'esborra res i el temps registrat sobre qualsevol d'ells queda intacte. En restaurar l'aplicació, torna tot.",
+  },
   "Assign": { de: "Zuweisen", es: "Asignar", ca: "Assignar" },
   "Awaiting your input": { de: "Wartet auf Ihre Angaben", es: "Pendiente de tu aportación", ca: "Pendent de la teva aportació" },
   "Background": { de: "Hintergrund", es: "Fondo", ca: "Fons" },
@@ -4644,8 +4733,6 @@ export const SEED: Catalogue = {
   // `registre de temps`, the same root "No time log" below already seeds).
   // The middle tile's own word, "Hours logged" (replacing "Effort hours"),
   // is already seeded above — see that entry's own header.
-  "Time log": { de: "Zeiterfassung", es: "Registro de tiempo", ca: "Registre de temps" },
-  "No time log": { de: "Keine Zeiterfassung", es: "Sin registro de tiempo", ca: "Sense registre de temps" },
   // THE EFFORT CARD'S OWN EMPTY STATE (Aurora's ruling, 21 Sep 2026, B44
   // amended) — no door, words only.
   "No time logged yet.": { de: "Noch keine Zeit erfasst.", es: "Aún no hay tiempo registrado.", ca: "Encara no hi ha temps registrat." },
@@ -4733,5 +4820,101 @@ export const SEED: Catalogue = {
   "Loading map…": { de: "Karte wird geladen…", es: "Cargando el mapa…", ca: "S'està carregant el mapa…" },
   "No address on file": { de: "Keine Adresse hinterlegt", es: "Sin dirección registrada", ca: "Sense adreça registrada" },
   "The map could not be loaded.": { de: "Die Karte konnte nicht geladen werden.", es: "No se ha podido cargar el mapa.", ca: "No s'ha pogut carregar el mapa." },
+
+  /* THE MEETINGS ROUND, 23 Sep 2026 — Aurora's four rulings on this module
+   * (meeting-detail.tsx's own header carries them verbatim). Seeded by hand
+   * rather than left to the generator, so TRANSLATION_CEILING stays where it
+   * is (R44).
+   *
+   * "Join" and "Google Calendar" are the two title buttons, and she chose
+   * both words herself ("rename to only join", "rename it to only this").
+   * "Google Calendar" is a PRODUCT NAME and is the same in all three — Google
+   * does not translate it in German, Spanish or Catalan either, and a
+   * translated one would name a thing the person cannot find.
+   *
+   * The three agenda sentences follow the register the meetings block a few
+   * hundred lines up already set: "Termin" for the record, "speichern" for
+   * the act, and the failure said as the passive the rest of this file uses
+   * ("Der Termin konnte nicht gespeichert werden."). "Agenda" itself is
+   * already in the generated catalogue as "Agenda" in all three, so nothing
+   * here invents a second word for it. */
+  "Join": { de: "Beitreten", es: "Unirse", ca: "Unir-se" },
+  "Save agenda": { de: "Agenda speichern", es: "Guardar la agenda", ca: "Desar l'agenda" },
+  "Agenda saved.": { de: "Agenda gespeichert.", es: "Agenda guardada.", ca: "Agenda desada." },
+  "Couldn't save the agenda.": { de: "Die Agenda konnte nicht gespeichert werden.", es: "No se pudo guardar la agenda.", ca: "No s'ha pogut desar l'agenda." },
+  "Change what it is about, when it is, and what you mean to cover.": { de: "Ändern Sie, worum es geht, wann er stattfindet und was Sie besprechen wollen.", es: "Cambia de qué trata, cuándo es y qué quieres tratar.", ca: "Canvia de què tracta, quan és i què vols tractar." },
+  /* THE LOGS ROUND, 23 Sep 2026 — Aurora's four rulings on this module
+   * (`web/components/work/time-screen.tsx`'s own header carries them
+   * verbatim). Seeded by hand rather than left to the generator, so
+   * TRANSLATION_CEILING stays at zero (R44).
+   *
+   * THE REGISTER IS THE ONE THIS FILE ALREADY SET FOR TIME: "Stunden" for
+   * hours, "erfasst"/"registrado"/"registrat" for logged, "Woche"/"semana"/
+   * "setmana" for the week. "Zeiterfassung" is deliberately NOT reused for the
+   * module's own name any more — that word translated "Work logs", which her
+   * "word is logs only" ruling retires; the rail's existing one-word entry
+   * ("Logs": Protokolle/Registros/Registres) is what the module is called in
+   * all three now, and these sentences sit under it.
+   *
+   * `{count} h` is the unit every figure and bar on the dashboard reads in. It
+   * is "h" in all three languages: the SI-style short form is the same in
+   * German, Spanish and Catalan, and a language-specific abbreviation would
+   * make one column of a chart wider than the next for no gain.
+   *
+   * No em dash and no en dash anywhere below (R95). */
+  "Hours today": { de: "Stunden heute", es: "Horas hoy", ca: "Hores avui" },
+  "Logged nothing last week": { de: "Letzte Woche nichts erfasst", es: "No registraron nada la semana pasada", ca: "No van registrar res la setmana passada" },
+  "of {count} who logged in the last eight weeks": { de: "von {count}, die in den letzten acht Wochen etwas erfasst haben", es: "de {count} que registraron algo en las últimas ocho semanas", ca: "de {count} que van registrar alguna cosa en les últimes vuit setmanes" },
+  "Records worked on": { de: "Bearbeitete Einträge", es: "Registros trabajados", ca: "Registres treballats" },
+  "Same as last week": { de: "Gleich wie letzte Woche", es: "Igual que la semana pasada", ca: "Igual que la setmana passada" },
+  "Nothing logged last week": { de: "Letzte Woche nichts erfasst", es: "Nada registrado la semana pasada", ca: "Res registrat la setmana passada" },
+  "{percent}% more than last week": { de: "{percent}% mehr als letzte Woche", es: "{percent}% más que la semana pasada", ca: "{percent}% més que la setmana passada" },
+  "{percent}% less than last week": { de: "{percent}% weniger als letzte Woche", es: "{percent}% menos que la semana pasada", ca: "{percent}% menys que la setmana passada" },
+  "Where the hours went": { de: "Wohin die Stunden gingen", es: "A dónde fueron las horas", ca: "On van anar les hores" },
+  "Hours a week, the last eight": { de: "Stunden pro Woche, die letzten acht", es: "Horas por semana, las últimas ocho", ca: "Hores per setmana, les últimes vuit" },
+  "Whose work it was": { de: "Wessen Arbeit es war", es: "De quién era el trabajo", ca: "De qui era la feina" },
+  "What ate the most": { de: "Was am meisten gekostet hat", es: "Qué se llevó más tiempo", ca: "Què es va endur més temps" },
+  "Our own work": { de: "Unsere eigene Arbeit", es: "Nuestro propio trabajo", ca: "La nostra pròpia feina" },
+  "Nobody logged anything.": { de: "Niemand hat etwas erfasst.", es: "Nadie registró nada.", ca: "Ningú no va registrar res." },
+  "Someone": { de: "Jemand", es: "Alguien", ca: "Algú" },
+  "Start a timer, or log an hour by hand, and the figures show here.": { de: "Starten Sie einen Timer oder erfassen Sie eine Stunde von Hand, und die Zahlen erscheinen hier.", es: "Inicia un temporizador, o registra una hora a mano, y las cifras aparecen aquí.", ca: "Inicia un temporitzador, o registra una hora a mà, i les xifres apareixen aquí." },
+  "{count} h": { de: "{count} h", es: "{count} h", ca: "{count} h" },
+  "{count} h, {percent}% of the time": { de: "{count} h, {percent}% der Zeit", es: "{count} h, {percent}% del tiempo", ca: "{count} h, {percent}% del temps" },
+  /* THE EFFORT CARD'S FLOW-EFFICIENCY PLACEHOLDER, renamed the same day from
+   * "No time log" (B0386's word) under her "word is logs only" ruling. Flow
+   * efficiency is hours divided by cycle time, so with no hours there is
+   * nothing to divide. */
+  "No logs": { de: "Keine Protokolle", es: "Sin registros", ca: "Sense registres" },
+  /* HER 24 SEP REVIEW OF THE LOGS DASHBOARD — three sentences, same register as
+   * the round above.
+   *
+   * "Search is on the Entries tab" is the DISABLED search field's own
+   * placeholder ("add full toolbar, even if search is diasbled"): the tab name
+   * is "Entries", which is already seeded, so the sentence reuses that word
+   * rather than inventing a second name for the same tab.
+   *
+   * The two "others" sentences belong to the weekly chart's cap. The short one
+   * rides a hover card beside a figure; the long one is the legend's own
+   * admission, and its second clause is the load-bearing half: the people it
+   * names ARE in the area behind the lines, they simply have no line. German
+   * keeps the two clauses in that order ("im Gesamtwert enthalten, aber nicht
+   * gezeichnet") because reversing them would make the omission sound like an
+   * exclusion. */
+  "Search is on the Entries tab": { de: "Die Suche ist im Tab Einträge", es: "La búsqueda está en la pestaña Entradas", ca: "La cerca és a la pestanya Entrades" },
+  "and {count} others": { de: "und {count} weitere", es: "y {count} más", ca: "i {count} més" },
+  "and {count} others, in the total but not drawn": { de: "und {count} weitere, in der Summe enthalten, aber nicht gezeichnet", es: "y {count} más, incluidos en el total pero no dibujados", ca: "i {count} més, inclosos en el total però no dibuixats" },
+
+  /* THE MEETING'S LOCATION SECTION, 23 Sep 2026 — Aurora's in-person section,
+   * view One (the address block; the map thumbnail is blocked on a key and a
+   * resolved position, see `MeetingLocationSection`'s own header).
+   *
+   * "Location" is the section's own title and reads as the place, not as a
+   * coordinate: `Ort`/`Ubicación`/`Ubicació`, the words a person uses about
+   * where a meeting is. "Open in Maps" keeps GOOGLE'S OWN PRODUCT NAME
+   * untranslated in the middle of a translated verb, the same way "Google
+   * Calendar" does a few lines up: Maps is called Maps in all three, and a
+   * translated name would send somebody looking for an app that is not there. */
+  "Location": { de: "Ort", es: "Ubicación", ca: "Ubicació" },
+  "Open in Maps": { de: "In Maps öffnen", es: "Abrir en Maps", ca: "Obrir a Maps" },
 
 }

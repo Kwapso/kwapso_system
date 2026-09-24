@@ -124,6 +124,13 @@ export interface ChatMessage {
   initials?: React.ReactNode;
   /** A photograph on the mark. Falls back to the initials silently. */
   avatarSrc?: string;
+  /** IS THIS PERSON FROM OUTSIDE? Forwarded straight to `Avatar`'s own
+   * `external` (see `components/avatar/avatar.tsx` for the ruling, the reason
+   * the fact is taken rather than guessed, and why the default is colour):
+   * an outside person's PHOTOGRAPH renders greyscale, one of our own in full
+   * colour. Aurora, 23 Sep 2026: "external photos (from contacts) gray scale.
+   * keep staff nirmal." Undefined reads as one of ours. */
+  external?: boolean;
   /** One mark per view may take mango (ruling 30). Opt in per message. */
   avatarVariant?: "default" | "inverse" | "brand" | "quiet";
   /** When, already formatted by the caller. Ruling 07 — format follows the app language. */
@@ -286,6 +293,7 @@ function Message({
         <Avatar
           size="sm"
           variant={message.avatarVariant ?? (message.mine ? "brand" : "default")}
+          external={message.external}
           className="mb-1"
         >
           {message.avatarSrc ? (

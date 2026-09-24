@@ -20,6 +20,7 @@
 // never touches. Keyset, newest first, exactly like the ticket list.
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { inClause } from "@shared/workers/filter-in"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { mendMojibake } from "@shared/workers/mojibake"
@@ -256,13 +257,13 @@ function toMeeting(r: MeetingRow): Meeting {
  * surface must expose too (R19) — the list is derived from this type's own
  * fields at the door. */
 export type MeetingFilter = {
-  accountId?: string
+  accountId?: string[]
   /** WHICH SYSTEM IT WAS ABOUT. The app record's own Meetings tab asks the
    * SERVER by this rather than narrowing a loaded page in the browser — the
    * meetings list is paged, and "this app's meetings among the newest fifty" is an
    * answer that looks like an answer. */
-  appId?: string
-  purposeId?: string
+  appId?: string[]
+  purposeId?: string[]
   /** 'upcoming' is what has not started yet, BY THE CLOCK — it used to be
    * "everything nobody has ticked", which is a different set the moment somebody
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
@@ -342,6 +343,14 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   // A cancelled meeting is hidden from every view but `all` — it is retired, not
   // deleted, so it stays readable by id and by asking for everything.
   if (filter.view !== "all") where.push("m.deactivated_at IS NULL")
+  // ARCHIVED IS INVISIBLE (0123, R112). A meeting the cascade archived carries
+  // its OWN archived state now, so this door hides it by its own column rather
+  // than by a clause about its account or its app. UNCONDITIONAL, unlike
+  // `deactivated_at` above: a CANCELLED meeting stays readable by asking for
+  // everything, because cancelling is her INACTIVE; an archived one does not,
+  // because archived is "not visible anywhere". It is cascade-only this round,
+  // so the way back is to restore the account or app that took it.
+  where.push("m.archived_at IS NULL")
   // STILL TO COME, BY THE CLOCK. It used to read `m.status <> 'held'`, which is
   // a different question wearing the same clothes: it answered "has anybody
   // ticked this", so a meeting from March that nobody ticked sat in "upcoming"
@@ -513,17 +522,20 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     where.push("m.starts_at >= ? AND m.starts_at < ?")
     params.push(from, to)
   }
-  if (filter.accountId) {
-    where.push("m.account_id = ?")
-    params.push(filter.accountId)
-  }
-  if (filter.appId) {
-    where.push("m.app_id = ?")
-    params.push(filter.appId)
-  }
-  if (filter.purposeId) {
-    where.push("m.purpose_id = ?")
-    params.push(filter.purposeId)
+  // A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to select multile for
+  // each filter type"). `inClause` carries the two properties this change rests
+  // on: one value is a set of one, so every existing caller is untouched, and an
+  // empty set narrows nothing rather than matching nothing.
+  for (const [column, values] of [
+    ["m.account_id", filter.accountId],
+    ["m.app_id", filter.appId],
+    ["m.purpose_id", filter.purposeId],
+  ] as const) {
+    const clause = inClause(column, values)
+    if (clause.sql) {
+      where.push(clause.sql)
+      params.push(...clause.params)
+    }
   }
   // WHETHER ANYBODY EVER WROTE DOWN WHAT WAS SAID. The captured stamp, not the
   // file id — see the field's own note. Anything that is not exactly 'yes' or
@@ -1115,6 +1127,22 @@ export async function captureTranscript(
   // logged again, whatever else has been reset. `logsWritten` counts what the
   // database actually accepted rather than how many people were in the room —
   // a re-capture honestly reports zero.
+  //
+  // AND THE GUARD NO LONGER CARRIES `kind` (24 Sep 2026). It used to read
+  // `AND kind = 'Meeting'` as a fourth term, which made the free-text column
+  // load-bearing for a correctness property it has no business holding: the
+  // identity of "this person's time on this meeting" is TARGET + PERSON, and
+  // those three terms already say it. The fourth term was strictly weaker than
+  // the other three — it could only ever let a row through that the first three
+  // had matched — so dropping it makes the guard tighter, not looser: an hour
+  // somebody hand-logged against this meeting now blocks a capture from adding
+  // a second one for the same person, where before it did not.
+  //
+  // THAT IS WHY TEAM MIGRATION 0122 SPARES THE MEETING ROWS ANYWAY. The
+  // migration runs BEFORE this file is deployed (OPERATIONS.md's order:
+  // tenancy, migrate-teams, then content), so for the length of one deploy the
+  // OLD guard is live and still reading the literal. A wipe that took it would
+  // open the 18.25-hour window above by construction.
   const staff = await ourStaffAmong(env, guard.teamId, event.attendees.map((a) => a.email))
   const endsAt = meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString()
   const seconds = Math.max(0, Math.round((Date.parse(endsAt) - Date.parse(meeting.startsAt)) / 1000))
@@ -1129,7 +1157,7 @@ SELECT ${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sqlS
  WHERE NOT EXISTS (
    SELECT 1 FROM work_logs
     WHERE target_table = 'meetings' AND target_id = ${sqlString(id)}
-      AND user_id = ${sqlString(person.userId)} AND kind = ${sqlString(MEETING_LOG_KIND)}
+      AND user_id = ${sqlString(person.userId)}
  )
 RETURNING id`
     )

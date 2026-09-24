@@ -5,9 +5,14 @@
 // Her ruling, 23 Sep 2026, struck four things from a design and left three:
 // how many active companies there are and how many countries they sit in,
 // where they are by country, and when they arrived, off each company's own
-// `created_at`. This file proves the SURVIVING three are counted honestly
-// (active only, entity only, a country nobody set is not a row) and that the
-// STRUCK four never ride along in the shape the door hands back.
+// `created_at`. This file proves those are counted honestly (active only,
+// entity only, a country nobody set is not a row) and that the three strikes
+// she did NOT reverse never ride along in the shape the door hands back.
+//
+// TENURE CAME BACK THE SAME DAY, by her own later word over the built screen:
+// "add the median tenure" and "when hover show who". So this file also proves
+// the two things that reversal bought — a TRUE median (odd, even, one, none)
+// and the NAMES behind each arrival month — against the same real database.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -20,6 +25,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
+import { ACCOUNTS_COUNTRY_FACES_PER_ROW } from "@shared/workers/limits"
 import { readAccountsDashboard } from "../src/lib/accounts"
 import { buildSpineDb, IDS } from "./spine-harness"
 
@@ -111,10 +117,27 @@ describe("readAccountsDashboard", () => {
 
     // TWO COUNTRIES, SPAIN BUSIEST FIRST — NOCOUNTRY sits in neither row.
     expect(after.countryCount).toBe(2)
+    // BUSIEST FIRST, and each row now carries WHO — her 23 Sep 2026 ruling,
+    // "when hover in donut in country, show which aacounts with name adn
+    // logo". The names are A→Z inside the country, the exact `n` rides beside
+    // them, and `logoUrl` is `null` where the company has no picture (the app
+    // draws its own letter tile for that; the door invents no second answer).
     expect(after.byCountry).toEqual([
-      { country: "Spain", n: 2 },
-      { country: "Germany", n: 1 },
+      {
+        country: "Spain",
+        n: 2,
+        accounts: [
+          { id: "DASH_ES1", name: "Madrid Co", logoUrl: null },
+          { id: "DASH_ES2", name: "Sevilla Co", logoUrl: null },
+        ],
+      },
+      { country: "Germany", n: 1, accounts: [{ id: "DASH_DE1", name: "Berlin Co", logoUrl: null }] },
     ])
+    // AND THE FENCE REACHES THE FACES TOO: the inactive, the archived and the
+    // person all name Spain, and none of them is in the list above.
+    const spain = after.byCountry.find((r) => r.country === "Spain")!
+    for (const hidden of ["Inactive Co", "Archived Co", "Someone"])
+      expect(spain.accounts.map((a) => a.name)).not.toContain(hidden)
 
     // ONE ROW PER MONTH AN ACTIVE COMPANY ARRIVED IN, oldest first — the
     // fixture's own baseline contributes "2026-01": 4 (unaffected by anything
@@ -135,13 +158,191 @@ describe("readAccountsDashboard", () => {
     expect(months).toEqual([...months].sort())
   })
 
-  it("hands back exactly the three surviving questions, and nothing she struck", async () => {
+  it("caps the faces per country while the count stays exact (R14)", async () => {
+    // Her ruling asks a slice to name WHO is in it, which is a list off a
+    // growing collection — so it needs a ceiling, and the ceiling must not
+    // become a lie about the count. `n` is the exact number of active
+    // companies in the country; `accounts` is at most
+    // `ACCOUNTS_COUNTRY_FACES_PER_ROW` of them, A→Z, and the screen says how
+    // many more it could not show rather than implying eight was all of them.
+    const over = ACCOUNTS_COUNTRY_FACES_PER_ROW + 2
+    for (let i = 0; i < over; i++)
+      seedAccount({
+        id: `CAP_${i}`,
+        type: "entity",
+        // Zero-padded so A→Z order is the same order a person would read.
+        name: `Cap Co ${String(i).padStart(2, "0")}`,
+        country: "Portugal",
+        createdAt: "2025-01-01",
+      })
+
+    const data = await readAccountsDashboard(cfg, guard, staff)
+    const row = data.byCountry.find((r) => r.country === "Portugal")!
+    expect(row.n, "the count is capped along with the list, which would understate the slice").toBe(over)
+    expect(row.accounts.length, "the per-slice list is not bounded").toBe(
+      ACCOUNTS_COUNTRY_FACES_PER_ROW
+    )
+    // THE FIRST N BY NAME, not an arbitrary N: the order has to be the one the
+    // screen prints, or "and 2 more" hides a different two every read.
+    expect(row.accounts.map((a) => a.name)).toEqual(
+      Array.from({ length: ACCOUNTS_COUNTRY_FACES_PER_ROW }, (_, i) => `Cap Co ${String(i).padStart(2, "0")}`)
+    )
+  })
+
+  it("splits the book by industry the same way it splits it by country", async () => {
+    // Aurora, 23 Sep 2026: "add metric industry (side of where they are , so in
+    // the same row country & industry)". The same fence, the same clause, one
+    // column along — so the two can never disagree about which accounts they
+    // are counting.
+    seedAccount({ id: "IND_1", type: "entity", name: "Broker One", createdAt: "2024-01-01" })
+    seedAccount({ id: "IND_2", type: "entity", name: "Broker Two", createdAt: "2024-01-02" })
+    seedAccount({ id: "IND_3", type: "entity", name: "Shipper", createdAt: "2024-01-03" })
+    seedAccount({ id: "IND_BLANK", type: "entity", name: "Unsaid", createdAt: "2024-01-04" })
+    // INACTIVE — outside this reading as it is outside every other one here.
+    seedAccount({
+      id: "IND_OUT",
+      type: "entity",
+      name: "Gone",
+      createdAt: "2024-01-05",
+      deactivatedAt: "2026-02-01",
+    })
+    const set = (id: string, industry: string) =>
+      db().prepare("UPDATE accounts SET industry = ? WHERE id = ?").run(industry, id)
+    set("IND_1", "Insurance")
+    set("IND_2", "Insurance")
+    set("IND_3", "Shipping and logistics")
+    set("IND_BLANK", "   ")
+    set("IND_OUT", "Insurance")
+
+    const data = await readAccountsDashboard(cfg, guard, staff)
+    // BUSIEST FIRST, an industry nobody set is not a row, and the inactive
+    // company's own word is counted nowhere.
+    expect(data.byIndustry).toEqual([
+      { industry: "Insurance", n: 2 },
+      { industry: "Shipping and logistics", n: 1 },
+    ])
+  })
+
+  it("names who arrived in each month, bounded, with the exact count beside them", async () => {
+    // Three companies in ONE month, so the month's own `names` is a list
+    // rather than a single entry, and A→Z rather than insertion order.
+    seedAccount({ id: "WHO_C", type: "entity", name: "Cedar Ltd", createdAt: "2025-04-02" })
+    seedAccount({ id: "WHO_A", type: "entity", name: "Alder Ltd", createdAt: "2025-04-20" })
+    seedAccount({ id: "WHO_B", type: "entity", name: "Birch Ltd", createdAt: "2025-04-11" })
+    // AND ONE THE FENCE MUST NOT NAME — an archived company in the same
+    // month. The hover must never be the one place a hidden record surfaces.
+    seedAccount({
+      id: "WHO_ARCHIVED",
+      type: "entity",
+      name: "Aardvark Ltd",
+      createdAt: "2025-04-01",
+      archivedAt: "2026-02-01",
+    })
+
+    const data = await readAccountsDashboard(cfg, guard, staff)
+    const april = data.arrivals.find((r) => r.month === "2025-04")
+    expect(april, "the month three active companies arrived in has no row at all").toBeDefined()
+    expect(april?.n, "the month's count is not the three active companies").toBe(3)
+    expect(april?.names, "the month names the wrong companies, or in the wrong order").toEqual([
+      "Alder Ltd",
+      "Birch Ltd",
+      "Cedar Ltd",
+    ])
+    // EVERY month carries the field, even one whose companies all came from
+    // the shared fixture — a screen reading `names` must never meet
+    // `undefined`.
+    for (const row of data.arrivals) expect(Array.isArray(row.names)).toBe(true)
+  })
+
+  it("takes a TRUE median tenure — odd, even, one, and none", async () => {
+    // A BOOK THIS TEST OWNS OUTRIGHT. The shared fixture seeds four active
+    // companies of its own; the median is a statement about the WHOLE active
+    // book, so it can only be asserted exactly once this test is the only
+    // thing in it.
+    const clearBook = () =>
+      db().prepare(`UPDATE accounts SET deactivated_at = '2026-01-02' WHERE deactivated_at IS NULL`).run()
+
+    /** The same arithmetic `julianday('now') - julianday(created_at)` does,
+     * done here independently rather than by re-running the door's own SQL —
+     * a check that computes the answer the same way as the thing it checks
+     * proves only that the code is self-consistent. Both are UTC. */
+    const daysSince = (iso: string) => (Date.now() - Date.parse(`${iso}T00:00:00Z`)) / 86_400_000
+    /** Loose enough to survive the seconds between the door's `now` and this
+     * line, tight enough that a mean-instead-of-median (which would be off by
+     * hundreds of days on these fixtures) can never slip through. */
+    const CLOSE = 0.05
+
+    // NONE — `null`, and never 0. "There is no middle of nothing" is a value
+    // a screen can branch on; 0 would read as "we have had them no time".
+    clearBook()
+    const none = await readAccountsDashboard(cfg, guard, staff)
+    expect(none.activeCount).toBe(0)
+    expect(none.medianTenureDays).toBeNull()
+
+    // ONE — the single account's own tenure, not half of it and not null.
+    seedAccount({ id: "MED_1", type: "entity", name: "One Ltd", createdAt: "2024-01-01" })
+    const one = await readAccountsDashboard(cfg, guard, staff)
+    expect(one.activeCount).toBe(1)
+    expect(one.medianTenureDays).toBeCloseTo(daysSince("2024-01-01"), 1)
+
+    // ODD — three accounts, the answer is the MIDDLE one. The mean of the
+    // three would be a different number (the oldest is far older than the
+    // other two), which is what makes this a real median test rather than a
+    // test two implementations would both pass.
+    seedAccount({ id: "MED_2", type: "entity", name: "Two Ltd", createdAt: "2025-06-01" })
+    seedAccount({ id: "MED_3", type: "entity", name: "Three Ltd", createdAt: "2019-01-01" })
+    const odd = await readAccountsDashboard(cfg, guard, staff)
+    expect(odd.activeCount).toBe(3)
+    expect(odd.medianTenureDays).toBeCloseTo(daysSince("2024-01-01"), 1)
+    const oddMean = (daysSince("2024-01-01") + daysSince("2025-06-01") + daysSince("2019-01-01")) / 3
+    expect(
+      Math.abs((odd.medianTenureDays ?? 0) - oddMean),
+      "the median equals the mean of the three, so this fixture cannot tell them apart"
+    ).toBeGreaterThan(1)
+
+    // EVEN — four accounts, the answer is the MEAN OF THE TWO MIDDLES, which
+    // is the definition rather than a convenience. Neither middle on its own
+    // is the answer, and this fixture is chosen so all three candidates are
+    // far apart.
+    seedAccount({ id: "MED_4", type: "entity", name: "Four Ltd", createdAt: "2022-01-01" })
+    const even = await readAccountsDashboard(cfg, guard, staff)
+    expect(even.activeCount).toBe(4)
+    // Tenures oldest-first: 2019, 2022, 2024, 2025. The two middles are the
+    // 2022 and the 2024 rows.
+    const twoMiddles = (daysSince("2022-01-01") + daysSince("2024-01-01")) / 2
+    expect(even.medianTenureDays).toBeCloseTo(twoMiddles, 1)
+    expect(Math.abs((even.medianTenureDays ?? 0) - daysSince("2022-01-01"))).toBeGreaterThan(CLOSE)
+    expect(Math.abs((even.medianTenureDays ?? 0) - daysSince("2024-01-01"))).toBeGreaterThan(CLOSE)
+
+    // AND IT IS COUNTED THROUGH THE SAME FENCE AS EVERY OTHER FIGURE HERE —
+    // an inactive company with a wildly different tenure must not move it.
+    seedAccount({
+      id: "MED_OUT",
+      type: "entity",
+      name: "Gone Ltd",
+      createdAt: "1999-01-01",
+      deactivatedAt: "2026-02-01",
+    })
+    const fenced = await readAccountsDashboard(cfg, guard, staff)
+    expect(fenced.activeCount).toBe(4)
+    expect(fenced.medianTenureDays).toBeCloseTo(twoMiddles, 1)
+  })
+
+  it("hands back exactly the surviving questions, and nothing she left struck", async () => {
     const data = await readAccountsDashboard(cfg, guard, staff)
     // A STRUCTURAL PROOF, not a word search: the shape itself carries no
-    // fourth or fifth field for a city, a tenure figure or a portal-reach
-    // column to hide inside — the door never asked the database for them
-    // (see `readAccountsDashboard`'s own header), so there is nothing here
-    // for a screen to accidentally draw.
-    expect(Object.keys(data).sort()).toEqual(["activeCount", "arrivals", "byCountry", "countryCount"])
+    // field for a city or a portal-reach column to hide inside — the door
+    // never asked the database for them (see `readAccountsDashboard`'s own
+    // header), so there is nothing here for a screen to accidentally draw.
+    // `medianTenureDays` IS on this list, and it is the one strike she
+    // reversed the same day ("add the median tenure"); the other three stand.
+    expect(Object.keys(data).sort()).toEqual([
+      "activeCount",
+      "arrivals",
+      "byCountry",
+      "byIndustry",
+      "countryCount",
+      "medianTenureDays",
+    ])
   })
 })

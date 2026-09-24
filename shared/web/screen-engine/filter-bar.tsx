@@ -119,6 +119,49 @@
 // either state, and the single merged container's radius is asserted to
 // switch instead of staying byte-identical.
 //
+// ── PASS SIX, WHICH RETIRES ALL FIVE — CLIENT RULING, 2026-09-23 ────────────
+//
+// Aurora, choosing among five drawn designs: "filter drop sheet popover". Read
+// against her own earlier sentence, which the five were drawn to answer: the
+// filters must open as "a temporary overlay not a second row".
+//
+// SO PASS TWO WAS RIGHT AND WAS RULED AGAINST, and it is worth saying plainly
+// rather than quietly reversing: on 2026-09-02 she said "the expanded toolbar
+// shoudl not be an overlay, but literaly expand the space", and passes three,
+// four and five are three increasingly careful ways of doing exactly that.
+// Every one of them is now superseded, and NOT because the work was wrong.
+// What she was rejecting in September was a panel that floated over the rows
+// while looking like a detached second card; what she has chosen now is an
+// overlay that is unmistakably one: anchored, elevated, dismissable, gone the
+// moment it is not wanted.
+//
+// WHAT THE TWO WORDS MEAN, AND WHY THEY ARE ONE COMPONENT. The recommendation
+// she accepted said it: "the two coexist because the sheet is simply a popover
+// that ran out of room." A POPOVER hangs under the Filter control, 20rem wide,
+// and is right for two or three facets. A DROP SHEET falls from the toolbar
+// across its full width and floats over the rows, and is right for four or
+// more, because every facet can stay open at once. One component, one
+// primitive, two geometries: `FilterOverlay`, beside this file.
+//
+// AND THE CHOICE IS THE CONTENT'S. `span` below is what the declared facets
+// cost in field rows, and `filterOverlayForm` is a pure function of it. No
+// screen passes a flag, because a screen that had to would be right once and
+// wrong the day a facet was added to it. On a phone neither form has room, so
+// it is the kit's own bottom sheet: the answer `sheet.tsx` already gives for
+// every other overlay below 45rem.
+//
+// WHAT THIS COST AND WHAT IT BOUGHT. The `{ pill, panel }` pair is gone;
+// `useFilterBar` returns ONE node. The pair existed only because the panel had
+// to land somewhere other than the pill, and nothing lands anywhere now. With
+// it went `ToolbarRow`'s and `ToolbarColumn`'s `toolbarPanel` slots, the
+// engine's two placements of it, and the census that used to catch a caller
+// dropping half a return value. A slot nothing fills is an invitation to the
+// exact row the ruling forbids, so it was removed rather than left empty, and
+// `web/test/filters-open-as-an-overlay.test.tsx` is what says so from the
+// outside: at all three widths, opening the overlay changes nothing the
+// toolbar renders in flow, and the surface is not a descendant of the toolbar
+// at all.
+//
 // ── THE TOOLBAR SAYS A COUNT, NEVER THE FILTERS — CLIENT RULING, 2026-09-02 ──
 //
 // Verbatim: "when activce filters, do not display them in the toolbar. only a
@@ -341,14 +384,15 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Button } from "@shared/ui/components/button/button"
 import {
   CompactFacet,
+  FACET_SPAN,
   FilterBar as KitFilterBar,
+  FilterOverlay,
   RangeFacet,
 } from "@shared/ui/components/filter-bar/filter-bar"
+import { joinFacet, splitFacet } from "@shared/facet-list"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { cn } from "@shared/ui/lib/utils"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
 
@@ -366,29 +410,32 @@ import { formatRange, parseRange } from "./range"
 const SEARCHABLE_PAST = 8
 
 /**
- * THE FILTER ROW, SPLIT IN TWO — `pill` (the toolbar's own "Filter" control)
- * and `panel` (what it opens), returned separately rather than as one
- * component's markup.
+ * THE TOOLBAR'S FILTER CONTROL AND THE SURFACE IT OPENS, as ONE node.
  *
- * SUPERSEDED MACHINERY, v1.2.27. This used to be a single component,
- * `<FilterBar>`, that rendered the pill in place and `createPortal`'d the
- * panel into a DOM node a bespoke context (`PanelSlot` + `FilterPanelProvider`
- * + `FilterPanelOutlet` + `FilterPanelColumn`, ~62 lines) published from
- * wherever the host's toolbar happened to sit — because neither `ToolbarRow`
- * (screen-bits.tsx) nor the kit's own `CollectionFrame` offered a real
- * position for a panel that must land BELOW the whole toolbar rather than
- * inside the pill (the header's three-pass saga explains why one is needed at
- * all). `CollectionFrame` gained a real `toolbarPanel` prop the same release
- * this facet work landed in, so the host itself can now place a panel node
- * exactly where the ruling wants it, in ONE render pass, with no cross-tree
- * portal and no context. A HOOK returning both pieces is the app-side twin of
- * that prop: the CALLER (a screen, or `ToolbarRow`'s own caller) holds `pill`
- * and `panel` as two ordinary values and hands each to wherever it belongs —
- * `filters` and `toolbarPanel` on `ToolbarRow`, or `filters` and `toolbarPanel`
- * on the kit's own `CollectionFrame` directly. The context and its portal are
- * therefore deleted rather than repointed at the kit's new slot: a value
- * returned from a hook reaches two places in a parent's own render without
- * needing either.
+ * A HOST PUTS IT IN `filters` AND IS DONE. There is nothing else to place: the
+ * facets open in a portaled, anchored overlay that the returned node carries
+ * with it, so a screen has no second value to hold, no second slot to find and
+ * no way to render half of this.
+ *
+ * SUPERSEDED MACHINERY, AND ALL OF IT IS WORTH A LINE, because each step was a
+ * real answer to the ruling in force at the time:
+ *
+ *   · ONE COMPONENT WITH A PORTAL (before v1.2.27). `<FilterBar>` rendered the
+ *     pill in place and `createPortal`'d the panel into a DOM node a bespoke
+ *     context (`PanelSlot` + `FilterPanelProvider` + `FilterPanelOutlet` +
+ *     `FilterPanelColumn`, ~62 lines) published from wherever the host's
+ *     toolbar happened to sit, because no host offered a real position for a
+ *     panel that had to land BELOW the whole toolbar.
+ *   · `{ pill, panel }`, TWO VALUES (v1.2.27). `CollectionFrame` and
+ *     `ToolbarRow` both grew a real `toolbarPanel` slot, so the context and
+ *     the portal were deleted and the caller placed each piece itself.
+ *   · ONE NODE AGAIN (2026-09-23). Aurora chose "filter drop sheet popover",
+ *     which puts the facets back on a floating surface, so there is no second
+ *     position left to name. Both `toolbarPanel` slots went with the pair, and
+ *     so did the census that used to catch a caller dropping one of two values
+ *     on the floor: it cannot drop half of one.
+ *
+ * The header's own "pass six" section carries the ruling and the argument.
  */
 function useFilterBar<T>({
   facets,
@@ -417,29 +464,17 @@ function useFilterBar<T>({
   onClearFacets: () => void
   /** Announced politely to screen readers when results change. */
   resultCount?: number
-  /** Applied to the pill's own wrapping box — NOT to the open panel, which
-   * takes its width from wherever the caller places `panel`. No call site
-   * uses this today. */
+  /** Applied to the box the Filter control stands in, never to the open
+   * overlay, which takes its measure from the form it chose. No call site uses
+   * this today. */
   className?: string
-}): { pill: React.ReactNode; panel: React.ReactNode } {
+}): React.ReactNode {
   const { t, lang } = useLanguage()
-  /** Is the panel open? Replaces the old Popover's own `open` state — same
-   * idea (a facet's controls are hidden until asked for), a plain toggle
-   * instead of a floating, portaled surface. */
+  /** Is the overlay open? The state is HELD HERE and not inside
+   * `FilterOverlay`, because the pill's count has to stay visible and correct
+   * while the overlay is open (client ruling, 2026-09-03) and the pill is this
+   * file's node. */
   const [open, setOpen] = React.useState(false)
-  /** THE OPEN PANEL ITSELF — focus lands on its first control the moment it
-   * appears, since (unlike the popover it replaces) nothing here traps focus
-   * or needs to hand it back: the "Filter" pill never unmounts, so leaving the
-   * panel open or closed never moves focus anywhere the reader didn't ask
-   * for. */
-  const panelRef = React.useRef<HTMLDivElement>(null)
-  const wasOpen = React.useRef(false)
-  React.useEffect(() => {
-    if (open && !wasOpen.current) {
-      panelRef.current?.querySelector<HTMLElement>("input, button")?.focus()
-    }
-    wasOpen.current = open
-  }, [open])
 
   /** WHAT THIS FACET'S PARENT IS SET TO — `""` when it has no parent to be set,
    * which is every facet in the app that declares no `dependsOn`. Read off
@@ -447,13 +482,14 @@ function useFilterBar<T>({
    * within the same render the parent was picked in (there is no Apply step on
    * this row: "the moment I select sth on a dropdown its applied", the client,
    * 2026-09-02). */
-  const parentValue = (f: FilterFacet): string =>
-    f.dependsOn ? (values[f.dependsOn.field] ?? "") : ""
+  const parentValues = (f: FilterFacet): string[] =>
+    f.dependsOn ? splitFacet(values[f.dependsOn.field] ?? "") : []
 
   /** THE FACET IS GATED — it hangs off another and that other is not answered
    * yet. Its control still draws (see the panel below); it just has nothing to
    * offer and says what to do first instead. */
-  const isGated = (f: FilterFacet): boolean => Boolean(f.dependsOn) && parentValue(f) === ""
+  const isGated = (f: FilterFacet): boolean =>
+    Boolean(f.dependsOn) && parentValues(f).length === 0
 
   /** WHAT THIS FACET MAY OFFER RIGHT NOW — the cascade, applied in the one place
    * every facet on both front doors passes through (the header carries the
@@ -480,13 +516,20 @@ function useFilterBar<T>({
   const optionsFor = (f: FilterFacet): FacetOption[] => {
     const dep = f.dependsOn
     if (!dep) return f.options ?? facetOptions(data, f.field)
-    const parent = values[dep.field] ?? ""
-    if (parent === "") return []
-    if (f.options) return f.options.filter((o) => o.within == null || o.within === parent)
+    // THE PARENT IS A SET NOW (24 Sep 2026). Three clients chosen above means
+    // this child offers every app of any of the three — the cascade runs down
+    // the ownership edge exactly as before, it is just that the edge now has
+    // several ends. `within == null` still survives every parent, for the
+    // reason `FacetOption.within` argues at length: our own systems are
+    // legitimately on a client's ticket.
+    const parents = splitFacet(values[dep.field] ?? "")
+    if (parents.length === 0) return []
+    if (f.options) return f.options.filter((o) => o.within == null || parents.includes(o.within))
     return facetOptions(
       data.filter((row) => {
         const owner = (row as Record<string, unknown>)[dep.field]
-        return owner == null || String(owner) === "" || String(owner) === parent
+        const said = String(owner ?? "")
+        return owner == null || said === "" || parents.includes(said)
       }),
       f.field
     )
@@ -521,9 +564,21 @@ function useFilterBar<T>({
      every call site passes) would re-fire the effect on every render. */
   const stranded = facets
     .filter((f) => f.dependsOn && (values[f.field] ?? "") !== "")
-    .filter((f) => !optionsFor(f).some((o) => o.value === values[f.field]))
-    .map((f) => ({
+    .map((f) => {
+      // ONLY THE VALUES THAT NO LONGER FIT GO. This used to drop the whole
+      // facet, which was the only possible answer while a facet held one
+      // value; with a set (24 Sep 2026) it would throw away two perfectly
+      // valid picks to correct a third. The kept subset is written back, so a
+      // reader who chose three of a client's apps and then added a second
+      // client keeps all three.
+      const offered = new Set(optionsFor(f).map((o) => o.value))
+      const had = splitFacet(values[f.field] ?? "")
+      return { facet: f, had, kept: had.filter((v) => offered.has(v)) }
+    })
+    .filter(({ had, kept }) => kept.length < had.length)
+    .map(({ facet: f, kept }) => ({
       field: f.field,
+      keep: joinFacet(kept),
       label: f.label,
       // The parent's own WORD, so the sentence reads "…the Client you picked"
       // rather than naming a query parameter at somebody. A `dependsOn` naming
@@ -543,7 +598,8 @@ function useFilterBar<T>({
     if (strandedFields === "") return
     const { stranded: gone, onChange: drop } = latest.current
     for (const s of gone) {
-      drop(s.field, "")
+      // The SUBSET that still fits, not "" — see `stranded` above.
+      drop(s.field, s.keep)
       // `t` is read from the enclosing render rather than through the ref
       // because the extractor's `t-call` position is an IDENTIFIER named `t`
       // (scripts/lib/i18n-source.mjs) — `latest.current.t("…")` is a property
@@ -565,7 +621,7 @@ function useFilterBar<T>({
     // re-run on a new translator identity meets that same guard.
   }, [strandedFields, t])
 
-  if (facets.length === 0) return { pill: null, panel: null }
+  if (facets.length === 0) return null
 
   /** HOW MANY FACETS ARE ON. The one definition in this row — the pill's count
    * reads it, and so does the panel's "Clear filters", which is not worth
@@ -599,48 +655,19 @@ function useFilterBar<T>({
   // slot; folding it into the sentence a second time would say it twice.
   const addFilterLabel = t("Filter")
 
-  const panel = open ? (
-    // NO `role="group"`/`aria-label` OF ITS OWN — the pill's own cluster
-    // already carries `role="group" aria-label="Filters"` (the kit's own
-    // `KitFilterBar` root), and each facet inside here names ITSELF
-    // (`RangeFacet`/`CompactFacet`'s own `role="group"`). A second "Filters,
-    // group" landmark wrapping both would tell a screen reader the same thing
-    // twice for no reason; this div is layout only.
-    //
-    // A NORMAL BLOCK, and every class that made it an overlay is gone:
-    // `absolute inset-x-0 top-full`, the `z-20` it needed to clear the rows it
-    // painted over, and `shadow-[var(--shadow-overlay)]`, the kit's
-    // floating-surface elevation — nothing here floats any more, so an
-    // elevation would be saying something untrue about the surface. `min-w-*`
-    // is for the one host that can only offer a narrow outlet (the engine's
-    // `useKitPanel` branch), so the panel keeps a usable measure instead of
-    // being squeezed to the width of the "Filter" pill.
-    //
-    // NO FILL AND NO RADIUS OF ITS OWN — CLIENT RULING, 2026-09-03, FOURTH
-    // PASS, SUPERSEDING THE `bg-background`/`rounded-[var(--radius)]` THIS DIV
-    // USED TO CARRY. Verbatim: "it kind of creates a second toolbar... merge
-    // this with the main toolbar so that it's one single background or
-    // container." A `bg-background` panel directly under a `bg-background`
-    // track, with a gap between the two, is not "one piece of furniture" —
-    // it is two boxes of the identical colour with air between them, which
-    // reads as exactly the second card she is naming. The surface (fill +
-    // shape) is now painted ONCE, by whichever container places this panel:
-    // `ToolbarRow` (screen-bits.tsx) merges it with its own track into one
-    // `bg-[var(--surface-raised)]` box (fixed off `bg-background` since this
-    // note was written — check screen-bits.tsx before trusting the name of a
-    // token in a comment about another file) that switches from
-    // `rounded-pill` to `rounded-[var(--radius)]` the moment this panel
-    // exists; the kit's own
-    // `CollectionFrame` places it inside its already-painted
-    // `bg-surface-panel` panel via `toolbarPanel`, where a second fill
-    // nested one level in would be the identical double-box CLAUDE.md's
-    // `useKitPanel` note calls "the broken combination". Either way this div
-    // paints nothing of its own — only layout and inset.
-    <div
-      ref={panelRef}
-      data-slot="filter-bar-row"
-      className="flex min-w-[min(26rem,calc(100vw-3rem))] flex-wrap items-start gap-4 p-4"
-    >
+  // THE FACETS, AS THE OVERLAY'S OWN CHILDREN — client ruling, 2026-09-23,
+  // superseding the in-flow panel this used to be. `FilterOverlay` owns the
+  // surface (fill, radius, elevation, geometry, focus, dismissal); this list
+  // owns what stands in it, which is exactly the split the four passes
+  // written up in this file's header kept failing to find. There is no
+  // wrapper of its own left: the overlay's `filter-overlay-body` IS the
+  // wrapper, and a second one here is the "two boxes" fault one level in.
+  //
+  // NO `role="group"`/`aria-label` OF ITS OWN — the surface carries
+  // `role="dialog"` and the overlay's title, and each facet names ITSELF
+  // (`RangeFacet`/`CompactFacet`'s own `role="group"`).
+  const facetFields = (
+    <>
       {facets.map((f) => {
         const val = values[f.field] ?? ""
 
@@ -765,11 +792,63 @@ function useFilterBar<T>({
                 const said = facetOptionList.find((o) => o.value === option.value)?.label ?? option.value
                 return said.toLowerCase().includes(query.trim().toLowerCase())
               }}
-              // `null` in, `""` out — the boundary conversion the header
-              // explains: the kit's own `null` means off, the app's own `""`
-              // does.
-              value={val === "" ? null : val}
-              onValueChange={(next) => onChange(f.field, next ?? "")}
+              // ── SEVERAL VALUES PER FACET — AURORA, 24 SEP 2026 ────────
+              // *"validated, but i shoudl be able to select multile for each
+              // filter type"*. Within one facet the chosen values mean OR;
+              // across facets the row still means AND, which is the doors'
+              // arithmetic (`inClause`, one `IN` per facet ANDed with the rest
+              // of the WHERE) and `selectRows`' (one predicate per facet,
+              // `every` across them, `includes` inside one).
+              //
+              // `single` IS THE NAMED EXCEPTION, and it is a fact about the
+              // VOCABULARY rather than a preference: a two-word facet whose
+              // words are opposites (Status active/inactive, Archived
+              // live/put-away) has nothing to multi-select, because ticking
+              // both is asking for no narrowing. `CollectionFacet.single`
+              // carries the argument and a census holds it to a two-option
+              // vocabulary, so a facet over records can never be pinned.
+              //
+              // THE BOUNDARY CONVERSION IS STILL THE ONLY THING HAPPENING
+              // HERE. The kit speaks `string[]`, the app's wire speaks one
+              // comma-joined parameter per field (`shared/facet-list.ts`), and
+              // `""` is off on this side exactly as `[]` is on that one.
+              //
+              // BOTH PAIRS ARE HANDED OVER, and that is not belt-and-braces:
+              // `multiple` chooses which one the kit reads, and a `single`
+              // facet drives `value`/`onValueChange` exactly as every facet
+              // did before today. Passing only the set pair left the three
+              // two-word facets (Status, Archived, the tickets view) wired to
+              // nothing — caught by this file's own single-select case, which
+              // is why that case exists.
+              multiple={!f.single}
+              values={splitFacet(val)}
+              onValuesChange={(next) => onChange(f.field, joinFacet(next))}
+              // `null` in, `""` out — the boundary conversion for the single
+              // half, unchanged since the day the kit's `CompactFacet` landed.
+              value={splitFacet(val)[0] ?? null}
+              onValueChange={(next) => onChange(f.field, next == null ? "" : joinFacet([next]))}
+              // WHAT THE CLOSED FIELD SAYS ABOVE ONE. The kit's own default is
+              // the first label and a bare ` +N`; this is the same sentence
+              // with a translator in front of it, which is the whole reason
+              // the kit made it a prop (R28: a sentence a person reads is in
+              // the catalogue, and a number glued to a label by the kit is
+              // not).
+              //
+              // IT READS THE APP'S OWN WORD, NEVER THE KIT-SHAPED LABEL. A
+              // facet that carries a `mark` (a ticket type's swatch, an app's
+              // own glyph — R93) hands the kit a composed NODE as its label,
+              // and a node cannot go into a translated sentence. The plain
+              // word is one lookup away in `facetOptionList`, which is the
+              // same list `filterOption` above already matches against for
+              // exactly this reason.
+              formatSummary={(chosen) =>
+                t("{what} +{count}", {
+                  what:
+                    facetOptionList.find((o) => o.value === chosen[0].value)?.label ??
+                    chosen[0].value,
+                  count: chosen.length - 1,
+                })
+              }
               // The dense control height, the height the kit's own facet
               // fields take when they stand in a panel rather than a form
               // (`CompactFacet`'s own `size` doc).
@@ -780,24 +859,8 @@ function useFilterBar<T>({
         )
       })}
 
-      {/* THE ONE "CLEAR FILTERS" — the header says why it is here and not
-          beside the pill. Drawn only when something is on, which is the kit's
-          own rule for the control it replaces ("a control that does nothing is
-          worse than no control"). `secondary` is the neutral paper pill every
-          other control in this row stands on, and the one Button variant that
-          carries no brand fill; `self-end` lines it up with the fields rather
-          than with their captions. R98 (21 Sep 2026) retired the `sm` height
-          this used to carry to match the dense facet fields beside it — every
-          toolbar button is the kit's default height now, so this one sits a
-          little taller than the fields it clears, which is the law's own
-          trade rather than a miss. */}
-      {activeCount > 0 && (
-        <Button variant="secondary" className="self-end" onClick={onClearFacets}>
-          {t("Clear filters")}
-        </Button>
-      )}
-    </div>
-  ) : null
+    </>
+  )
 
   // A REAL BADGE, NOT A NUMBER FOLDED INTO THE SENTENCE — CLIENT RULING,
   // 2026-09-03: "The count design should replicate the count design that we
@@ -824,7 +887,7 @@ function useFilterBar<T>({
   // is why `addFilterLabel` stays the plain, un-numbered "Filter" rather
   // than folding the count into the sentence a second time.
   const pill = (
-    <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>
+    <>
       {/* NO `filters`, NO `onRemove`, NO `onClear` — client ruling,
           2026-09-02: the toolbar shows a count and nothing else (see the
           header). What is left of the kit's bar is its "+ filter" slot,
@@ -849,10 +912,54 @@ function useFilterBar<T>({
       <span aria-live="polite" className="sr-only">
         {resultCount != null ? t("{count} results", { count: resultCount }) : ""}
       </span>
-    </div>
+    </>
   )
 
-  return { pill, panel }
+  // WHAT THE FACETS COST, WHICH IS WHAT DECIDES THE OVERLAY'S FORM — client
+  // ruling, 2026-09-23 ("filter drop sheet popover"), and the whole reason it
+  // is computed HERE rather than passed by a screen. `filterOverlayForm` takes
+  // a number and `FACET_SPAN` says what each declared facet contributes, so a
+  // collection that grows a fourth facet tomorrow moves from the popover to
+  // the drop sheet on its own, in `web/lib/collection-filters.ts`, with no
+  // screen revisited and nothing to keep in step. A screen that had to choose
+  // would choose right once and be wrong on the next ruling: `COLLECTION_
+  // FILTERS.help` went from three facets to four in a single afternoon's
+  // ruling and `accounts` from one to three a week later.
+  const span = facets.reduce(
+    (n, f) => n + (f.control === "range" ? FACET_SPAN.range : FACET_SPAN.field),
+    0
+  )
+
+  // THE OVERLAY IS THE WHOLE RETURN NOW — one node, not a `{ pill, panel }`
+  // pair. That pair existed because the panel had to land in a DIFFERENT place
+  // from the pill: a real sibling BELOW the toolbar, which meant two values and
+  // two slots and a census (`filter-row-is-the-kits`) whose job was to catch a
+  // caller that rendered one and dropped the other. Nothing lands below the
+  // toolbar any more — the surface floats, portaled, anchored — so the two
+  // pieces are one element again and half of a value cannot be dropped.
+  //
+  // "CLEAR ALL" AND "SHOW N" ARE THE OVERLAY'S, not this list's. They are the
+  // design's own two foot controls and the overlay places them; this file only
+  // says what they do and what they are called. Clear is handed over only when
+  // something is on, which is the same rule the old in-panel button followed
+  // ("a control that does nothing is worse than no control"), and Show carries
+  // the live result count the pill's own `aria-live` span already announces,
+  // so the number a reader hears and the number they read are one expression.
+  return (
+    <FilterOverlay
+      open={open}
+      onOpenChange={setOpen}
+      title={t("Filters")}
+      span={span}
+      className={className}
+      trigger={pill}
+      onClear={activeCount > 0 ? onClearFacets : undefined}
+      clearLabel={t("Clear all")}
+      showLabel={resultCount != null ? t("Show {count}", { count: resultCount }) : undefined}
+    >
+      {facetFields}
+    </FilterOverlay>
+  )
 }
 
 export { useFilterBar }

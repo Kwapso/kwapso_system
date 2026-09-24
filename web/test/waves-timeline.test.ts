@@ -67,6 +67,7 @@ function app(over: Partial<AppRow> & { id: string; name: string }): AppRow {
     staff: [],
     stakeholders: [],
     active: true,
+    archived: false,
     ...over,
   }
 }

@@ -214,7 +214,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
     },
   ]
   const sortOptions = DELIVERABLE_SORTS.map((o) => ({ ...o, label: t(o.label) }))
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values: facetValues,
     data: [],
@@ -279,7 +279,6 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
           )
         }
         filters={q.data.length > 0 && filterPill}
-        toolbarPanel={q.data.length > 0 && filterPanel}
         // A CONFIG, NOT A `<SortControl>` (R53) — the row draws the control
         // itself now, so this panel and every other collection toolbar in the
         // app put the same chip in the same place. See screen-bits.tsx's

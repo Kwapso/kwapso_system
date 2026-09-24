@@ -926,7 +926,6 @@ export function ToolbarRow({
   title,
   search,
   filters,
-  toolbarPanel,
   sort,
   view,
   actions,
@@ -986,28 +985,22 @@ export function ToolbarRow({
    * `sort`, the same position the design kit's own toolbar contract fixes
    * (search → filters → … → actions). Omitted wherever a screen has no
    * facets, exactly like `search`. It says a COUNT and never the filters
-   * themselves (client ruling, 2 Sep 2026); its open panel is `toolbarPanel`
-   * below, never a sibling of this pill inside the track. */
+   * themselves (client ruling, 2 Sep 2026); the facets it opens float above
+   * the rows and never land in this row at all.
+   *
+   * THERE IS NO `toolbarPanel` SLOT ANY MORE, and its removal is the point
+   * rather than a tidy-up — Aurora, 2026-09-23: "filter drop sheet popover",
+   * over her own earlier "a temporary overlay not a second row". That prop was
+   * the in-flow position the facets used to take, a real sibling beneath the
+   * track that pushed the collection down; four passes of it are written up in
+   * `shared/web/screen-engine/filter-bar.tsx`'s header. `useFilterBar` now
+   * returns ONE node that carries its own portaled surface, so there is
+   * nothing left to place here, and an unused slot for an in-flow panel is an
+   * invitation to draw the exact row the ruling forbids.
+   * `web/test/filters-open-as-an-overlay.test.tsx` (the check behind
+   * R110) reads this component's own props and fails if one comes
+   * back. */
   filters?: React.ReactNode
-  /** THE FILTER PILL'S OPEN PANEL — `useFilterBar`'s own `panel`, rendered as
-   * a real sibling BENEATH the track rather than floating over it (client
-   * ruling, 2 Sep 2026, third pass: "the expanded toolbar shoudl not be an
-   * overlay, but literaly expand the space"). It takes real space and pushes
-   * the collection down. Its PRESENCE also decides the merged container's own
-   * radius (client ruling, 2026-09-03, fourth pass, below): the track no
-   * longer carries its own fill or shape, so the panel's height feeds no box
-   * model but this column's, and the column's shape is chosen by
-   * `Boolean(toolbarPanel)` rather than measured from anything. The three
-   * passes that got here — a flex-sibling panel inside the pill (a giant
-   * oval), an absolutely-positioned one (floated over the rows), and an
-   * in-flow one with a visible seam between two same-toned boxes (read as a
-   * second toolbar) — are written up in `filter-bar.tsx`'s header. Named
-   * after the kit's own `CollectionFrame` `toolbarPanel` prop (v1.2.27),
-   * which draws the identical placement for a kit-panel collection; this is
-   * the same placement for the app's own bespoke row. `undefined`/`null`
-   * draws nothing, which is the pill closed or a caller with no facets at
-   * all — and it is also what keeps the container a pill. */
-  toolbarPanel?: React.ReactNode
   /** THE SORT CONTROL, after `filters` and before `view` — and a CONFIG, not
    * a node (R53). This row constructs the `<SortControl>` itself, so its
    * placement, its wrapper and its `label`/`hideLabel` treatment are the
@@ -1182,7 +1175,20 @@ export function ToolbarRow({
           "mb-[var(--toolbar-content-gap)]"
         )}
       >
-        <div data-slot="toolbar-row-track" className={cn("flex flex-wrap items-center gap-2", className)}>
+        <div
+          data-slot="toolbar-row-track"
+          /* THE DROP SHEET'S ANCHOR — `FILTER_ANCHOR_ATTR`
+             (shared/ui/components/filter-bar/filter-bar.tsx). Aurora's 2026-09-23
+             ruling gives the sheet form a width that is a fact about THE
+             TOOLBAR ("falls from the toolbar across its full width"), and a
+             popover anchors to its trigger, so the overlay finds the box it
+             spans by this attribute. One attribute on each of the app's two
+             toolbar tracks (this one and `ToolbarColumn`'s, paged-find.tsx),
+             never a ref threaded through every screen with facets. It changes
+             nothing about this element's own drawing. */
+          data-filter-anchor=""
+          className={cn("flex flex-wrap items-center gap-2", className)}
+        >
           {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
               like in your atifact": her reference artifact's search element is
               `flex: 1 1 auto`, not a fixed width, so it is what pushes
@@ -1198,9 +1204,8 @@ export function ToolbarRow({
           {/* `useFilterBar`'s own `pill` (`shared/web/screen-engine/filter-bar.tsx`)
               renders inline here — a normal flex child, wrapped in its own
               non-growing box internally, same as every other slot on this row.
-              Its OPEN panel is a SEPARATE value, `toolbarPanel` below — not
-              folded into this slot, which is exactly the shape a `ReactNode`
-              prop could not enforce back when one component drew both. */}
+              The facets it opens are not a second value and not a second
+              row: they ride with it, portaled, above the rows (R110). */}
           {filters}
           {/* THE ROW DRAWS BOTH OF THESE (R53), from the configs above. Before
               this, both were `React.ReactNode` and eight call sites handed
@@ -1249,7 +1254,6 @@ export function ToolbarRow({
           )}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
-        {toolbarPanel}
       </div>
     </div>
   )

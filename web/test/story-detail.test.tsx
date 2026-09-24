@@ -645,13 +645,13 @@ describe("Done is disabled while a timer on the story is still running (R99)", (
 
 // DEFECT (live proof, 21 Sep 2026): the Effort card's own stat tiles stayed
 // on their BEFORE-the-timer values (a story never worked on: "Not started",
-// "No time log", "0h") after a real Start-then-Stop of a very short (3
+// "No logs", "0h") after a real Start-then-Stop of a very short (3
 // second) timer, until a full reload — `refreshTimers` (shell/timer-bar.tsx)
 // invalidated `recordTimeKey` (the ROWS) on every start/stop but never
 // `story:metrics:<id>` (the door behind these three TILES), so the rows
 // updated and the tiles beside them did not.
 describe("the Effort card's stat tiles update after a real start/stop, no reload", () => {
-  it("moves off 'Not started' / 'No time log' once a short timer is stopped", async () => {
+  it("moves off 'Not started' / 'No logs' once a short timer is stopped", async () => {
     api.story = story({ status: "open" })
     // A REAL WORK LOG ALREADY EXISTS (the default `WORK_LOG` fixture,
     // `beforeEach` primes it) — the card draws nothing at all otherwise
@@ -667,7 +667,7 @@ describe("the Effort card's stat tiles update after a real start/stop, no reload
 
     // BEFORE: nothing has ever run on this story — the placeholder words.
     await screen.findByText("Not started")
-    expect(screen.getByText("No time log")).toBeTruthy()
+    expect(screen.getByText("No logs")).toBeTruthy()
 
     const startButton = await screen.findByRole("button", { name: /^Start/ })
     fireEvent.click(startButton)
@@ -679,7 +679,7 @@ describe("the Effort card's stat tiles update after a real start/stop, no reload
     // placeholder words a stale cache would keep showing.
     await waitFor(() => {
       expect(screen.queryByText("Not started")).toBeNull()
-      expect(screen.queryByText("No time log")).toBeNull()
+      expect(screen.queryByText("No logs")).toBeNull()
     })
     // AND THE TILES STILL RENDER — never blank, never gone — with the
     // rounded-to-zero figure the 3 second stop actually produced.
@@ -784,32 +784,32 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     api.metrics = FIXTURE_METRICS
     openStory()
     await screen.findByText("Cycle time")
-    // The title row itself: "Time log" then its own count, "1" — one WORK_LOG
+    // The title row itself: "Logs" then its own count, "1" — one WORK_LOG
     // fixture row — the same `<h3>{title}{count}</h3>` shape
     // `help-stakeholders.tsx`'s own "Stakeholders 4" register renders
     // through (`TicketSidePanel`).
-    const heading = await screen.findByRole("heading", { name: /^Time log/ })
-    expect(heading.textContent).toBe("Time log1")
+    const heading = await screen.findByRole("heading", { name: /^Logs/ })
+    expect(heading.textContent).toBe("Logs1")
   })
 
-  it("reads 'Not started' and 'No time log' before any work is logged, with the record count beside the title", async () => {
+  it("reads 'Not started' and 'No logs' before any work is logged, with the record count beside the title", async () => {
     api.story = story({})
     api.metrics = NO_METRICS
     openStory()
     await screen.findByText("Cycle time")
     expect(await screen.findByText("Not started")).toBeTruthy()
-    expect(await screen.findByText("No time log")).toBeTruthy()
+    expect(await screen.findByText("No logs")).toBeTruthy()
     // The one WORK_LOG fixture row is still logged even though the metrics
     // door has nothing to say yet — the title's own count answers a
     // different question from the tiles now, and does so honestly.
-    const heading = await screen.findByRole("heading", { name: /^Time log/ })
-    expect(heading.textContent).toBe("Time log1")
+    const heading = await screen.findByRole("heading", { name: /^Logs/ })
+    expect(heading.textContent).toBe("Logs1")
   })
 
   // AMENDED, 22 Sep 2026 — Aurora, verbatim: "make the metrics cards inside
   // the container, like in the metrics artifact you did for me!" The three
   // lines are real `<StatGrid>` tiles now, and the middle one reads "Effort
-  // hours" (not "Time log") since the title's own count answers "Time log" on
+  // hours" (not "Logs") since the title's own count answers "Logs" on
   // its own now — the figure is said once, not twice.
   it("renders the door's own cycle time, effort hours and flow efficiency as stat tiles", async () => {
     api.story = story({})
@@ -889,7 +889,7 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
   // AMENDED, 22 Sep 2026 — Aurora, from the task review, verbatim: "if no
   // time logged yet, hide that component." Stricter than R88's own
   // header-only drop: at zero rows the card renders NOTHING at all, not
-  // even the body's own "No time logged yet." sentence — the head's own
+  // even the body's own "No logsged yet." sentence — the head's own
   // Start/Stop timer button is the one way in.
   it("renders nothing at all — no card, no sentence — once the record has no time at all", async () => {
     api.story = story({})
@@ -900,8 +900,8 @@ describe("Effort — the metrics AND the rows, no add door (B44 amended)", () =>
     // The rest of the page still settles (a neighbouring panel proves the
     // page did not simply fail to render).
     await screen.findByText("Phase and wave")
-    expect(screen.queryByText("No time logged yet.")).toBeNull()
-    expect(screen.queryByRole("heading", { name: /^Time log/ })).toBeNull()
+    expect(screen.queryByText("No logsged yet.")).toBeNull()
+    expect(screen.queryByRole("heading", { name: /^Logs/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
     // No Effort card at all on the page — not even an empty shell.
     expect(container.querySelector('[data-slot="effort-log-rows"]')).toBeNull()

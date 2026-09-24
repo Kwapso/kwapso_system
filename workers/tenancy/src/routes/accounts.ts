@@ -15,6 +15,8 @@ import { fail, json, pagedJson } from "@shared/workers/http"
 import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP, idBatches } from "@shared/workers/limits"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { splitFacet } from "@shared/facet-list"
+import { oneOfPair } from "@shared/workers/filter-in"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -275,6 +277,11 @@ export async function getAccountsDashboard(request: Request, env: Env): Promise<
  * own Archived tab asking for exactly that pile; every other caller —
  * including one written before this field existed — gets the default
  * exclusion `accountsWhere` applies regardless of what this function parses. */
+/** THE TWO WORDS every yes/no facet on this door speaks. Named once so the
+ * three that use it cannot drift, and so `oneOfPair` is told the vocabulary
+ * rather than guessing it. */
+const YES_NO = ["yes", "no"] as const
+
 function accountQuery(url: URL): AccountFilters {
   const rawType = queryText(url.searchParams.get("type"), "Type")
   const rawInactive = queryText(url.searchParams.get("inactive"), "Inactive")
@@ -288,8 +295,13 @@ function accountQuery(url: URL): AccountFilters {
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
     type: rawType === "entity" || rawType === "individual" ? rawType : undefined,
-    inactive: rawInactive === "yes" || rawInactive === "no" ? rawInactive : undefined,
-    archived: rawArchived === "yes" || rawArchived === "no" ? rawArchived : undefined,
+    // A TWO-WORD FACET A MULTI-SELECT CONTROL MAY LAND ON BOTH OF (24 Sep
+    // 2026). Asking for every word a facet has is asking for no narrowing, so
+    // both collapses to `undefined` exactly as neither does — `oneOfPair`
+    // carries that argument. One word still means what it always did, so the
+    // Archived tab and every bookmark are untouched.
+    inactive: oneOfPair(splitFacet(rawInactive), YES_NO),
+    archived: oneOfPair(splitFacet(rawArchived), YES_NO),
     portal: rawPortal === "yes" || rawPortal === "no" ? rawPortal : undefined,
     parentId: queryText(url.searchParams.get("parentId"), "Parent"),
     // WHO'S RESPONSIBLE — a `team_members` user id, bounded text like every
@@ -297,12 +309,16 @@ function accountQuery(url: URL): AccountFilters {
     // check here: `accountsWhere` is what silently drops it for a portal
     // caller (see `AccountFilters.manager`), so this door never has to know
     // which kind of caller it is answering.
-    manager: queryText(url.searchParams.get("manager"), "Manager"),
+    // A SET SINCE 24 SEP 2026 — `splitFacet` reads the comma list off the
+    // ALREADY-VALIDATED string, so the cap and the NUL strip stay on the
+    // `searchParams.get` where R20's census looks for them and only the value's
+    // spelling grew.
+    manager: splitFacet(queryText(url.searchParams.get("manager"), "Manager")),
     // WHERE THE ACCOUNT IS — an open, per-team vocabulary value
     // (`shared/selectable-groups.ts`'s "Country"), so this is bounded text the
     // same way `q` is, never a closed allow-list: `accountsWhere` matches it
     // exactly, and a value naming nothing simply returns no rows.
-    country: queryText(url.searchParams.get("country"), "Country"),
+    country: splitFacet(queryText(url.searchParams.get("country"), "Country")),
   }
 }
 

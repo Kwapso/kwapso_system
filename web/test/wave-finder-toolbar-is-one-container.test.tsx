@@ -63,7 +63,14 @@ afterEach(cleanup)
  * expected value) is deliberate: the point here is that the track did not
  * move, and the aria state has its own test elsewhere. */
 const trackShape = (el: HTMLElement) =>
-  el.outerHTML.replace(/ aria-expanded="(?:true|false)"/g, "")
+  el.outerHTML
+    .replace(/ aria-expanded="(?:true|false)"/g, "")
+    // The control's own `data-open`, for the same reason: a state
+    // announcement, not a move. And `aria-hidden`, which a modal overlay puts
+    // over everything behind it (2026-09-23) — again a state, not a layout.
+    .replace(/ data-open="true"/g, "")
+    .replace(/ aria-hidden="true"/g, "")
+    .replace(/ data-aria-hidden="true"/g, "")
 
 
 const CLIENTS: Account[] = [{ id: "a1", name: "Bergman S.A." } as Account]
@@ -88,10 +95,11 @@ function HarnessWithActions() {
   )
 }
 
-const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
+const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/, hidden: true }))
+const overlay = () => document.querySelector('[data-slot="filter-overlay"]') as HTMLElement | null
 
 describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () => {
-  it("the track never moves, and neither the track nor the column paints a surface any more", async () => {
+  it("the track never moves, and the facets never land in the container at all", async () => {
     render(<Harness />)
 
     const column = document.querySelector('[data-slot="toolbar-row-column"]')
@@ -100,7 +108,7 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
     expect(track, "the track is a named child of the merged container").toBeTruthy()
     expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
 
-    expect(document.querySelector('[data-slot="filter-bar-row"]'), "nothing is open yet").toBeNull()
+    expect(overlay(), "nothing is open yet").toBeNull()
     // 22 SEP 2026 — NO FILL, NO RADIUS, NEITHER OPEN NOR CLOSED (this file's
     // header has the ruling). The column used to switch between `rounded-pill`
     // and `rounded-[var(--radius)]` off whether the panel was open; both are
@@ -116,46 +124,36 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
       "the track paints no fill or shape of its own either"
     ).not.toMatch(/rounded-pill|bg-background|bg-surface-panel/)
     const closedTrack = trackShape(track)
+    const closedColumn = trackShape(column as HTMLElement)
 
     openPanel()
-    const panelRow = await waitFor(() => {
-      const node = document.querySelector('[data-slot="filter-bar-row"]') as HTMLElement | null
+    const surface = await waitFor(() => {
+      const node = overlay()
       expect(node).toBeTruthy()
       return node!
     })
 
-    expect(trackShape(track), "opening the panel must not change the track's own markup").toBe(
+    expect(trackShape(track), "opening the overlay must not change the track's own markup").toBe(
       closedTrack
     )
-    expect(track.contains(panelRow), "the panel must never be inside the track").toBe(false)
-    expect(column!.contains(panelRow), "the panel lives in the merged container").toBe(true)
+    // THE FACETS ARE NOWHERE IN THIS TOOLBAR — Aurora, 2026-09-23 ("filter
+    // drop sheet popover"), over her own "a temporary overlay not a second
+    // row". `wave-finder.tsx` is a registered hand-copy of `ToolbarRow`
+    // (`TOOLBAR_CONTROL_OWNERS`, R53), which is exactly why it is held to the
+    // same property in its own file: a guarantee the row makes and a copy of
+    // it does not is the drift that registry exists to keep readable.
+    expect(track.contains(surface), "the overlay is never inside the track").toBe(false)
+    expect(column!.contains(surface), "the overlay is never inside the container either").toBe(false)
     expect(
-      panelRow.className,
-      "an in-flow panel positions nothing — no overlay"
-    ).not.toMatch(/(?:^|\s)(?:absolute|fixed|sticky|top-full|inset-x-0|z-\d+)(?:\s|$)/)
-    expect(
-      panelRow.className,
-      "the open panel must not paint its own background — one surface, not two"
-    ).not.toMatch(/bg-background|bg-surface-panel/)
-    expect(
-      panelRow.className,
-      "the open panel must not round its own corners — the merged container does"
-    ).not.toMatch(/rounded-\[var\(--radius\)\]/)
+      trackShape(column as HTMLElement),
+      "the container's own markup is untouched by opening it"
+    ).toBe(closedColumn)
+    expect(surface.getAttribute("data-form")).toMatch(/^(popover|sheet|bottom-sheet)$/)
 
-    // STILL NOTHING PAINTED WITH THE PANEL OPEN — the column used to switch
-    // to the box radius here; now it stays exactly as it was closed.
-    expect(column!.className, "the container still owns no background, panel open or not").not.toMatch(
-      /\bbg-(?!clip|none)[\w-]+/
-    )
-    expect(column!.className, "and no radius, panel open or not").not.toMatch(
-      /\brounded-[\w[\]().,%/#-]+/
-    )
-
-    openPanel()
-    await waitFor(() =>
-      expect(document.querySelector('[data-slot="filter-bar-row"]')).toBeNull()
-    )
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    await waitFor(() => expect(overlay()).toBeNull())
     expect(trackShape(track)).toBe(closedTrack)
+    expect(trackShape(column as HTMLElement)).toBe(closedColumn)
   })
 })
 

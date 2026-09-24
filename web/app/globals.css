@@ -448,6 +448,156 @@
 }
 
 /* ============================================================================
+   A TAB WHOSE BODY IS NOT A CARD STILL GETS THE LEAD — THE STRIP PAYS IT
+   (R83, extended 23 Sep 2026). AURORA, VERBATIM: "on accounts dashbard, the
+   mandatory space between tabs and content is missing".
+   ============================================================================
+   She is right, and it was missing everywhere rather than on one screen. The
+   strip pays NOTHING since 21 Sep (`renderFolderTabs` merges `pb-0` over
+   `--tab-content-gap` for every host, the rule three blocks up), so the WHOLE
+   distance is paid by the content below it — and the only payer this file had
+   written was `[data-slot="card"]`. Every tab that is a collection is a
+   `<CollectionCard>` and collects it; every tab that is NOT — a dashboard of
+   bare panels — collected zero. On Accounts the fault was visible twice over
+   in one screen: the Dashboard tab's error and empty registers ARE plain
+   `<Card>`s and picked the lead up, while the tab with real figures in it,
+   the only state anybody looks at, sat flush against the strip.
+
+   FIXED AT THE LAW, NOT AT THE SCREEN. The screen could not have fixed it:
+   R83's own census fails any `renderFolderTabs(` call whose immediate JSX
+   parent carries a `gap-*`/`space-y-*`, precisely so a caller cannot grow a
+   second opinion about this number — accounts-screen.tsx's own wrapper is the
+   gapless `flex flex-col` the law requires, and adding a margin to the
+   dashboard component would be the per-screen hard-code the 2026-09-03 ruling
+   ("don't hard-code page by page, but rather you change the rule and you
+   apply it everywhere") refuses. So the payment lands here, beside the card's
+   own, reading the IDENTICAL token: one number, two shapes of body.
+
+   THE STRIP PAYS, NOT THE BODY, AND THAT IS A MEASURED DECISION RATHER THAN A
+   SYMMETRY WITH THE CARD RULE ABOVE. A card can be paid on
+   `[data-slot="card-content"]`, an element whose `padding-top` the kit owns
+   and nobody else sets. A NON-card body is whatever the tab happens to be:
+   `TicketsDashboard`'s and `AccountsDashboard`'s own gapless columns, but
+   also `NoAccess`/`ShapeStateBody`'s state registers, which carry vertical
+   padding of their OWN. A `padding-top` written here would out-specify those
+   (a `:not()` chain beats a single utility class) and silently replace a
+   register's own inset with this number. Paying on the strip touches nothing
+   below it at all, and it is where `--tab-content-gap` was paid until 21 Sep
+   anyway — the same box, the same property, a different token.
+
+   IT IS `padding-bottom` ON THE STRIP, NEVER A MARGIN BETWEEN THE TWO, and
+   that is `STICKY_FOLDER_TABS`'s own argument: a margin between siblings is
+   never painted, so the moment the strip pins, the body keeps scrolling and
+   carries the reserved space away with it, arriving flush against the tabs —
+   the exact bug the 2026-09-03 ruling's second sentence names ("maintain the
+   space between tabs and content on all screens, even when I scroll down").
+   Padding is inside the sticky, painted box and is repainted at every
+   scroll position the strip is stuck at.
+
+   TWO EXCLUSIONS, AND BOTH ARE THE EXISTING RULE'S OWN FOOTPRINT. A card is
+   excluded because the rule above already pays it on `card-content` — paying
+   here as well would double the lead on every collection in the app. A
+   wrapper whose FIRST CHILD is a card is excluded for exactly the same
+   reason: that is `paged-find.tsx`'s own unconditional flow `<div>`, which
+   the second selector above already reaches THROUGH to the card inside it.
+
+   TWO POSSIBLE SELECTORS, NOT ONE IMPOSSIBLE ONE, AND THIS IS THE CORRECTION.
+   The first shipped form of this block wrote both exclusions into ONE
+   condition — `:has(+ *:not([data-slot="card"]):not(:has(> …)))` — which is
+   not a selector at all: the grammar forbids `:has()` inside `:has()`, at any
+   depth and through any `:not()`, so the whole prelude is unparsable and the
+   browser DISCARDS the rule. It is silent: no warning, no fallback, a
+   stylesheet that still loads, and a computed `padding-bottom` of 0px in
+   every case including the bare dashboard column this amendment was written
+   for. Measured rather than read — `document.querySelector` on that string
+   raises `SyntaxError: Invalid selector`, and each sub-part parses perfectly
+   on its own, so nothing short of asking a parser could have found it.
+
+   So each property is settled by a PAIR: one rule that pays, and one that
+   takes it back for the wrapper shape. The second is strictly more specific
+   than the first — `[data-slot="card"]:first-child` inside the `:has()`
+   against a single `:not([data-slot="card"])` — so the outcome does not
+   depend on source order, and both are more specific than the plain
+   `*:has(> .pinned-strip.pinned-strip-tight)` rule further up, which stays
+   the answer for a card that is the strip's own next sibling.
+
+   AND THE PINNED OFFSET MOVES WITH IT. `--pinned-chrome-h` is what a pinned
+   toolbar reads as its own `top`, and the rule further up sets it to the
+   strip's painted height, `var(--tab-strip-h)` — a CONSTANT derived from the
+   trigger's own geometry, not a measurement, so it does not learn about
+   padding by itself. A strip 10px taller with a stale offset would let a
+   pinned toolbar land 10px inside it. The second pair below raises the
+   property under exactly the conditions the first pair pays under, so the two
+   can never disagree. It matters at real call sites, not in theory: Settings
+   › Team draws its toolbar inside `TeamPanel`, a bare `<div>` and not a card,
+   which is precisely the shape this block is about.
+
+   PROVED BY `web/test/tab-content-gap.test.ts`, which reads this file off
+   disk AND HANDS EVERY SELECTOR TO A REAL PARSER — the half the first version
+   of that suite was missing, which is why a rule no browser accepted passed
+   four green string searches. It fails if a rule stops excluding a card (the
+   double-pay), if one stops reading `--toolbar-lead-gap` (a second number),
+   if the paying and cancelling halves drift apart, if any selector in this
+   file nests `:has()` inside `:has()`, or if the Accounts dashboard grows a
+   lead of its own instead of collecting this one.
+
+   ── AND THE LEAD IS TWO NUMBERS, 23 SEP 2026 ────────────────────────────────
+
+   Aurora, of the accounts dashboard: "there's margin missing under tabs", and
+   separately "needs to be a bit mor ein case withous toolbar!". MEASURED IN A
+   BROWSER against the real compiled stylesheet before anything was changed:
+   the lead was NOT missing. It was 10px, correctly, on every shape — the
+   Accounts dashboard and Settings > Appearance included. Her two sentences
+   read together say what that means: 10px is the number she ruled for the
+   space ABOVE A TOOLBAR (21 Sep, "the 10pc above and below"), and a tab with
+   no toolbar under the strip inherited it by accident.
+
+   So the strip's payment splits THREE ways by what follows it, and the three
+   rules below are that split in source order:
+
+     · a bare body with NO toolbar (every dashboard, Settings > Appearance)
+       pays `--tab-content-gap`, 20px — the number this exact relationship
+       carried until the toolbar ruling took it from every strip, which is why
+       no token is minted for it;
+     · a bare body that LEADS WITH A TOOLBAR (`[data-slot="toolbar-row-pin"]`,
+       Settings > Team's own `TeamPanel`) keeps `--toolbar-lead-gap`, 10px,
+       because a toolbar under the strip IS the relationship she ruled on;
+     · a card, or a wrapper around one, pays nothing here — the card is
+       already paying `--toolbar-lead-gap` on its own `card-content` above.
+
+   The order matters only for the first two, and specificity settles it
+   anyway: the toolbar and card conditions each carry an attribute plus
+   `:first-child` against the first rule's single `:not([attr])`.
+
+   MEASURED AFTER, same fixture, same compiled stylesheet: 18.75px (bare
+   column), 18.75px (bare `<section>`), 9.375px on the card's own
+   `card-content`, 9.375px for the paged-find wrapper, 9.375px on the strip
+   for the toolbar-led body — at the app's own 15px root. */
+.pinned-strip:has(+ *:not([data-slot="card"])) {
+  padding-bottom: var(--tab-content-gap);
+}
+
+.pinned-strip:has(+ * > [data-slot="toolbar-row-pin"]:first-child) {
+  padding-bottom: var(--toolbar-lead-gap);
+}
+
+.pinned-strip:has(+ * > [data-slot="card"]:first-child) {
+  padding-bottom: 0;
+}
+
+*:has(> .pinned-strip.pinned-strip-tight + *:not([data-slot="card"])) {
+  --pinned-chrome-h: calc(var(--tab-strip-h) + var(--tab-content-gap));
+}
+
+*:has(> .pinned-strip.pinned-strip-tight + * > [data-slot="toolbar-row-pin"]:first-child) {
+  --pinned-chrome-h: calc(var(--tab-strip-h) + var(--toolbar-lead-gap));
+}
+
+*:has(> .pinned-strip.pinned-strip-tight + * > [data-slot="card"]:first-child) {
+  --pinned-chrome-h: var(--tab-strip-h);
+}
+
+/* ============================================================================
    A COLLECTION NESTED INSIDE A RECORD'S OWN TAB PANE PAYS THE SAME REMAINDER
    (R83, extended 18 Sep 2026). CLIENT RULING, VERBATIM: "on app / tickets the
    space above the toolbar is huge and inocrrect!!! review app-wide!"
@@ -955,6 +1105,18 @@ body {
   overflow-x: clip;
   /* And nothing may make the page wider than the phone it is on. */
   max-width: 100vw;
+  /* THE BASE WEIGHT. Saans ships exactly two faces, Light 300 and Medium
+     500 (see the @font-face block in the kit's tokens.css) — no 400 face
+     exists. This element set no font-weight, so text fell back to the UA's
+     `normal` (400), and CSS font matching resolves an unavailable 400 to
+     the nearest AVAILABLE weight at or above it, which is 500: every weight
+     in the app rendered as Medium, collapsing any light/medium step (the
+     ticket stage ladder's current-step cue among them) to no signal at all.
+     The kit's own demo sets this same token on its body (demo/demo.css) —
+     that is why the kit looks correct in isolation and was wrong here.
+     Token, not a literal, so it tracks the kit if the light weight ever
+     changes. */
+  font-weight: var(--font-weight-light);
 }
 
 /* ── T3656/B0293 — "the tickets page sometimes reloads by itself with a

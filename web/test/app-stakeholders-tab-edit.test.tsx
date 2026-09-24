@@ -80,6 +80,12 @@ const BASE_PROPS = {
     ["c1", "Alice Bergman"],
     ["c2", "Bob Bergman"],
   ]),
+  // The client's own people's faces, off the same read their names come from
+  // (23 Sep 2026 — "Theirs" drew a null photo unconditionally until then).
+  contactPhotos: new Map<string, string | null>([
+    ["c1", null],
+    ["c2", null],
+  ]),
   host: { base: "/apps/app-1" },
   appId: "app-1",
   appName: "Dispatch",

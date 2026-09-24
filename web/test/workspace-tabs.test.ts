@@ -41,6 +41,7 @@ import {
   back,
 
   closeTab,
+  closeTabAndLand,
   forgetOpenTabs,
   forward,
   jumpTo,
@@ -713,6 +714,107 @@ describe("closing lands somewhere real", () => {
     setWorkspaceScope(null)
     setWorkspaceScope(ME)
     expect(strip()).toEqual(["Apps"])
+  })
+})
+
+// ── CLOSING THE LAST TAB OPENS THE NEW-TAB SCREEN ──────────────────────────
+//
+//   THE CLIENT, 23 SEP 2026, verbatim: "when i close the last folder tab, it
+//   shoudl open a new screen (the one with search bar)"
+//
+// "The one with search bar" is `NewTabScreen` — the `Where to?` page at
+// `NEW_TAB_PATH`, the same screen the strip's pinned "+" and cmd/ctrl-T open.
+//
+// WHAT THIS REPLACED, because the old behaviour is the reason the tests below
+// look the way they do. `closeTab` returns `null` on an empty set and its one
+// caller fell through to the collection of whatever had just been closed;
+// that navigation reached `visitTrail`, which — with no active tab — seeded a
+// FRESH tab for that collection and persisted it. The strip therefore never
+// looked empty, it just quietly refilled itself with a tab she never asked
+// for, and a reload brought it back. So the assertions here are not only
+// "lands on /new" but "and the closed tab's own address is nowhere in the
+// set, on disk or after a reload" — the failure mode was a wrong tab
+// appearing, never a missing one.
+describe("closeTabAndLand — the last tab closes onto the new-tab screen", () => {
+  it("closing the LAST tab lands on /new and leaves exactly one tab, the /new one", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    const id = activeTabIdSnapshot()
+    if (!id) throw new Error("expected an active tab")
+
+    expect(closeTabAndLand(id, "New tab")).toBe(NEW_TAB_PATH)
+
+    // A TAB, NOT AN EMPTY STRIP — the deliberate half of the decision. An
+    // empty set would make `tabStripState` drop the folder strip for the
+    // plain text trail (the phone chrome) rather than show "a new screen".
+    expect(paths()).toEqual([NEW_TAB_PATH])
+    expect(strip()).toEqual(["New tab"])
+    expect(activeTabPathSnapshot()).toBe(NEW_TAB_PATH)
+
+    // AND THE CLOSED TAB IS GONE — not resurrected as its own collection,
+    // which is precisely what used to happen one navigation later.
+    expect(paths()).not.toContain("/apps")
+    expect(paths()).not.toContain("/apps/A1")
+  })
+
+  it("the /new tab it opens is a ONE-STEP tab — the address that follows pushes nothing onto it", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    const id = activeTabIdSnapshot()
+    if (!id) throw new Error("expected an active tab")
+    closeTabAndLand(id, "New tab")
+
+    // The caller navigates to what this returned, and the screen that lands
+    // reports its own trail back through `visitTrail`. That must be the tab
+    // catching up with itself, never a second step — exactly as it is when
+    // "+" is pressed.
+    const newTabId = activeTabIdSnapshot()
+    visitTrail(at([NEW_TAB_PATH, "New tab"]))
+    expect(trailOf(newTabId!)).toEqual([NEW_TAB_PATH])
+    expect(activeTabIdSnapshot()).toBe(newTabId)
+    expect(openTabsSnapshot()).toHaveLength(1)
+  })
+
+  it("closing a NON-last tab is untouched: the neighbour rule still decides, and no /new appears", () => {
+    visitTrail(at(["/apps", "Apps"]))
+    openBeside("/apps/A1", "APP-1")
+    const [firstId, secondId] = openTabsSnapshot().map((t) => t.id)
+    if (!firstId || !secondId) throw new Error("expected two tabs")
+
+    // The same answer `closeTab` alone gave before this ruling existed.
+    expect(closeTabAndLand(secondId, "New tab")).toBe("/apps")
+    expect(strip()).toEqual(["Apps"])
+    expect(activeTabIdSnapshot()).toBe(firstId)
+    expect(paths()).not.toContain(NEW_TAB_PATH)
+  })
+
+  it("closing the FIRST of two still falls to the tab that took its place", () => {
+    visitTrail(at(["/apps", "Apps"]))
+    openBeside("/apps/A1", "APP-1")
+    const [firstId, secondId] = openTabsSnapshot().map((t) => t.id)
+    if (!firstId || !secondId) throw new Error("expected two tabs")
+    expect(closeTabAndLand(firstId, "New tab")).toBe("/apps/A1")
+    expect(activeTabIdSnapshot()).toBe(secondId)
+    expect(paths()).not.toContain(NEW_TAB_PATH)
+  })
+
+  // THE PERSISTED CASE — the store writes `localStorage` on every mutation,
+  // so "she closed her last tab and reloaded" is a real path a person walks.
+  // It must come back as the new-tab screen, never as the tab she just shut.
+  it("a reload after closing the last tab reopens /new, never the closed tab", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    const id = activeTabIdSnapshot()
+    if (!id) throw new Error("expected an active tab")
+    closeTabAndLand(id, "New tab")
+
+    // What actually sits on disk — read before the reload, so a failure says
+    // whether the write or the read is the broken half.
+    const stored = localStorage.getItem(`ss-open-tabs:${ME}`) ?? ""
+    expect(stored).toContain(NEW_TAB_PATH)
+    expect(stored).not.toContain("/apps/A1")
+
+    setWorkspaceScope(null)
+    setWorkspaceScope(ME)
+    expect(paths()).toEqual([NEW_TAB_PATH])
+    expect(strip()).toEqual(["New tab"])
   })
 })
 

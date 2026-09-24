@@ -620,7 +620,7 @@ describe("the sheet reacts to a start/stop/done mutation in the same page load, 
 
       // NO LOGGED TIME YET — the card draws nothing at all (its own rule,
       // effort-card.tsx).
-      await waitFor(() => expect(within(sheet).queryByText("Time log")).toBeNull())
+      await waitFor(() => expect(within(sheet).queryByText("Logs")).toBeNull())
 
       const startButton = within(actionsRow)
         .getAllByRole("button")
@@ -638,7 +638,7 @@ describe("the sheet reacts to a start/stop/done mutation in the same page load, 
       fireEvent.click(stopButton)
 
       // THE EFFORT CARD APPEARS — one settled row, no remount, no reload.
-      await waitFor(() => expect(within(sheet).queryByText("Time log")).toBeTruthy())
+      await waitFor(() => expect(within(sheet).queryByText("Logs")).toBeTruthy())
     } finally {
       door.workLogs = savedLogs
     }
@@ -711,8 +711,8 @@ describe("the sheet reacts to a start/stop/done mutation in the same page load, 
 
       // THE EFFORT CARD'S COUNT AND ROW LAND TOGETHER, no reload — clause
       // (b)'s count/row half, which the proof found correct.
-      const heading = await within(sheet).findByText("Time log")
-      await waitFor(() => expect(heading.closest("h3")?.textContent).toBe("Time log1"))
+      const heading = await within(sheet).findByText("Logs")
+      await waitFor(() => expect(heading.closest("h3")?.textContent).toBe("Logs1"))
       const list = document.querySelector('[data-slot="effort-log-rows"]') as HTMLElement
       expect(list, "the row list is drawn").toBeTruthy()
       expect(within(list).getByText(/Ana/)).toBeTruthy()
@@ -818,7 +818,7 @@ describe("the order of sections, top to bottom", () => {
     const detailsCard = document.querySelector('[data-slot="task-details-card"]') as HTMLElement
     // The Effort card's own title (`EmptyGatedPanel`) only draws once the
     // card's own work-log read settles, so this one waits.
-    const effortHeading = await within(sheet).findByText("Time log")
+    const effortHeading = await within(sheet).findByText("Logs")
     const footerBand = document.querySelector('[data-record-region="footer"]') as HTMLElement
 
     for (const el of [titleRow, actionsRow, detailsCard, effortHeading, footerBand]) {
@@ -1063,12 +1063,12 @@ describe("the Effort section draws the shared EffortCard", () => {
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
-    const heading = await within(sheet).findByText("Time log")
+    const heading = await within(sheet).findByText("Logs")
     // The record count sits beside the title, inside the same `<h3>` — one WORK_LOG
     // fixture row — the same `<h3>{title}{count}</h3>` shape
     // `help-stakeholders.tsx`'s own "Stakeholders 4" register renders
     // through (`TicketSidePanel`).
-    expect(heading.closest("h3")?.textContent).toBe("Time log1")
+    expect(heading.closest("h3")?.textContent).toBe("Logs1")
   })
 
   it("no Cycle time / Flow efficiency grid draws — a task has neither concept", async () => {
@@ -1076,7 +1076,7 @@ describe("the Effort section draws the shared EffortCard", () => {
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
-    await within(sheet).findByText("Time log")
+    await within(sheet).findByText("Logs")
     expect(within(sheet).queryByText("Cycle time")).toBeNull()
     expect(within(sheet).queryByText("Flow efficiency")).toBeNull()
   })
@@ -1085,7 +1085,7 @@ describe("the Effort section draws the shared EffortCard", () => {
     const teamId = warmTeam([TASK])
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
-    await screen.findByText("Time log")
+    await screen.findByText("Logs")
 
     // Scoped off `document`, not the render `container` — the sheet's
     // content renders through a Radix portal (`ticket-detail-no-tabs.test.tsx`
@@ -1109,7 +1109,7 @@ describe("the Effort section draws the shared EffortCard", () => {
     render(<Harness teamId={teamId} tasks={[TASK]} initialOpenTaskId="t1" />)
     await screen.findByRole("heading", { level: 2, name: "File the quarterly VAT return" })
     const sheet = document.querySelector('[data-slot="task-sheet-scroll"]') as HTMLElement
-    await within(sheet).findByText("Time log")
+    await within(sheet).findByText("Logs")
     // `WorkLogsPanel`'s own toolbar drew a "Log time" pill; the card this
     // sheet mounts now has no toolbar and no such door at all.
     expect(within(sheet).queryByText("Log time")).toBeNull()
@@ -1145,8 +1145,8 @@ describe("the Effort section is absent when the task has no time logged", () => 
       // its absence — the same wait every other Effort test in this file
       // gives it to assert its PRESENCE.
       await waitFor(() => {
-        expect(within(sheet).queryByText("Time log")).toBeNull()
-        expect(within(sheet).queryByText("No time logged yet.")).toBeNull()
+        expect(within(sheet).queryByText("Logs")).toBeNull()
+        expect(within(sheet).queryByText("No logsged yet.")).toBeNull()
       })
     } finally {
       door.workLogs = savedLogs

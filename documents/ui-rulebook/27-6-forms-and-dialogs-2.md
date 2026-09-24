@@ -92,3 +92,58 @@ clamp, they shorten it themselves.
 **Law.** R87's own amendment (`title-length`), no new rule number.
 
 ---
+
+### F19: a photograph always beats initials; initials are the fallback, never the default
+
+**The ruling.** Aurora, verbatim, 23 Sep 2026, over the Choices table's own "Added by"
+cell, and generalised by her in the same sentence before anybody could scope it to that
+screen: *"on choices adde by show avatar, not initials. make this a rule, but not only for
+this case but always: where there's avatar show it- only initials when avatar is empty."*
+
+**The mechanism.** Wherever this app draws a PERSON, that mark is handed the person's
+photograph, and the initials tile renders only where there is genuinely no photograph on
+file. THE COMPONENT WAS NEVER THE DEFECT: `RecordMark` (`shared/web/record-mark.tsx`) has
+drawn a picture when given one and fallen back to an initial when not since the day it was
+written, so a check that read the component would have been green on the morning she filed
+this. The defect is upstream of it every time, and all six found the day this law shipped
+were the same shape, a fact the call site already held, or could reach in one lookup, and
+simply did not forward: the Choices Added-by cell (the door had been selecting
+`selectable_data.creator_id` since the Added columns landed, and `toValue` dropped it); the
+Kanban card's assignee (`membersById` was already in scope, built for the Assignee facet);
+the app stakeholders checklist AND its Main stakeholder picker (both callers flattened
+`AccountLink.personLogoUrl` away in their own `.map`); the task sheet's assignee chip
+(drawing a letter tile while the Effort card three hundred lines down the same file drew
+each logger's real face off the same members cache); and the Stakeholders tab's "Theirs"
+column, which hardcoded `photo: null` while "Ours" beside it resolved a real picture one
+line above.
+
+**What it costs.** A `picture={…}` at the call site, which is almost always one lookup away
+from something already in scope. Where it genuinely is not, the cost is a line in
+`PHOTO_UNREACHABLE` saying why, keyed by `{file, contains}`, a fragment of the call site's
+own text and never a line number. That table is NOT expected to be empty, unlike most in
+this repo, and that is deliberate: a person with no photograph on file is the ordinary
+case, and some marks stand for somebody who is not a record yet at all (a pending invite's
+only identity is the email it was sent to). What the table buys is the DIFFERENCE being
+written down: "this person has no picture", which is fine and is exactly the fallback she
+asked for, against "this screen never went and got the picture", which was the defect, six
+times over.
+
+**What it cannot see.** A call site that passes `picture={…}` with a value that is
+hardcoded `null`. The Stakeholders tab's "Theirs" column was exactly that, and it was found
+by reading, not by the check: a census over VALUES rather than prop names would have to
+resolve an expression, which is a type-checker's job. This law catches the missing ASK; a
+reader still has to catch a dishonest answer.
+
+**Status: ruled and enforced, 23 Sep 2026.**
+
+**Law.** [R111](../RULES.md) (`photo-beats-initials`), `web/test/photo-beats-initials.test.ts`,
+a CALL-SITE census over every `.tsx` under `web/components`, read through the repo's one
+comment stripper (four of the files walked quote `<RecordMark shape="round" />` in their own
+prose, and a census that counted those would report findings that are not code): every
+`<RecordMark shape="round">` and every `<PersonCard>` that carries no `picture=` is a
+finding, unless the call site is named in `PHOTO_UNREACHABLE` with its reason, rot-checked
+both ways so the list can only shrink. A tripwire renders a synthetic sample through the
+same parser and asserts it FINDS the offender, so the census cannot pass by matching
+nothing.
+
+---

@@ -1911,20 +1911,41 @@ describe("R67 — a titled section stands on paper", () => {
     ).toEqual([])
 
     // AMENDMENT 7's TRIPWIRE, IN TWO HALVES LIKE AMENDMENT 4's. First the
-    // REVIEWED PIN against the real app: today it is zero, because the one
-    // live chokepoint that forwards `{children}` on a `<section>`
-    // (`settings-section.tsx`) paints itself directly and is resolved by
-    // shape (a) before `bodies()` is ever called on it — see that table's own
-    // comment. A rise here means a section's real content just went dark to
-    // this walk; resolve it one hop through the caller or explain the new
-    // count at this line.
+    // REVIEWED PIN against the real app.
+    //
+    // IT WAS ZERO UNTIL 23 SEP 2026, and the reason it was zero is the reason
+    // it is now ONE. Amendment 7's own note named the risk exactly: the one
+    // live chokepoint that forwards `{children}` on a `<section>` is
+    // `shared/web/settings-section.tsx`, and it was resolved by shape (a) —
+    // "the section IS the box" — before `bodies()` was ever called on it,
+    // because it painted `bg-surface-panel` on itself. *"So the live risk is
+    // not this exact file, it is the NEXT chokepoint that forwards
+    // `{children}`/`{body}`/`{content}` without painting itself."* It turned
+    // out to be this exact file. Aurora, 23 Sep 2026, verbatim: "settings
+    // appearacne shoudl not have card - thats not minimal." The fill came
+    // off, shape (a) stopped short-circuiting, and the walk reached the bare
+    // `{children}` that was always underneath it.
+    //
+    // ONE, AND THE ONE IS NAMED. This is a BLINDNESS counter, not an
+    // offence: R67's "a body must stand on paper" clause was deleted whole by
+    // amendment 10 the moment Aurora overturned the premise app wide, so an
+    // unpainted section forwarding its children is the ordinary shape now and
+    // there is nothing here for it to fail. What the counter exists to say is
+    // that this walk cannot see INTO that section — and it cannot, for
+    // exactly the file amendment 7 predicted. Resolving it for real is still
+    // the second, nested census amendment 7 declined to build (one hop to
+    // every call site of the component), and it would today resolve to ONE
+    // caller, `AppearancePanel`, whose body is four rows on the page ground
+    // that no surviving clause judges. So the pin moves rather than the walk.
+    // It must still only ever rise WITH a reason written at this line.
     expect(
       amendment7.unresolvedIdentifiers,
-      "the real census now finds a bare identifier standing where a section's content should be — a " +
-        "component is forwarding `{children}`/`{body}`/`{content}` on an unpainted `<section>` the way " +
-        "`settings-section.tsx` almost does. Resolve it one hop through the caller, or explain the new " +
-        "count here (it must only ever rise together with a reason)"
-    ).toBe(0)
+      "the real census now finds MORE bare identifiers standing where a section's content should be than " +
+        "the one `shared/web/settings-section.tsx` has forwarded since its box came off (23 Sep 2026) — a " +
+        "second component is forwarding `{children}`/`{body}`/`{content}` on an unpainted `<section>`. " +
+        "Resolve it one hop through the caller, or explain the new count here (it must only ever rise " +
+        "together with a reason)"
+    ).toBe(1)
     // …then the OWNED FIXTURE, so the counter's own wiring is proved without
     // waiting for the app to grow a second chokepoint (this file's own most
     // recent lesson, at amendment 5's `rootsFollowed` tripwire above).

@@ -42,6 +42,7 @@ import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { refuseWhileTimerRuns } from "./work-logs"
+import { accountArchivedClause, ticketArchivedClause } from "./help"
 import {
   idBatches,
   LIST_HARD_CAP,
@@ -457,8 +458,41 @@ function storyPhaseActiveSql(): string {
   ))`
 }
 
+/** ARCHIVED MEANS INVISIBLE, AND IT REACHES DOWN (R112) — Aurora, 23 Sep 2026,
+ * widening her account ruling: "validated - this for everything when archived,
+ * not only accounts."
+ *
+ * A story hangs off TWO archivable records and both are asked, separately and
+ * unconditionally, exactly as `ticketWhere` asks the account one: its CLIENT
+ * (`stories.account_id`, migration 0117's `accounts.archived_at`) and its
+ * TICKET (`stories.ticket_id`, `help.archived_at`). Two facts, two columns, two
+ * tables, and neither reads the other's — archiving a ticket must never silently
+ * archive the account it was raised by, and un-archiving one must hand back
+ * exactly what the story carried before.
+ *
+ * BOTH SHORT-CIRCUIT ON NULL and here that is the majority case, not the edge:
+ * four out of five stories in the real base carry no ticket at all (migration
+ * 0014's own header on the nullable `ticket_id`), and an enabler story nobody
+ * raised against a company carries no account either. A clause that dropped
+ * either short-circuit would empty the board rather than filter it.
+ *
+ * SAID ONCE, read by `storyWhere` (the page AND its R16 count) and by
+ * `countStoryViews` (every tab's badge, which builds its own WHERE by hand).
+ * The badge and the rows must answer the same question or the strip counts work
+ * the list refuses to show. */
+function storyArchivedClauses(alias = "s"): string[] {
+  // ITS OWN ARCHIVED STATE FIRST (0123). Aurora widened the ruling from hiding
+  // to CASCADING — "when archiving a parent item, always archive as well the
+  // child items" — so a row whose parent was archived now carries `archived_at`
+  // of its own, and this is what hides it. The two parent clauses below stay as
+  // the BELT for the one case a cascade cannot reach: a row created AFTER its
+  // parent was archived is born live under an invisible parent, and only a
+  // clause about the parent can see that.
+  return [`${alias}.archived_at IS NULL`, accountArchivedClause(alias), ticketArchivedClause(alias)]
+}
+
 function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
-  const parts: string[] = []
+  const parts: string[] = [...storyArchivedClauses()]
   const params: string[] = []
   const view = storyViewSql(filter.view ?? "open")
   if (view.sql) {
@@ -602,7 +636,9 @@ export async function countStoryViews(
   guard: MemberGuard,
   filter: { assigneeId?: string; includeUnassigned?: boolean }
 ): Promise<StoryViewCounts> {
-  const clauses: string[] = []
+  // R112 + R16: the same two archive clauses `storyWhere` rides, so every tab's
+  // badge counts the rows the list can actually show.
+  const clauses: string[] = [...storyArchivedClauses()]
   const innerParams: string[] = []
   if (filter.assigneeId) {
     clauses.push(filter.includeUnassigned ? "(s.assignee_id = ? OR s.assignee_id IS NULL)" : "s.assignee_id = ?")

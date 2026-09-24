@@ -42,6 +42,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv, req } from "./spine-harness"
 import { addressChanged, geocodeAddress } from "../src/lib/geocode"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 
 const ROOT = join(__dirname, "..", "..", "..")
 
@@ -65,8 +66,35 @@ const accountRow = (id: string) =>
 const okResponse = (lat: number, lng: number) =>
   new Response(JSON.stringify({ status: "OK", results: [{ geometry: { location: { lat, lng } } }] }), { status: 200 })
 
+/** A COUNTRY GOOGLE CANNOT RESOLVE, AND THE TEAM CAN STILL OFFER.
+ *
+ * The two door cases below are about the GEOCODER giving up, not about the
+ * vocabulary, and they were written while an account's country was free text.
+ * Since team migration 0120 the write door refuses a country that is not one
+ * of the team's current options (`requirePickedAccountValues`,
+ * workers/tenancy/src/lib/accounts.ts) -- Aurora's 23 Sep 2026 ruling, "make
+ * it a drop down, adjustable on settings", which the country had been ruled
+ * into long before and never enforced.
+ *
+ * SO THE WORD GOES ON THE LIST rather than out of the test. Swapping in a real
+ * country would change what these cases are about (Google resolves "Austria"),
+ * and dropping the country would stop handing the geocoder an address at all.
+ * The pure `geocodeAddress` case further up needs none of this: it never
+ * touches a door. */
+const NOWHERELAND = "Nowhereland"
+
+function offerNowhereland(): void {
+  ;(holder.db as DatabaseSync)
+    .prepare(
+      `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_name)
+       VALUES (lower(hex(randomblob(16))), ?, ?, 0, datetime('now'), 'Test')`
+    )
+    .run(SELECTABLE_GROUPS.country, NOWHERELAND)
+}
+
 beforeEach(() => {
   holder.db = buildSpineDb()
+  offerNowhereland()
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -228,7 +256,7 @@ describe("createAccount, the geocode never blocks or fails the write", () => {
   it("an address Google cannot resolve still creates the account, lat/lng left null", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ status: "ZERO_RESULTS", results: [] }), { status: 200 })))
     const { status, text } = await call(
-      req("POST /api/tenancy/accounts", { accountType: "entity", name: "Padelbase", country: "Nowhereland" }),
+      req("POST /api/tenancy/accounts", { accountType: "entity", name: "Padelbase", country: NOWHERELAND }),
       IDS.staffUser,
       { GOOGLE_MAPS_GEOCODE_KEY: "test-key" }
     )
@@ -339,7 +367,7 @@ describe("updateAccount, only re-geocodes when the address actually changed", ()
         id: IDS.victimAccount,
         name: "Bergman S.A.",
         street: "Nowhere Ave",
-        country: "Nowhereland",
+        country: NOWHERELAND,
       }),
       IDS.staffUser,
       { GOOGLE_MAPS_GEOCODE_KEY: "test-key" }

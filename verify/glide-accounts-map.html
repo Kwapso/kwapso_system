@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glide Customers &rarr; our Accounts</title>
+<style>
+  :root {
+    --background:#FFFEF9; --foreground:#1A1918; --card:#FFFEF9; --muted:#FAF9F7;
+    --border:rgba(26,25,24,.08); --ink-secondary:#4a4946; --ink-tertiary:#5f5d59;
+    --hair-strong:rgba(26,25,24,.20); --accent:#8a5a2b;
+    --ok-bg:#e9f3ea; --ok-border:#5a9a63; --ok-ink:#2f5c37;
+    --warn-bg:#fff4e0; --warn-border:#d9a441; --warn-ink:#6b4a12;
+    --gap-bg:#fbeaea; --gap-border:#c46a6a; --gap-ink:#7a2f2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background:#141310; --foreground:#FFFEF9; --card:#26241F; --muted:#2F2D28;
+      --border:rgba(255,254,249,.12); --ink-secondary:#d5d1c9; --ink-tertiary:#bdb9b1;
+      --hair-strong:rgba(255,254,249,.24); --accent:#d3ac74;
+      --ok-bg:#16261a; --ok-border:#3f7a4a; --ok-ink:#9fd0a8;
+      --warn-bg:#2e2610; --warn-border:#8a6a2a; --warn-ink:#e9c887;
+      --gap-bg:#2c1717; --gap-border:#8a3f3f; --gap-ink:#e8a5a5;
+    }
+  }
+  :root[data-theme="dark"] {
+    --background:#141310; --foreground:#FFFEF9; --card:#26241F; --muted:#2F2D28;
+    --border:rgba(255,254,249,.12); --ink-secondary:#d5d1c9; --ink-tertiary:#bdb9b1;
+    --hair-strong:rgba(255,254,249,.24); --accent:#d3ac74;
+    --ok-bg:#16261a; --ok-border:#3f7a4a; --ok-ink:#9fd0a8;
+    --warn-bg:#2e2610; --warn-border:#8a6a2a; --warn-ink:#e9c887;
+    --gap-bg:#2c1717; --gap-border:#8a3f3f; --gap-ink:#e8a5a5;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:40px 16px 100px; background:var(--background); color:var(--foreground);
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; font-weight:300; line-height:1.55;
+  }
+  .wrap { max-width:960px; margin:0 auto; }
+  h1 { font-size:26px; font-weight:500; letter-spacing:-.02em; margin:0 0 6px; }
+  .sub { color:var(--ink-tertiary); font-size:14px; margin:0 0 28px; }
+  .scores { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 32px; }
+  .score { flex:1 1 180px; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--muted); }
+  .score b { display:block; font-size:30px; font-weight:500; letter-spacing:-.02em; line-height:1.1; }
+  .score span { font-size:13px; color:var(--ink-secondary); }
+  .score.ok b { color:var(--ok-border); }
+  .score.warn b { color:var(--warn-border); }
+  .score.gap b { color:var(--gap-border); }
+  h2 { font-size:17px; font-weight:500; margin:36px 0 4px; letter-spacing:-.01em; }
+  h2 .pill { font-size:12px; font-weight:400; border-radius:999px; padding:2px 9px; margin-left:8px; vertical-align:2px; }
+  .pill.ok { background:var(--ok-bg); border:1px solid var(--ok-border); color:var(--ok-ink); }
+  .pill.warn { background:var(--warn-bg); border:1px solid var(--warn-border); color:var(--warn-ink); }
+  .pill.gap { background:var(--gap-bg); border:1px solid var(--gap-border); color:var(--gap-ink); }
+  .lede { color:var(--ink-secondary); font-size:14px; margin:0 0 14px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.06em;
+       color:var(--ink-tertiary); padding:0 10px 8px 0; border-bottom:1px solid var(--hair-strong); }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid var(--border); vertical-align:top; }
+  td.mono, th.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:var(--ink-tertiary); }
+  td.note { color:var(--ink-secondary); font-size:13px; }
+  .arrow { color:var(--ink-tertiary); }
+  .box { border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px;
+         background:var(--muted); padding:14px 16px; margin:28px 0; font-size:14px; }
+  .box b { font-weight:500; }
+  .ask { border-left-color:var(--warn-border); background:var(--warn-bg); color:var(--warn-ink); }
+  .ask a { color:inherit; }
+  ol { padding-left:20px; margin:8px 0 0; }
+  li { margin:6px 0; }
+  @media (max-width:620px) {
+    td.mono, th.mono { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Glide <em>Customers</em> &rarr; our <em>Accounts</em></h1>
+  <p class="sub">Field-by-field, 22 Sep 2026. Glide table <span class="mono">native&#8209;table&#8209;KtgLf68Rejdeh7590Lem</span> &middot; 34 columns &middot; 20 rows.</p>
+
+  <div class="scores">
+    <div class="score ok"><b>13</b><span>land straight into a column we already have</span></div>
+    <div class="score warn"><b>4</b><span>land, but something needs deciding first</span></div>
+    <div class="score gap"><b>17</b><span>have nowhere to go &mdash; half the table</span></div>
+  </div>
+
+  <h2>1 &middot; These just work <span class="pill ok">13 fields</span></h2>
+  <p class="lede">Same meaning, same shape. Nothing to decide, nothing to build.</p>
+  <table>
+    <tr><th>In Glide</th><th class="mono">id</th><th>In our app</th></tr>
+    <tr><td>customerName</td><td class="mono">LoM8i</td><td><span class="arrow">&rarr;</span> name</td></tr>
+    <tr><td>customerDescription</td><td class="mono">FBJAw</td><td><span class="arrow">&rarr;</span> about</td></tr>
+    <tr><td>adminEmail</td><td class="mono">aW2YY</td><td><span class="arrow">&rarr;</span> email</td></tr>
+    <tr><td>adminPhone</td><td class="mono">B48wf</td><td><span class="arrow">&rarr;</span> phone</td></tr>
+    <tr><td>aboutIndustry</td><td class="mono">f29Du</td><td><span class="arrow">&rarr;</span> industry</td></tr>
+    <tr><td>visualsLogo</td><td class="mono">UABQC</td><td><span class="arrow">&rarr;</span> logo_url</td></tr>
+    <tr><td>visualsCover</td><td class="mono">lfClr</td><td><span class="arrow">&rarr;</span> cover_url</td></tr>
+    <tr><td>adressStreet</td><td class="mono">Fi04u</td><td><span class="arrow">&rarr;</span> street</td></tr>
+    <tr><td>adressCity</td><td class="mono">lTZIw</td><td><span class="arrow">&rarr;</span> city</td></tr>
+    <tr><td>adressPc</td><td class="mono">5Oyda</td><td><span class="arrow">&rarr;</span> postal_code</td></tr>
+    <tr><td>adressCountry</td><td class="mono">HTt36</td><td><span class="arrow">&rarr;</span> country</td></tr>
+    <tr><td>statusId</td><td class="mono">ngHBG</td><td><span class="arrow">&rarr;</span> status</td></tr>
+    <tr><td>contactLanguage</td><td class="mono">Zc406</td><td><span class="arrow">&rarr;</span> locale</td></tr>
+  </table>
+
+  <h2>2 &middot; These land, but something needs deciding <span class="pill warn">4 fields</span></h2>
+  <p class="lede">All four are the same problem: <b>who made this, and when</b>.</p>
+  <table>
+    <tr><th>In Glide</th><th class="mono">id</th><th>The problem</th></tr>
+    <tr><td>logCreatedOn</td><td class="mono">VnwNS</td><td class="note">Our app stamps the date itself, at the moment of writing. So a client you signed in 2024 arrives dated today.</td></tr>
+    <tr><td>logCreatedBy</td><td class="mono">Iii5e</td><td class="note">Same: the app records whoever ran the import, not the person who really added them.</td></tr>
+    <tr><td>logLastEditedOn</td><td class="mono">x0Sgb</td><td class="note">Same.</td></tr>
+    <tr><td>logLastEditedBy</td><td class="mono">h8KNN</td><td class="note">Same.</td></tr>
+  </table>
+  <div class="box">
+    That's deliberate &mdash; it's what makes the history trustworthy, nobody can fake a date. But it means
+    <b>the real dates are lost on screen</b> unless we add a "came from Glide on&hellip;" field. Your call, and it's cheap either way.
+  </div>
+
+  <h2>3 &middot; These have nowhere to go <span class="pill gap">17 fields</span></h2>
+  <p class="lede">Half the Glide table. Each one is: <b>add a field, or let it go.</b></p>
+  <table>
+    <tr><th>In Glide</th><th class="mono">id</th><th>What it is</th></tr>
+    <tr><td>contactWebsite</td><td class="mono">Jl0Rk</td><td class="note">The client's website. Surprising one &mdash; we genuinely have no website field.</td></tr>
+    <tr><td>contactLinkedin</td><td class="mono">Sqhqk</td><td class="note">Their LinkedIn page.</td></tr>
+    <tr><td>adminLegalName</td><td class="mono">dMbUL</td><td class="note">The registered company name, for invoices.</td></tr>
+    <tr><td>adminTaxId</td><td class="mono">VFtG2</td><td class="note">VAT number. Needed the moment you invoice from here.</td></tr>
+    <tr><td>adressState</td><td class="mono">aDsuB</td><td class="note">State / region. We have street, city, postcode, country &mdash; just not this.</td></tr>
+    <tr><td>aboutLeadSource</td><td class="mono">TtLzs</td><td class="note">How you found them.</td></tr>
+    <tr><td>aboutFounded</td><td class="mono">AJ7GL</td><td class="note">Year the client company started.</td></tr>
+    <tr><td>aboutSize</td><td class="mono">mNiP6</td><td class="note">How big they are.</td></tr>
+    <tr><td>aboutHistory</td><td class="mono">YyWXk</td><td class="note" rowspan="1">Their story.</td></tr>
+    <tr><td>aboutCoreServiceProduct</td><td class="mono">PiTez</td><td class="note">What they sell.</td></tr>
+    <tr><td>aboutUsp</td><td class="mono">qAcXj</td><td class="note">What makes them different.</td></tr>
+    <tr><td>aboutMission</td><td class="mono">wfWrj</td><td class="note">Their mission.</td></tr>
+    <tr><td>aboutGoals</td><td class="mono">Xy7OI</td><td class="note">What they're trying to achieve.</td></tr>
+    <tr><td>operationsDriveFolder</td><td class="mono">3Lk9G</td><td class="note">Their Google Drive folder. 13 of 20 clients have one.</td></tr>
+    <tr><td>webhooksGoogleChatTickets</td><td class="mono">viK2q</td><td class="note">Google Chat: where new tickets get posted.</td></tr>
+    <tr><td>webhooksGoogleChatComments</td><td class="mono">8jDpK</td><td class="note">Google Chat: where comments get posted.</td></tr>
+    <tr><td>webhooksDailyDigest</td><td class="mono">bP4DP</td><td class="note">Google Chat: the daily summary.</td></tr>
+  </table>
+
+  <div class="box ask">
+    <b>The seven in the middle</b> &mdash; history, what they sell, their USP, mission, goals, founded, size &mdash; are one idea, not seven.
+    That's <b>a client profile</b>: everything you'd want in front of you before a meeting. It's the biggest thing in this table
+    that our app has no answer for.
+  </div>
+
+  <h2>4 &middot; One thing I'd flag</h2>
+  <div class="box">
+    The mapping we wrote in August covered <b>19 of these 34 columns</b>. The 15 it never saw are the 3 Google Chat webhooks,
+    LinkedIn, the 4 log fields, and all 7 profile fields above. So the data already in staging is <b>missing the profile
+    entirely</b> &mdash; not because it was dropped, but because nobody knew those columns existed.
+    That alone is a good reason to redo this table properly.
+  </div>
+
+  <h2>5 &middot; What I need from you</h2>
+  <ol>
+    <li><b>The profile fields</b> &mdash; build a proper client profile section, or let those 7 go?</li>
+    <li><b>Website, LinkedIn, VAT, legal name, region, lead source, Drive folder</b> &mdash; I'd add all seven. Any you don't want?</li>
+    <li><b>The Google Chat webhooks</b> &mdash; are you still using Google Chat, or is that finished with Glide?</li>
+    <li><b>The old dates</b> &mdash; show "client since 2024", or accept that everything reads as today?</li>
+  </ol>
+
+</div>
+</body>
+</html>

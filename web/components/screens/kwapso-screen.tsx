@@ -227,6 +227,14 @@ function TeamPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
             picture={m.imageUrl}
             name={personName(m)}
             shape="round"
+            /* GREY IF THEY ARE NOT OURS — Aurora, 23 Sep 2026: "external
+               photos (from contacts) gray scale. keep staff nirmal." This
+               list is the raw `members:<teamId>` read, unfiltered, so a
+               client-portal login appears on the page called "who we are"
+               exactly as `shapeMembersList` shows one on the admin list. The
+               fact rides the row already (`TeamMember.isClient`); the face
+               now reads it. */
+            external={m.isClient}
           />
           <span className="font-medium">
             {/* R54, and this was the one place in the app that joined the pair

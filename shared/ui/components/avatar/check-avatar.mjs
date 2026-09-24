@@ -135,6 +135,149 @@ if (!/const\s+setRefs\s*=\s*React\.useCallback/.test(imageBody)) {
   );
 }
 
+/* ── 5 · A PHOTOGRAPH IS TOLD WHOSE FACE IT IS ───────────────────────────
+   Aurora's ruling, 23 Sep 2026, verbatim: "external photos (from contacts)
+   gray scale. keep staff nirmal." An outside person's photograph renders
+   greyscale; one of our own renders in full colour.
+
+   THIS SECTION EXISTS BECAUSE THE DEFAULT IS COLOUR, AND THE DEFAULT IS
+   COLOUR ON PURPOSE. The other choice — defaulting to greyscale — fails
+   more LOUDLY (a call site nobody updated greys our own people, and
+   somebody notices that morning), and it fails by SAYING SOMETHING FALSE
+   about a real person, in every app that vendors this kit, on screens
+   nobody here can see. Colour-default never lies: an un-updated mark is
+   NOT YET TREATED, never WRONGLY treated. So the loudness is bought here
+   instead, where it cannot lie — red at build time, before the thing
+   ships, which is louder and earlier than a grey face ever was.
+
+   §5a — the mechanism survives: `AvatarImage` reads `external` off the
+   context and puts `grayscale` on the IMAGE's own class list. Both halves
+   matter: reading the flag and doing nothing with it passes a prop census
+   and draws a contact in full colour, and a `grayscale` on the MARK rather
+   than the image would drain the kit's own `brand`/`inverse` fills too.
+
+   §5b — THE CALL-SITE CENSUS, which is the half with the teeth. Every
+   component in this kit that renders an `<AvatarImage>` must ALSO hand its
+   surrounding `<Avatar>` an `external` (a photograph a call site can supply
+   is a photograph that can be a contact's), or name itself in
+   `EXTERNAL_NOT_A_PERSON` with the reason its picture is not a person's
+   face. A component-only check would pass the day someone adds a tenth
+   person-bearing component and forgets, which is exactly the "six of eight
+   places" failure this treatment cannot survive: a rule applied nearly
+   everywhere is worse than none, because the places it misses become the
+   lie.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* READ THE EXPRESSION, NOT THE FILE. A first draft of this clause asked only
+   whether the words `external` and `grayscale` appeared anywhere inside
+   `AvatarImage`, and it PASSED with the utility deleted from the class list —
+   because this file's own comment beside that line says both words. A census
+   that its own documentation satisfies measures nothing, so both halves are
+   pinned POSITIONALLY: the flag must be destructured off the context, and the
+   utility must sit inside the `cn(...)` the `<img>`'s own `className` reads,
+   guarded by that same flag. Proved by deleting the utility and watching this
+   go red. */
+const readsFlag = /const\s*\{[^}]*\bexternal\b[^}]*\}\s*=\s*useAvatarContext\(/.test(imageBody);
+const graysTheImage = /className=\{cn\(\s*"size-full object-cover",\s*external\s*&&\s*"grayscale"/.test(
+  imageBody,
+);
+
+if (!readsFlag) {
+  findings.push(
+    "`AvatarImage` no longer destructures `external` off the avatar context — it cannot know " +
+      "whose face it is holding, so an outside person's photograph renders in full colour beside a " +
+      "staff one (Aurora, 23 Sep 2026: \"external photos (from contacts) gray scale. keep staff " +
+      "nirmal\")."
+  );
+}
+
+if (!graysTheImage) {
+  findings.push(
+    "the <img>'s own `className` no longer reads `cn(\"size-full object-cover\", external && " +
+      "\"grayscale\", ...)` — either the utility is gone (a contact draws in colour) or it " +
+      "moved off the IMAGE onto the MARK, which would also drain the kit's own `brand` mango and " +
+      "`inverse` charcoal fills wherever a caller pairs one with an outside face."
+  );
+}
+
+if (!/external\s*=\s*false/.test(src)) {
+  findings.push(
+    "`Avatar` no longer defaults `external` to `false` — a call site that has not been told " +
+      "whose face it is holding would start greying our own people, which is a FALSE statement " +
+      "about a real person rather than an untreated one. See this check's §5 header for why " +
+      "the safe default is colour and the loudness lives here instead.",
+  );
+}
+
+/** A component whose `<AvatarImage>` never holds a PERSON's photograph, so it
+ * has nothing to be external or not. Keyed by file, with the reason, and
+ * rot-checked both ways below so the list can only shrink: an entry naming a
+ * file that no longer renders an `<AvatarImage>` at all has outlived its
+ * subject, and an entry on a file that HAS since grown a person's face would
+ * be a silent hole. */
+const EXTERNAL_NOT_A_PERSON = [
+  {
+    file: "compositions/screens/company-hub.tsx",
+    why: "the mark is a COMPANY's logo, not a person's photograph — the composition's own header says so (\"A supplied logo goes INSIDE it as AvatarImage\"). A company is not one of us or from outside; it is the thing an outside person belongs to.",
+  },
+];
+
+const KIT_ROOT = path.join(HERE, "..", "..");
+const SCAN_DIRS = ["components", "compositions"];
+
+function walk(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walk(full));
+    else if (entry.name.endsWith(".tsx")) out.push(full);
+  }
+  return out;
+}
+
+const scanned = SCAN_DIRS.flatMap((d) => walk(path.join(KIT_ROOT, d)))
+  .filter((f) => f !== FILE)
+  .map((f) => ({ rel: path.relative(KIT_ROOT, f).split(path.sep).join("/"), body: fs.readFileSync(f, "utf8") }))
+  .filter((f) => /<AvatarImage\b/.test(f.body));
+
+const exemptFiles = new Set(EXTERNAL_NOT_A_PERSON.map((e) => e.file));
+
+for (const f of scanned) {
+  if (exemptFiles.has(f.rel)) continue;
+  if (!/\bexternal=\{/.test(f.body)) {
+    findings.push(
+      `${f.rel} renders an <AvatarImage> but never hands its <Avatar> an \`external\` — an ` +
+        "outside person's photograph would draw in full colour here while the rest of the app " +
+        "greys theirs, which is worse than not doing it at all: the places the treatment misses " +
+        "become the lie. Forward the fact, or name this file in EXTERNAL_NOT_A_PERSON with the " +
+        "reason its picture is not a person's face.",
+    );
+  }
+}
+
+for (const entry of EXTERNAL_NOT_A_PERSON) {
+  const found = scanned.find((f) => f.rel === entry.file);
+  if (!found) {
+    findings.push(
+      `EXTERNAL_NOT_A_PERSON names \`${entry.file}\`, which renders no <AvatarImage> any more — ` +
+        "the line has outlived its subject. Delete it.",
+    );
+  } else if (/\bexternal=\{/.test(found.body)) {
+    findings.push(
+      `EXTERNAL_NOT_A_PERSON names \`${entry.file}\`, but that file DOES forward \`external\` now ` +
+        "— it draws a person after all. Delete the exemption rather than leaving a hole the " +
+        "census steps over.",
+    );
+  }
+}
+
+if (scanned.length === 0) {
+  findings.push(
+    "the §5b census found no file in this kit rendering an <AvatarImage> at all, which cannot " +
+      "be right — the walk is looking in the wrong place and is proving nothing.",
+  );
+}
+
 if (findings.length > 0) {
   console.error("FAIL avatar check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -143,5 +286,9 @@ if (findings.length > 0) {
 console.log(
   "OK avatar check: `AvatarFallback` hides only on \"loaded\", `AvatarImage` unmounts only on " +
     '"error", and the post-mount `complete`/`naturalWidth` read that closes the cache/hydration ' +
-    "race (client, 18 Sep 2026) is still in place — the mark and the initials stay mutually exclusive.",
+    "race (client, 18 Sep 2026) is still in place — the mark and the initials stay mutually exclusive. " +
+    `Whose face it is travels too: \`external\` defaults to colour, \`AvatarImage\` greys the IMAGE ` +
+    `alone when it is set, and all ${scanned.length} file(s) in this kit that render an <AvatarImage> ` +
+    `either forward the fact or say in EXTERNAL_NOT_A_PERSON why their picture is not a person's face ` +
+    `(Aurora, 23 Sep 2026: "external photos (from contacts) gray scale. keep staff nirmal").`,
 );

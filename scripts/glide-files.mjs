@@ -79,8 +79,17 @@ for (const file of files) {
   for (const row of rows) {
     const rowId = row?.$rowID ?? null
     for (const [column, value] of Object.entries(row ?? {})) {
-      if (typeof value !== "string") continue
-      for (const url of value.match(URLS_IN) ?? []) {
+      // A CELL IS NOT ALWAYS A STRING, and the version of this loop that assumed
+      // it was cost us nearly everything. Glide stores a multi-image column as an
+      // ARRAY of urls, and `typeof value !== "string"` skipped every one of them
+      // in silence: this script reported "194 files" in August and "92" today
+      // while 4,210 ticket screenshots and 544 backlog ones sat unseen in array
+      // cells. A rescue that reports success having looked at a tenth of the data
+      // is worse than no rescue, because nobody re-runs it.
+      const texts = typeof value === "string" ? [value]
+        : Array.isArray(value) ? value.filter((v) => typeof v === "string")
+        : []
+      for (const url of texts.flatMap((v) => v.match(URLS_IN) ?? [])) {
         if (!isHostedFile(url)) continue
         const entry = found.get(url) ?? { url, refs: [] }
         entry.refs.push({ source, rowId, column })
@@ -102,7 +111,16 @@ const localNameFor = (url) => {
   const appUploadId = parts[0] ?? "unknown"
   const tail = decodeURIComponent(parts[parts.length - 1] ?? "file")
   const safe = tail.replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 120)
-  return `${appUploadId}/${safe}`
+  // THE PER-FILE ID IS PART OF THE NAME, and leaving it out lost real files.
+  // A Glide url is `<appUploadId>/pub/<fileId>/<filename>`, and the FILENAME is
+  // not unique — Outlook calls every pasted screenshot `image001.png`, so twelve
+  // different images shared one local path and eleven of them were overwritten
+  // in silence. 6 paths, 28 urls, on a run that reported "4,869 of 4,869 files"
+  // and looked complete. The fileId is the one segment Glide guarantees unique,
+  // so it rides in the name; the download is verified against the manifest's
+  // byte count either way, which is what surfaced this.
+  const fileId = parts.length > 2 ? parts[parts.length - 2] : ""
+  return fileId ? `${appUploadId}/${fileId}-${safe}` : `${appUploadId}/${safe}`
 }
 
 const EXT_FOR = {

@@ -110,12 +110,16 @@ describe("the one walker every law reads source through", () => {
  * and can only ever be fixed upstream. Five hand entries in the table said that
  * same sentence, three more kit checks landed in one day, and a per-file line
  * pretends somebody reviewed a decision when the only fact is "it is a kit
- * file". Narrow on purpose: only `check-*.mjs` under `shared/ui/`, so a kit
- * COMPONENT that starts stripping comments is still caught, and so is every
- * file this repo actually owns. Both directions proved by planting the pattern
- * and watching each fail. Read by BOTH censuses below, declared once. */
-const kitCheckScript = (rel: string) =>
-  rel.startsWith("shared/ui/") && /(^|\/)check-[^/]*\.mjs$/.test(rel)
+ * file". WIDENED 24 Sep 2026 from `check-*.mjs` to every `.mjs` under
+ * `shared/ui/`: kit tag v1.2.167 brought `foundations/tokens/ground-map.mjs`,
+ * a rule script that declares its own stripper and is not named `check-*`, and
+ * the narrower predicate turned a re-vendor red for a file nobody here may
+ * edit. The extension carries the whole distinction the old prefix was reaching
+ * for -- a kit COMPONENT is `.tsx` and is still caught, and so is every file
+ * this repo actually owns, because `shared/ui/` is the vendored tree and
+ * nothing else. Both directions proved by planting the pattern and watching
+ * each fail. Read by BOTH censuses below, declared once. */
+const kitCheckScript = (rel: string) => rel.startsWith("shared/ui/") && rel.endsWith(".mjs")
 
 // HAND_ROLLED_STRIPPER_OK moved to shared/rules/registry.ts, 14 Sep 2026
 // (RULES.md line 13's promise made true). Imported above.

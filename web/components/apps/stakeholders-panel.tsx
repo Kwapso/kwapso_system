@@ -47,6 +47,9 @@ type Side = {
   id: string
   name: string
   photo: string | null
+  /** Ours or the client's — the greyscale, per person rather than per group,
+   * so `PersonRow` stays one component for both lists. */
+  external: boolean
   main: boolean
   href: string
 }
@@ -58,7 +61,7 @@ function PersonRow({ p, mainLabel }: { p: Side; mainLabel: string }) {
     <li className="flex flex-wrap items-center gap-2 px-3 py-2">
       {/* No `fit`: every picture fills its box (R60, client 2026-09-09), so the
           `cover` this line used to spell out is the mark's only behaviour. */}
-      <RecordMark picture={p.photo} name={p.name} shape="round" />
+      <RecordMark picture={p.photo} name={p.name} shape="round" external={p.external} />
       {/* The kit's `link` variant: no box, inherited ink, underline on hover.
           The overrides are layout only — the name flexes and truncates inside
           the row, against a base skin that is `shrink-0 justify-center`. */}
@@ -172,6 +175,7 @@ export function StakeholdersPanel({
   memberNames,
   memberPhotos,
   contactNames,
+  contactPhotos,
   host,
   appId,
   appName,
@@ -187,6 +191,11 @@ export function StakeholdersPanel({
    * the accounts list — accounts PAGE, so a contact outside page one resolved to
    * "Somebody" on the screen this replaces. */
   contactNames: Map<string, string>
+  /** The client's own people's photographs, off the same `listAccountLinks`
+   * read their names come from (`AccountLink.personLogoUrl`). Added 23 Sep
+   * 2026: "Theirs" drew `photo: null` unconditionally while "Ours" beside it
+   * resolved a real face, so one panel gave two answers to one question. */
+  contactPhotos: Map<string, string | null>
   host: { base: string }
   /** T3849 — who to save an edit against, and where its live patch lands
    * (`appsKey`, the same key the app record itself reads). */
@@ -219,21 +228,32 @@ export function StakeholdersPanel({
   )
   const contacts = (contactsQ.data?.links ?? [])
     .filter((l) => l.active)
-    .map((l) => ({ id: l.personAccountId, name: l.personName }))
+    .map((l) => ({ id: l.personAccountId, name: l.personName, photo: l.personLogoUrl }))
   // A CONTACT IS AN ACCOUNTS ROW (there is no contacts table), so their record
   // is at the accounts address — which is where the account screen sends an
   // individual too, so both routes reach the same screen.
+  // OURS AND THEIRS ARE THE TWO POPULATIONS THIS WHOLE PANEL IS ABOUT, which
+  // is why it is the clearest place in the app to read Aurora's 23 Sep 2026
+  // ruling off: "external photos (from contacts) gray scale. keep staff
+  // nirmal." The two groups already sit under two headings and now differ in
+  // the faces too, so the heading is not the only thing saying which is which.
   const ours: Side[] = staff.map((p) => ({
     id: p.userId,
     name: memberNames.get(p.userId) ?? t("Somebody"),
     photo: memberPhotos.get(p.userId) ?? null,
+    external: false,
     main: p.isLead,
     href: `${host.base}/members/${p.userId}`,
   }))
   const theirs: Side[] = stakeholders.map((p) => ({
     id: p.contactId,
     name: contactNames.get(p.contactId) ?? t("Somebody"),
-    photo: null,
+    // WAS `null`, UNCONDITIONALLY — see `contactPhotos`' own note above and
+    // `app-detail.tsx`'s where the map is built. A stakeholder with a
+    // photograph on file drew a letter tile here while the colleague above
+    // them drew a face.
+    photo: contactPhotos.get(p.contactId) ?? null,
+    external: true,
     main: p.isMain,
     href: `${host.base}/accounts/${p.contactId}`,
   }))

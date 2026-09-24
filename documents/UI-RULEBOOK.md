@@ -57,7 +57,7 @@ file stays the index: the front matter above, this table, and the rule-count led
 | 4. Collections (part 5 of 8) | [documents/ui-rulebook/14-4-collections-5.md](ui-rulebook/14-4-collections-5.md) | Collections — K33–K38 |
 | 4. Collections (part 6 of 8) | [documents/ui-rulebook/15-4-collections-6.md](ui-rulebook/15-4-collections-6.md) | Collections — K39–K49 |
 | 4. Collections (part 7 of 8) | [documents/ui-rulebook/16-4-collections-7.md](ui-rulebook/16-4-collections-7.md) | Collections — K50–K59 |
-| 4. Collections (part 8 of 8) | [documents/ui-rulebook/17-4-collections-8.md](ui-rulebook/17-4-collections-8.md) | Collections — K60–K62 |
+| 4. Collections (part 8 of 8) | [documents/ui-rulebook/17-4-collections-8.md](ui-rulebook/17-4-collections-8.md) | Collections — K60–K63 |
 | 5. Buttons and actions (part 1 of 8) | [documents/ui-rulebook/18-5-buttons-and-actions-1.md](ui-rulebook/18-5-buttons-and-actions-1.md) | Buttons and actions — B1–B10 |
 | 5. Buttons and actions (part 2 of 8) | [documents/ui-rulebook/19-5-buttons-and-actions-2.md](ui-rulebook/19-5-buttons-and-actions-2.md) | Buttons and actions — B11–B17 |
 | 5. Buttons and actions (part 3 of 8) | [documents/ui-rulebook/20-5-buttons-and-actions-3.md](ui-rulebook/20-5-buttons-and-actions-3.md) | Buttons and actions — B18–B27 |
@@ -67,7 +67,7 @@ file stays the index: the front matter above, this table, and the rule-count led
 | 5. Buttons and actions (part 7 of 8) | [documents/ui-rulebook/24-5-buttons-and-actions-7.md](ui-rulebook/24-5-buttons-and-actions-7.md) | Buttons and actions — B43–B46 |
 | 5. Buttons and actions (part 8 of 8) | [documents/ui-rulebook/25-5-buttons-and-actions-8.md](ui-rulebook/25-5-buttons-and-actions-8.md) | Buttons and actions — B47–B49 |
 | 6. Forms and dialogs (part 1 of 2) | [documents/ui-rulebook/26-6-forms-and-dialogs-1.md](ui-rulebook/26-6-forms-and-dialogs-1.md) | Forms and dialogs — F1–F17 |
-| 6. Forms and dialogs (part 2 of 2) | [documents/ui-rulebook/27-6-forms-and-dialogs-2.md](ui-rulebook/27-6-forms-and-dialogs-2.md) | Forms and dialogs — F18 |
+| 6. Forms and dialogs (part 2 of 2) | [documents/ui-rulebook/27-6-forms-and-dialogs-2.md](ui-rulebook/27-6-forms-and-dialogs-2.md) | Forms and dialogs — F18–F19 |
 | 7. Typography | [documents/ui-rulebook/28-7-typography.md](ui-rulebook/28-7-typography.md) | Typography — T1–T9 |
 | 8. Spacing, and the scale setting | [documents/ui-rulebook/29-8-spacing-and-the-scale-setting.md](ui-rulebook/29-8-spacing-and-the-scale-setting.md) | Spacing, and the scale setting — S1–S8 |
 | 9. Mobile | [documents/ui-rulebook/30-9-mobile.md](ui-rulebook/30-9-mobile.md) | Mobile — M1–M6 |
@@ -86,16 +86,16 @@ file stays the index: the front matter above, this table, and the rule-count led
 
 ## Rule index
 
-**268 rules.**
+**270 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L43 (43) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K62 (62) |
+| 4. Collections | K1 to K63 (63) |
 | 5. Buttons and actions | B1 to B49 (49) |
-| 6. Forms and dialogs | F1 to F18 (18) |
+| 6. Forms and dialogs | F1 to F19 (19) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S8 (8) |
 | 9. Mobile | M1 to M6 (6) |

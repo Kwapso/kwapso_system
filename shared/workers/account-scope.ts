@@ -116,20 +116,44 @@ export function idList(accountIds: string[]): string {
  * every root then became a bound parameter in the switcher's own lookup. `ORDER
  * BY id` already made the set stable across requests, which is what makes a LIMIT
  * safe to add — the same fifty every time, not a different fifty per refresh. */
+/** ARCHIVED ROOTS ARE MARKED, NOT DROPPED (R112, 23 Sep 2026). Filtering them
+ * out in SQL was the first shape and it was wrong in one case that matters: a
+ * contact whose only company has been archived would come back with NO rows,
+ * which is indistinguishable from the FREELANCER below (no parent, no link),
+ * and would then be handed their own row as "their world" instead of being
+ * refused. So the walk still finds every company they belong to and says which
+ * of them are live, and `resolveAccountScope` tells the two cases apart.
+ *
+ * `ORDER BY live DESC` AHEAD OF THE ID ORDER so the cap can never spend itself
+ * on archived companies and hide a live one behind them; the id order the
+ * switcher's stable fallback pick depends on is restored in JS, over the live
+ * set, which is the set that order was ever about. */
 const ROOTS_SQL = `
-SELECT parent_account_id AS id FROM accounts
- WHERE id = ? AND parent_account_id IS NOT NULL
-UNION
-SELECT l.account_id FROM account_links l
- WHERE l.person_account_id = ? AND l.deactivated_at IS NULL
-ORDER BY id LIMIT ${PORTAL_ROOTS_CAP}`
+SELECT r.id AS id,
+       EXISTS (SELECT 1 FROM accounts arc WHERE arc.id = r.id AND arc.archived_at IS NULL) AS live
+  FROM (
+  SELECT parent_account_id AS id FROM accounts
+   WHERE id = ? AND parent_account_id IS NOT NULL
+  UNION
+  SELECT l.account_id FROM account_links l
+   WHERE l.person_account_id = ? AND l.deactivated_at IS NULL
+) r
+ ORDER BY live DESC, r.id LIMIT ${PORTAL_ROOTS_CAP}`
 
-/** From the company they're standing in, everything nested beneath it. */
+/** From the company they're standing in, everything nested beneath it.
+ *
+ * `a.archived_at IS NULL` ON THE RECURSIVE STEP (R112, 23 Sep 2026): an archived
+ * business nested under a live holding company is invisible, and so is
+ * everything nested under IT — the walk stops at the archived row rather than
+ * stepping over it, which is the difference between hiding one company and
+ * hiding one company's whole subtree. The SEED needs no such clause: `current`
+ * is chosen out of `roots`, which `ROOTS_SQL` has already filtered. */
 const REACH_SQL = `
 WITH RECURSIVE reach(id) AS (
   SELECT ?
   UNION
   SELECT a.id FROM accounts a JOIN reach r ON a.parent_account_id = r.id
+   WHERE a.archived_at IS NULL
 )
 SELECT id FROM reach LIMIT ${SCOPE_HARD_CAP}`
 
@@ -154,10 +178,12 @@ export const FENCE_INPUTS: Record<string, string[]> = {
   // Its very existence is a "you belong to this company" (ROOTS_SQL), and
   // deactivating it withdraws one — so the whole row is an input.
   account_links: [],
-  // ONE column. The fence walks PARENTS and nothing else off an account row, so
-  // editing a name, an address or a status is not a fence write and must not
-  // spend a confirm panel on one.
-  accounts: ["parent_account_id"],
+  // TWO columns. The fence walks PARENTS off an account row, and — since R112,
+  // 23 Sep 2026 — it also asks whether each company in reach has been ARCHIVED,
+  // because Aurora's ruling that an archived record is invisible reaches the
+  // login of the contacts who stand in it. Editing a name, an address or a
+  // status is still not a fence write and must not spend a confirm panel on one.
+  accounts: ["parent_account_id", "archived_at"],
 }
 
 /** COLUMNS THAT DECIDE **WHICH HUMAN** A GRANT LANDS ON — the third category,
@@ -272,34 +298,76 @@ async function resolveAccountScope(cfg: D1Rest, guard: MemberGuard): Promise<Acc
     app_restriction: string | null
     current_account_id: string | null
     deactivated_at: string | null
+    /** THE PERSON'S OWN ACCOUNT ROW'S ARCHIVED STATE — a correlated subquery
+     * rather than a JOIN or a second read, so the archived half of this
+     * refusal costs the corridor nothing it was not already paying. A contact
+     * IS an `accounts` row (it hangs under its company through
+     * `parent_account_id`), so it can be archived exactly like a company can. */
+    person_archived_at: string | null
   }>(
     cfg,
     guard.databaseId,
-    `SELECT account_id, app_restriction, current_account_id, deactivated_at FROM portal_users
+    // UNALIASED, AND THAT IS LOAD-BEARING. `workers/mcp/test/staff-only.test.ts`
+    // reads this statement off disk and asserts its WHERE is EXACTLY
+    // `user_id = ?` — presence and nothing else — because portal-ness is
+    // decided by the EXISTENCE of a row, live or revoked, and a liveness filter
+    // here would reopen the transition its own header describes (revoke → reads
+    // as staff → mints a token). Aliasing the table to `pu` spelled the same
+    // clause `pu.user_id = ?` and broke that census while changing nothing it
+    // guards. The correlated subquery names the table instead, which SQLite
+    // resolves identically and the census can still read.
+    `SELECT account_id, app_restriction, current_account_id, deactivated_at,
+            (SELECT a.archived_at FROM accounts a WHERE a.id = portal_users.account_id) AS person_archived_at
+       FROM portal_users
       WHERE user_id = ? ORDER BY (deactivated_at IS NULL) DESC LIMIT 1`,
     [guard.userId]
   )
   const row = rows[0]
   if (!row) return { kind: "staff" }
-  if (row.deactivated_at != null)
-    return {
-      kind: "portal",
-      personAccountId: row.account_id,
-      appRestriction: null,
-      appIds: null,
-      roots: [],
-      currentAccountId: null,
-      accountIds: [],
-    }
+  /** STANDING NOWHERE, SEEING NOTHING — the shape a revoked grant has always
+   * resolved to, and the ONE place a client login is refused. R112 (Aurora,
+   * 23 Sep 2026, settled beside the widening: portal login is refused for the
+   * contacts of an archived account) is answered HERE rather than by a new gate
+   * in front of the portal, for the reason this file's own header gives: you
+   * cannot get a WHERE clause out of it without first having resolved a caller,
+   * so every fenced door in both workers inherits one refusal written once. A
+   * new gate would have had to be remembered by each of them. */
+  const nowhere = (): AccountScope => ({
+    kind: "portal",
+    personAccountId: row.account_id,
+    appRestriction: null,
+    appIds: null,
+    roots: [],
+    currentAccountId: null,
+    accountIds: [],
+  })
+  if (row.deactivated_at != null) return nowhere()
+  // THEIR OWN ROW, ARCHIVED. A contact put away for good is not a login that
+  // stands somewhere smaller; it is a login that stands nowhere, the same
+  // answer a revoked grant gets. Checked before the roots walk because their own
+  // row is also the freelancer fallback below, and an archived person must not
+  // be handed their own archived company back as "their world".
+  if (row.person_archived_at != null) return nowhere()
 
-  const found = await d1Query<{ id: string }>(cfg, guard.databaseId, ROOTS_SQL, [
+  const found = await d1Query<{ id: string; live: number }>(cfg, guard.databaseId, ROOTS_SQL, [
     row.account_id,
     row.account_id,
   ])
+  // AN ARCHIVED COMPANY IS NOT ONE OF THEIR WORLDS (R112) — it is off the
+  // switcher and cannot be stood in, the same shape an archived account already
+  // has on every other surface.
+  const live = found.filter((r) => Number(r.live) === 1).map((r) => r.id)
+  // EVERY COMPANY THEY BELONG TO HAS BEEN ARCHIVED. They belong somewhere —
+  // `found` is not empty — so this is NOT the freelancer below; it is a contact
+  // of a company that has been put away for good, and Aurora settled it beside
+  // the widening: portal login is refused for the contacts of an archived
+  // account. The same refusal a revoked grant gets, in the same place.
+  if (found.length && live.length === 0) return nowhere()
   // A freelancer signs in as their own account: no parent, no link, and their
-  // own row IS the world. Without this they would resolve to the empty set and
-  // see nothing — a fence so tight it locks out the person it protects.
-  const roots = found.length ? found.map((r) => r.id) : [row.account_id]
+  // own row IS the world (proved live above). Without this they would resolve to
+  // the empty set and see nothing — a fence so tight it locks out the person it
+  // protects.
+  const roots = live.length ? [...live].sort() : [row.account_id]
 
   // Their stored choice, but only if it is still one of their own — a company
   // they were unlinked from must not keep working because the pointer is stale.

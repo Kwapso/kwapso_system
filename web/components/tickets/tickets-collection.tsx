@@ -2325,11 +2325,25 @@ export function TicketRowsTable<T extends TicketFace>({
                           same lookup finds their face too — the members
                           cache holds every login on the team, not staff
                           alone. */}
+                      {/* GREY IF THEY ARE NOT OURS — Aurora, 23 Sep 2026:
+                          "external photos (from contacts) gray scale. keep
+                          staff nirmal." This is the one cell in the app where
+                          both populations draw through ONE expression: a
+                          client LOGIN raising their own ticket is an ordinary
+                          team member with an ordinary face, which is why the
+                          lookup above finds it at all (see its own comment).
+                          `w.raiserIsClient` is the fact the row already
+                          carries and the line below already reads to decide
+                          whether to trim the name to a first name (R54) — so
+                          the face and the words now answer the same question
+                          the same way, off the same field, instead of the
+                          words knowing and the face not. */}
                       <RecordMark
                         picture={memberFace(members, w.raiserId)}
                         name={w.raiserName}
                         shape="round"
                         size="choice"
+                        external={w.raiserIsClient}
                       />
                       <span className="min-w-0 truncate">
                         {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
@@ -2337,11 +2351,16 @@ export function TicketRowsTable<T extends TicketFace>({
                     </span>
                   ) : w.raisedByContactName ? (
                     <span className="flex items-center gap-2">
+                      {/* ALWAYS GREY — this branch IS the contact branch: no
+                          login raised it, so the ticket names the client's own
+                          CONTACT off the account's detail door. External by
+                          construction, never a fact to look up. */}
                       <RecordMark
                         picture={w.raisedByContactLogo}
                         name={w.raisedByContactName}
                         shape="round"
                         size="choice"
+                        external
                       />
                       <span className="min-w-0 truncate">{w.raisedByContactName}</span>
                     </span>
@@ -2558,6 +2577,17 @@ export function ticketBoardCard(
           picture={raiserPicture}
           mark={nameInitials(raiserName)}
           markName={raiserName}
+          /* GREY IF THEY ARE NOT OURS — Aurora, 23 Sep 2026: "external photos
+             (from contacts) gray scale. keep staff nirmal." TWO WAYS this card
+             is theirs, and `raiserName` three lines up already reads both to
+             decide how to spell the name: `raiserIsClient` (a client login
+             typed it) or `raisedByContactName` (no login at all, so the ticket
+             names the client's own CONTACT). The name knew and the face did
+             not — the same pairing the LIST view of this very collection
+             already makes one screen over, which is what makes this a gap
+             rather than a difference of opinion: one ticket, two views, two
+             answers. */
+          external={r.raiserIsClient || Boolean(r.raisedByContactName)}
           title={<span className="min-w-0 truncate text-sm">{raiserName}</span>}
         />
       ) : undefined,

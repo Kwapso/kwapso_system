@@ -328,7 +328,7 @@ export function WaveFinder({
       : []),
   ]
 
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values: { accountId: query.accountId, status: query.status, sprintType: query.sprintType, appId: query.appId },
     // Empty on purpose: every facet carries its own options, so there is
@@ -428,6 +428,15 @@ export function WaveFinder({
       >
         <div
           data-slot="toolbar-row-track"
+          /* THE DROP SHEET'S ANCHOR — `FILTER_ANCHOR_ATTR`
+             (shared/ui/components/filter-bar/filter-bar.tsx). This file is a
+             registered hand-copy of `ToolbarRow` (`TOOLBAR_CONTROL_OWNERS`,
+             R53), and the overlay law's own census holds every track in the
+             app to this attribute for exactly that reason: a guarantee the
+             row makes and a copy of it does not is the drift the registry
+             exists to keep readable. Without it the sheet form would fall
+             back to the popover's measure on this one screen. */
+          data-filter-anchor=""
           // ONE ROW, ALWAYS — FOR REAL THIS TIME (client, 16 Sep 2026, over a
           // screenshot: "the container looks broken", the "+" and the view
           // switch spilling out past the row's own right edge). The comment
@@ -476,9 +485,10 @@ export function WaveFinder({
             </div>
             {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
                 normal flex child (wrapping itself in a non-growing box internally),
-                and its open PANEL is the separate `filterPanel` value, rendered
-                into the column below rather than into this row — the split
-                `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
+                and the facets it opens float above the rows rather than landing in
+                the column below (Aurora, 2026-09-23: "filter drop sheet popover",
+                over her own "a temporary overlay not a second row"). It says a
+                COUNT and
                 never the filters themselves — client, 2026-09-02: "when activce
                 filters, do not display them in the toolbar. only a count niside
                 the filter pill". See `filter-bar.tsx`'s own header for the full
@@ -528,7 +538,6 @@ export function WaveFinder({
             </div>
           ) : null}
         </div>
-        {filterPanel}
       </div>
     </div>
   )

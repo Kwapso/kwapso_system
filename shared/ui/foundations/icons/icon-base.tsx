@@ -7,14 +7,36 @@ import { cn } from "../../lib/utils";
    The one icon wrapper. Every export is this component with a different
    `viewBox` and `children` baked in by generate-icons.mjs.
 
-   THE ART IS PHOSPHOR (MIT), fill weight throughout with three named
-   exceptions drawn at regular weight instead — Plus, Power and Prohibit.
-   Client ruling, verbatim, 2026-09-03: those three "take names from
-   Phosphor... the only icons that we are using are these icons from
-   Phosphor." Fill wraps a bare mark (a plus, a power glyph, a prohibit
-   circle) in a solid disc or square, which reads as a heavy badge rather
-   than a lean glyph for an action icon; regular keeps them a thin outline.
-   See foundations/icons/ATTRIBUTION.md.
+   THE ART IS PHOSPHOR (MIT), fill weight by default, with a NAMED LIST OF
+   REGULAR-WEIGHT EXCEPTIONS THAT IS NOT KEPT HERE. Client ruling, verbatim,
+   2026-09-03, which started the list at three (Plus, Power, Prohibit): those
+   "take names from Phosphor... the only icons that we are using are these
+   icons from Phosphor." Fill wraps a bare mark (a plus, a power glyph, a
+   prohibit circle) in a solid disc or square, which reads as a heavy badge
+   rather than a lean glyph for an action icon; regular keeps them a thin
+   outline.
+
+   THIS COMMENT SAID "three named exceptions — Plus, Power and Prohibit"
+   UNTIL 24 SEP 2026, AND HAD BEEN WRONG SINCE 6 SEP 2026. Her rulings kept
+   coming (X, DotsThree, DotsThreeVertical, MagnifyingGlass, Paperclip,
+   Asterisk, Check, Waves, the whole Arrow* family) and none of them edited
+   this paragraph, so a prose count of three sat over 111 regular-weight
+   files. ATTRIBUTION.md's own §Weight says why that shape is dangerous:
+   "A weight rule that lives only in prose drifts silently from the art it
+   describes." So this paragraph names no count and no list any more.
+
+   THE LIST IS foundations/icons/ATTRIBUTION.md §Weight — every exception,
+   with the ruling and the date that put it there — and the MACHINE-READABLE
+   truth is icon-art.manifest.json, which records each glyph's verified
+   upstream name and weight and is enforced offline by check-icon-art.mjs in
+   `npm run check`. Read those, never this.
+
+   MOST RECENT ENTRY: `Check` (Phosphor `check`, regular) is the tick on the
+   ticket stage ladder's mark, on Aurora's ruling of 24 Sep 2026 — "icon on
+   completed stages shoudl be phospor check regular". `Check` was already
+   regular here (6 Sep 2026); her ruling moved the CALL SITE
+   (components/status-stepper/status-stepper.tsx) off `CheckFat`, which is
+   Phosphor's separate `check-fat` glyph at fill weight.
 
    Swapping in different art means replacing icons/<Name>.svg and re-running
    the generator. No call site and no component changes — that is the whole

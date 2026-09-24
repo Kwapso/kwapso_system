@@ -413,7 +413,11 @@ export const ScalePicture = ({
         /* The scale picture keeps its 58 band even on narrow — the kit
            never draws it at 40, and three lines of specimen type cannot
            stand in a 40px band; the words truncate instead. */
-        "h-[3.625rem] flex-col bg-surface-panel shadow-[var(--hairline)]",
+        /* NO BOX — 23 Sep 2026, RULES.md §2.8. This band is a PICTURE of a
+           card, so it wears what a card wears, and a card wears no stroke
+           now. Soft paper against the swatch strip's own ground is the
+           paper step that carries it. */
+        "h-[3.625rem] flex-col bg-surface-panel",
       )}
       style={{ gap: `${gap}rem`, padding: `${padY}rem ${padX}rem` }}
       aria-hidden="true"
@@ -516,11 +520,15 @@ export const ScalePicture = ({
         mark and a longer one, the shape "module › record" reads as even at
         preview scale, replacing the single 2px/32% hairline that measured as
         a stray line rather than as chrome.
-     3. THE PANEL WEARS THE ROW'S OWN HAIRLINE (`shadow-[var(--hairline)]`,
-        already drawn on the innermost row below) SO ITS EDGE SURVIVES WHERE
-        COLOUR ALONE DOES NOT — the identical move `sections-stand-on-paper`
-        (the app repo's R67) had to make for real panels-on-cards for the
-        same measured reason, applied here to a picture of one.
+     3. THE PANEL WORE THE ROW'S OWN HAIRLINE, AND DOES NOT ANY MORE.
+        v1.2.78 gave it one so its edge survived where colour alone measured
+        too thin; the 23 Sep 2026 ruling — *"by rule no borders nowhere in
+        the kit"* — takes it back off, here and on the row below it, because
+        this preview is a PICTURE of a card and a panel and must wear what
+        the kit actually ships. What carries the edge now is the paper step
+        the preview exists to show: panel on card, 1.103 light / 1.111 dark
+        (this file's own header states the figures).
+        `foundations/rules/boxes.mjs` is what keeps it off.
 
    WHAT DID NOT CHANGE: the ground/rail/card hierarchy, the resolved-theme
    contract (`theme` takes `"light" | "dark"` only), and the scale mechanic
@@ -760,13 +768,20 @@ export function AppearancePreview({
               picture of one. Top-aligned, not centred: the space is spent on
               rows now, not on margin around a single one. */}
           <div
-            className="flex flex-1 flex-col gap-1.5 rounded-[var(--radius)] p-2.5 shadow-[var(--hairline)]"
+            /* NO BOX — 23 Sep 2026, RULES.md §2.8. v1.2.78 gave this panel
+               the row's own hairline; the ruling takes it back. The panel
+               keeps its own `background: panel` against the card above it,
+               which is the paper step (1.103 light / 1.111 dark, this file's
+               own header) this preview exists to show. */
+            className="flex flex-1 flex-col gap-1.5 rounded-[var(--radius)] p-2.5"
             style={{ background: panel }}
           >
             {/* ROW 1 — the specimen: a chip, a title, a body. v1.2.79 — see
                 this file's own header for the full account. */}
             <div
-              className="flex flex-col gap-1.5 rounded-[var(--radius)] px-3 py-2.5 shadow-[var(--hairline)]"
+              /* NO BOX — 23 Sep 2026, RULES.md §2.8. Same reasoning as the
+                 panel above: `background: card` on panel is the step. */
+              className="flex flex-col gap-1.5 rounded-[var(--radius)] px-3 py-2.5"
               style={{ background: card }}
             >
               {/* THE CHIP — ABOVE the title, never beside it: R65 in the

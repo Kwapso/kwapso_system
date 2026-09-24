@@ -65,34 +65,45 @@
      reviewing kit v1.2.164): "remove the numbers inside (they are not
      numbered) is either check or empty." `variant="steps"` (chapter 15's
      rail, both orientations) no longer calls `formatNumber` from either mark
-     at all — a reached stage (done or current) draws the `CheckFat` tick, a
+     at all — a reached stage (done or current) draws the `Check` tick, a
      stage still ahead draws nothing. The sentence a client repeats back is
      still true of `stages`' hero pills, which keep their numbers unchanged;
      it stopped being true of the small circular MARK the moment she ruled it
      was never a numbered thing to begin with.
-   · THE CURRENT STEP'S LABEL IS UNDERLINED — `variant="steps"` ONLY, ADDED
-     23 SEP 2026, THE SAME DAY AS THE BULLET ABOVE, IMMEDIATELY AFTER IT. NOT
-     PART OF HER RULING'S OWN WORDS: "remove the numbers inside (they are not
-     numbered) is either check or empty" is about what the MARK contains,
-     nothing more, and taking the number out is correct on its own terms —
-     these stages are not numbered things, and a digit implied an order that
-     does not exist. But taking it out left `isDone` and `isCurrent` drawing
-     the identical fill AND the identical glyph, so a ladder whose whole job
-     is to say where a record stands could no longer say it to a sighted
-     reader glancing at the row — a regression she did not ask for and would
-     have noticed within a minute. So this bullet exists to close that gap
-     without reopening hers: `underline underline-offset-[0.1875rem]
-     decoration-hair-strong` on the current step's LABEL ONLY, never the
-     mark. Not a colour — `--hair-strong` is the same neutral ink-hairline
-     token `button.tsx`'s text-link variant and `article-body.tsx`'s in-copy
-     links already underline with ("ink, underlined, never coloured"), not a
-     new one bound for this file. Not a number. THE MARK ITSELF IS
-     UNTOUCHED BY THIS BULLET — it stays exactly what the bullet above
-     leaves it, a tick on the ink fill or an empty grey circle; the
-     underline is the row's only added signal. DO NOT DELETE THIS AS
-     LEFTOVER DECORATION: it is the one thing standing between this ladder
-     and a current step nobody can find at a glance. `check-status-stepper.
-     mjs` §6 pins it exactly so a later "cleanup" cannot drop it quietly.
+   · NOTHING IS UNDERLINED, AND THE TICK IS PHOSPHOR'S `Check` AT REGULAR
+     WEIGHT — `variant="steps"` ONLY, 24 SEP 2026. Two of her words, one
+     line: "on tickets stage, why is done underlined? … icon on completed
+     stages shoudl be phospor check regular."
+
+     THE UNDERLINE LIVED FOR ONE DAY AND WAS NEVER HERS. The 23 Sep pass that
+     carried out the bullet above took the number out of the mark, found that
+     `isDone` and `isCurrent` then drew the identical fill AND the identical
+     glyph, and underlined the current LABEL to put the position back. Her
+     ruling that day says nothing about the label; asking why it is there is
+     a rejection. It is gone from BOTH `steps` windows.
+
+     WHAT THAT LEAVES, MEASURED: `aria-current="step"` (a screen reader only),
+     the current mark's and label's `font-[var(--font-weight-medium)]`, and
+     the row's own ordering. The weight is worth nothing in `kwapso_system` —
+     Saans ships two faces, 300 and 500, the app sets no base font-weight, and
+     CSS font matching resolves the UA's `normal` (400) to the 500 face, so
+     the whole page already renders at Medium. Measured: "In progress" at 13px
+     is 50.375px at 300 and 51.984px at 400, 500 and `normal` alike. The kit's
+     own demo sets body to `--font-weight-light`, which is why the signal
+     looks alive here and is dead there. So on the ticket screen the current
+     step now draws exactly like a done step. That is filed back to her, not
+     patched with a second uninvited mark. See the horizontal `steps` label's
+     own render-site comment for the full working.
+
+     THE TICK IS `Check`, NOT `CheckFat`. Her own words name Phosphor's
+     `check` at regular weight, and this kit already ships it that way:
+     `foundations/icons/Check.svg` is byte-identical to upstream
+     `regular/check.svg` and `icon-art.manifest.json` records
+     `{"upstream":"check","weight":"regular"}`. `CheckFat` was a different
+     Phosphor glyph (`check-fat`, fill) that this file happened to draw. No
+     new exception was created — `Check` has been on the kit's regular-weight
+     list since 6 Sep 2026 (`foundations/icons/ATTRIBUTION.md`, §Weight,
+     which her ruling now also names).
 
    THE SEVEN-STAGE CASE AT MOBILE WIDTH — WHAT IT DOES AND WHY
    The kit answers this itself and the answer is NOT a media query: "over
@@ -119,7 +130,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-import { CheckFat } from "../../foundations/icons";
+import { Check } from "../../foundations/icons";
 
 /** Where a stage sits relative to the present. */
 export type StatusStageState = "done" | "current" | "later";
@@ -263,18 +274,19 @@ function plainNumber(value: number): string {
  *                      one ink fill (`--surface-inverse`/`--ink-on-inverse`)
  *                      AND, since her second ruling that same day ("remove
  *                      the numbers inside … is either check or empty"), the
- *                      same glyph too: both draw the `CheckFat` tick, never a
- *                      number. A later mark draws neither fill nor glyph — an
- *                      empty grey circle. Done and current are no longer told
- *                      apart by anything the MARK itself draws; the LABEL
- *                      carries the signal instead — the current step's label
- *                      is underlined (`decoration-hair-strong`, added the
- *                      same day once removing the number left no visible
- *                      mark of position at all), plus the current mark and
- *                      label's own extra weight, `aria-current`, and the
- *                      row's own reached-before-later ordering. See the
- *                      `steps` mark's own render-site comment for both
- *                      rulings, the underline, and the full argument.
+ *                      same glyph too: both draw the `Check` tick (Phosphor's
+ *                      `check` at regular weight, her 24 Sep 2026 ruling;
+ *                      `CheckFat` until then), never a number. A later mark
+ *                      draws neither fill nor glyph — an empty grey circle.
+ *                      Done and current are told apart by NOTHING the mark
+ *                      draws and, since the underline came off on 24 Sep
+ *                      2026, by nothing visible on the label either: what is
+ *                      left is `aria-current`, the current mark and label's
+ *                      own extra weight (a no-op in `kwapso_system`, whose
+ *                      body carries no font-weight — measured, see the
+ *                      horizontal label's render-site comment), and the row's
+ *                      reached-before-later ordering. That gap is open with
+ *                      Aurora rather than closed with a second invention.
  *  2. hover          — a pressable stage takes one defined step from its own
  *                      fill: `--surface-quiet` for done and later,
  *                      `--btn-primary-hover` for the mango current pill. A
@@ -314,10 +326,10 @@ function plainNumber(value: number): string {
  *                      nor (since 23 Sep 2026's second ruling) a distinct
  *                      glyph — done and current share both the ink fill and
  *                      the tick, so "selected" there reads through
- *                      `aria-current`, the LABEL's underline (added the same
- *                      day so the row still has a visible mark of position),
- *                      and the current mark's extra weight — not through
- *                      colour and not through the mark's own content.
+ *                      `aria-current` and the current mark's extra weight
+ *                      alone — not through colour, not through the mark's own
+ *                      content, and (since 24 Sep 2026) not through an
+ *                      underline on the label either.
  * 10. read-only      — every stepper without `onStageSelect` is read-only,
  *                      and that is the default. The stages become spans, so
  *                      there are no tab stops that do nothing.
@@ -452,7 +464,7 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   {isDone || isCurrent ? (
                     <>
                       {isDone ? <span className="sr-only">{doneLabel}</span> : null}
-                      <CheckFat size={16} aria-hidden="true" />
+                      <Check size={16} aria-hidden="true" />
                     </>
                   ) : null}
                 </span>
@@ -460,13 +472,11 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   data-slot="status-stepper-label"
                   className={cn(
                     "min-w-0 truncate text-caption",
-                    // The underline — see the horizontal steps rail's own
-                    // render-site comment, below, for the full argument. The
-                    // identical `markClasses` mark this rail shares with the
-                    // horizontal one keeps its glyph untouched; only this
-                    // label gains the signal.
-                    isCurrent &&
-                      "font-[var(--font-weight-medium)] underline underline-offset-[0.1875rem] decoration-hair-strong",
+                    // NO UNDERLINE. Removed 24 Sep 2026 with the horizontal
+                    // rail's — see that block's own render-site comment,
+                    // below, for her question and what it leaves. Weight is
+                    // what remains here, exactly as it was before 23 Sep.
+                    isCurrent && "font-[var(--font-weight-medium)]",
                     state === "later" ? "text-ink-tertiary" : "text-foreground",
                   )}
                 >
@@ -589,8 +599,8 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                      argument by name: the stages are not numbered things, so
                      a mark is either a check or it is empty.
 
-                     THE SECOND FIX (this pass): `isCurrent` now draws the
-                     SAME GLYPH `isDone` draws — the `CheckFat` tick — instead
+                     THE SECOND FIX (23 Sep 2026): `isCurrent` now draws
+                     the SAME GLYPH `isDone` draws — the tick — instead
                      of `formatNumber(index + 1)`. A later mark draws nothing
                      at all (an empty circle), where it used to draw its own
                      number. No branch in this mark calls `formatNumber`
@@ -599,32 +609,44 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                      untouched — this pass only removes what was still inside
                      the fill.
 
+                     THE THIRD RULING, 24 SEP 2026, VERBATIM: "icon on
+                     completed stages shoudl be phospor check regular." The
+                     glyph this branch draws is now `Check` — Phosphor's
+                     `check`, regular weight, which this kit has shipped at
+                     that weight since 6 Sep 2026 — and no longer `CheckFat`,
+                     which is Phosphor's separate `check-fat` glyph at fill.
+                     Her word is the glyph's own upstream name, so nothing is
+                     translated on the way in. No new weight exception was
+                     minted; `foundations/icons/ATTRIBUTION.md` §Weight is the
+                     list, it already held `Check`, and it now also carries
+                     her ruling and its date.
+
                      WHAT A READER HAS LEFT, NOW THAT NEITHER THE FILL NOR THE
-                     GLYPH TELLS DONE FROM CURRENT: (1) the LABEL'S underline
-                     — added in the SAME pass this comment describes, once the
-                     honest read below was filed and the answer came back "yes,
-                     add the smallest one, on the label, not the mark" — see
-                     the law block's own bullet, above, for why it exists and
-                     why it must not be deleted as decoration; (2) weight —
-                     the current mark and its label both keep the
-                     `font-[var(--font-weight-medium)]` they already carried,
-                     so the current stage reads slightly heavier than a done
-                     stage's tick or a later stage's empty circle; (3)
-                     `aria-current="step"` on the pressable/static stage
-                     below, unchanged, which is what a screen reader still
-                     reports; (4) position — the row is ordered and
-                     contiguous (done, done, …, current, later, later…), so
-                     the LAST filled (ink) mark in reading order is
-                     structurally the current one, the same way it was before,
-                     just without a glyph that names it directly. Before the
-                     underline, (2) and (4) alone read as faint to a sighted
-                     user at a glance — weight at 12px/16px is a subtle
-                     difference, and "the last one" requires scanning the row
-                     rather than reading one mark; that gap is why (1) exists.
-                     The MARK itself still says nothing beyond fill and glyph
-                     — this file's own TEN STATES block, item 1, and
-                     GAPS-CE STP-2/3 record the same honest read this comment
-                     does.
+                     GLYPH TELLS DONE FROM CURRENT, AND THE UNDERLINE IS GONE
+                     TOO (24 Sep 2026 — see the LABEL's own comment below):
+                     (1) weight — the current mark and its label both keep the
+                     `font-[var(--font-weight-medium)]` they carried before
+                     either ruling. IN THE KIT'S OWN DEMO that is a real step,
+                     because demo.css sets body to `--font-weight-light`; IN
+                     `kwapso_system` IT IS NOTHING, measured rather than
+                     assumed — the app sets no base font-weight, Saans ships
+                     only 300 and 500, and CSS font matching resolves a 400
+                     request to the 500 face, so every label on the row is
+                     already Medium. (2) `aria-current="step"` on the
+                     pressable/static stage below, unchanged, which is what a
+                     screen reader still reports — and the ONLY one of these
+                     that is unambiguously working. (3) position — the row is
+                     ordered and contiguous (done, done, …, current, later,
+                     later…), so the LAST filled (ink) mark in reading order
+                     is structurally the current one; that requires scanning
+                     the row rather than reading one mark. So for a sighted
+                     reader on the ticket screen there is now NO mark of
+                     position at all. This is stated, not patched: the last
+                     thing invented here to close it is the thing she just
+                     asked about. The MARK itself still says nothing beyond
+                     fill and glyph — this file's own TEN STATES block, item
+                     1, and GAPS-CE STP-2/3 record the same honest read this
+                     comment does.
 
                      SCOPE — checked against every variant and orientation
                      this file draws, not only this one, the same way the
@@ -692,7 +714,7 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                 {isDone || isCurrent ? (
                   <>
                     {isDone ? <span className="sr-only">{doneLabel}</span> : null}
-                    <CheckFat size={16} aria-hidden="true" />
+                    <Check size={16} aria-hidden="true" />
                   </>
                 ) : null}
               </span>
@@ -720,21 +742,55 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                   data-slot="status-stepper-label"
                   className={cn(
                     "block w-full truncate pe-[var(--space-2h)] text-caption",
-                    /* THE UNDERLINE — added THIS pass, not her ruling's own
-                       words. See the mark's comment above for the full
-                       argument: removing the number left the row with no
-                       visible mark of position at all, which she did not ask
-                       for and would have noticed. This is the smallest
-                       non-colour, non-number signal on offer, the kit's own
-                       "ink, underlined, never coloured" idiom (the same
-                       `decoration-hair-strong` / `underline-offset-
-                       [0.1875rem]` pair `button.tsx`'s text-link variant and
-                       `article-body.tsx`'s in-copy links already use) rather
-                       than an invented one. Label only — the mark stays
-                       exactly what her ruling leaves it, a tick on ink or an
-                       empty grey circle, nothing added there. */
-                    isCurrent &&
-                      "font-[var(--font-weight-medium)] underline underline-offset-[0.1875rem] decoration-hair-strong",
+                    /* NO UNDERLINE ON THIS LABEL. REMOVED 24 SEP 2026.
+
+                       An underline lived here for one day. It was added
+                       23 Sep 2026 by the pass that carried out her second
+                       ruling of that day ("remove the numbers inside (they
+                       are not numbered) is either check or empty") — not by
+                       the ruling, which is about what the MARK contains. The
+                       pass took the number out, saw that done and current
+                       then drew the identical fill AND the identical glyph,
+                       and added an underline to the current LABEL so a
+                       sighted reader could still find the row's position.
+                       She never asked for it.
+
+                       AURORA, 24 SEP 2026, VERBATIM: "on tickets stage, why
+                       is done underlined?" A question about a mark nobody
+                       asked for is a rejection, not curiosity, so it is
+                       gone — and gone in BOTH `steps` windows, not only the
+                       one she was looking at.
+
+                       WHAT IS LEFT, MEASURED RATHER THAN ASSERTED, so the
+                       next reader does not have to re-derive it:
+                         · `aria-current="step"` on the step below — real,
+                           and only a screen reader hears it.
+                         · the current mark's and label's own
+                           `font-[var(--font-weight-medium)]`, kept here
+                           untouched. IT IS WORTH NOTHING IN THE APP, and
+                           that is a measurement, not a guess: Saans ships
+                           exactly two faces, Light 300 and Medium 500
+                           (tokens.css §"WHY `swap`"), `--font-weight-medium`
+                           is 500, and `kwapso_system` sets NO base
+                           font-weight on `<body>` — so the app's resting
+                           weight is the UA's `normal`, and CSS font matching
+                           resolves a 400 request to 500 when 400 is absent.
+                           Measured in a browser against these two faces:
+                           "In progress" at 13px is 50.375px wide at 300 and
+                           51.984px at 400, at 500 AND at `normal` — three
+                           identical numbers. The kit's own demo sets
+                           `font-weight: var(--font-weight-light)` on body
+                           (demo/demo.css), which is why this signal LOOKS
+                           like it works when the kit is built and looked at,
+                           and does not on the ticket screen.
+                         · position: the row is ordered, so the LAST ink mark
+                           is structurally the current one. Requires scanning
+                           the row rather than reading one mark.
+                       So on the ticket screen the current step is now drawn
+                       identically to a done step. That is stated back to her
+                       rather than patched with a second invention — the
+                       first one is what she just rejected. */
+                    isCurrent && "font-[var(--font-weight-medium)]",
                     state === "later" ? "text-ink-tertiary" : "text-foreground",
                   )}
                 >

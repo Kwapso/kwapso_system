@@ -198,6 +198,7 @@ export function RecordMarkGlyph({
   picture: stored,
   mark,
   name,
+  external = false,
 }: {
   /** The stored path to the record's own picture, if it has one. */
   picture?: string | null
@@ -205,6 +206,9 @@ export function RecordMarkGlyph({
   mark?: string | null
   /** The record's name — the last resort is its first letter. */
   name?: string | null
+  /** IS THIS PERSON FROM OUTSIDE? See `RecordMark` below for the ruling and
+   * for why the default is colour. */
+  external?: boolean
 }) {
   const [failed, setFailed] = React.useState<string | null>(null)
   const picture = safeSrc(stored ?? undefined)
@@ -222,7 +226,22 @@ export function RecordMarkGlyph({
       alt=""
       // FILL, NEVER FIT (R60, client 2026-09-09). Unconditional: see this
       // file's header for what the old `fit` prop weighed and why it lost.
-      className="size-full object-cover"
+      //
+      // GREYSCALE FOR AN OUTSIDE PERSON, and only for their PHOTOGRAPH.
+      // Aurora, 23 Sep 2026: "external photos (from contacts) gray scale.
+      // keep staff nirmal." The filter sits on the `<img>` rather than on
+      // `RecordMark`'s own box below, for the same reason the kit's
+      // `AvatarImage` puts it there: the box holds the FALLBACK — a letter or
+      // a type glyph on `bg-muted` — and those are the app's own tokens, not
+      // this person's colours, so draining them would say "quiet" rather than
+      // "external". A contact with no photograph therefore draws exactly the
+      // tile a staff member with no photograph draws, which is the honest
+      // answer to her word: she said "photos".
+      //
+      // THE TERNARY IS SAFE UNDER R60, which reads the CLASS NAME to prove no
+      // `object-contain` survives: `object-cover` stays unconditional and
+      // literal on its own, and the grey rides beside it.
+      className={external ? "size-full object-cover grayscale" : "size-full object-cover"}
       onError={() => setFailed(picture)}
     />
   ) : (
@@ -236,6 +255,7 @@ export function RecordMark({
   name,
   shape = "square",
   size = "row",
+  external = false,
   className = "",
 }: {
   /** The stored path to the record's own picture, if it has one. NOT called
@@ -257,17 +277,69 @@ export function RecordMark({
    * not. `board` (80px) is for the apps board's own Kanban card — see `BOX`'s
    * own note. */
   size?: keyof typeof BOX
+  /** IS THIS PERSON FROM OUTSIDE — a client contact rather than one of ours?
+   * Aurora's ruling, 23 Sep 2026, verbatim: *"external photos (from contacts)
+   * gray scale. keep staff nirmal."* ("nirmal" is normal.) Their PHOTOGRAPH
+   * renders greyscale; a staff photograph renders in full colour, so a reader
+   * can tell at a glance whose face they are looking at, in a table, on a
+   * card, in a chip, on a record's header mark, anywhere.
+   *
+   * THE CALLER TELLS IT; THIS FILE NEVER GUESSES. Which population a person
+   * belongs to is a fact about the DATA — `TeamMember.isClient` for a login,
+   * an `accountType: "individual"` account linked to a company for a contact
+   * — and this component sees neither, only a path and a name. A mark that
+   * inferred it (from the URL's host, from whether initials were supplied)
+   * would be wrong the first time a staff photograph landed on the same CDN
+   * a contact's did.
+   *
+   * THE DEFAULT IS COLOUR, AND IT IS A CHOICE BETWEEN TWO IMPERFECT ONES.
+   * Defaulting to greyscale fails more LOUDLY — a call site nobody has
+   * updated greys our own people, and somebody says so the same morning —
+   * but it fails by SAYING SOMETHING FALSE about a real person, on every one
+   * of the ninety-odd marks in this app at once, most of which are staff.
+   * Colour-default is the status quo: an un-updated call site is NOT YET
+   * TREATED, never WRONGLY treated. The loudness is bought back somewhere
+   * that cannot lie instead — the kit's own `check-avatar.mjs` census fails
+   * the build where a person-bearing component is not told, which is red,
+   * and before the thing ships, rather than grey and after.
+   *
+   * A SQUARE MARK NEVER SETS IT. `shape="square"` is a company, an app, an
+   * asset — a THING, which is not one of us or from outside. Nothing here
+   * enforces that; it is simply never true. */
+  external?: boolean
   className?: string
 }) {
   const round = shape === "round"
   return (
     <span
       aria-hidden
+      /* THE FACT IS PUBLISHED ON THE BOX, NOT ONLY ON THE PICTURE — added
+         23 Sep 2026, mirroring the kit's own `Avatar`, which writes exactly
+         this attribute for exactly this reason (avatar.tsx: "PUBLISHED, so the
+         fact is readable from the DOM — by a test, by a measuring script, and
+         by a composition that needs to know without re-deriving it").
+         `external` reached the DOM ONLY as the `grayscale` class on the `<img>`
+         below, so a person from outside WITH NO PHOTOGRAPH left no trace of it
+         anywhere: their tile was indistinguishable from one of ours, and a
+         caller that had correctly gone and got the fact had nowhere to put it.
+         That is the half-state the meetings lane hit on the Attendees list,
+         where a client's face is still a door change away and only the FLAG is
+         reachable today.
+         WRITTEN ONLY WHEN TRUE (`undefined` otherwise), the same shape the kit
+         uses: the attribute's presence is the answer, and an un-updated mark
+         carries nothing rather than a cheerful `data-external="false"` that
+         would read as "we checked, and they are ours".
+         IT CHANGES NO PIXEL TODAY. Her ruling was about PHOTOS ("external
+         photos (from contacts) gray scale"), and the fallback tile is
+         deliberately untouched — this only means that if an outside person's
+         tile is ever given its own quieter paper, every call site already
+         carrying the flag needs no second pass. */
+      data-external={external ? "true" : undefined}
       className={`bg-muted text-muted-foreground grid shrink-0 place-items-center overflow-hidden leading-none ${
         round ? "rounded-pill" : "rounded-[var(--radius)]"
       } ${BOX[size]} ${className}`}
     >
-      <RecordMarkGlyph picture={picture} mark={mark} name={name} />
+      <RecordMarkGlyph picture={picture} mark={mark} name={name} external={external} />
     </span>
   )
 }

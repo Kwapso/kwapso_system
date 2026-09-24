@@ -124,6 +124,45 @@ const SETTINGS_FILES = [
   join(REPO_ROOT, "web", "components", "team", "roles-matrix.tsx"),
   join(REPO_ROOT, "web", "components", "team", "role-picker-dialog.tsx"),
   join(REPO_ROOT, "web", "components", "team", "member-screen.tsx"),
+  // ── THE SETTINGS MODULE'S OTHER HALF, ADDED 23 SEP 2026 ─────────────────
+  //
+  // Aurora, the same day, over the one settings screen the sweep above left
+  // boxed: "settings appearacne shoudl not have card - thats not minimal."
+  //
+  // SHE WAS LOOKING AT A FILE THIS CENSUS COULD NOT SEE. The eleven paths
+  // above are all `web/components/screens/**` and `web/components/team/**`,
+  // which is where the lane that wrote this test was sent — but Settings ›
+  // Appearance draws none of its UI from either folder. The whole tab is
+  // `shared/web/appearance-panel.tsx` standing in `shared/web/settings-
+  // section.tsx`, and it was THAT `<section>` that still carried
+  // `rounded-[var(--radius)] bg-surface-panel p-4 lg:p-[var(--space-7)]` —
+  // the identical literal box this census had just taken off four tabs one
+  // folder away. A census scoped by FOLDER rather than by SCREEN passed
+  // green over the last card in the module it is named after.
+  //
+  // So the six files the Appearance tab is actually made of are in the
+  // subject now. `settings-section.tsx` is the box itself; `appearance-
+  // panel.tsx` is the column that used to draw its row rule as a `divide-y`
+  // stroke (census 3 — invisible inside a box, the whole of the offence on
+  // the bare page); the four `*-section.tsx` files are the pill rows, in for
+  // the same reason the eleven above are: this is where a fill would come
+  // back first.
+  //
+  // KNOWN, MEASURED AND DELIBERATELY NOT IN THIS LIST:
+  // `web/components/screens/settings-choices-panel.tsx` still wraps its own
+  // `<NoAccess />` refusal in `rounded-[var(--radius)] bg-surface-panel p-6
+  // lg:p-[var(--space-7)]` — the exact shape this census's own first pass
+  // removed from `settings-screen.tsx`'s four tabs, surviving because that
+  // pass's eleven files did not include it either. Aurora has not named that
+  // screen, and naming a file here while exempting the finding in it would
+  // be a green over an open question. It is reported instead, so the ruling
+  // is asked for rather than assumed.
+  join(REPO_ROOT, "shared", "web", "settings-section.tsx"),
+  join(REPO_ROOT, "shared", "web", "appearance-panel.tsx"),
+  join(REPO_ROOT, "shared", "web", "language-section.tsx"),
+  join(REPO_ROOT, "shared", "web", "scale-section.tsx"),
+  join(REPO_ROOT, "shared", "web", "theme-section.tsx"),
+  join(REPO_ROOT, "shared", "web", "spine-section.tsx"),
 ]
 
 function relOf(path: string): string {

@@ -46,6 +46,7 @@ import { d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { hasRight, type MemberGuard } from "@shared/workers/gating"
 import { countCollection } from "@shared/workers/count"
 import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
+import { archivedParentClause, ARCHIVABLE } from "./help"
 
 /** HOW MANY NEIGHBOURS ONE STEP MAY RETURN. Not a page — a neighbourhood past
  * this size is not a neighbourhood, and the honest answer is the count beside it
@@ -307,9 +308,111 @@ export const RETIRABLE = new Set([
  * ambiguity `workers/content/src/lib/help.ts`'s own `accountArchivedClause`
  * describes SQLite refusing at runtime; qualifying to `o` here is what keeps
  * this file from reproducing that failure. */
+/** TABLES WHOSE ROWS GO AWAY WITH THEIR CLIENT — a row this map must not draw
+ * because the ACCOUNT it names is archived, which is a fact about a DIFFERENT
+ * ROW ON A DIFFERENT TABLE from the one being drawn.
+ *
+ * ── WHY THIS IS NOT THE CLAUSE ABOVE ────────────────────────────────────────
+ *
+ * `liveOnly`'s other two halves ask the far row about ITSELF: its own
+ * `deactivated_at`, or — when the far row IS an account — its own
+ * `archived_at`. Together they stop the map drawing an archived COMPANY. They
+ * cannot stop it drawing that company's TICKET, because a ticket's own
+ * columns say nothing about its client, and Aurora's ruling (23 Sep 2026,
+ * answering a question put to her directly) is about exactly those: "yes,
+ * archived accounts should hide their tickets too."
+ *
+ * Three standing points reached one anyway, every one of them a place where
+ * `help` is the FAR end of an edge: an APP (`help.app_id -> apps`, read
+ * backwards), a STORY (`stories.ticket_id -> help`, read forwards) and the
+ * ACCOUNT itself (`help.account_id -> accounts`, read backwards). The first
+ * two are the leak proper — a live record handing back an archived client's
+ * ticket title to a reader who can no longer open that ticket on its own page
+ * (`getTicket(..., { hideArchivedAccount: true })`). The third disagreed with
+ * a screen: the account's own Tickets tab counts zero through the fixed
+ * `ticketWhere`, so the map of that same company drew what its own tab said
+ * it did not have.
+ *
+ * ── AND WHY IT IS A SET OF ONE RATHER THAN "ANY TABLE WITH account_id" ──────
+ *
+ * Nine other tables on `RECORD_EDGES` carry `account_id` — apps, meetings,
+ * todos, tasks, sprints, waves, portal_users, account_links,
+ * knowledge_sources. NOT ONE of their own list doors hides a row whose client
+ * is archived: the meetings screen, the tasks screen and the stories board all
+ * still show them, and only `help` (plus `accounts` itself, and the assistant's
+ * own mirror, which retires rather than filters) was given the filter. A map
+ * that hid a meeting the meetings list still shows would not be enforcing her
+ * ruling — it would be inventing one, on the surface least able to explain
+ * itself, since an edge that is absent is absent without a word (the whole
+ * argument this file's header makes about fences).
+ *
+ * So the map matches each far table's OWN door, and this set is the list of
+ * tables where that door filters. Data, so the day a second ruling lands it is
+ * one line here rather than a code path — and the suite asserts both its
+ * contents (a deliberate act to change) and that every table in it really does
+ * carry `account_id`, read off the migrations' own schema. */
+/** ── WIDENED 23 SEP 2026 (R112): "NOT ONLY ACCOUNTS" ────────────────────────
+ *
+ * Aurora, validating the account round and extending it in the same sentence:
+ * "validated - this for everything when archived, not only accounts." So this
+ * is no longer a set of tables that hide with their CLIENT; it is a map from a
+ * table to the ARCHIVABLE PARENTS it hangs off, whichever record type each is.
+ *
+ * A MAP RATHER THAN A SET because a row can hang off more than one archivable
+ * parent, and a story does: its client AND the ticket it answers. A set could
+ * only ever have said "accounts", which is why the widening could not have been
+ * expressed in the old shape without a second mechanism beside it.
+ *
+ * STILL MATCHING EACH FAR TABLE'S OWN DOOR, which is the discipline the
+ * paragraphs above argue for at length and is unchanged: a map that hid an edge
+ * the far table's own list still shows would be inventing a ruling on the
+ * surface least able to explain itself. What moved is the DOORS — `storyWhere`
+ * and `countStoryViews` (lib/stories.ts) and `whereFor` (lib/todos.ts) now hide
+ * a row whose ticket is archived, so the map follows them rather than leading.
+ *
+ * THE NINE OTHER `account_id` TABLES ON `RECORD_EDGES` ARE STILL ABSENT — apps,
+ * meetings, tasks, sprints, waves, portal_users, account_links,
+ * knowledge_sources — for exactly the reason the paragraph above gives: not one
+ * of their own list doors hides a row whose client is archived. That is a REAL
+ * GAP in the account half of this law, reported to Aurora rather than closed
+ * here by a map that would then disagree with every one of those screens. */
+export const ARCHIVED_PARENT_HIDES: Record<string, { parent: string; column: string }[]> = {
+  help: [{ parent: "accounts", column: "account_id" }],
+  stories: [
+    { parent: "accounts", column: "account_id" },
+    { parent: "help", column: "ticket_id" },
+  ],
+  todos: [
+    { parent: "accounts", column: "account_id" },
+    { parent: "help", column: "ticket_id" },
+  ],
+}
+
+/** `AND (o.account_id IS NULL OR <its account is not archived>)`, for the
+ * tables above. `help.ts`'s own clause, asked through the far end's alias
+ * rather than reimplemented — the two must never be able to drift into
+ * answering different questions about one ticket, and its short-circuit is
+ * load-bearing: A TICKET RAISED AGAINST NO COMPANY (the agency's own
+ * housekeeping) has no client's archived state to inherit and must never be
+ * hidden by a predicate about one.
+ *
+ * `o` IS AN ALIAS HERE, not a table name, which is the one thing that had to
+ * be checked before reusing it: the clause takes the prefix as a parameter and
+ * writes `o.account_id`, while its own `accounts arc` lives inside its own
+ * subquery and so cannot collide with `n`, with `o`, or with the `accounts`
+ * the SAME statement already joins when the far end is a company. */
 const liveOnly = (table: string) =>
   (RETIRABLE.has(table) ? ` AND o.deactivated_at IS NULL` : "") +
-  (table === "accounts" ? ` AND o.archived_at IS NULL` : "")
+  // THE FAR ROW'S OWN ARCHIVED STATE, for every archivable table rather than
+  // for `accounts` alone (R112). `help` joined this set when the ruling widened:
+  // a ticket somebody put away had left the tickets list, the triage queue and
+  // the corpus, and was still drawn as a neighbour of its app, its account and
+  // its own stories. `ARCHIVABLE` (lib/help.ts) is the one list of which tables
+  // carry the column, read rather than spelled again here.
+  (ARCHIVABLE[table] ? ` AND o.archived_at IS NULL` : "") +
+  (ARCHIVED_PARENT_HIDES[table] ?? [])
+    .map((p) => ` AND ${archivedParentClause({ ...p, table: "o" })}`)
+    .join("")
 
 const key = (n: { table: string; id: string }) => `${n.table}:${n.id}`
 
@@ -332,12 +435,28 @@ export async function neighbourhood(
   const focusLabel = LABEL_COLUMN[table]
   if (!readable.has(table)) return { focus: null, nodes: [], links: [], total: 0, capped: false }
 
+  // THE ONE PLACE THE FOCUS IS NOT EXEMPT, and the distinction is the reason
+  // RETIRABLE's own header writes the exemption down. A retired row still draws
+  // itself because opening its map is a deliberate act — you reached the record
+  // on its own page and the map of a record cannot be empty of that record. An
+  // archived ACCOUNT is the same: the accounts screen's Archived view still
+  // opens it on purpose.
+  //
+  // A TICKET WHOSE CLIENT IS ARCHIVED HAS NO SUCH PAGE. `GET /api/content/help
+  // ?id=` already refuses it (`hideArchivedAccount`), so the exemption's own
+  // premise is false here and this door would be the last one handing back its
+  // title. It answers with the shape it already gives for a row that is not
+  // there — which is right twice over, because that answer does not disclose
+  // that the ticket exists.
+  const focusHidden = (ARCHIVED_PARENT_HIDES[table] ?? [])
+    .map((p) => ` AND ${archivedParentClause({ ...p, table })}`)
+    .join("")
   const [focusRow] = await d1Query<{ id: string; label: string | null }>(
     cfg,
     guard.databaseId,
     // R14: one row by primary key.
     `SELECT id${focusLabel ? `, ${focusLabel} AS label` : ", NULL AS label"} FROM ${table}
-      WHERE id = ${sqlString(id)} LIMIT 1`
+      WHERE id = ${sqlString(id)}${focusHidden} LIMIT 1`
   )
   if (!focusRow) return { focus: null, nodes: [], links: [], total: 0, capped: false }
   const focus: MapNode = { table, id: focusRow.id, label: focusRow.label ?? focusRow.id }

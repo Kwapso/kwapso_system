@@ -87,8 +87,17 @@ import * as React from "react";
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "../popover/popover";
+import { useHasRoom } from "../../lib/use-has-room";
+import { Button } from "../button/button";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "../popover/popover";
 import { selectTriggerVariants } from "../select/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "../sheet/sheet";
 import {
   CheckFat,
   CaretDown,
@@ -1093,6 +1102,21 @@ export interface SearchableFacetProps
   readOnly?: boolean;
 }
 
+/** WHAT A MULTI-VALUED FIELD SAYS WHEN IT HOLDS MORE THAN ONE. The first
+ * chosen option's own label, and how many more there are — the shortest true
+ * thing a 20rem field can say, and the one shape that does not go stale when a
+ * later option is added. A host with a translator passes `formatSummary`
+ * instead: "+2" is a number and a plus in every language this kit has been
+ * asked about, but a host that wants words is entitled to them. */
+function defaultSummary(chosen: FacetOption[]): React.ReactNode {
+  return (
+    <>
+      <span className="truncate">{chosen[0].label}</span>
+      <span className="shrink-0 tabular-nums"> +{chosen.length - 1}</span>
+    </>
+  );
+}
+
 function defaultFilterOption(option: FacetOption, query: string): boolean {
   if (query.trim() === "") return true;
   const text = typeof option.label === "string" ? option.label : option.value;
@@ -1414,6 +1438,44 @@ export interface CompactFacetProps
   /** Fires with the chosen option's `value`, or `null` when the facet is turned off. */
   onValueChange?: (value: string | null) => void;
   /**
+   * SEVERAL AT ONCE. Aurora, 24 Sep 2026, validating the filter overlay:
+   * *"validated, but i shoudl be able to select multile for each filter
+   * type"*. Within one facet the chosen values mean OR; across facets a
+   * toolbar still means AND, which is the host's arithmetic and not this
+   * component's.
+   *
+   * ADDITIVE, AND OFF BY DEFAULT, so every existing call site is byte-identical
+   * with it omitted: `value`/`onValueChange` keep their single-valued contract
+   * and this file keeps drawing exactly what it drew. Turning it on swaps THREE
+   * things and nothing else — the value pair becomes `values`/`onValuesChange`,
+   * each row's mark becomes `SearchableFacet`'s checkbox (the box that says
+   * "several of these may be on", which is the distinction the single-valued
+   * tick's own note already draws), and a pick no longer closes the panel,
+   * because somebody choosing three clients should not have to reopen the list
+   * twice.
+   *
+   * WHY NOT `SearchableFacet` INSTEAD, which has been multi-valued all along:
+   * that component is an ALWAYS-EXPANDED panel — a heading, a search pill, then
+   * every option as a row — and a consuming app measured two of them as a
+   * screenful of controls hanging off a toolbar. The ruling that produced this
+   * component was "one short labelled field, not an expanded list"; taking
+   * several values is not a reason to give that up.
+   */
+  multiple?: boolean;
+  /** Controlled value in `multiple` mode. An empty array is the facet off. */
+  values?: string[];
+  /** Uncontrolled starting values in `multiple` mode. */
+  defaultValues?: string[];
+  /** Fires with the whole set, in the order the options are declared. */
+  onValuesChange?: (values: string[]) => void;
+  /**
+   * WHAT THE CLOSED FIELD SAYS when several are chosen. The default is the
+   * first chosen option's own label with a ` +N` after it, which is the
+   * shortest true thing a 20rem field can say; a host with a translator passes
+   * its own. Never called with fewer than two.
+   */
+  formatSummary?: (chosen: FacetOption[]) => React.ReactNode;
+  /**
    * What the closed field says while nothing is chosen — the kit's own example
    * is "Any client". Tertiary ink, exactly as a select's placeholder is.
    * Translatable.
@@ -1534,6 +1596,11 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
       value,
       defaultValue,
       onValueChange,
+      multiple = false,
+      values,
+      defaultValues,
+      onValuesChange,
+      formatSummary,
       placeholder = "Any",
       anyLabel,
       searchable = false,
@@ -1569,6 +1636,16 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
     const valueControlled = value !== undefined;
     const selected = valueControlled ? value : uncontrolledValue;
 
+    /* THE SET, in `multiple` mode. Held beside the single value rather than
+       instead of it so the two contracts cannot leak into each other: a host
+       that never passes `multiple` cannot reach this state at all, and every
+       read below asks `multiple` first. */
+    const [uncontrolledValues, setUncontrolledValues] = React.useState<string[]>(
+      () => defaultValues ?? [],
+    );
+    const valuesControlled = values !== undefined;
+    const selectedMany = valuesControlled ? values : uncontrolledValues;
+
     const [uncontrolledQuery, setUncontrolledQuery] = React.useState(defaultQuery);
     const queryControlled = query !== undefined;
     const currentQuery = queryControlled ? query : uncontrolledQuery;
@@ -1595,6 +1672,25 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
        `label` for). */
     const chosen = selected === null ? undefined : options.find((o) => o.value === selected);
 
+    /* THE SAME QUESTION IN `multiple` MODE, answered off the options for the
+       same reason: a value whose option has gone away must not be named at the
+       reader as a stored id. Ordered by the OPTIONS rather than by the order
+       they were ticked, so the field's summary does not change under somebody
+       who unticks and re-ticks the same name. */
+    const chosenMany = multiple ? options.filter((o) => selectedMany.includes(o.value)) : [];
+    const chosenSays: React.ReactNode = !multiple
+      ? chosen
+        ? chosen.label
+        : placeholder
+      : chosenMany.length === 0
+        ? placeholder
+        : chosenMany.length === 1
+          ? chosenMany[0].label
+          : formatSummary
+            ? formatSummary(chosenMany)
+            : defaultSummary(chosenMany);
+    const isOff = multiple ? chosenMany.length === 0 : !chosen;
+
     const setOpen = (next: boolean) => {
       if (!openControlled) setUncontrolledOpen(next);
       onOpenChange?.(next);
@@ -1603,6 +1699,34 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
     const commit = (next: string | null) => {
       if (!valueControlled) setUncontrolledValue(next);
       onValueChange?.(next);
+      setOpen(false);
+    };
+
+    /* TOGGLE, AND THE PANEL STAYS OPEN. Two properties, both deliberate.
+       A row that is already on turns itself OFF, which is how a reader drops
+       one value out of four without hunting for a separate control — the
+       coordinate answer to "do not let the only way out of four selections be
+       four clicks" is the off row below, which drops all of them at once.
+       And the panel does not close, because closing after each pick would make
+       choosing three clients three round trips through the trigger.
+
+       The set is rebuilt in the OPTIONS' own order rather than appended to, so
+       what the host receives, what the field summarises and what the list shows
+       are one order and cannot disagree. */
+    const toggle = (optionValue: string) => {
+      const wanted = new Set(selectedMany);
+      if (wanted.has(optionValue)) wanted.delete(optionValue);
+      else wanted.add(optionValue);
+      const next = options.filter((o) => wanted.has(o.value)).map((o) => o.value);
+      if (!valuesControlled) setUncontrolledValues(next);
+      onValuesChange?.(next);
+    };
+
+    /* THE WAY OUT OF A WHOLE FACET, in one press. Closes the panel, because
+       unlike a toggle this one is finished. */
+    const clearMany = () => {
+      if (!valuesControlled) setUncontrolledValues([]);
+      onValuesChange?.([]);
       setOpen(false);
     };
 
@@ -1645,12 +1769,29 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
           <span className="shrink-0 text-badge tabular-nums text-ink-tertiary">{count}</span>
         ) : null}
 
-        {/* The tick at the reading end, which is how `SelectItem` marks the
-            chosen row — NOT the checkbox mark `SearchableFacet` draws. That
-            box says "several of these may be on"; this facet holds one. */}
-        <span aria-hidden="true" className="grid size-[var(--icon-button)] shrink-0 place-content-center">
-          {isSelected ? <CheckFat className="size-[var(--icon-button)]" /> : null}
-        </span>
+        {/* THE MARK SAYS WHICH KIND OF FACET THIS IS. Single: the tick at the
+            reading end, the way `SelectItem` marks a chosen row. Multiple: the
+            checkbox `SearchableFacet` draws, at `--radius-select` (ruling 03),
+            because that box is the one shape in the system that says "several
+            of these may be on" — and a reader who cannot tell the two apart
+            will not know that a second press adds rather than replaces. */}
+        {multiple ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "order-first grid size-4 shrink-0 place-content-center rounded-select",
+              isSelected
+                ? "bg-surface-inverse text-ink-on-inverse"
+                : "shadow-[var(--hairline-strong)] bg-background",
+            )}
+          >
+            {isSelected ? <CheckFat size={12} /> : null}
+          </span>
+        ) : (
+          <span aria-hidden="true" className="grid size-[var(--icon-button)] shrink-0 place-content-center">
+            {isSelected ? <CheckFat className="size-[var(--icon-button)]" /> : null}
+          </span>
+        )}
       </button>
     );
 
@@ -1688,8 +1829,14 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
             {/* Tertiary ink while nothing is chosen — the same thing
                 `data-[placeholder]` does on a real select, said in JS because
                 Radix is not the one rendering this value. */}
-            <span className={cn("min-w-0 truncate text-start", chosen ? undefined : "text-muted-foreground")}>
-              {chosen ? chosen.label : placeholder}
+            <span
+              data-slot="compact-facet-value"
+              className={cn(
+                "flex min-w-0 items-baseline truncate text-start",
+                isOff && "text-muted-foreground",
+              )}
+            >
+              {chosenSays}
             </span>
             <CaretDown
               aria-hidden="true"
@@ -1757,6 +1904,10 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
                 data-slot="compact-facet-list"
                 role="listbox"
                 aria-label={label}
+                /* SAID OUT LOUD, because the mark alone is a picture. A
+                   listbox that takes several is a different control to a
+                   screen-reader reader and has to announce itself as one. */
+                aria-multiselectable={multiple || undefined}
                 style={{ maxHeight }}
                 className={cn("flex flex-col gap-1 overflow-y-auto", searchable && "mt-2")}
               >
@@ -1765,13 +1916,18 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
                     the filters, not hunted for at the end of 131 of them. */}
                 {offLabel === null
                   ? null
-                  : row("__any__", selected === null, () => commit(null), offLabel)}
+                  : row(
+                      "__any__",
+                      isOff,
+                      multiple ? clearMany : () => commit(null),
+                      offLabel,
+                    )}
 
                 {visible.map((option) =>
                   row(
                     option.value,
-                    selected === option.value,
-                    () => commit(option.value),
+                    multiple ? selectedMany.includes(option.value) : selected === option.value,
+                    multiple ? () => toggle(option.value) : () => commit(option.value),
                     option.label,
                     option.count,
                     option.disabled,
@@ -1788,8 +1944,401 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
 
 CompactFacet.displayName = "CompactFacet";
 
+
+/* ============================================================================
+   FilterOverlay — the ONE thing the "Filter" control opens.
+
+   THE CLIENT'S TWO RULINGS, AND THEY ARE ONE COMPONENT
+
+   2026-09-02, first: the filters must open as "a temporary overlay not a
+   second row". A second toolbar row is forbidden, at every width, forever.
+
+   2026-09-23, choosing between five drawn designs: "filter drop sheet
+   popover". That names TWO of the five, and the recommendation she accepted
+   said why they are not two things:
+
+       POPOVER    anchored under the Filter button that opened it. The
+                  quietest form. Right where there are two or three facets.
+                  Gets cramped beyond that.
+       DROP SHEET falls from the toolbar across its FULL width and floats OVER
+                  the rows rather than pushing them down. Right where there
+                  are four or more facets, because every facet can stay open
+                  at once.
+
+       "the two coexist because the sheet is simply a popover that ran out of
+        room."
+
+   So this file is ONE component with one primitive underneath it (a Radix
+   popover), and the two forms are two GEOMETRIES of that one primitive:
+   the popover anchors to the trigger and is 20rem wide; the sheet anchors to
+   the TOOLBAR and is the toolbar's own width. Nothing else differs. There is
+   no second component, no `variant` prop, and no call site that chooses.
+
+   WHY THE CHOICE IS THE CONTENT'S AND NEVER A CALL SITE'S
+
+   A screen that has to say which form it wants will say it once, correctly,
+   and then be wrong the day somebody adds a facet to it. That is not a
+   hypothetical about this codebase: the app's own `COLLECTION_FILTERS` grew
+   from three facets to four on the tickets collection in a single afternoon's
+   ruling, and from one to three on accounts a week later. A flag on the
+   screen would have gone stale both times, silently, in the one direction
+   nobody looks (a cramped popover still renders).
+
+   So the deciding input is a measure of the CONTENT: `span`, what the facets
+   cost in field-rows. `filterOverlayForm` below is the whole rule, it is a
+   pure function of that number, and it is exported so a check can assert the
+   threshold rather than a screenshot having to.
+
+   THE THIRD GEOMETRY, WHICH IS THE PHONE ANSWER
+
+   Below 45rem neither form as drawn has room: the popover's 20rem is most of
+   a 375 viewport with none of the toolbar's width to hang off, and the sheet
+   IS the toolbar's width, which at that size is the viewport with a page
+   inset subtracted. Both degrade into the same thing, badly.
+
+   The kit already answers this question everywhere else it arises, and the
+   answer is written into `sheet.tsx`'s own `NARROW_BOTTOM`: below 45rem a
+   drawer stops flying in from the side and RISES FROM THE BOTTOM, full width,
+   capped at 85dvh, with a grabber. A filter overlay that invented a fourth
+   behaviour at the one width where the kit is most opinionated would be the
+   odd one of two on the same screen. So on a phone this opens the kit's own
+   `Sheet` at `side="bottom"`, and the facets, the Clear all and the Show N
+   are the same nodes in the same order.
+
+   `useHasRoom` IS A JS READ, AND HERE THAT IS SAFE, WHICH IT IS NOT IN
+   `sheet.tsx`. That file refuses `matchMedia` for its own geometry because a
+   drawer renders on the server and the first painted frame would be the wrong
+   one. Nothing renders here until a reader presses the trigger, which is long
+   after hydration: there is no first frame to get wrong, because there is no
+   frame at all until the press. The kit's own precedent for the read is
+   `split.tsx` / `quick-view` / `bulk-edit`, which is why `useHasRoom` exists.
+
+   HOW THE SHEET FINDS THE TOOLBAR
+
+   "across its full width" is a fact about the toolbar, and a popover anchors
+   to its trigger. Radix's own escape hatch is a VIRTUAL anchor: an object
+   with `getBoundingClientRect`. So the sheet form anchors to the nearest
+   ancestor of the trigger carrying `data-filter-anchor` — an attribute a
+   toolbar sets on its own track, once, rather than every screen passing a
+   ref — and Radix's `--radix-popover-trigger-width` then reports the
+   TOOLBAR's width, which is what the sheet is sized by.
+
+   A HOST THAT SETS NO ANCHOR gets the popover's own width instead of a
+   toolbar-wide sheet. That is a visible degradation rather than a crash, and
+   it is the one thing here a check has to police from the outside, because
+   nothing inside this file can know how many toolbars exist.
+
+   WHAT THIS FILE DOES NOT DECIDE
+
+   What a facet is, how it applies, whether there is an Apply step. The
+   children are whatever the host draws, applied the moment they are picked,
+   exactly as before. This component owns WHERE they appear and nothing else.
+
+   FOCUS, ESCAPE AND THE GROUND BEHIND
+   `modal` is on, in both the popover and the sheet branch, so Radix traps
+   focus inside the surface while it is open and returns it to the trigger on
+   close. Escape and a press on the ground behind are Radix's own dismissal,
+   not a keydown listener written here.
+
+   RENDERING CONTEXT
+   `"use client"`. Radix positions, portals and holds focus; the open state is
+   the CALLER's, because the caller's own toolbar pill has to report it.
+   ========================================================================= */
+
+/** WHAT ONE FACET COSTS, in the field-rows it needs to be usable.
+ *
+ * A closed field (`CompactFacet`) is one row whatever its option list does,
+ * because its list is behind the field rather than under it. A `RangeFacet`
+ * is TWO: it draws a min and a max side by side and keeps a line under them
+ * for the "first number must be lower" state, so two of them in a popover is
+ * already the cramped shape the drop sheet exists to relieve. */
+export const FACET_SPAN = { field: 1, range: 2 } as const;
+
+/** THE POPOVER'S BUDGET, in the same units. Three, because the ruling says
+ * "two or three facets" is the popover's range and "four or more" is the
+ * sheet's, and because three closed fields at the dense height plus the foot
+ * is 20rem of surface, which is the width the popover already is. */
+export const FILTER_POPOVER_BUDGET = 3;
+
+/** The two forms with room to be themselves, plus the one a phone gets. */
+export type FilterOverlayForm = "popover" | "sheet" | "bottom-sheet";
+
+/**
+ * THE WHOLE DECIDING RULE, as a pure function of what the content costs.
+ *
+ * Not a prop, not a breakpoint, not a screen's own opinion: a facet added to
+ * a collection tomorrow moves this on its own, which is the property the
+ * ruling's "the sheet is simply a popover that ran out of room" describes.
+ */
+export function filterOverlayForm(span: number, hasRoom: boolean): FilterOverlayForm {
+  if (!hasRoom) return "bottom-sheet";
+  return span > FILTER_POPOVER_BUDGET ? "sheet" : "popover";
+}
+
+/** THE ATTRIBUTE A TOOLBAR SETS ON ITS OWN TRACK so the drop sheet can be the
+ * toolbar's width. One attribute on a shared toolbar, never a ref threaded
+ * through every screen that has filters. */
+export const FILTER_ANCHOR_ATTR = "data-filter-anchor";
+
+/* The popover form's surface. `PopoverContent` already paints the fill, the
+   radius, the elevation and the anchored motion; these are the two things
+   that are this overlay's rather than the floating layer's: a measure wide
+   enough for three dense fields, and no inset of its own (the body and the
+   foot pay their own, so the foot's hairline can reach both edges). */
+const POPOVER_FORM = [
+  "w-[20rem] max-w-[calc(100vw-2rem)] p-0",
+] as const;
+
+/* The drop sheet's surface. `--radix-popover-trigger-width` is the ANCHOR's
+   width, and the anchor in this form is the toolbar, so this is the toolbar's
+   own width and nothing is measured by hand. The floor is the popover's
+   measure, for a toolbar narrower than its own overlay (a panel inside a
+   split, say) where a sheet thinner than a popover would be absurd. */
+const SHEET_FORM = [
+  "w-[max(20rem,var(--radix-popover-trigger-width))]",
+  "max-w-[calc(100vw-2rem)] p-0",
+] as const;
+
+export interface FilterOverlayProps {
+  /** Open, held by the CALLER: the toolbar pill has to report the same state
+   * (its count stays visible while the overlay is open, client ruling
+   * 2026-09-03), and a component that owned the boolean privately would make
+   * the pill guess at it. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** THE CONTROL THAT OPENS THIS, rendered in place, inside the toolbar. The
+   * kit's own `FilterBar` add slot is what a collection toolbar passes, which
+   * is why this is a node and not a label plus a badge: that pill's drawing
+   * has been re-tuned twice against the sort and view pills standing beside it
+   * (v1.2.27's `CHIP_ADD` alignment, and the client's "fix and uniform it"
+   * before it), and a second copy of the recipe here would be a third pill to
+   * keep in step. */
+  trigger: React.ReactNode;
+  /** The overlay's accessible name, and the phone sheet's visible heading. */
+  title: string;
+  /** WHAT THE CONTENT COSTS, in `FACET_SPAN` units. The only input to the form
+   * decision, and it is a fact about the facets rather than a choice. */
+  span: number;
+  /** Drop every facet at once. Drawn only when given: a control that does
+   * nothing is worse than no control (the bar's own rule, one file up). */
+  onClear?: () => void;
+  clearLabel?: string;
+  /** "Show 42", the live result count and the way out. The filters are already
+   * applied (there is no Apply step and the client has twice said so), so this
+   * closes the overlay and asserts nothing else. */
+  showLabel?: string;
+  /** The facet controls. Whatever the host draws. */
+  children?: React.ReactNode;
+  /** Applied to the box the trigger stands in, never to the open surface. */
+  className?: string;
+}
+
+/**
+ * The Filter control, and the one surface it opens.
+ *
+ * TEN STATES
+ *  1. default        — the control alone; nothing else is rendered until it
+ *                      is pressed.
+ *  2. hover          — the control's own, whatever the caller passed. The
+ *                      surface has none.
+ *  3. focus-visible  — NOT here. tokens.css section 8 rings every control.
+ *  4. active/pressed — does not apply; the press outcome is the overlay.
+ *  5. disabled       — does not apply. A toolbar with no facets renders no
+ *                      Filter control at all rather than a dead one.
+ *  6. loading        — does not apply to the surface. A facet that is fetching
+ *                      says so inside itself.
+ *  7. empty          — no children: the foot alone. A host with no facets
+ *                      should not be drawing this component.
+ *  8. error          — belongs to the facet, not the surface.
+ *  9. selected       — the count the caller draws on its own control is the
+ *                      whole of what this says about what is on.
+ * 10. read-only      — expressed per facet as `disabled`.
+ *
+ * THREE BREAKPOINTS
+ *  mobile  — below 45rem, the kit's bottom sheet, full width, capped 85dvh.
+ *  tablet  — from 45rem, the form `filterOverlayForm` chose.
+ *  desktop — as tablet. The sheet gets wider because the toolbar does.
+ *
+ * RTL — safe. `align="start"` is mirrored by Radix, the foot is a flex row in
+ * DOM order, and nothing here names a physical side.
+ */
+const FilterOverlay = React.forwardRef<HTMLDivElement, FilterOverlayProps>(
+  (
+    {
+      open,
+      onOpenChange,
+      trigger,
+      title,
+      span,
+      onClear,
+      clearLabel = "Clear all",
+      showLabel,
+      children,
+      className,
+    },
+    ref,
+  ) => {
+    const hasRoom = useHasRoom();
+    const form = filterOverlayForm(span, hasRoom);
+
+    /* THE BOX THE TRIGGER STANDS IN. Two jobs, and neither is drawing: it is
+       what the POPOVER form anchors to, and it is where focus goes back to
+       when the overlay closes. A box rather than the control itself because
+       the control is the caller's node and this file will not reach into
+       somebody else's element to attach a ref to it. */
+    const box = React.useRef<HTMLDivElement | null>(null);
+    const setBox = React.useCallback(
+      (node: HTMLDivElement | null) => {
+        box.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref],
+    );
+
+    /* THE ANCHOR, VIRTUAL IN BOTH FORMS, and this one object is the whole
+       structural difference between a popover and a drop sheet: the popover
+       measures the control that opened it, the sheet measures the TOOLBAR the
+       control stands in. Read at the moment Radix measures rather than
+       captured at mount, so a toolbar that changes width (a rail collapsing,
+       the assistant opening) is still what the sheet spans. The object
+       identity never changes, which is what Radix's ref contract wants; only
+       what it reports does. */
+    const wants = React.useRef(form);
+    wants.current = form;
+    const anchor = React.useRef<{ getBoundingClientRect: () => DOMRect }>({
+      getBoundingClientRect: () => {
+        const here = box.current;
+        const target =
+          wants.current === "sheet"
+            ? (here?.closest(`[${FILTER_ANCHOR_ATTR}]`) ?? here)
+            : here;
+        return target ? target.getBoundingClientRect() : new DOMRect(0, 0, 0, 0);
+      },
+    });
+
+    /* FOCUS GOES BACK TO THE CONTROL THAT OPENED THIS, always, and it is
+       written down rather than left to the default. Radix returns focus to
+       its own Trigger, and there is no Trigger here: the control is the
+       caller's node, rendered in place inside the toolbar, because the pill's
+       drawing is `FilterBar`'s and restating it here would be a second copy of
+       a recipe that has already been re-tuned twice against the sort and view
+       pills beside it. */
+    const focusBack = (event: Event) => {
+      event.preventDefault();
+      box.current?.querySelector<HTMLElement>("button, [role=button]")?.focus();
+    };
+
+    const control = (
+      <div
+        ref={setBox}
+        data-slot="filter-overlay-control"
+        data-form={form}
+        data-open={open || undefined}
+        className={cn("flex min-w-0 shrink-0 items-center", className)}
+      >
+        {trigger}
+      </div>
+    );
+
+    /* THE FACETS. One column in a popover and on a phone, a wrapping row in
+       the drop sheet, which is the whole reason the sheet exists: "every
+       facet can stay open at once" is a statement about how many fit side by
+       side. The surface's own maximum height is Radix's measured available
+       height (popover) or 85dvh (sheet), so this scrolls rather than pushing
+       the foot off the bottom. */
+    const body = (
+      <div
+        data-slot="filter-overlay-body"
+        className={cn(
+          "flex min-h-0 flex-1 items-start gap-4 overflow-y-auto p-[var(--space-5)]",
+          form === "sheet" ? "flex-wrap" : "flex-col [&>*]:w-full",
+        )}
+      >
+        {children}
+      </div>
+    );
+
+    /* THE FOOT. Clear all on the reading start, Show N on the reading end:
+       the design's own two controls for this surface. Show N is the live
+       result count AND the way out. It confirms nothing, because a facet
+       applies the moment it is picked and there is no Apply step. */
+    const foot = (
+      <div
+        data-slot="filter-overlay-foot"
+        className={cn(
+          "flex shrink-0 items-center justify-between gap-3",
+          "shadow-[var(--hairline-over)]",
+          "px-[var(--space-5)] py-[var(--space-4)]",
+        )}
+      >
+        {onClear ? (
+          <Button variant="text" onClick={onClear}>
+            {clearLabel}
+          </Button>
+        ) : (
+          <span />
+        )}
+        {/* The primary move, in the INK fill rather than the brand one: a
+            consuming app's own law reserves mango for a screen's title
+            component, and an overlay's foot is not one. */}
+        {showLabel ? (
+          <Button variant="inverse" onClick={() => onOpenChange(false)}>
+            {showLabel}
+          </Button>
+        ) : null}
+      </div>
+    );
+
+    if (form === "bottom-sheet") {
+      return (
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          {control}
+          <SheetContent
+            side="bottom"
+            data-slot="filter-overlay"
+            data-form={form}
+            className="p-0"
+            onCloseAutoFocus={focusBack}
+          >
+            <SheetHeader>
+              <SheetTitle>{title}</SheetTitle>
+            </SheetHeader>
+            {body}
+            {foot}
+          </SheetContent>
+        </Sheet>
+      );
+    }
+
+    return (
+      <Popover open={open} onOpenChange={onOpenChange} modal>
+        <PopoverAnchor virtualRef={anchor} />
+        {control}
+        {open ? (
+          <PopoverContent
+            role="dialog"
+            aria-label={title}
+            align="start"
+            data-slot="filter-overlay"
+            data-form={form}
+            onCloseAutoFocus={focusBack}
+            className={cn("flex flex-col", form === "sheet" ? SHEET_FORM : POPOVER_FORM)}
+          >
+            {body}
+            {foot}
+          </PopoverContent>
+        ) : null}
+      </Popover>
+    );
+  },
+);
+
+FilterOverlay.displayName = "FilterOverlay";
+
 export {
   FilterBar,
+  FilterOverlay,
   RangeFacet,
   SearchableFacet,
   CompactFacet,

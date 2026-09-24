@@ -215,6 +215,13 @@ export interface ThreadMessage {
    * own `image`/`initials` even though they carry no `author`/`time`.
    */
   image?: string;
+  /** IS THIS PERSON FROM OUTSIDE? Forwarded straight to `Avatar`'s own
+   * `external` (see `components/avatar/avatar.tsx` for the ruling, the reason
+   * the fact is taken rather than guessed, and why the default is colour):
+   * an outside person's PHOTOGRAPH renders greyscale, one of our own in full
+   * colour. Aurora, 23 Sep 2026: "external photos (from contacts) gray scale.
+   * keep staff nirmal." Undefined reads as one of ours. */
+  external?: boolean;
   /** Alt text for `image`. Empty is correct when the name is already beside it. */
   imageAlt?: string;
   /** What was said. A node, so a mention pill or a link rides along. */
@@ -742,7 +749,7 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                        reads `Avatar size="control"` instead (40, matching
                        the message-actions trigger) — see this prop's own
                        doc on `TicketThreadProps`. */
-                    <Avatar size={faceSize === "md" ? "control" : "sm"} className="flex-none">
+                    <Avatar size={faceSize === "md" ? "control" : "sm"} external={message.external} className="flex-none">
                       {message.image ? (
                         <AvatarImage src={message.image} alt={message.imageAlt ?? ""} />
                       ) : null}

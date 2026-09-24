@@ -455,7 +455,14 @@ describe("an archived account cannot leak into a list, a count, or a picker (011
 
     const after = await listAccounts(cfg, guard, staff, { mayListPeople: true, maySeeLogins: true })
     expect(after.rows.map((r) => r.id)).not.toContain(IDS.victimAccount)
-    expect(after.total).toBe(before.total - 1)
+    // TWO ROWS, NOT ONE, SINCE 0123 — and that is the cascade, not a drift in
+    // this fixture. Aurora's ruling of 24 Sep 2026 ("when archiving a parent
+    // item, always archive as well the child items") makes a nested business a
+    // CHILD of the company above it, so archiving the victim takes
+    // `IDS.victimChild` with it. The number is written as the pair it is, rather
+    // than as `- 2`, so the next reader sees which two rows left.
+    expect(after.rows.map((r) => r.id)).not.toContain(IDS.victimChild)
+    expect(after.total).toBe(before.total - 2)
 
     // THE WAY BACK — `archived: "yes"` is the one door in, and it is exact.
     const archivedOnly = await listAccounts(
@@ -466,7 +473,11 @@ describe("an archived account cannot leak into a list, a count, or a picker (011
       { archived: "yes" }
     )
     expect(archivedOnly.rows.map((r) => r.id)).toContain(IDS.victimAccount)
-    expect(archivedOnly.total).toBe(1)
+    // …and the cascaded child is findable in the same pile, which is the whole
+    // of her "should stay in the system, but invisible. just in case we need to
+    // in the future recover it."
+    expect(archivedOnly.rows.map((r) => r.id)).toContain(IDS.victimChild)
+    expect(archivedOnly.total).toBe(2)
   })
 
   it("an archived row is excluded from the CSV export by the same default", async () => {
@@ -1411,14 +1422,14 @@ describe("filtering by account manager and country", () => {
   it("by manager returns only that manager's accounts", async () => {
     setManager(IDS.victimAccount, IDS.staffUser)
     setManager(IDS.burglarAccount, IDS.burglarUser)
-    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { manager: IDS.staffUser, type: "entity" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { manager: [IDS.staffUser], type: "entity" })
     expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
   })
 
   it("by country returns only that country", async () => {
     setCountry(IDS.victimAccount, "Spain")
     setCountry(IDS.burglarAccount, "France")
-    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { country: "Spain", type: "entity" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { country: ["Spain"], type: "entity" })
     expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
   })
 
@@ -1428,14 +1439,57 @@ describe("filtering by account manager and country", () => {
     setManager(IDS.victimChild, IDS.staffUser)
     setCountry(IDS.victimChild, "France")
     const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {
-      manager: IDS.staffUser,
-      country: "Spain",
+      manager: [IDS.staffUser],
+      country: ["Spain"],
     })
     expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
   })
 
+  it("SEVERAL VALUES IN ONE FACET WIDEN — two countries return both, not neither", async () => {
+    // Aurora, 24 Sep 2026: "i shoudl be able to select multile for each filter
+    // type". Within one facet the values mean OR, which is the half a person
+    // can see: picking a second country must ADD rows, never remove them.
+    setCountry(IDS.victimAccount, "Spain")
+    setCountry(IDS.victimChild, "France")
+    setCountry(IDS.burglarAccount, "Peru")
+    const one = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { country: ["Spain"] })
+    const two = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { country: ["Spain", "France"] })
+    expect(one.rows.map((r) => r.id).sort()).toEqual([IDS.victimAccount])
+    expect(two.rows.map((r) => r.id).sort()).toEqual([IDS.victimAccount, IDS.victimChild].sort())
+    // AND THE COUNT AGREES WITH THE ROWS, which is the number the overlay's
+    // own "Show N" prints. A widening that moved the rows and not the total
+    // would tell somebody their second pick did nothing.
+    expect(two.total).toBe(2)
+    expect(one.total).toBe(1)
+  })
+
+  it("TWO FACETS STILL NARROW — a set in each intersects, it does not union", async () => {
+    setManager(IDS.victimAccount, IDS.staffUser)
+    setManager(IDS.victimChild, IDS.burglarUser)
+    setCountry(IDS.victimAccount, "Spain")
+    setCountry(IDS.victimChild, "France")
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {
+      country: ["Spain", "France"],
+      manager: [IDS.staffUser],
+    })
+    expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
+    expect(page.total).toBe(1)
+  })
+
+  it("an empty set is not a filter — it returns what no filter returns", async () => {
+    // `IN ()` is not valid SQL in SQLite, and "named no value" cannot be told
+    // apart from "did not ask". Anything else here is a door that answers
+    // nothing the moment a person clears their last chosen value.
+    setCountry(IDS.victimAccount, "Spain")
+    const asked = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { country: [] })
+    const unasked = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {})
+    expect(asked.rows.map((r) => r.id).sort()).toEqual(unasked.rows.map((r) => r.id).sort())
+    expect(asked.total).toBe(unasked.total)
+    expect(unasked.rows.length, "the probe proves nothing if nothing is there").toBeGreaterThan(0)
+  })
+
   it("an unknown manager id is an empty page, not a 400 — a filter, not a write", async () => {
-    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { manager: "NOBODY_LIKE_THIS" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { manager: ["NOBODY_LIKE_THIS"] })
     expect(page.rows).toEqual([])
     expect(page.total).toBe(0)
   })
@@ -1452,8 +1506,8 @@ describe("filtering by account manager and country", () => {
     // one probe; comparing against the caller's own unfiltered page is what
     // tells the two apart.
     const unfiltered = await listAccounts(cfg, guard, client, SEES_PEOPLE, {})
-    const probedReal = await listAccounts(cfg, guard, client, SEES_PEOPLE, { manager: IDS.staffUser })
-    const probedFake = await listAccounts(cfg, guard, client, SEES_PEOPLE, { manager: "NOBODY_LIKE_THIS" })
+    const probedReal = await listAccounts(cfg, guard, client, SEES_PEOPLE, { manager: [IDS.staffUser] })
+    const probedFake = await listAccounts(cfg, guard, client, SEES_PEOPLE, { manager: ["NOBODY_LIKE_THIS"] })
     expect(probedReal.rows.map((r) => r.id).sort()).toEqual(unfiltered.rows.map((r) => r.id).sort())
     expect(probedFake.rows.map((r) => r.id).sort()).toEqual(unfiltered.rows.map((r) => r.id).sort())
     expect(unfiltered.rows.length, "the probe proves nothing if the caller sees nothing").toBeGreaterThan(0)
@@ -1463,7 +1517,7 @@ describe("filtering by account manager and country", () => {
     setCountry(IDS.victimAccount, "Spain")
     setCountry(IDS.victimChild, "France")
     const client = await accountScope(cfg, { ...guard, userId: IDS.victimUser })
-    const page = await listAccounts(cfg, guard, client, SEES_PEOPLE, { country: "Spain" })
+    const page = await listAccounts(cfg, guard, client, SEES_PEOPLE, { country: ["Spain"] })
     expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
   })
 

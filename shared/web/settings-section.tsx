@@ -1,8 +1,43 @@
 "use client"
 
 /* ============================================================================
-   A SETTINGS SECTION. THE TITLE IS INSIDE THE BOX, AND THERE IS NO SUBTITLE.
+   A SETTINGS SECTION. THERE IS NO BOX ANY MORE, AND THERE IS NO SUBTITLE.
    ============================================================================
+
+   ── THE BOX IS GONE, 23 SEP 2026 — AURORA, VERBATIM ────────────────────────
+
+     "settings appearacne shoudl not have card - thats not minimal."
+
+   She had already ruled it over the whole module the same day — "the whole
+   settings module does not have the minimal aspect! Make minimal the whole
+   app, not only tickets anymore" — and `web/test/settings-minimal.test.ts`
+   took eleven files plain on that ruling. THIS FILE WAS NOT ONE OF THE
+   ELEVEN: that census reads `web/components/screens/**` and
+   `web/components/team/**`, and the last box in the settings module was not
+   in either folder. It was here, one hop away, in `shared/web/`, drawn for
+   the one screen this component still has a call site on — Settings ›
+   Appearance. So the screen she is looking at kept its paper while the
+   module around it went plain, and she named it.
+
+   WHAT WENT: `rounded-[var(--radius)] bg-surface-panel p-4
+   lg:p-[var(--space-7)]` — the fill, the radius and the inset, the three
+   things that made this a card. WHAT STAYS: the `<section>` landmark, its
+   accessible name, and the `flex flex-col gap-4` column. NOTHING REPLACED
+   THE BOX, which is the point of the ruling and also the only shape left
+   open to it: a law minted the same day (the kit's own container-box law,
+   `foundations/rules/boxes.mjs`, off her sentence "by rule no borders
+   nowhere in the kit") forbids a four-edge stroke around a container in
+   either spelling, so an outline is not the way to keep an edge here. The
+   rows inside separate themselves the way the app already separates rows
+   that stand on the page — one kit `<Separator>` between adjacent rows
+   (R107, `web/components/work/effort-card.tsx`'s own work-log list) — and
+   `appearance-panel.tsx` draws them, not this file.
+
+   THE PARAGRAPHS BELOW ARE THE RECORD OF THE BOX AND OF THE FIVE RULINGS
+   THAT BUILT IT. They are kept verbatim, unreconciled, because the title
+   contract they argue for is the half of this component that still stands:
+   a call site may still not PLACE a heading, only hand over a string. Read
+   "the box" in them as history.
 
    THE CLIENT, 2026-09-11, over a screenshot of Settings › Ticket settings:
 
@@ -83,68 +118,48 @@
    #F7F2EB on page #FFFEF9 is contrast 1.103 in light; #1C1B18 on #141310 is
    1.079 in dark. A container that measures 1.000 is not a container.
 
-   ── `hideTitle`, ADDED 2026-09-14, SETTINGS › APPEARANCE ONLY ─────────────
+   ── `hideTitle` CAME AND WENT, 2026-09-14 to 2026-09-23 ───────────────────
 
-   The client, over the Appearance tab specifically: "please remove the title
+   The client, over the Appearance tab, on 14 Sep: "please remove the title
    inside the collection. We will use the title only at the top." The tab
    strip already names this panel "Appearance" — `AppearancePanel` mounts
    inside a `TabsView` panel headed by the tab of the same name — so the
-   `<Headline>` this component draws was a second, redundant "Appearance"
-   one screen-height below the first.
+   `<Headline>` this component drew was a second, redundant "Appearance" one
+   screen-height below the first. That was answered with a `hideTitle` prop:
+   skip the visible heading, keep `title` as the `<section>`'s `aria-label`.
 
-   NOT A DELETED PROP, A HIDDEN ONE — because R67 (`sections-stand-on-paper`)
-   dropped its own heading requirement (amendment 4: a titled section OR a
-   headless one both pass, as long as the body stands on paper), but a
-   `<section>` landmark is still better read with a name than without one,
-   and `title` already IS that name. So `hideTitle` skips the visible
-   `<Headline>` while `title` keeps labelling the `<section>` itself via
-   `aria-label` — the accessible-name route the kit already uses throughout
-   (`AppearancePreview`'s own `aria-label`, the overlays' `aria-label` props
-   for a rail or a tab strip) rather than a node with nothing to read. This
-   is the one prop this component takes beyond `title`/`children` on
-   purpose: it does not accept a *different* word to show or hide, only
-   whether the word it already has is drawn or only spoken. Defaults to
-   `false`, so the seven Automations sections and everything else already
-   passing `title` are byte-for-byte unchanged. */
+   THE PROP IS GONE NOW AND THE BEHAVIOUR IT SELECTED IS THE ONLY ONE LEFT.
+   Two things closed the question on 23 Sep 2026. R108 ruled that a section's
+   own title is the eyebrow (`text-micro text-muted-foreground uppercase`),
+   never a heading size — so the `size="h4"` this component drew is not a
+   shape any settings section may ask for any more, hidden or not. And the
+   only surviving call site is `AppearancePanel`, which passed `hideTitle`
+   from the day the prop existed. A boolean with one value in the whole app
+   is not a choice, it is a branch nobody takes: `title` is now, always and
+   only, the section's ACCESSIBLE NAME — the route the kit already uses
+   throughout (`AppearancePreview`'s own `aria-label`, the overlays'
+   `aria-label` props for a rail or a tab strip) rather than a node with
+   nothing to read. A future section that wants a VISIBLE name draws the
+   eyebrow, which is what every other section in the app already does, and
+   it cannot smuggle a heading back in through here. */
 
 import * as React from "react"
 
-import { Headline } from "@shared/ui/components/typography/typography"
-
 export function SettingsSection({
   title,
-  hideTitle = false,
   children,
 }: {
   /** The section's own name, ALREADY TRANSLATED by the host — a string and
    * never a node, which is the whole of this component's guarantee. Handed a
    * `ReactNode` it would accept a `<div>` with a second sentence in it and
    * enforce nothing, which is precisely what the `description` prop it
-   * replaces was. Still the section's accessible name even when `hideTitle`
-   * is set — see this file's own header. */
+   * replaces was. It is the `<section>`'s accessible name and nothing is
+   * painted from it — see this file's own header. */
   title: string
-  /** Draw no visible heading; `title` still labels the `<section>` via
-   * `aria-label`. Settings › Appearance only — see this file's own header. */
-  hideTitle?: boolean
   children: React.ReactNode
 }) {
   return (
-    <section
-      className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4 lg:p-[var(--space-7)]"
-      aria-label={hideTitle ? title : undefined}
-    >
-      {/* h2 BECAUSE THE PAGE'S OWN TITLE IS THE h1 — `ModuleSettingsScreen`
-          draws `<Headline as="h1" size="display-m">` and every section under
-          it is one level down, so a screen reader's outline is the page and
-          its parts rather than a flat row of peers. `size="h4"` is the step
-          `SelectableScreen` and `ModuleAutomations` already used; Appearance's
-          three sections drew a hand-rolled `<h2 className="text-lg
-          font-medium">`, which was the same idea at a fourth spelling. */}
-      {hideTitle ? null : (
-        <Headline as="h2" size="h4">
-          {title}
-        </Headline>
-      )}
+    <section className="flex flex-col gap-4" aria-label={title}>
       {children}
     </section>
   )

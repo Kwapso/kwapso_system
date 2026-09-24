@@ -338,6 +338,68 @@ border. `tokens.css` §3, button internals; `button.tsx` header.
 Form fields and selection controls are the two blessed places a hairline is
 allowed at all.
 
+### 2.8 A container carries no box. A surface is told from its ground by a tone or a gap.
+
+**The rule.** No stroke on all four edges of a card, a panel, a tile or a
+section — in any spelling. Not a `border`, which §2.7 already refuses, and not
+the kit's own remedy for one either: `shadow-[var(--hairline)]`,
+`--hairline-strong`, `--hairline-error`, `--hairline-ink`, or the same box
+written out as `shadow-[inset_0_0_0_…]`. `Card`'s `hairline` prop still
+exists and still compiles; it draws nothing.
+
+```tsx
+<Card variant="raised">…</Card>   {/* off-beige on soft paper — the step */}
+<Card hairline>…</Card>           {/* accepted, and identical to the above */}
+```
+
+**The reason.** Client ruling, **23 September 2026**, verbatim: *"by rule no
+borders nowhere in the kit"*. §2.7 already said a control carries none; this
+says a container carries none either, and it has to be written separately
+because §2.7's law is about the CSS `border` property and **the kit had
+already stopped using that**. On the run before this section existed,
+`borders` judged 17 border utilities and every one was a reviewed exception —
+a spinner's arc, a drop target's dashed edge. What she was looking at was the
+inset shadow §2.7 blesses as the **remedy**, which `borders.mjs` is blind to
+by construction. A law written against one spelling passes green while the
+thing it exists to prevent is drawn in another; §13's picture law is the same
+failure, found the same way.
+
+**The three replacements, and all three are already in this document.**
+
+| Case | Answer | Written at |
+|---|---|---|
+| A card standing on a band | the other paper tone | §2.6's table |
+| Two cards side by side | the gap between them | §1.2's ladder |
+| Two surfaces of the same tone that touch | `Separator` | `Card variant="plain"`, 21 Sep 2026 |
+
+**The four exceptions, and they are the only four.** Each is a stroke that is
+not a box around a container, and each is recorded as exemption data with a
+reason, not as a carve-out in the law:
+
+| | Exception | Example |
+|---|---|---|
+| **B** | A separator — a rule **between** two things, on one edge | a card shell's header seam, a table row rule, the underline under the current stage label |
+| **C** | A focus or selection affordance | a select's hairline going to ink on open, a chosen node's ring |
+| **D** | A form control's own edge — §2.7's own two blessed places | `input`, `textarea`, `select`, a checkbox mark |
+| **E** | A stroke that **is** the object rather than a box around one | a colour swatch too pale to see without an edge, a stepper's pending mark, `Badge variant="outline"` |
+
+A one-edge shape (`--hairline-under`, `--hairline-over`,
+`--hairline-start`) is **B** by construction and the law does not read it at
+all — it counts them and passes them over, so the report says how many rather
+than leaving a reader to wonder whether it looked.
+
+**Two are still open with the client** and are drawn until she answers:
+`web-embed`'s frame, which is the only thing separating a third party's page
+from ours, and `unsaved-changes-bar`'s `--warning`-tinted edge, which is
+carrying a status rather than drawing an outline. Both carry their argument in
+`foundations/rules/exemptions.json`.
+
+**Enforced by** `foundations/rules/boxes.mjs`, beside `borders`, and it is a
+census rather than a blocklist: **every** four-edge stroke is a finding until
+somebody writes down which exception it falls under. A new one fails, and a
+recorded one whose stroke has gone fails too. §12 has how to run it over your
+own source.
+
 ---
 
 ## 3 · Focus
@@ -931,7 +993,7 @@ The full list with reasoning is `manifest.json → notDelivered` and `STATUS.md`
 
 ## 12 · Conformance — running these laws in *your* app
 
-Everything above this line is prose. Four of the rules are now **executable**,
+Everything above this line is prose. Five of the rules are now **executable**,
 and they run against **your** source, not just the kit's:
 
 | Law | What it holds you to | Written in this document at |
@@ -940,6 +1002,7 @@ and they run against **your** source, not just the kit's:
 | `palette` | Every colour resolves through a token; the raw `--kw-*` ramp is tokens.css's alone | §2.2, §8.3 |
 | `borders` | A boundary is a paper step, a fill, or an inset shadow — never a CSS border | §2.7 |
 | `images` | A picture fills its box and crops to it — never `contain`, `fill`, `none` or `scale-down` | §4.4 |
+| `boxes` | A container is told from its ground by a tone or a gap — never by a stroke closing on all four edges | §2.8 |
 
 The kit supplies the rules. **You supply the paths, and your own reviewed
 exceptions.** Nothing about your directory layout is baked into the kit, and
@@ -952,7 +1015,7 @@ nothing about the kit's is baked into your build.
 with no change. Confirm it arrived:
 
 ```bash
-ls shared/ui/foundations/rules/   # conformance.mjs, radii.mjs, palette.mjs, borders.mjs, images.mjs, source.mjs
+ls shared/ui/foundations/rules/   # conformance.mjs, radii.mjs, palette.mjs, borders.mjs, boxes.mjs, images.mjs, source.mjs
 ```
 
 **2 · Run it over your own source.** Name the directories a person's UI is
@@ -1003,7 +1066,7 @@ list can only ever shrink.
 "check:kit": "node shared/ui/foundations/rules/conformance.mjs --exemptions web/test/kit-conformance.json web/components web/app web/lib web-portal/components shared/web"
 ```
 
-**Optional:** `--law radii|palette|borders|images` runs one law alone, which is how
+**Optional:** `--law radii|palette|borders|boxes|images` runs one law alone, which is how
 adopt them one at a time rather than all at once.
 
 ### 12.2 What it needs from you: nothing
@@ -1047,8 +1110,12 @@ follow, and needs no seam: its whole subject is kit source.
 
 The kit also carries rules the app has no twin for, and they are the reason
 this list is not just three: the **contrast law** (implemented), the **boundary
-law** (§2.7, implemented here, enforced nowhere before now), the **picture
-law** (§4.4, added 2026-09-09 with the client's ruling that made it), the
+law** (§2.7, implemented here, enforced nowhere before now), the **box law**
+(§2.8, added 2026-09-23 with the ruling that made it, and the clearest case
+yet that a law must read the SHAPE and not the spelling — §2.7 had been green
+for weeks while the kit drew the very thing it forbids, as an inset shadow),
+the **picture law** (§4.4, added 2026-09-09 with the client's ruling that made
+it), the
 **`--kw-*` ramp** clause (§8.3, folded into `palette`), and four that remain
 prose — `px`-freedom (§1.1), strings-as-props (§7.1), one-motion-class (§6.1)
 and no-colour-only-in-a-media-query (§2.1). **This group is what a second app
@@ -1159,6 +1226,8 @@ Copy this into a review checklist.
 - White type on an accent
 - A border on a Button, in any state
 - A border on a coloured pill
+- A stroke closing on all four edges of a card, a panel, a tile or a section — `border`, `shadow-[var(--hairline)]` or `shadow-[inset_0_0_0_…]` alike
+- `Card hairline` reinstated as something that paints
 
 **API**
 - A renamed or dropped export; a renamed or dropped variant value

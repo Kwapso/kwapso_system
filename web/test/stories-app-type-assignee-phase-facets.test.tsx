@@ -217,7 +217,15 @@ async function pick(label: string, option: string) {
   const listbox = await screen.findByRole("listbox")
   await waitFor(() => expect(within(listbox).getAllByRole("option").length).toBeGreaterThan(0))
   fireEvent.click(within(listbox).getByRole("option", { name: option }))
-  await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull())
+  // A MULTI-SELECT FACET'S LIST STAYS OPEN after a pick (Aurora, 24 Sep 2026 —
+  // a facet takes several values now, and choosing three should not be three
+  // visits to the trigger). This used to WAIT for the list to close itself; it
+  // closes it instead. Escape shuts the innermost Radix layer, which is the
+  // facet's own panel, leaving the filter overlay behind it open.
+  if (screen.queryByRole("listbox")) {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull())
+  }
 }
 
 /** The BACKLOG TABLE's own rows, never the whole screen — `StartTimerStrip`

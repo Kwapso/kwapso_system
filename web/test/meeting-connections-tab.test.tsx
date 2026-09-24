@@ -1,4 +1,29 @@
-// A CALL GATHERS WHAT CAME OUT OF IT — the meeting screen's Connections tab.
+// A CALL GATHERS WHAT CAME OUT OF IT — the meeting screen's Connections
+// section.
+//
+// IT WAS A TAB UNTIL 23 SEP 2026, and this suite was written against one. The
+// meeting record became ONE PAGE that day (Aurora: "meetings: implement the
+// one page, love how you did it"), so the tab strip is gone and Connections is
+// a section in the right-hand column. EVERY CASE BELOW SURVIVED THE MOVE —
+// none was deleted, because none of them was ever really about a tab: they are
+// about whether a call's siblings reach a person, whether the count and the
+// picture agree, and whether a failure says so. Only the address changed, and
+// each case now finds the section where it actually is.
+//
+// ONE CASE CHANGED ITS EXPECTATION RATHER THAN ITS ADDRESS, and it is the
+// empty one. Her same ruling: when there is nothing filed against the call the
+// section DISAPPEARS rather than explaining itself, the way the ticket's own
+// Related stories already behaves. So the old assertion ("the register says
+// what is missing") is now wrong BY RULING, and what is asserted instead is
+// the new intent: nothing at all — no title, no count, no sentence.
+//
+// AND TWO CASES CAUGHT A REAL REGRESSION IN THAT REWRITE, which is the reason
+// this file is worth more than the tab it was written for. The first gate read
+// `(mapQ.data?.total ?? 0) > 0`, and `data` is undefined on a read that failed
+// as well as on one that came back empty — so a meeting whose map door broke
+// drew nothing at all, no sentence and no retry. Fixed in the screen, not
+// here: the section is drawn when there is something to show OR something went
+// wrong, and withheld only on a read that came back and said zero.
 //
 // WHY THIS TAB EXISTS AT ALL, since it is the second one in the app to draw a
 // relationship map and the first on a record that is not a knowledge source.
@@ -142,26 +167,42 @@ function primeTeam(meeting: Meeting) {
   primeCache(`activity:record:meetings:${meeting.id}`, [])
 }
 
-function openConnections() {
-  const tab = screen.getByRole("tab", { name: /Connections/ })
-  fireEvent.mouseDown(tab, { button: 0 })
-  fireEvent.click(tab)
-  expect(tab.getAttribute("aria-selected")).toBe("true")
-  return tab
+/** THERE IS NOTHING TO OPEN ANY MORE. This used to click the Connections tab
+ * and assert it had become selected; the section is simply on the page now, so
+ * every case below just waits for what it is about. Kept as a named function
+ * rather than deleted at eight call sites, so the diff that moved this suite
+ * reads as "the address changed" rather than as eight rewritten tests — and so
+ * there is one place to look if the section ever grows a disclosure again.
+ *
+ * `findBy*` IS WHAT ACTUALLY WAITS. The map is its own read (`recordMapKey`),
+ * so on first paint the section is not there yet whatever this function does. */
+async function connectionsSection(): Promise<HTMLElement> {
+  return await screen.findByRole("group", { name: /Connections/ })
 }
 
 afterEach(cleanup)
 
-describe("the Connections tab on a meeting", () => {
-  it("REACHABLE AT ALL — the tab exists and asks for THIS meeting's map", () => {
-    // The assertion the whole lane turns on. Before this, `knowledge-detail` was
-    // the only screen in the app that drew a map (censused), so a call's siblings
-    // were door-only. A source's map links here; this is what it lands on.
+describe("the Connections section on a meeting", () => {
+  it("REACHABLE AT ALL — the screen asks for THIS meeting's map, and draws it", async () => {
+    // The assertion the whole lane turns on, and the ONE line of it that
+    // changed is where the answer lands: a section on the page instead of a
+    // tab to click. Before this lane, `knowledge-detail` was the only screen
+    // in the app that drew a map (censused), so a call's siblings were
+    // door-only. A source's map links here; this is what it lands on.
     const meeting = makeMeeting()
     primeTeam(meeting)
+    const focus = { table: "meetings", id: meeting.id, label: "Strategy Session w kwapso" }
+    const mail = { table: "knowledge_sources", id: "KS1", label: "Re: Strategy Session" }
+    door.recordMap = async () => ({
+      focus,
+      nodes: [focus, mail],
+      links: [{ from: "knowledge_sources:KS1", to: `meetings:${meeting.id}`, relation: "came out of" }],
+      total: 1,
+      capped: false,
+    })
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
 
-    expect(screen.getByRole("tab", { name: /Connections/ })).toBeTruthy()
+    expect(await connectionsSection()).toBeTruthy()
     expect(door.asked).toContainEqual({ table: "meetings", id: meeting.id })
   })
 
@@ -178,7 +219,6 @@ describe("the Connections tab on a meeting", () => {
       capped: false,
     })
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    openConnections()
 
     // Twice on purpose: a node in the picture, and the same fact as a sentence a
     // screen reader can read and a person can click (relationship-map.tsx).
@@ -186,18 +226,30 @@ describe("the Connections tab on a meeting", () => {
     expect(screen.getByText(/came out of/)).toBeTruthy()
   })
 
-  it("EMPTY — the common case — says what is missing, in the kit's register", async () => {
+  it("EMPTY — the common case — the section is not there at all", async () => {
+    // THE EXPECTATION REVERSED, 23 Sep 2026, and it is the one case in this
+    // file whose INTENT changed rather than its address. It used to assert the
+    // meeting's own register sentence ("Nothing is filed against this call
+    // yet."), on the reasoning that 58% of readers land on an empty map and
+    // deserve to be told what would fill it. Aurora ruled the other way on the
+    // one-page design: an empty section disappears rather than explaining
+    // itself, the same behaviour the ticket's own Related stories already has.
+    // On a page with no tabs, a paragraph about an absence is a section about
+    // nothing, and the majority reading of this record is now one section
+    // shorter rather than one paragraph longer.
     const meeting = makeMeeting()
     primeTeam(meeting)
     const focus = { table: "meetings", id: meeting.id, label: "Strategy Session w kwapso" }
     door.recordMap = async () => ({ focus, nodes: [focus], links: [], total: 0, capped: false })
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    openConnections()
 
-    // The meeting's OWN sentence, not the knowledge base's "Nothing is linked to
-    // this yet." — 58% of readers land here and deserve to be told what would
-    // fill it.
-    expect(await screen.findByText("Nothing is filed against this call yet.")).toBeTruthy()
+    // Waited for rather than asserted on first paint: the map is its own read,
+    // so "not there" has to mean "not there once the read has answered", never
+    // "not there yet". The Agenda section is always drawn, so its arrival is
+    // the proof this render actually settled.
+    expect(await screen.findByText("Agenda")).toBeTruthy()
+    expect(screen.queryByRole("group", { name: /Connections/ })).toBeNull()
+    expect(screen.queryByText("Nothing is filed against this call yet.")).toBeNull()
     expect(screen.queryByText("Couldn't load this record's connections.")).toBeNull()
   })
 
@@ -212,25 +264,39 @@ describe("the Connections tab on a meeting", () => {
     const focus = { table: "meetings", id: meeting.id, label: "Strategy Session w kwapso" }
     door.recordMap = async () => ({ focus, nodes: [focus], links: [], total: 0, capped: false })
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    openConnections()
 
-    expect(await screen.findByText("Nothing is filed against this call yet.")).toBeTruthy()
+    // A STRICTER VERSION OF THE SAME SENTENCE. This case was written when the
+    // register replaced the plate; now the whole section is absent, so the
+    // three things it forbade are forbidden a fortiori — asserted anyway,
+    // because "the section is gone" and "no inert control survived somewhere
+    // else on the page" are two different facts and only the second one is
+    // about the zoom buttons.
+    expect(await screen.findByText("Agenda")).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Zoom in" })).toBeNull()
     expect(screen.queryByRole("button", { name: "Fit the whole map" })).toBeNull()
     expect(screen.queryByText("0 connected")).toBeNull()
   })
 
-  it("EMPTY — and the badge renders nothing rather than a zero (R16)", async () => {
+  it("EMPTY — and no zero is printed anywhere, because there is no count to print (R16)", async () => {
+    // THE COUNT REGISTER MOVED WITH THE SECTION. It was a tab badge; it is now
+    // the count beside the section's own title (R97 — "just a count next to
+    // the title"), drawn through the same `formatCount` seam, which renders
+    // NOTHING at zero. On an empty map there is no section, so there is no
+    // title and no number either: this asserts the record never advertises
+    // that it has none, which is the sentence this case always made.
     const meeting = makeMeeting()
     primeTeam(meeting)
     const focus = { table: "meetings", id: meeting.id, label: "Strategy Session w kwapso" }
     door.recordMap = async () => ({ focus, nodes: [focus], links: [], total: 0, capped: false })
-    render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    const tab = await screen.findByRole("tab", { name: /Connections/ })
+    const { container } = render(
+      <MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />
+    )
+    expect(await screen.findByText("Agenda")).toBeTruthy()
 
-    // `formatCount` renders nothing at zero, so the tab reads as a plain offer
-    // and not as a record advertising that it has none.
-    expect(tab.textContent?.replace(/\s/g, "")).toBe("Connections")
+    expect(screen.queryByText("Connections")).toBeNull()
+    expect(container.textContent, "no stray zero where a count used to be").not.toMatch(
+      /Connections\s*0/
+    )
   })
 
   it("THE BADGE AND THE PICTURE ANSWER THE SAME QUESTION, denied module included", async () => {
@@ -253,14 +319,27 @@ describe("the Connections tab on a meeting", () => {
       capped: false,
     })
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    const tab = await screen.findByRole("tab", { name: /Connections/ })
-    expect(tab.textContent).toContain("1")
-    openConnections()
+    // THE SAME QUESTION, ASKED OF THE SECTION'S OWN COUNT. The badge on the
+    // retired tab and the count beside this title are the same number through
+    // the same seam; what this case is about — one counted, one drawn — is
+    // unchanged.
+    const section = await connectionsSection()
+    expect(section.textContent).toContain("1")
     const drawn = (await screen.findAllByText("Re: Strategy Session")).length / 2
-    expect(drawn, "the badge says one neighbour, so the picture draws one").toBe(1)
+    expect(drawn, "the count says one neighbour, so the picture draws one").toBe(1)
   })
 
-  it("a failed read says so and offers a retry that asks again", async () => {
+  it("A FAILED READ IS NOT AN EMPTY ONE — it says so, and offers a retry that asks again", async () => {
+    // THIS CASE CAUGHT A REAL REGRESSION, 23 Sep 2026, and it is why the suite
+    // was worth moving rather than deleting. The one-page rewrite gated the
+    // section on `(mapQ.data?.total ?? 0) > 0`, and `mapQ.data` is `undefined`
+    // on a read that FAILED exactly as it is on one that came back empty — so
+    // a meeting whose map door broke drew nothing whatsoever: no sentence, no
+    // retry, no trace that anything had been asked for. Worse than the tab it
+    // replaced, which at least existed to be clicked. The screen is fixed, not
+    // this test: it draws the section when there is something to show OR
+    // something went wrong, and withholds it only on a read that came back and
+    // said zero.
     const meeting = makeMeeting()
     primeTeam(meeting)
     let calls = 0
@@ -269,7 +348,6 @@ describe("the Connections tab on a meeting", () => {
       return Promise.reject(new Error("network"))
     }
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    openConnections()
 
     expect(await screen.findByText("Couldn't load this record's connections.")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Try again" }))
@@ -284,8 +362,10 @@ describe("the Connections tab on a meeting", () => {
         new ApiFailure(400, "invalid_input", "That is not a kind of record this map draws.")
       )
     render(<MeetingDetailScreen teamId={TEAM} meetingId={meeting.id} basePath={`/t/${TEAM}/meetings`} />)
-    openConnections()
 
+    // The other half of the same regression: a 400 is a read that came back
+    // with an answer, and the answer is "never". Hiding it would tell a person
+    // the call has no siblings, which is a different and untrue sentence.
     expect(await screen.findByText("This meeting doesn't have a map to draw.")).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull()
   })

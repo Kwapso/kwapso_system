@@ -59,6 +59,78 @@ const DISABLED = [
      look the same when disabled", and an underline is a second signal on a
      control that has nothing left to signal. */
   "no-underline",
+
+  /* ---- AND THE STATES, PINNED — 2026-09-24 -------------------------------
+     THIS IS WHERE THE `enabled:` GUARD USED TO LIVE, and moving it here is the
+     same argument the paragraph above already makes, applied to the half it
+     did not cover.
+
+     Every variant wrote `enabled:hover:bg-[…]`, and the guard worked. What it
+     also did was make the class UNBEATABLE by a call site. tailwind-merge only
+     resolves two classes it recognises as one group, and `enabled:hover:bg-`
+     and `hover:bg-` are different prefixes, so both survive the merge; then
+     `:enabled:hover` carries one more pseudo-class than `:hover` and wins on
+     specificity whatever the emission order. MEASURED with this repo's own
+     tailwind-merge:
+
+       twMerge("enabled:hover:bg-[var(--btn-secondary-hover)]",
+               "hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)]")
+         -> "enabled:hover:bg-[var(--btn-secondary-hover)] hover:bg-[color-mix(…)]"
+       twMerge("hover:bg-[var(--btn-secondary-hover)]",
+               "hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)]")
+         -> "hover:bg-[color-mix(…)]"
+
+     PATTERN.md §1 promises "the caller's className goes last so a call site
+     can always win", and `lib/utils.ts` exists to keep that promise. For a
+     colour in a state it was not being kept. THE BUG THAT FOUND IT: the
+     consuming app's live-status toast (`shared/web/live-status.tsx`) paints a
+     `bg-surface-inverse text-ink-on-inverse` pill and gives its Refresh button
+     a wash keyed to `currentColor`, so fill and ink can never come apart —
+     `bg-[color-mix(…currentColor 14%…)] text-current
+     hover:bg-[color-mix(…currentColor 24%…)]`. At rest that works. On hover
+     the caller's class lost, the button took `--btn-secondary-hover` — a fill
+     chosen for a PAGE ground — and the label stayed the toast's ink:
+
+         dark    #454239 fill under #1A1918 ink    1.748
+         light   #F1ECE4 fill under #FFFEF9 ink    1.165
+
+     Aurora saw the dark one: "when button color is black, text should be
+     white (i saw this on the refresh button in dark mode when hover)".
+
+     SO THE GUARD MOVES INSTEAD OF THE HOVER. The variants now write a plain
+     `hover:`/`active:`, which a call site's own `hover:` merges with and wins.
+     The guard becomes a `disabled:`-prefixed PIN, in two places that agree:
+
+       · here, pointing at the disabled fill, emitted after the variant and
+         before `className`, so `cn` resolves it by MERGE (same prefix, same
+         group, later wins) rather than by specificity — the determinism this
+         section's opening paragraph is entirely about; and
+       · once per variant in the table below, pointing at that variant's OWN
+         REST fill, which is what a non-reacting control looks like when this
+         skin is not in play.
+
+     THE SECOND ONE IS NOT BELT-AND-BRACES. `buttonVariants` is worn directly,
+     without this component, by six others — `ticket-thread.tsx:818` renders a
+     bare `<button disabled>` wearing `variant: "default"` — and those never
+     receive this array at all. Under the old spelling `:enabled` suppressed
+     their hover; under a plain `hover:` it would not, and a disabled Save
+     button would light up mango under the pointer. The per-variant pin is what
+     replaces the guard FOR THEM. It names the rest fill rather than the
+     disabled one for a second reason: `loading` also puts `disabled` on the
+     element, and this file's rule is that "Loading is not disabled-looking: it
+     keeps its fill" — a pin to the disabled fill would have greyed a loading
+     button the moment a pointer crossed it.
+
+     AND IT FIXES SOMETHING THE KIT HAD ALREADY WRITTEN DOWN TWICE. `:enabled`
+     matches form elements ONLY, so on an `<a>` or a Radix action the hover
+     never arrived at all — `pagination.tsx` says "`enabled:hover:*` never
+     matches AT ALL", `rail.tsx` says "`buttonVariants` silently loses its hover
+     with nothing to see in review". Both are true of the old spelling and
+     neither is true of this one. */
+  "disabled:hover:bg-[var(--btn-disabled-fill)]",
+  "disabled:hover:text-[var(--btn-disabled-label)]",
+  "disabled:hover:no-underline",
+  "disabled:active:bg-[var(--btn-disabled-fill)] disabled:active:translate-y-0",
 ].join(" ");
 
 const buttonVariants = cva(
@@ -84,7 +156,8 @@ const buttonVariants = cva(
     // Pressed: the kit drops the button one hairline and kills its shadow. 1px is an
     // optical nudge, one of the two values tokens.css allows off the scale;
     // written in rem so it never becomes a px in a component.
-    "enabled:active:translate-y-[0.0625rem]",
+    "active:translate-y-[0.0625rem]",
+    "disabled:active:translate-y-0",
   ],
   {
     variants: {
@@ -92,8 +165,9 @@ const buttonVariants = cva(
         /** `.kw-btn--primary` — mango fill, charcoal label. The one brand fill. */
         default: [
           "bg-[var(--btn-primary-fill)] text-[var(--btn-primary-label)]",
-          "enabled:hover:bg-[var(--btn-primary-hover)]",
-          "enabled:active:bg-[var(--btn-primary-pressed)]",
+          "hover:bg-[var(--btn-primary-hover)]",
+          "active:bg-[var(--btn-primary-pressed)]",
+          "disabled:hover:bg-[var(--btn-primary-fill)] disabled:active:bg-[var(--btn-primary-fill)]",
         ],
 
         /**
@@ -104,20 +178,23 @@ const buttonVariants = cva(
          */
         secondary: [
           "bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
-          "enabled:hover:bg-[var(--btn-secondary-hover)]",
+          "hover:bg-[var(--btn-secondary-hover)]",
+          "disabled:hover:bg-[var(--btn-secondary-fill)]",
         ],
 
         /** `.kw-btn--destructive` — solid poppy, CHARCOAL label. Not white on red. */
         destructive: [
           "bg-[var(--btn-destructive-fill)] text-[var(--btn-destructive-label)]",
-          "enabled:hover:bg-[var(--btn-destructive-hover)]",
+          "hover:bg-[var(--btn-destructive-hover)]",
+          "disabled:hover:bg-[var(--btn-destructive-fill)]",
         ],
 
         /** `.kw-btn--text` — a quiet action. Ink, permanently underlined on a faint rule. */
         text: [
           "bg-transparent text-foreground",
           "underline underline-offset-[0.1875rem] decoration-hair-strong",
-          "enabled:hover:decoration-[var(--foreground)]",
+          "hover:decoration-[var(--foreground)]",
+          "disabled:hover:decoration-hair-strong",
         ],
 
         /**
@@ -130,12 +207,17 @@ const buttonVariants = cva(
          * because it also removes the only hover an icon-only ghost had, and
          * ch26 says an icon-only control is `secondary` anyway.
          */
-        ghost: ["bg-transparent text-ink-tertiary", "enabled:hover:text-foreground"],
+        ghost: [
+          "bg-transparent text-ink-tertiary",
+          "hover:text-foreground",
+          "disabled:hover:text-ink-tertiary",
+        ],
 
         /** `.kw-link` — inherits its ink, underlines on hover, occupies no box. */
         link: [
           "bg-transparent text-inherit no-underline",
-          "underline-offset-[0.1875rem] enabled:hover:underline",
+          "underline-offset-[0.1875rem] hover:underline",
+          "disabled:hover:no-underline",
         ],
 
         /* ---- Added, not required. Commission §2 rule 3 permits additions.
@@ -145,13 +227,15 @@ const buttonVariants = cva(
         /** `.kw-btn--inverse` — charcoal fill, off-beige label. Flips with the palette. */
         inverse: [
           "bg-[var(--btn-inverse-fill)] text-[var(--btn-inverse-label)]",
-          "enabled:hover:bg-[var(--btn-inverse-hover)]",
+          "hover:bg-[var(--btn-inverse-hover)]",
+          "disabled:hover:bg-[var(--btn-inverse-fill)]",
         ],
 
         /** `.kw-btn--cancel` — the quiet dismissal beside a primary. */
         cancel: [
           "bg-[var(--btn-cancel-fill)] text-[var(--btn-cancel-label)]",
-          "enabled:hover:bg-[var(--btn-cancel-hover)]",
+          "hover:bg-[var(--btn-cancel-hover)]",
+          "disabled:hover:bg-[var(--btn-cancel-fill)]",
         ],
       },
 
@@ -173,7 +257,7 @@ const buttonVariants = cva(
       // The kit pads a text button to `--space-2`, whatever its height.
       { variant: "text", class: "px-2" },
       // A link is not a box: no height, no padding, no nudge on press.
-      { variant: "link", class: "h-auto p-0 enabled:active:translate-y-0" },
+      { variant: "link", class: "h-auto p-0 active:translate-y-0" },
     ],
 
     defaultVariants: {

@@ -4,12 +4,43 @@
 //
 // `shared/ui/` has shipped a rulebook (`docs/RULES.md`) since the day it was
 // vendored, and until kit v1.2.70 nothing in this repository executed a line of
-// it. Four of its rules are now EXECUTABLE — `foundations/rules/{radii,
-// palette,borders,images}.mjs`, run through `conformance.mjs` — and they arrive
-// with the tag, inside `foundations/`, because that is one of the nine entries
-// `scripts/sync-design.mjs` copies.
+// it. FIVE of its rules are now EXECUTABLE — `foundations/rules/{radii,
+// palette,borders,boxes,images}.mjs`, run through `conformance.mjs` — and they
+// arrive with the tag, inside `foundations/`, because that is one of the nine
+// entries `scripts/sync-design.mjs` copies.
 //
-// `images` is the newest (kit v1.2.75) and the only one this app had already
+// `boxes` IS THE NEWEST (kit v1.2.166, 23 Sep 2026), and it exists because the
+// law that should have caught what the client was looking at could not see it.
+// Her ruling: *"by rule no borders nowhere in the kit"*. `borders` forbids a CSS
+// `border` and the kit had already stopped writing them — on the run before
+// §2.8 shipped it judged 17 border utilities upstream and every one was a
+// reviewed exception. What she was pointing at was the kit's own REMEDY for a
+// border, an inset shadow, which `borders.mjs` blesses by name and therefore
+// cannot read. `boxes` reads the SHAPE instead of the spelling: a stroke closing
+// on all four edges, however it is written, is a finding until somebody records
+// which of §2.8's exceptions it falls under.
+//
+// ITS FIRST RUN AGAINST THIS APP RETURNED 22 FINDINGS ACROSS EIGHT FILES, AND
+// NOT ONE OF THEM WAS A BOX AROUND A CONTAINER. That is worth writing down
+// rather than leaving as an empty findings list, because it is the opposite of
+// what `borders` found here: this app draws no neutral outline whose only
+// message is "here is a card". Every four-edge stroke it draws is a selection
+// affordance, a form control's own edge, a mark, or a TONE. The boundary law's
+// own first run, by contrast, returned 30 real CSS borders, sixteen of them
+// drawing full-strength ink where the design language asks for an 8% edge.
+//
+// AND THE APP FOUND A CLASS §2.8 DOES NOT HAVE A LETTER FOR. The law names four
+// exceptions — a separator (B), a focus or selection affordance (C), a form
+// control's edge (D), a stroke that IS the object (E) — and seven of this app's
+// twenty-two fit none of them: `process-map.tsx`'s six step-box tones and
+// `timer-bar.tsx`'s runaway edge, where the stroke's COLOUR is the information
+// and the fill beside it is a 5% wash that cannot carry it alone. Both entries
+// in `kit-conformance.json` say so in full and propose a name (a TONED stroke)
+// rather than stretching a letter that was written for something else. The kit
+// has the same shape standing open upstream in its own `unsaved-changes-bar`,
+// so this is one question with three sites and not an app-only quirk.
+//
+// `images` is the next newest (kit v1.2.75) and the only one this app had already
 // written for itself BEFORE the kit shipped it: R60, `web/test/an-image-fills.
 // test.ts`, from the client's 2026-09-09 ruling. The two now run side by side
 // and that is not duplication worth deleting — R60 also counts the KIT's own
@@ -30,7 +61,7 @@
 // re-derived them would be re-deriving them in every app — which is precisely
 // what the owner asked to stop ("the only UI&UX input for other apps. I wanna
 // avoid iteration there"). R31 and R32 in `shared/rules/registry.ts` are this
-// app's own hand-written versions of two of these four laws, and R60 is a third
+// app's own hand-written versions of two of these five laws, and R60 is a third
 // — all arrived at by iterating with the client. A second app would have paid
 // for them again.
 //
@@ -212,7 +243,7 @@ describe("kit conformance — the vendored kit's own laws, run against this app"
     }
   })
 
-  it("kit-conformance: radii, palette, borders and images pass, with no blind spot and no rotted exemption", () => {
+  it("kit-conformance: radii, palette, borders, boxes and images pass, with no blind spot and no rotted exemption", () => {
     // `only: null` is "run every law", spelled out rather than left off: the
     // kit's own CLI passes the flag's value through whether or not it was
     // given, so the parameter has no default and omitting it here would be a
@@ -228,7 +259,11 @@ describe("kit conformance — the vendored kit's own laws, run against this app"
     /* THE LAWS ARE NAMED, NOT COUNTED. This asserted `.toBe(3)` until v1.2.75
      * arrived carrying a fourth (`images`, foundations/rules/images.mjs — the
      * kit's own enforcement of the client's 2026-09-09 fill-not-fit ruling,
-     * which is R60 on this side). A bare count told the truth and told it
+     * which is R60 on this side), and a FIFTH (`boxes`, v1.2.166) after it.
+     * Each arrival costs exactly one line here, which IS the design working:
+     * the failure `boxes` printed when it landed named the law by name, so the
+     * app was told a law had arrived rather than left to discover it. A bare
+     * count told the truth and told it
      * uselessly: "expected 4 to be 3" names neither the law that arrived nor
      * the law that would have LEFT, and a tag that dropped `borders` while
      * adding `images` would have kept this line green with a law silently gone.
@@ -236,7 +271,7 @@ describe("kit conformance — the vendored kit's own laws, run against this app"
     expect(
       results.map((r: { law: string }) => r.law).sort(),
       "the laws shipping in this kit tag are not the laws that ran — a law arrived, left, or was renamed upstream"
-    ).toEqual(["borders", "images", "palette", "radii"])
+    ).toEqual(["borders", "boxes", "images", "palette", "radii"])
 
     /* A LAW THAT CANNOT SEE ITS SUBJECT HAS NOT PASSED. Each law upstream
      * declares its own ways of going blind — a vocabulary read off an empty

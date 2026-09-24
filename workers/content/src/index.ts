@@ -42,7 +42,8 @@
 //   POST /api/content/sprints             -> start a sprint
 //   POST /api/content/sprints/update      -> edit one (name, kind, dates, PRICE)
 //   POST /api/content/sprints/complete    -> mark a sprint finished / reopen it
-//   GET  /api/content/work-logs           -> time, newest first (scope/target/user filters)
+//   GET  /api/content/work-logs           -> time, newest first (scope/target/user/account filters)
+//   GET  /api/content/work-logs/dashboard -> the Logs dashboard, over the same filter
 //   GET  /api/content/work-logs/running   -> what the caller has running right now
 //   POST /api/content/work-logs           -> write time down by hand
 //   POST /api/content/work-logs/start     -> start a timer (the one click)
@@ -149,6 +150,7 @@ import {
   postUpdateStory,
 } from "./routes/stories"
 import {
+  getLogsDashboard,
   getRunningTimers,
   getWorkLogs,
   getWorkLogSummary,
@@ -463,6 +465,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // the page, because a screen showing the header without the rows (or the rows
   // without the header) should pay for exactly what it draws.
   "GET /api/content/work-logs/summary": { handler: getWorkLogSummary, kind: "read" },
+  "GET /api/content/work-logs/dashboard": { handler: getLogsDashboard, kind: "read" },
   "GET /api/content/work-logs/running": { handler: getRunningTimers, kind: "read" },
   "POST /api/content/work-logs": { handler: postLogTime, kind: "mutation" },
   "POST /api/content/work-logs/start": { handler: postStartTimer, kind: "mutation" },

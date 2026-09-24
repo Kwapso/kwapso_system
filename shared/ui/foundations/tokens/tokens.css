@@ -773,9 +773,78 @@
 
   --btn-destructive-fill:  var(--destructive);
   --btn-destructive-label: var(--destructive-foreground);
-  --btn-destructive-hover: #D33E28;
+  /* RULED BY ARITHMETIC, 2026-09-24 — THE HOVER HAD NOWHERE DARKER TO GO.
+     Found by the state axis added to the contrast law the same day, which is
+     the first thing in this repository ever to measure a button's label
+     against the fill it takes ON HOVER rather than at rest:
 
-  --btn-disabled-fill:     var(--surface-quiet);
+         rest   --btn-destructive-label #1A1918 on #E94A32   4.590  ✔
+         hover  --btn-destructive-label #1A1918 on #D33E28   3.753  ✘   (floor 4.5)
+         dark rest  #1A1918 on #F2634B                       5.569  ✔
+         dark hover #1A1918 on #E05540                       4.634  ✔
+
+     Only light failed, and it could not be fixed in the direction it was
+     written. This kit prints CHARCOAL on every accent — button.tsx states it
+     as law, "Charcoal on every accent, both modes ... Trust it" — and light's
+     resting poppy already sits at 4.590, ninety thousandths above the floor.
+     Every step DARKER spends contrast the fill does not have. There is no hex
+     between #E94A32 and #D33E28 that clears 4.5.
+
+     SO THE STEP GOES THE OTHER WAY, AND THAT IS NOT A NEW IDEA HERE. "Hover is
+     darker" was never the kit's rule; a visible STEP is. `--btn-inverse-hover`
+     lifts #1A1918 to #333230 in light, and in dark `--btn-secondary-hover`
+     lifts #26241F to #454239 while `--btn-inverse-hover` drops #FFFEF9 to
+     #ECE8DF. The step always moves AWAY from the ink, and on an accent whose
+     ink is charcoal that means lighter.
+
+     THE VALUE IS NOT MINTED. `--kw-poppy-lift` #F2634B is already in the ramp
+     and is already what `--destructive` becomes in dark, so this is an address
+     change rather than a colour decision — the same move §8 makes for
+     `--btn-secondary-fill`:
+
+         hover  --btn-destructive-label #1A1918 on #F2634B   5.569  ✔
+         step   #F2634B against the rest fill #E94A32        1.213
+         (the step it replaces, #D33E28, measured 1.223; dark's own is 1.202)
+
+     The hover is the same strength it always was, in the one direction that
+     leaves the word readable.
+
+     VISIBLE CHANGE, AND AURORA SHOULD SEE IT: a destructive button in LIGHT
+     now brightens under the pointer instead of darkening. Dark is untouched. */
+  --btn-destructive-hover: var(--kw-poppy-lift);
+
+  /* RULED BY ARITHMETIC, 23 SEP 2026 — THE ALIAS BROKE A WELL.
+     This line read `var(--surface-quiet)`, and `--surface-quiet` is ALSO the
+     ground `Image` paints under every picture ("the ground under every state
+     — a paper tone, never an alpha", image.tsx). So a disabled surface and
+     the media well inside it were the same #E2DDD4: the contrast law measured
+     1.000 on `Gallery`'s own disabled tile — the picture area vanished into
+     the tile, and a tile with no picture, a failed one, a loading one, or a
+     `fit="contain"` letterbox was a single flat grey rectangle with a caption
+     under it.
+
+     DARK ALREADY BROKE THIS ALIAS, for a neighbouring reason — see the dark
+     block's own note, "HELD at #2F2D28 while N2 lifts --surface-quiet". Light
+     never followed, so this is light catching up rather than a new idea.
+
+     THE VALUE IS THE SMALLEST STEP ALONG THE SAME BEIGE THAT CLEARS BOTH
+     FLOORS AT ONCE, which is the method override 9 used for `--kw-forest` and
+     override 43 for `--kw-poppy-ink`. Disabled can only go DARKER — light's
+     enabled secondary is `--card` #FFFEF9, the lightest paper there is, and
+     the dark block's own rule is that disabled must never end up lighter than
+     an enabled secondary. Darker is squeezed from the other side by
+     `--ink-tertiary` #5F5D59, which real components print ON this fill
+     (`ticket-thread.tsx`'s frozen composer) and which needs 4.5. That leaves
+     one narrow window, and #DCD7CD sits in the middle of it:
+
+         boundary vs --surface-quiet #E2DDD4    1.060   (floor 1.05)
+         ink        --ink-tertiary  #5F5D59     4.58    (floor 4.5)
+
+     `--btn-cancel-hover` #D8D2C7, the existing neighbour one rung further
+     down, was tried first and REFUSED by the law: it drops the ink to 4.368.
+     The hex is new because the light ramp has no rung inside the window; the
+     reason it is new is this paragraph. */
+  --btn-disabled-fill:     #DCD7CD;
   --btn-disabled-label:    var(--ink-disabled);
 }
 
@@ -1036,6 +1105,29 @@
   --ink-primary:     var(--foreground);
   --ink-tertiary:    var(--muted-foreground);
   --ink-on-accent:   var(--kw-charcoal);   /* the accent law, as a token     */
+
+  /* ---- THE PAGE LADDER, HELD STILL — minted 2026-09-24 with the inverse
+     flip in §8b, and the reason it has to exist rather than be restated.
+
+     The inverse ground rebinds `--foreground`, `--ink-secondary` and
+     `--ink-tertiary` so a word on it takes the paper tone (Aurora, 24 Sep:
+     "when button color is black, text should be white ... make it rule").
+     Custom properties INHERIT, so that ladder reaches a card nested inside an
+     inverse panel too, and the paper grounds have to hand it back.
+
+     THEY CANNOT HAND IT BACK AS A HEX. `--foreground` is charcoal in light and
+     off-beige in dark; writing either one into a ground scope asserts that the
+     value does not move with the palette, which is the exact mistake §8's own
+     `--btn-secondary-hover` post-mortem is about ("a fixed value sat on a
+     flipping ground"). So the page ladder is captured HERE, on `:root`, where
+     a custom property is substituted at computed-value time against the
+     palette in force — the mechanism the `.bg-surface-inverse` block's own
+     "NINE SHAPES" note spells out. The inverse block does not redeclare these
+     three, so they still hold the page's ink inside it, and a paper ground
+     points back at them in one line that is right in both palettes. */
+  --ink-page:           var(--foreground);
+  --ink-page-secondary: var(--ink-secondary);
+  --ink-page-tertiary:  var(--ink-tertiary);
   --hair:            var(--border);
   --hair-strong:     rgba(26, 25, 24, .20);/* section rules                  */
   /* ---- THE GRIDLINE GROUND — a fourth tier, minted 2026-08-27 ------------
@@ -1537,8 +1629,17 @@
    properties, so one Tailwind utility sets all three (commission section 4).
 
    Kit weight per step, for reference when authoring:
-     500 — 7xl 6xl 5xl 4xl 3xl 2xl xl, badge, micro
+     500 — 7xl 6xl 5xl 4xl 3xl 2xl xl, badge, micro, xs
      300 — lg, base, sm, caption
+
+  Until now this list was reference only: the `--text-*` utilities below set
+  font-size, line-height and letter-spacing but never font-weight, so every
+  call site had to remember and re-state the weight documented here — and
+  most didn't. Each step's own `--text-*--font-weight` custom property below,
+  and its registration in the `@theme inline` block in section 7, is what
+  makes the weight a property of the step instead of a thing each call site
+  has to repeat. (`xs` was missing from this summary line though its own
+  comment below always said 500 — corrected here to match.)
    ========================================================================= */
 
 /* ----------------------------------------------------------------------------
@@ -1646,73 +1747,89 @@
   --text-micro:                  0.6875rem;
   --text-micro--line-height:     1.3;
   --text-micro--letter-spacing:  0.08em;
+  --text-micro--font-weight:     var(--font-weight-medium);
 
   /* xs · 12 / 500 — same step as badge; the kit has one size here, and no
      value was invented to separate the two commission names.               */
   --text-xs:                     0.75rem;
   --text-xs--line-height:        1.35;
   --text-xs--letter-spacing:     0em;
+  --text-xs--font-weight:        var(--font-weight-medium);
 
   /* sm · 14 / 300 — button and control labels */
   --text-sm:                     0.875rem;
   --text-sm--line-height:        1.45;
   --text-sm--letter-spacing:     0em;
+  --text-sm--font-weight:        var(--font-weight-light);
 
   /* badge · 12 / 500 — badges, counts, status (kit ruling 02) */
   --text-badge:                  0.75rem;
   --text-badge--line-height:     1.35;
   --text-badge--letter-spacing:  0em;
+  --text-badge--font-weight:     var(--font-weight-medium);
 
   /* base · 16 / 300 */
   --text-base:                   1rem;
   --text-base--line-height:      1.45;
   --text-base--letter-spacing:   0em;
+  --text-base--font-weight:      var(--font-weight-light);
 
   /* lg · 18 / 300 */
   --text-lg:                     1.125rem;
   --text-lg--line-height:        1.4;
   --text-lg--letter-spacing:     0em;
+  --text-lg--font-weight:        var(--font-weight-light);
 
   /* xl · 20 / 500 */
   --text-xl:                     1.25rem;
   --text-xl--line-height:        1.3;
   --text-xl--letter-spacing:     -0.01em;
+  --text-xl--font-weight:        var(--font-weight-medium);
 
   /* 2xl · 24 / 500 */
   --text-2xl:                    1.5rem;
   --text-2xl--line-height:       1.25;
   --text-2xl--letter-spacing:    -0.014em;
+  --text-2xl--font-weight:       var(--font-weight-medium);
 
   /* 3xl · 32 / 500 */
   --text-3xl:                    2rem;
   --text-3xl--line-height:       1.18;
   --text-3xl--letter-spacing:    -0.02em;
+  --text-3xl--font-weight:       var(--font-weight-medium);
 
   /* 4xl · 44 / 500 */
   --text-4xl:                    2.75rem;
   --text-4xl--line-height:       1.08;
   --text-4xl--letter-spacing:    -0.025em;
+  --text-4xl--font-weight:       var(--font-weight-medium);
 
   /* 5xl · 56 / 500 */
   --text-5xl:                    3.5rem;
   --text-5xl--line-height:       1.06;
   --text-5xl--letter-spacing:    -0.025em;
+  --text-5xl--font-weight:       var(--font-weight-medium);
 
   /* 6xl · 72 / 500 */
   --text-6xl:                    4.5rem;
   --text-6xl--line-height:       1.04;
   --text-6xl--letter-spacing:    -0.026em;
+  --text-6xl--font-weight:       var(--font-weight-medium);
 
   /* 7xl · 96 / 500 */
   --text-7xl:                    6rem;
   --text-7xl--line-height:       1.02;
   --text-7xl--letter-spacing:    -0.028em;
+  --text-7xl--font-weight:       var(--font-weight-medium);
 
   /* Additive: the kit's 13px caption step (timestamps, helper text). The
-     commission has no name for it, so it keeps the kit's.                  */
+     commission has no name for it, so it keeps the kit's. Weight (300) comes
+     from the section-5 summary above, which is the only place caption's
+     weight was ever documented — its own comment here named none.          */
   --text-caption:                0.8125rem;
   --text-caption--line-height:   1.4;
   --text-caption--letter-spacing: 0em;
+  --text-caption--font-weight:   var(--font-weight-light);
 
   --tracking-eyebrow: 0.08em;    /* kit ruling 16 */
   --tracking-serif:   -0.005em;
@@ -2463,6 +2580,61 @@
 
 .bg-surface-inverse,
 [data-surface="inverse"] {
+  /* ---- THE INK LADDER FLIPS WITH THE GROUND ---------------------------------
+     RULED 2026-09-24. Aurora, verbatim:
+
+         "when button color is black, text should be white (i saw this on the
+          refresh button in dark mode when hover) fix it and make it rule"
+
+     THE RULE, stated once: WHEN A SURFACE IS THE INK TONE, EVERY WORD AND
+     EVERY ICON ON IT TAKES THE PAPER TONE. Not one button — the ground.
+
+     This block already flips two things on exactly this mechanism, and both
+     arguments are written above and below: `--focus` (a ring that would
+     otherwise be charcoal on charcoal) and `--hair` (a hairline that measured
+     1.000 in BOTH palettes on this ground). The ink ladder was the third and
+     was missing, so a control that names an ink RELATIVE TO THE PAGE while
+     standing on this ground painted the page's ink on the page's opposite.
+
+     MEASURED, `compositions/screens/page-failure.tsx:177` — the reference
+     button on the charcoal 404 screen, `Button variant="ghost"`, whose whole
+     variant is `bg-transparent text-ink-tertiary`:
+
+         --ink-tertiary on --surface-inverse    2.672 light   1.937 dark
+
+     — against an ink floor of 4.5, in both palettes, and the same three lines
+     below would have been true of its hover, which is `text-foreground`:
+     charcoal on charcoal, 1.000, in light.
+
+     THE VALUES ARE NOT NEW AND NOTHING IS MINTED. The inverse ladder is the
+     OTHER palette's ladder and the file already says so: `--ink-secondary` is
+     #4a4946 light / #d5d1c9 dark, and `--ink-on-inverse-secondary` is exactly
+     those two hexes the other way round. So this is an address change, the
+     same move §8 makes for `--btn-secondary-fill` and `--surface-lift` — a
+     RELATION where a fixed value cannot hold one — and not a colour decision.
+
+     TERTIARY TAKES THE SECONDARY RUNG, because the inverse ladder has two
+     rungs and the page ladder has three. The alternative is inventing a third
+     inverse ink, which is a hex nobody has ruled on; the kit's own answer for
+     a quiet word on this ground is `--ink-on-inverse-secondary` and it is
+     already what `--ink-on-record-footer-secondary` points at.
+
+     ON THE ELEMENT, NOT ON `*` — and that is the difference from `--focus`
+     three lines up. An outline is drawn OUTSIDE its own border box, so an
+     inverse pill's own ring lands on the page and only its descendants want
+     the flip. A word is drawn ON its own fill, so this ground's own label
+     wants it too. Custom properties inherit, so every descendant gets it with
+     no `*` and no component change — the mechanism ruling 01 already uses.
+
+     THE OTHER HALF IS WRITTEN IN §8, and it has to be: the two paper-ground
+     scopes restore this ladder, or a card standing INSIDE an inverse panel
+     would inherit the flipped ink onto its own off-beige. §8 states the
+     principle in as many words for the fill — "Both halves have to be
+     written" — and the reason is identical. */
+  --foreground:    var(--ink-on-inverse);
+  --ink-secondary: var(--ink-on-inverse-secondary);
+  --ink-tertiary:  var(--ink-on-inverse-secondary);
+
   /* The hairline flips on exactly the same mechanism, for exactly the same
      reason. --hair is charcoal-at-8% and this ground IS charcoal, so every
      `--hairline*` shape on a charcoal panel drew at contrast 1.000 — measured,
@@ -2557,6 +2729,23 @@
 .bg-surface-raised,
 .bg-surface-page,
 [data-ground="page"] {
+  /* AND THE INK LADDER BACK WITH IT — the other half of the 24 Sep inverse
+     flip, written here for the reason this section states about the fill:
+     "Both halves have to be written." The inverse block hands its descendants
+     an ink ladder belonging to the OTHER palette, and custom properties do not
+     stop at a new background. A `Card variant="raised"` standing inside a
+     charcoal panel paints off-beige and would have inherited the inverse
+     ladder onto it. Declaring the page ladder on the paper grounds ends the
+     inheritance at exactly the element that changes the paper.
+     Nothing outside an inverse region changes: `--ink-page*` is captured on
+     `:root` against whichever palette is in force, so these three lines are
+     the identity everywhere except under an inverse ground — and there they
+     are the whole point. `--ink-tertiary` gets its own rung back rather than
+     staying collapsed onto secondary the way the inverse ladder collapses it. */
+  --foreground:    var(--ink-page);
+  --ink-secondary: var(--ink-page-secondary);
+  --ink-tertiary:  var(--ink-page-tertiary);
+
   --btn-secondary-fill:  var(--surface-panel);
   /* And the LIFT with it, for exactly the reason the fill is here: §4's
      `--surface-lift`. A raised thing standing on off-beige takes soft paper,
@@ -2597,6 +2786,13 @@
 .bg-surface-panel,
 .bg-secondary,
 [data-ground="panel"] {
+  /* The page ladder back, exactly as in the off-beige block above and for the
+     same reason — see the note there. Soft paper is a page tone, not an ink
+     tone, so a word on it is the page's word. */
+  --foreground:    var(--ink-page);
+  --ink-secondary: var(--ink-page-secondary);
+  --ink-tertiary:  var(--ink-page-tertiary);
+
   --btn-secondary-fill:  var(--surface-raised);
   --surface-lift:        var(--surface-raised);
   /* The other half of the 21 Sep relation - see the off-beige block above.
@@ -2841,6 +3037,35 @@
   --text-5xl--letter-spacing:     var(--text-5xl--letter-spacing);
   --text-6xl--letter-spacing:     var(--text-6xl--letter-spacing);
   --text-7xl--letter-spacing:     var(--text-7xl--letter-spacing);
+
+  /* Same reason, same fix, for weight: Tailwind's own theme carries no
+     font-weight sub-key for `--text-*` either (confirmed against the
+     installed tailwindcss 4.3.3 — `text-*`'s utility only emits a
+     `font-weight` declaration when a `--text-*--font-weight` theme key
+     exists at all). Without these, section 5's "Kit weight per step" comment
+     is just prose: `text-micro` etc. set size/line-height/tracking and
+     nothing carries the weight, so every call site has to re-state it or
+     silently inherit whatever `<body>` happens to be. Registering all
+     fourteen here is what makes a step's weight a property of the step.
+     Tailwind still lets an explicit `font-*` utility win over this default:
+     both `font-*` and this `font-weight` declaration route through the same
+     `--tw-font-weight` custom property, and `font-*` sets it directly while
+     this one reads it with a fallback, so a call site naming its own weight
+     is never overridden by its size step.                                  */
+  --text-micro--font-weight:      var(--text-micro--font-weight);
+  --text-xs--font-weight:         var(--text-xs--font-weight);
+  --text-sm--font-weight:         var(--text-sm--font-weight);
+  --text-badge--font-weight:      var(--text-badge--font-weight);
+  --text-base--font-weight:       var(--text-base--font-weight);
+  --text-lg--font-weight:         var(--text-lg--font-weight);
+  --text-xl--font-weight:         var(--text-xl--font-weight);
+  --text-2xl--font-weight:        var(--text-2xl--font-weight);
+  --text-3xl--font-weight:        var(--text-3xl--font-weight);
+  --text-4xl--font-weight:        var(--text-4xl--font-weight);
+  --text-5xl--font-weight:        var(--text-5xl--font-weight);
+  --text-6xl--font-weight:        var(--text-6xl--font-weight);
+  --text-7xl--font-weight:        var(--text-7xl--font-weight);
+  --text-caption--font-weight:    var(--text-caption--font-weight);
 
   --tracking-eyebrow:           var(--tracking-eyebrow);
   --tracking-serif:             var(--tracking-serif);

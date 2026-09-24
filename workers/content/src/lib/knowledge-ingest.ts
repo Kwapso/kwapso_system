@@ -1201,7 +1201,18 @@ export const INGEST_KINDS: IngestKind[] = [
     // Aurora's ruling that an archived account is "not visible anywhere",
     // read off its own aliased `account_archived_at`. The bump walks the
     // cursor back over every story already filed.
-    textVersion: 2,
+    //
+    // v3: 23 Sep 2026, THE SAME RULING WIDENED — "validated - this for
+    // everything when archived, not only accounts" (R112). A story hangs off
+    // TWO archivable records and only one of them was being asked: its own
+    // TICKET, put away on the tickets screen, left the corpus (the ticket
+    // kind above has retired on `h.archived_at` since v2) while the story
+    // answering it stayed embedded and quotable. Read off its own aliased
+    // `ticket_archived_at` for the same reason `account_archived_at` is
+    // aliased: this statement already joins `help`, and a bare `archived_at`
+    // beside `accounts` is the ambiguity `help.ts`'s `archiveClause` header
+    // describes SQLite refusing at runtime.
+    textVersion: 3,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(s.updated_at, s.created_at)", "s.id")
       const rows = await d1Query<{
@@ -1223,6 +1234,10 @@ export const INGEST_KINDS: IngestKind[] = [
         app_name: string | null
         sprint_name: string | null
         ticket_ref: string | null
+        /** THE TICKET'S OWN ARCHIVED STATE, aliased so it can never collide
+         * with `account_archived_at` above — two archivable parents, two
+         * columns of the same name on two joined tables. */
+        ticket_archived_at: string | null
         processes: string | null
         work_notes: string | null
         created_at: string
@@ -1236,6 +1251,7 @@ export const INGEST_KINDS: IngestKind[] = [
                 s.assignee_name, s.account_id, s.app_id, s.ticket_id, s.sprint_id, s.created_at,
                 a.name AS account_name, a.archived_at AS account_archived_at,
                 ap.name AS app_name, sp.name AS sprint_name, h.ref AS ticket_ref,
+                h.archived_at AS ticket_archived_at,
                 COALESCE(s.updated_at, s.created_at) AS sort_at,
                 ${childLines(
                   `SELECT pr.name AS line FROM story_processes stp
@@ -1292,9 +1308,12 @@ export const INGEST_KINDS: IngestKind[] = [
         // The customer spine is the team's, like every other row this app owns.
         ownerUserId: null,
         sourceUrl: null,
-        // THE ONLY REASON A STORY RETIRES: its account has been archived.
-        // Nothing else about a story's own lifecycle takes its material away.
-        retired: r.account_archived_at !== null,
+        // TWO REASONS A STORY RETIRES, both about a record it hangs off and
+        // neither about its own lifecycle: its account has been archived, or
+        // the ticket it answers has (R112). Independent facts, read
+        // independently — restoring either one on its own brings the story
+        // back only if the other never hid it.
+        retired: r.account_archived_at !== null || r.ticket_archived_at !== null,
       }))
     },
   },
@@ -1529,7 +1548,12 @@ export const INGEST_KINDS: IngestKind[] = [
     // reason: a to-do for an archived account now retires (Aurora's ruling,
     // "not visible anywhere"), read off its own aliased `account_archived_at`.
     // The bump walks the cursor back over every to-do already filed.
-    textVersion: 4,
+    //
+    // v5: 23 Sep 2026, the same ruling widened (R112) — a to-do raised off a
+    // ticket retires when THAT ticket is archived too, read off its own
+    // aliased `ticket_archived_at`. This statement already joins `help` for
+    // the reference, so the column was one alias away the whole time.
+    textVersion: 5,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
       const rows = await d1Query<{
@@ -1547,6 +1571,9 @@ export const INGEST_KINDS: IngestKind[] = [
         account_name: string | null
         account_archived_at: string | null
         ticket_ref: string | null
+        /** Aliased for the same reason `account_archived_at` is: this statement
+         * joins both archivable tables and both carry `archived_at`. */
+        ticket_archived_at: string | null
         created_at: string
         sort_at: string
       }>(
@@ -1556,6 +1583,7 @@ export const INGEST_KINDS: IngestKind[] = [
         `SELECT t.id, t.ref, t.title, t.detail, t.due_on, t.completed_at, t.cancelled_at,
                 t.completer_name, t.file_name, t.account_id, t.ticket_id, t.created_at,
                 a.name AS account_name, a.archived_at AS account_archived_at, h.ref AS ticket_ref,
+                h.archived_at AS ticket_archived_at,
                 COALESCE(t.updated_at, t.created_at) AS sort_at
            FROM todos t
            LEFT JOIN accounts a ON a.id = t.account_id
@@ -1603,9 +1631,11 @@ export const INGEST_KINDS: IngestKind[] = [
           recordDate: r.created_at,
           ownerUserId: null,
           sourceUrl: null,
-          // THE ONLY REASON A TO-DO RETIRES: its account has been archived.
-          // Nothing else takes a to-do's material away — see the header above.
-          retired: r.account_archived_at !== null,
+          // TWO REASONS A TO-DO RETIRES, both about a record it hangs off: its
+          // account has been archived, or the ticket it was raised off has
+          // (R112). Its own `cancelled_at` is NOT one of them — a withdrawn
+          // ask is still a true record of what we asked for.
+          retired: r.account_archived_at !== null || r.ticket_archived_at !== null,
         }
       })
     },

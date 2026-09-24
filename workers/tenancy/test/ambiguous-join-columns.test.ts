@@ -192,13 +192,36 @@ const AMBIGUOUS_JOIN_EXEMPT: { file: string; expression: string; reason: string 
 describe("a query joining two tables that both own a pinned column qualifies it", () => {
   it("the schema oracle is reading the real, live columns — not an empty derivation", () => {
     const owners = ownersOfPinnedColumns()
-    // THE CANARY. `archived_at` is the column this whole suite exists for,
-    // and its owner set MUST be exactly {help, accounts} today — not more,
-    // not fewer, not empty. A change here is news: a third table growing
-    // `archived_at` widens the blast radius of the exact bug this file
-    // guards, and losing one of the two silently turns this check into one
-    // that passes for finding nothing.
-    expect([...(owners.get("archived_at") ?? [])].sort()).toEqual(["accounts", "help"])
+    // THE CANARY. `archived_at` is the column this whole suite exists for, and
+    // its owner set must be EXACTLY this list — not more, not fewer, not empty.
+    // A change here is news: every table that grows the column widens the blast
+    // radius of the exact bug this file guards (a bare `archived_at` in a
+    // statement joining two owners is refused by SQLite at runtime, and on
+    // `help` it took the whole Tickets screen down), and losing one silently
+    // turns this check into one that passes for finding nothing.
+    //
+    // WIDENED FROM TWO TO TEN, 24 Sep 2026, migration 0123. Aurora's ruling —
+    // "when archiving a parent item, always archive as well the child items" —
+    // gave eight more tables an archived state of their own, because a cascaded
+    // child now IS archived rather than merely filtered out of sight. Eight of
+    // the ten are new; `accounts` (0117) and `help` (0011) are the originals.
+    // `work_logs` is deliberately NOT here and never will be: "never archive
+    // work logs, time is logged and we must always know where it went."
+    expect([...(owners.get("archived_at") ?? [])].sort()).toEqual([
+      "accounts",
+      "apps",
+      "help",
+      "meetings",
+      "processes",
+      "sprints",
+      "stories",
+      "tasks",
+      "todos",
+      "waves",
+    ])
+    // AND THE ONE THAT MUST NEVER JOIN THEM, asserted as a negative because an
+    // absence is otherwise indistinguishable from an oversight.
+    expect([...(owners.get("archived_at") ?? [])]).not.toContain("work_logs")
     // `deactivated_at` is the audit-block column: virtually every team table
     // carries it, so the owner set is large rather than exact.
     expect((owners.get("deactivated_at")?.size ?? 0)).toBeGreaterThan(15)

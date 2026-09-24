@@ -58,6 +58,12 @@ type LoadStatus = "idle" | "loading" | "loaded" | "error";
 interface AvatarContextValue {
   status: LoadStatus;
   setStatus: (status: LoadStatus) => void;
+  /** WHOSE FACE THIS IS — see `Avatar`'s own `external` prop. It travels on
+   * the context rather than as a second prop on `AvatarImage`, for the same
+   * reason `status` does: the call site sets it ONCE on the mark, and the
+   * photograph inside reads it. A call site that had to remember to put the
+   * same word on both would be a call site that puts it on one. */
+  external: boolean;
 }
 
 const AvatarContext = React.createContext<AvatarContextValue | null>(null);
@@ -176,7 +182,49 @@ const avatarVariants = cva(
 
 export interface AvatarProps
   extends React.ComponentPropsWithoutRef<"span">,
-    VariantProps<typeof avatarVariants> {}
+    VariantProps<typeof avatarVariants> {
+  /**
+   * IS THIS PERSON FROM OUTSIDE? Aurora's ruling, 23 Sep 2026, verbatim:
+   * *"external photos (from contacts) gray scale. keep staff nirmal."*
+   * ("nirmal" is normal.) An outside person's PHOTOGRAPH renders in
+   * greyscale; one of our own renders in full colour, so a reader can tell
+   * at a glance whose face they are looking at, in a table, on a card, in a
+   * chip, in an attendee list, on a record's header mark, anywhere.
+   *
+   * IT IS A FACT, NOT A GUESS. The kit has no idea who anybody is — it holds
+   * no notion of a team, a contact, or a company — so this is the one thing
+   * it can do honestly: TAKE the answer and draw it. A component that tried
+   * to infer "external" from a URL's host, or from whether initials were
+   * supplied, would be wrong the first time somebody put a staff photograph
+   * on a CDN.
+   *
+   * THE DEFAULT IS COLOUR (`false`), AND THAT IS A DELIBERATE CHOICE
+   * BETWEEN TWO IMPERFECT ONES. Defaulting to GREYSCALE fails more loudly —
+   * a call site nobody has updated greys our own people, which somebody
+   * notices the same morning — and it fails by SAYING SOMETHING FALSE about
+   * a real person, in every app that vendors this kit, on a screen nobody
+   * here can see. Defaulting to COLOUR is the status quo: an un-updated call
+   * site is merely NOT YET TREATED, never WRONGLY treated, and no face ever
+   * claims to be something it is not. So the loudness is bought somewhere
+   * that cannot lie instead — `check-avatar.mjs` reads every `AvatarImage`
+   * this kit renders and fails the build where the mark around it is not
+   * told, which is louder than a grey face (it is red, and it is before the
+   * thing ships) and costs nobody a false statement in the meantime.
+   *
+   * IT IS ABOUT THE PHOTOGRAPH, NOT THE INITIALS. Her word was "photos", and
+   * this file draws the two separately: `AvatarImage` desaturates,
+   * `AvatarFallback` does not. An initials tile has no colour OF THE PERSON
+   * to remove — its fill is the mark's own variant, the same token every
+   * other mark on the screen paints — so greying it would not say "external",
+   * it would say "quiet", a word this kit already spends on `variant="quiet"`
+   * for a different meaning entirely.
+   *
+   * A SQUARE MARK NEVER PASSES IT. `shape="square"` is a THING (ruling 30) —
+   * a company's logo, a record's mark — and a company is not a person to be
+   * one of us or not. Nothing enforces that here; it is simply never true.
+   */
+  external?: boolean;
+}
 
 /**
  * A person's mark, or — with `shape="square"` — a thing's.
@@ -228,11 +276,11 @@ export interface AvatarProps
  */
 const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
   (
-    { className, shape = "pill", size = "md", variant = "default", children, ...props },
+    { className, shape = "pill", size = "md", variant = "default", external = false, children, ...props },
     ref,
   ) => {
     const [status, setStatus] = React.useState<LoadStatus>("idle");
-    const value = React.useMemo(() => ({ status, setStatus }), [status]);
+    const value = React.useMemo(() => ({ status, setStatus, external }), [status, external]);
 
     return (
       <AvatarContext.Provider value={value}>
@@ -241,6 +289,14 @@ const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
           data-slot="avatar"
           data-shape={shape ?? "pill"}
           data-size={size ?? "md"}
+          /* PUBLISHED, so the fact is readable from the DOM — by a test, by a
+             measuring script, and by a composition that needs to know without
+             re-deriving it. Written only when TRUE (`undefined` otherwise, the
+             same shape `aria-hidden` is given above), so the attribute's mere
+             presence is the answer and an un-updated mark carries nothing at
+             all rather than a cheerful `data-external="false"` that would read
+             as "we checked, and they are ours". */
+          data-external={external ? "true" : undefined}
           className={cn(avatarVariants({ shape, size, variant }), className)}
           {...props}
         >
@@ -291,7 +347,7 @@ export interface AvatarImageProps extends React.ComponentPropsWithoutRef<"img"> 
  */
 const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
   ({ className, onLoad, onError, onLoadingStatusChange, src, ...props }, ref) => {
-    const { status, setStatus } = useAvatarContext("AvatarImage");
+    const { status, setStatus, external } = useAvatarContext("AvatarImage");
 
     /* The callback is held in a ref rather than listed as a dependency. A
        call site that passes an inline arrow gets a new identity every render,
@@ -348,7 +404,26 @@ const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
         ref={setRefs}
         data-slot="avatar-image"
         src={src}
-        className={cn("size-full object-cover", className)}
+        /* GREYSCALE FOR AN OUTSIDE PERSON — Aurora, 23 Sep 2026: "external
+           photos (from contacts) gray scale. keep staff nirmal." See
+           `AvatarProps.external` for why the fact is taken rather than
+           guessed, and why the default is colour.
+
+           `grayscale` IS A TAILWIND CORE UTILITY (`filter: grayscale(100%)`),
+           not a token this kit has to mint: there is no COLOUR here to name.
+           §32-shaped laws are about which ink a thing paints; this removes
+           chroma from a PHOTOGRAPH, whose colours were never ours to have a
+           token for in the first place — an arbitrary value or a new
+           `--surface-*` entry would both be pretending otherwise.
+
+           IT SITS ON THE `<img>`, NOT ON THE MARK. The mark's own box holds
+           the variant fill and, underneath a loading photograph, the initials;
+           desaturating the whole box would quietly drain the kit's own
+           `variant="brand"` mango and `variant="inverse"` charcoal wherever a
+           caller paired one with an outside face, which is a second, unasked
+           change to a token colour. The filter belongs to the one element
+           whose colours belong to the person. */
+        className={cn("size-full object-cover", external && "grayscale", className)}
         onLoad={(event) => {
           setStatus("loaded");
           notify.current?.("loaded");

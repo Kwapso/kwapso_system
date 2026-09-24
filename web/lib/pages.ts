@@ -514,10 +514,16 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // ("we only have one-word names... We need an alternative for work logs.
   // Propose me multiple") and "Hours" shipped as the provisional
   // recommendation while she decided. Her answer, the same day: "The word for
-  // work logs is logs." Only THIS rail destination needed a one-word
-  // substitute — "Work logs" stays the word everywhere else in the app (the
-  // glossary term, and every record's own tab — story/task/meeting/ticket
-  // detail). The URL segment (`time`) and the module (`work`) are unchanged.
+  // work logs is logs."
+  //
+  // AND IT IS THE WHOLE APP'S WORD NOW, not just this rail entry — Aurora, 23
+  // Sep 2026, verbatim: "word is logs only". The clause that stood here ("Work
+  // logs stays the word everywhere else") is retired: the Home tile, the
+  // glossary term ("Log") and the section on a story, a ticket and a task all
+  // say Logs, which REVERSES B0386 of 22 Sep 2026 ("Effort" -> "Time log").
+  // One string is still owed, the meeting detail's own tab, and another lane
+  // owns that file. The URL segment (`time`) and the module (`work`) are
+  // unchanged, for the reason the paragraph above gives.
   { key: "time", title: "Logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
   // ── BUILD: the work engine's remaining destinations ─────────────────────────
   //

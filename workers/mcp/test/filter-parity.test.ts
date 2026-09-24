@@ -55,6 +55,29 @@ import { DOORS, doorBodyFields, doorParams, key, ROOT, WORKERS, type Door } from
  * which is what this census exists to end. Keyed "METHOD /path". */
 const TOOLLESS_DOORS: Record<string, string> = {
   /* ------------------------------- tenancy ------------------------------- */
+  // ── ARCHIVING AN APP, WHICH CASCADES ──────────────────────────────────────
+  //
+  // OFF THE MACHINE SURFACE ON PURPOSE, and the reason is the cascade rather
+  // than the app. `POST /api/tenancy/apps/archived` (migration 0123) archives
+  // the app AND everything the app owns — its tickets, meetings, tasks, to-dos,
+  // stories, phases, waves and process maps — each carrying its own archived
+  // state. That is a client's whole world made invisible from ONE call, and the
+  // machine surface has no turn to hang a confirm panel on: one `tools/call` is
+  // the whole conversation, which is the same argument R24 makes for refusing
+  // the money door outright.
+  //
+  // THE INACTIVE TOGGLE IS STILL OFFERED, through `RECORD_TOGGLES.app`
+  // (`/api/tenancy/apps/active`), and it is the weaker, non-cascading state a
+  // machine caller can safely reach: an app drops out of the value figures and
+  // everything under it stays exactly where it was. So the capability is not
+  // absent from the surface — the DESTRUCTIVE half of it is, deliberately.
+  //
+  // (Note for whoever revisits this: `RECORD_TOGGLES.app`'s own words say
+  // "Archive an app" for that weaker state, which predates the word having a
+  // stronger meaning. That is a vocabulary bug on the machine surface, filed
+  // rather than widened here.)
+  "POST /api/tenancy/apps/archived":
+    "archiving an app cascades to everything it owns, and one tools/call has no turn to confirm on; the non-cascading inactive toggle stays available as RECORD_TOGGLES.app",
   // ── READING A CALL INTO A PROPOSED MAP ────────────────────────────────────
   // Five doors, deliberately off the machine surface, and the reasoning is worth
   // reading before anybody "completes" it.
@@ -209,6 +232,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
 
   "GET /api/content/work-logs/summary":
     "THE SAME ROWS, ADDED UP FOR A PICTURE. It answers hours by person, by kind of work and by week over one record — every one of which is a SUM over the very rows `list_work_logs` already hands back against the same `targetTable` and `targetId`, under the same gate. So a machine caller is not missing an answer; it is missing an arithmetic it can do better than we can describe, on data it already has. The door exists because a BROWSER cannot do that arithmetic honestly: the list is paged, so summing what is loaded would answer about the newest fifty rows while looking exactly like an answer about the record.",
+
+  "GET /api/content/work-logs/dashboard":
+    "THE SAME ROWS, GROUPED SIX WAYS FOR ONE SCREEN — 23 Sep 2026, Aurora's Logs dashboard tab. Every grouping on it is one `query_records` call away on this surface already, better: that tool takes `groupBy` over the work_logs module and answers with the groups and their counts, over the same rows under the same gate, so by person, by related record type and by client are three such calls and the ones nobody has thought of yet are free. This door exists for a BROWSER: six grouped reads on every open of one tab is six round trips, and a screen that tallied the loaded page would picture the newest fifty rows under a heading that says the year. It also carries a JUDGEMENT a machine should not be handed as fact — `quietLastWeek` counts people who logged nothing last week against a denominator of everyone who logged anything in the last eight weeks, which is the only roster this worker can see, and the SCREEN prints that denominator beside the figure. A tool returning the number alone would be handing a model a statistic with its own caveat stripped off. DELETE THIS LINE if a developer asks for hours grouped by client as a capability — that is a real counting tool over `work_logs.account_id`, and it must expose and forward every filter `logFilterFrom` parses (R19), `accountId` included.",
 
   "GET /api/content/help/dashboard":
     "THE SAME TICKETS, GROUPED FIVE WAYS FOR FIVE PICTURES — and every one of those groupings is already on this surface, better. `query_records` on the tickets module takes `groupBy` of one or two fields and answers with the groups, their labels and their counts, over the same rows under the same gate: type × status, account × type, and app are three of those calls, and `raisedAsType` (the column the recategorisation matrix is built on) is a field of that module like any other, so the fifth is a fourth. A tool here would be a rigid, five-shaped duplicate of a general tool that can already ask those questions AND the ones nobody has thought of yet — and two answers to one question start disagreeing. The one thing this door computes that `query_records` does not is the days-to-close QUARTILES, which is arithmetic over `createdAt` and `resolvedAt` — two fields that same tool hands over per ticket, and arithmetic a model does not need a door for. What the door is FOR is a browser: five separate grouped reads on every open of one tab is five round trips, and drawing the charts from loaded rows would picture the newest fifty tickets under a heading that says backlog. It is a shape for a screen, not a capability, and the surface is not missing anything.",

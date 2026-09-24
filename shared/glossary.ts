@@ -174,8 +174,16 @@ export const GLOSSARY = {
     term: "Phase type",
     def: "Where a phase sits in its lifecycle: audit, plan, build, pilot, revision, deploy, or hypercare. Icons, not colour.",
   },
-  workLog: { term: "Work log", def: "One row of time: who, what they worked on, and how long, in whole seconds." },
-  timer: { term: "Timer", def: "A work log still running. Start it in one click; it waits in the header until you stop it." },
+  // "WORD IS LOGS ONLY" — Aurora, 23 Sep 2026. The term was "Work log" and the
+  // screens said four different things (Logs on the rail, "Work logs" on the
+  // Home tile and a meeting's tab, "Time log" on a story, a ticket and a task).
+  // It is LOGS everywhere now; a single entry is a LOG. This REVERSES ticket
+  // B0386 of 22 Sep 2026 ("Inside stories and tickets, let's rename 'effort' to
+  // 'time log'"), which was itself an approved rename: her ruling is the newer
+  // one, and the date is here so nobody reverts it next week on the strength of
+  // the older note.
+  workLog: { term: "Log", def: "One row of time: who, what they worked on, and how long, in whole seconds." },
+  timer: { term: "Timer", def: "A log still running. Start it in one click; it waits in the header until you stop it." },
   triage: { term: "Triage", def: "The first read of a new ticket. Answer it, or split it into stories." },
   engagementType: { term: "Engagement type", def: "A label on time saying how it was sold: blueprint, sprint, support or hourly." },
   recordReference: { term: "Reference number", def: "The short number on a ticket, story or phase. BERG-T0412, so anyone can say which one they mean." },

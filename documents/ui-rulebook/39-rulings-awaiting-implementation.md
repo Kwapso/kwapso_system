@@ -4,6 +4,276 @@
 
 ## Rulings awaiting implementation
 
+**The Logs dashboard, her review (2026-09-24):** four rulings over the tab built the day
+before, verbatim: *"add full toolbar, even if search is diasbled. kpi need background. put who
+logged it next to where they went 1/2 and 1/2. HOURS A WEEK, show multiple lines, one per staff
+and area for total."* **Status: built.**
+
+1. **A full toolbar, with the search shown and off.** It drew two filters and nothing else, and
+   a toolbar missing its most recognisable control reads as broken rather than deliberate. It is
+   the KIT'S OWN `SearchInput` in the kit's own disabled state (its state 5: `--hair-faint` fill,
+   `--ink-disabled` ink, no shadow, clear control withdrawn), so nothing here fakes a field with
+   a div, and there is no kit gap to report. The placeholder says where search does live ("Search
+   is on the Entries tab") so the control is not a dead end. `TOOLBAR_EXEMPT` no longer names this
+   screen; the list shrank, which is the only direction it may move. **The sort slot is still
+   empty and still reasoned** (`TOOLBAR_SORT_EXEMPT`): a donut is ordered by share, a line by
+   time, a rank by hours, so a sort chip would have to pick one picture to reorder and leave the
+   other five.
+
+2. **The KPI figures get their background, and it is Effort's.** Her word was "like effort", so
+   the tile is `effort-card.tsx`'s part for part: `<Card variant="default">` + `<CardContent>` +
+   `<StatGrid surface="bare">`, on the same `gap-[var(--space-4)]` grid. A FILL, never a stroke
+   (R67 as amended forbids the box drawn as an outline), and the four are written out as literal
+   elements rather than mapped, because R65 reads a keyed kit `<Card>` as a per-record row. This
+   is her own "unless explicitly said" clause in R97, said: `COUNT_REGISTER_EXEMPT` records it as
+   SETTLED rather than pending, beside the identical Effort entry.
+
+3. **Where the hours went sits beside Who logged it, half and half.** One `lg:grid-cols-2` row at
+   `gap-6`, the same arrangement the accounts overview uses for country beside industry. The
+   weekly chart keeps its own full-width row: a line is read across the whole measure.
+
+4. **Hours a week is one line per person over an area for the total.** The door already hands
+   back every person's own share of the same eight windows from ONE grouped read, so this costs
+   no second round trip and emphatically no read per person. **The cap is five, and it is the
+   palette's rather than a taste:** `--chart-1..5` is how many hues this system can tell apart, so
+   a sixth line would repeat one (two people drawn identically) or invent one (R32 forbids it).
+   **Nobody is quietly dropped.** The AREA is everybody, because it is the door's exact total
+   computed without the grouping cap, so an undrawn person is still inside the shape their
+   colleagues' lines sit under; the legend then carries "and N others, in the total but not
+   drawn", and each week's hover carries those others' own hours so the rows add up to the total
+   above them. N comes from the door's exact `activePeople`, not from the capped array, so it
+   does not under-report past `WORK_LOG_GROUP_CAP`. Who is drawn is ranked by hours IN THE WINDOW,
+   never by the all-time total the door sorts on, or a chart of eight weeks could draw five flat
+   lines at zero.
+
+**A stale kit comment found on the way:** `chart.tsx`'s header still warns that `--chart-4` and
+`--chart-5` "currently resolve to `--chart-1` and `--chart-2`". At the pinned kit (v1.2.167)
+`tokens.css` resolves them to `--kw-lavender` #B1A3CF and `--kw-orange` #F7953E, both admitted
+2026-09-02 and both distinct. Reported upstream; nothing app-side works around it.
+
+**The Logs module (2026-09-23):** five rulings, verbatim: *"tabs: dahsbaord, entries."* ·
+*"word is logs only"* · *"kind of work is what its related to"* · *"implement everything you
+suggested for dashboard - exclude running now. add toolbar w filters by person, account."* ·
+and, later the same day, *"on logs this kind of work shoudl not be manual, but automatic to
+where it was created: if it was creted in a story its stories, in a ticket its a ticke, in a
+meeting its a meeting, etc"*. **Status: built.**
+
+1. **Two tabs, Dashboard first and default.** Exactly two, and nothing else becomes one. The
+   same place Tickets' and Accounts' own Dashboard tabs hold on their strips; a Logs URL with
+   no `tab` lands on Dashboard, and pressing back onto it drops `tab` from the address.
+   Entries is the timesheet that was the whole screen until today, its rows unchanged.
+
+2. **One word: Logs.** One concept had been wearing FOUR: "Logs" on the rail, "Work logs" on
+   the Home tile and a meeting's own tab, "Time log" on a story, a ticket and a task, and
+   "Work log" in the glossary. It is **Logs** everywhere now and a single entry is a **Log**;
+   the glossary term, the glossary knowledge seed and the translation seeds moved with it.
+   **This REVERSES ticket B0386 of 22 Sep 2026** ("Inside stories and tickets, let's rename
+   'effort' to 'time log'"), which was itself an approved rename. Her ruling is the newer one
+   and its date is recorded beside it in `shared/glossary.ts` so nobody reverts it next week on
+   the strength of the older note. **One string still owed:** the meeting detail's own tab
+   (`web/components/meetings/meeting-detail.tsx`), owned by another lane;
+   `web/test/logs-dashboard.test.tsx` pins that it is the ONLY one left.
+
+2b. **"Wipe them" (2026-09-24).** Asked what to do with the words people had
+   already typed into "Kind of work" before it became automatic, she ruled:
+   *"wipe them"*. Team migration **0122** clears them, backing every one up first
+   in `work_log_kinds_backup` (restorable with one statement, safe to run twice,
+   touches nothing else). **One set is spared on purpose:** `target_table =
+   'meetings' AND kind = 'Meeting'`. That literal is what the transcript capture
+   stamps, and a person could have typed the same word on a meeting themselves,
+   so no column tells them apart. Sparing costs a handful of invisible words;
+   wiping cost the capture's de-duplication guard 18.25 hours across 21 work logs
+   nobody worked, once already. `target_table` is the discriminator everywhere
+   else, so a hand-typed "Meeting" on a story IS wiped. **The two readers moved
+   off the column the same day:** the "with or without meeting time" filter now
+   asks `target_table` (NOT NULL, so the awkward `kind IS NULL OR ...` arm is
+   gone), and the capture's guard now matches target + person, which is tighter,
+   not looser. The constant itself stays until Aurora rules on the spared rows.
+
+3. **"Kind of work" is the related record type, and nobody types it.** It now means what the
+   time was logged AGAINST: Story, Ticket, Task or Meeting (`work_logs.target_table`, NOT NULL
+   on every row). The free-text `kind` text box is gone from the log form and the correction
+   sheet, the badge on an Entries row draws the related type instead, and the record panel's
+   old "Hours by kind of work" card is deleted (on one record that split can only have a single
+   bar). **The column and its stored data survive**: the meetings door still stamps its own
+   constant, the `meetingTime` filter still reads it, and a correction that sends no kind falls
+   back to the stored value, so a row that already carries a typed word keeps it and simply
+   stops being shown it.
+
+4. **The dashboard, six sections and no "running now".** Four figures across the top (hours
+   this week with the change on last week, hours today with how many people, how many people
+   logged nothing last week, and how many records were worked on), a donut by related record
+   type, a line of the last eight weeks whose hover names who logged them, a bar per person
+   with their face, a bar per client **plus a row for our own work**, and the records with the
+   most hours against them. She excluded "running now" by name: the header bar already carries
+   every running timer on every screen. **`work_logs.account_id` had never been displayed
+   anywhere in the app** - written on every row since migration 0015, inherited from the
+   target, indexed, and read back by nothing until this tab.
+
+5. **The denominator is printed, not implied.** "How many people logged nothing last week"
+   cannot be answered against a roster this door cannot see (members live in the global core
+   database behind the tenancy worker), so it is answered over the people it CAN see - everyone
+   with time in the last eight weeks - and the figure prints "of N who logged in the last eight
+   weeks" beside itself, every time.
+
+6. **The toolbar: two filters, person and account, narrowing every section.** Declared through
+   the shared facet table (`web/lib/collection-filters.ts`) and drawn through the shared filter
+   seam; the filters ride the dashboard's own cache key, so two narrowings can never share one
+   answer. Both tabs offer the same two. The Dashboard row draws no search box and no sort, and
+   both are named, reasoned lines in `TOOLBAR_EXEMPT` / `TOOLBAR_SORT_EXEMPT` rather than
+   silent omissions: there is nothing on a tab of grouped pictures for a browser to sieve, and
+   each picture already carries its own order.
+
+
+**The Accounts dashboard, her second pass (2026-09-23):** four rulings over the tab she had
+ordered that same morning, verbatim: *"on accounts oevrview, fix how the kpis cards look, and
+add the median tenure"* · *"make the where as a donut graphic (when hover show)"* · *"make the
+how long weve had this account a line graphic, and when hover show who (like tickets
+tendency)"* · *"on accounts dashbard, the mandatory space between tabs and content is
+missing"*. **Status: built.**
+
+1. **The figures.** They were a wrapping baseline row (a `text-3xl` figure beside a grey word,
+   `gap-8`), which reads as one run-on sentence rather than a set of figures. They are the
+   kit's own stat register now, borrowed from `stat-grid.tsx` without its box: a `text-micro`
+   uppercase eyebrow over a `text-4xl` figure, on a real `sm:grid-cols-3` so three figures line
+   up. **Still not cards and still not `<StatGrid>`** - R97 is explicit that a count never gets
+   one, and the kit's own primitive is a number-and-label card by construction. The third
+   figure is the new median tenure.
+
+2. **Median tenure.** A TRUE median, taken by the database over the active company book
+   (`readAccountsDashboard`, `workers/tenancy/src/lib/accounts.ts`): an even count answers the
+   mean of the two middles, one account answers its own tenure, and no accounts answers `null`
+   rather than 0. Handed over in DAYS, the only unit the database measures exactly; the screen
+   spells it in MONTHS, because the picture under it has one point per calendar month and a
+   figure should share its neighbour's ruler. Proved in `workers/tenancy/test/
+   accounts-dashboard.test.ts` (odd, even, one, none, and the fence).
+
+3. **Where they are, as a donut.** The ring is the KIT's own `Donut`. **The legend is not, and
+   that is a kit gap rather than a preference**: `donut.tsx`'s own state table says "hover -
+   none drawn", it exposes no per-segment callback, and the ring is rendered inside the
+   component, so her "(when hover show)" cannot be answered through the kit's legend today. So
+   the rows are drawn app-side as real `<button>`s under the kit's `HoverCard`, the same hover
+   language `tickets-dashboard.tsx` already uses. At rest every country is named with its own
+   colour; the COUNT and the share are what hover reveals. The legend's colour sequence is
+   pinned to the kit donut's own, read off both files, so a key can never drift from its ring.
+   **Open upstream:** give `Donut` an optional per-segment hover, then this legend collapses
+   back into `legend`/`showPercent`.
+
+4. **How long we have had them, as a line.** The arrivals bars became a line plus a filled
+   area, drawn in `ClosureTrend`'s exact language (unit-square `viewBox` under
+   `preserveAspectRatio="none"`, months as rules behind the mark, one HTML hit area per month
+   over the plot, each a real button so the hover card opens on focus too, the readout carried
+   as the button's accessible name). Her "show who" is the account NAMES behind each month,
+   which the door now hands back bounded (`ACCOUNTS_ARRIVAL_NAMES_PER_MONTH`, eight) with the
+   exact count beside them, so a busier month says how many more it could not name. A single
+   month is still a dot rather than nothing.
+
+5. **The gap is R83, and it was missing app-wide.** Since 21 Sep the strip pays nothing and the
+   content pays the whole `--toolbar-lead-gap`, but the only payer written was
+   `[data-slot="card"]` - so every collection tab collected it and every DASHBOARD tab, being
+   bare panels, collected zero. Fixed at the law in `web/app/globals.css`, never in the screen
+   (R83's own census forbids the caller a `gap-*`, and a margin in the component would be the
+   per-screen hard-code the 2026-09-03 ruling refuses). See RULES.md R83's own amendment for
+   why the STRIP pays it in the non-card case and why `--pinned-chrome-h` moves with it.
+   **Corrected the same day, and the correction is worth reading:** the first landing wrote both
+   exclusions into one condition, `:has(+ *:not([data-slot="card"]):not(:has(> …)))`, which the
+   grammar forbids - `:has()` may not contain `:has()` - so every browser discarded the rule and
+   the lead stayed 0px everywhere, including the dashboard it was written for. Nothing complained:
+   the stylesheet loaded, lightningcss parsed and emitted it, and the check that shipped with it
+   was a string search over the text of `globals.css`, so it passed against a fix that did
+   nothing. It is two possible selectors now, a paying rule and a cancelling one, and
+   `web/test/tab-content-gap.test.ts` asks a real selector engine what each rule MATCHES over the
+   four real bodies a tab can have (bare column, bare `<section>`, card sibling, wrapper around a
+   card) rather than only that it is written.
+
+6. **Industry joins the row, beside "Where they are"** (her later ruling the same day:
+   *"add metric industry (side of where they are , so in the same row country & industry)"*).
+   The two splits are one `SplitDonut` drawn twice, in a `lg:grid-cols-2` row that stacks into
+   one column below `lg` - the same arrangement every panel row on `tickets-dashboard.tsx`
+   already keeps, rather than a stacking rule invented for this screen. The door gained
+   `byIndustry`, read through the identical fence and the identical "a word nobody set is not a
+   row" clause as `byCountry`. The section title is **"What they do"**, a question because its
+   neighbour is one; the FIELD is still called Industry everywhere a person sets one.
+
+7. **Industry stops being free text** (*"make it a drop down, adjustable on settings"*).
+   **Status: built.** It was already half a dropdown, which is why it drifted: the form has
+   picked from an "Industry" group since it was built, `VOCABULARY_HOMES` has named
+   `accounts.industry` as its home, and Settings > Accounts > "Industries and countries" has
+   edited it - but the WRITE DOOR took free text, and the group was never seeded from the
+   column. Three parts landed together, and the order matters:
+   - **The seed first.** Team migration **0120** back-fills the `Industry` and `Country` groups
+     from the distinct non-blank words already stored on `accounts`. Measured against the
+     22 Sep 2026 account backup, ten of the eleven live industries and two of the six live
+     countries were outside the team's own seeded vocabulary, so closing the door first would
+     have made those accounts uneditable.
+   - **Then the door.** `requirePickedAccountValues` (`workers/tenancy/src/lib/accounts.ts`)
+     refuses a word that is not a currently active option, on create and on edit, through the
+     shared `requireActiveSelectableValue` (moved to `shared/workers/vocabulary.ts` so tenancy
+     can reach it; the content worker re-exports it and no call site there changed). An edit
+     that re-sends the word the row ALREADY holds is never re-checked - retiring a word must
+     stop it being set, not make an existing record uneditable.
+   - **Country gets the identical fix**, because it is the same field twice and its door had
+     been open longer.
+   **Nothing is merged.** Every distinct stored spelling becomes its own option, near-duplicates
+   included: "Insurance" / "Insurance Broker", "Events" / "Event & Sport", "Austria" /
+   "Osterreich". A migration runs once, per team, with nobody watching, and these may be real
+   distinctions. Merging two of them is an ordinary rename on the Choices screen, which rewrites
+   the stored words through `storedWordColumns` - Aurora's call, and safe to make whenever she
+   wants. Checked by `workers/tenancy/test/accounts-picked-vocabulary.test.ts` (the seed and the
+   door, called for real) and `web/test/account-fields-are-picked.test.ts` (the wiring).
+
+**Her review of the built overview (2026-09-23, same tab).** Verbatim: *"the cards kpi need some
+kind of background, like effort. also there's margin missing under tabs. make industry a bar
+chart. when hover in donut in country, show which aacounts with name adn logo"*, and separately
+*"needs to be a bit mor ein case withous toolbar!"* **Status: built.**
+
+8. **The KPI tiles get Effort's own background.** `<Card variant="default">` around a bare
+   `<StatGrid>`, which is `effort-card.tsx`'s own treatment rather than a third one that nearly
+   agrees with it. **It is a tone, not a box** - checked against the kit's newest law rather than
+   assumed, because "give it a background" is the one instruction a reader could answer with an
+   outline: §2.8 (her own "by rule no borders nowhere in the kit", the same day) forbids a
+   container told from its ground by a STROKE, and `variant="default"` is soft paper, a fill.
+   **It also overturns R97 for this tab, which is her call and not the lane's**: R97 reads "a
+   count never gets its own card, UNLESS EXPLICITLY SAID", and every line in its exemption table
+   has said "pending her word" since it shipped. She has now said it, so
+   `accounts-dashboard.tsx` joins that table with her sentence as the reason, and joins
+   `PAPER_ON_PURPOSE` beside Effort's own tiles.
+
+9. **Industry becomes a bar chart; country stays a donut; they still share the row.** A donut
+   answers "what share of the whole", which is the question about where clients are; a ranked bar
+   answers "which is biggest and by how much", which is the question about what they do - and an
+   industry list is longer with longer words, so eleven named bars read where eleven legend
+   colours would not. One neutral ink, not the chart sequence: the name is beside every bar, so a
+   hue would encode a fact already written down. The count sits at the end of its own row rather
+   than behind a hover, because a bar has somewhere to write it and a slice does not.
+
+10. **Hovering a country slice names the accounts in it, with their faces.** The kit's `Donut`
+    reports the active segment since v1.2.167 (`activeId`/`onActiveChange`), so the readout is
+    driven by the ring rather than by a second control beside it; the legend rows stay real
+    buttons and set the same state on focus. The door now returns the accounts per country,
+    **bounded** by `ACCOUNTS_COUNTRY_FACES_PER_ROW` (8, the same ceiling an arrival month's names
+    carry, because both are "who is behind this mark" read in a panel that cannot scroll) while
+    `n` stays exact - so a country with more says "and N more" rather than showing eight and
+    implying that is all. **A company with no logo falls back to the app's own letter tile**:
+    the readout draws `RecordMark`, the same face every account list already draws, and invents
+    no second fallback. The readout sits under the picture rather than in a popover, because a
+    floating panel would cover the ring the pointer is on.
+
+11. **The tab-to-content lead is now two numbers, and the smaller one was never her complaint.**
+    Measured in a browser against the real compiled stylesheet before changing anything: the lead
+    was **not missing** - it was 10px, correctly, on all four shapes including the Accounts
+    dashboard and Settings > Appearance. Her two sentences read together say what that means:
+    10px is the number she ruled for the space **above a toolbar** (21 Sep, "the 10pc above and
+    below"), and a tab with no toolbar under the strip inherited it by accident. So the law splits
+    three ways by what follows the strip: a body that is a card, or a wrapper around one, is
+    unchanged (the card pays 10px on its own `card-content`); a bare body that **leads with a
+    toolbar** (`[data-slot="toolbar-row-pin"]`, Settings > Team) keeps the ruled 10px; and a bare
+    body with **no toolbar** (every dashboard, Settings > Appearance) gets 20px -
+    `--tab-content-gap`, which is the number this exact relationship carried until the toolbar
+    ruling took it from every strip. No new token. Measured after: 18.75px, 18.75px, 9.375px,
+    9.375px, 9.375px across the five shapes at the app's own 15px root.
+
+
 **Assistant conversations (2026-09-15):** A "+" tab is always visible in the assistant's tab
 strip and remains visible even when the assistant is closed. A new conversation opens on a
 scope picker first. A pinned clock tab sits ahead of "+", never closable, and opens the
@@ -276,3 +546,4 @@ length (F18's I1 amendment, [F18](#f18-a-title-fits-one-line-on-a-macbook-air)) 
 the last of these, verbatim: *"Validated."*
 
 ---
+

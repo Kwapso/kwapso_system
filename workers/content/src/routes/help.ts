@@ -9,6 +9,7 @@
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { afterResponse } from "@shared/workers/parallel"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { splitFacet } from "@shared/facet-list"
 import { d1Query, sqlString } from "@shared/workers/d1-rest"
 import { GuardError } from "@shared/workers/gating"
 import { MENTIONS_LIMIT, TICKET_ATTACHMENT_CAP } from "@shared/workers/limits"
@@ -194,12 +195,17 @@ function ticketFilterFrom(url: URL): TicketFilter {
     // to rows the fence has already excluded, which is an empty page rather than
     // a leak. It is what a client record's Tickets tab and a contact's own screen
     // ask, so the rows and the badge answer the same question (R16).
-    accountId: queryText(url.searchParams.get("accountId"), "Client"),
+    // A SET SINCE 24 SEP 2026 — `splitFacet` reads the comma list off the
+    // ALREADY-VALIDATED string, exactly as `statuses` below has done since the
+    // Open tab named three stages. The parameter's NAME is unchanged, so R19's
+    // census of what this door parses and the machine surface that mirrors it
+    // are both untouched; only the value's spelling grew.
+    accountId: splitFacet(queryText(url.searchParams.get("accountId"), "Client")),
     // WHICH SYSTEM — the app record's Tickets tab (8.6). Same reasoning as the
     // account narrowing above: a filter over the fence, asked of the SERVER
     // because the list pages, so "this app's tickets among the newest fifty" is
     // an answer that would look like an answer and not be one.
-    appId: queryText(url.searchParams.get("appId"), "App"),
+    appId: splitFacet(queryText(url.searchParams.get("appId"), "App")),
     // WHICH SECTION of it — the module. The same filter-over-the-fence reasoning
     // as the two above, and the reason the list can be grouped at all: a module
     // belonging to an app the caller cannot see narrows to rows already excluded.
@@ -207,7 +213,7 @@ function ticketFilterFrom(url: URL): TicketFilter {
     // The sub-tab strip's two halves. The type is the team's OWN vocabulary, so
     // it is not checked against a list here — an unknown word narrows to nothing,
     // which is the honest answer for a type nobody uses.
-    helpType: queryText(url.searchParams.get("helpType"), "Type"),
+    helpType: splitFacet(queryText(url.searchParams.get("helpType"), "Type")),
     // A SET, COMMA-SEPARATED, AND ONE WORD IS A SET OF ONE — the client's Open
     // tab names three stages ("Open → triaged + scheduled + in_progress"), so
     // the parameter had to grow a separator rather than the strip growing three
@@ -982,12 +988,12 @@ export async function getHelpDashboard(request: Request, env: Env): Promise<Resp
   return json(
     await readTicketDashboard(cfg, guard, scope, {
       ...EVERYDAY_LIST,
-      accountId: queryText(params.get("accountId"), "Client"),
-      helpType: queryText(params.get("helpType"), "Type"),
+      accountId: splitFacet(queryText(params.get("accountId"), "Client")),
+      helpType: splitFacet(queryText(params.get("helpType"), "Type")),
       // ONE SYSTEM'S OWN DASHBOARD — see this handler's header. Checked in the
       // same position as its two neighbours, because a value off a query string
       // is untrusted whether it ends up in a WHERE or in a GROUP BY.
-      appId: queryText(params.get("appId"), "App"),
+      appId: splitFacet(queryText(params.get("appId"), "App")),
       // THE SEARCH BOX — see this handler's header. Named `q` because that is
       // what the LIST door calls it (`ticketFilterFrom`), checked in the same
       // position as its three neighbours, and handed to `readTicketDashboard`

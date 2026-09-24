@@ -1024,8 +1024,14 @@ function RaisedByRow({
       {/* A PERSON'S OWN FACE IS ROUND — the same shape every contact/member mark
           in the app already draws (`accounts-screen.tsx`, `staff-panel.tsx`,
           `member-screen.tsx`); `RecordMark`'s own default, `square`, is for a
-          record with no face of its own (an app, an account, a company). */}
-      <RecordMark picture={row.contactLogoUrl} name={name} shape="round" />
+          record with no face of its own (an app, an account, a company).
+
+          AND IT IS GREY — Aurora, 23 Sep 2026: "external photos (from
+          contacts) gray scale. keep staff nirmal." Every row of this panel is
+          a CONTACT (`contactId`/`contactName`/`contactLogoUrl`, the door's own
+          three fields for the client's own person), so `external` is a
+          constant here rather than a fact any row has to carry. */}
+      <RecordMark picture={row.contactLogoUrl} name={name} shape="round" external />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 items-center justify-between gap-2">
           <span className="min-w-0 truncate text-xs" title={name}>

@@ -26,6 +26,26 @@ export const SELECTABLE_GROUPS = {
    * account; the owner ruled for a group, because a country typed free into an
    * address is a country spelled five ways by five people. */
   country: "Country",
+  /** WHAT AN ACCOUNT DOES. Aurora, 23 Sep 2026, verbatim: "make it a drop down,
+   * adjustable on settings."
+   *
+   * IT WAS ALREADY HALF A GROUP AND THAT IS WHY IT DRIFTED. The form has picked
+   * from an "Industry" group since it was built, `VOCABULARY_HOMES`
+   * (shared/selectable-homes.ts) has named `accounts.industry` as its home, and
+   * Settings › Accounts › "Industries and countries" has edited it — but the
+   * WRITE DOOR took free text, the group was never seeded from what was already
+   * stored, and the group's NAME was a literal typed at the call site rather
+   * than read from here. So a value could reach the column without ever being a
+   * dropdown row, which is how the live book came to hold "Insurance" and
+   * "Insurance Broker" as two spellings of one trade. Team migration 0120 seeds
+   * the group from the column, and `requireActiveSelectableValue`
+   * (shared/workers/vocabulary.ts) is what closes the door behind it.
+   *
+   * THE SAME SENTENCE IS NOW TRUE OF `country` BELOW, and it was true of it for
+   * longer: that group has been seeded since 0018 and its door was open the
+   * whole time, which is how "Österreich" got in beside "Austria". Both are
+   * closed in the same change, because they are the same field twice. */
+  industry: "Industry",
   /** HOW BIG AN ACCOUNT IS. The second ungrouped set — five size bands.
    *
    * NOTHING READS THIS KEY, and nothing ever has: the owner ruled for a group

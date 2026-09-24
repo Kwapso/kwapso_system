@@ -483,8 +483,21 @@ function FormScreen({
       className={cn(
         "mx-[var(--space-6)] flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1",
         "rounded-[var(--radius)] px-[var(--space-4h)] py-[var(--space-4)]",
-        "bg-card shadow-[var(--hairline-strong)]",
-        "max-sm:mx-[var(--space-4)] max-sm:bg-surface-panel max-sm:shadow-none",
+        /* NO BOX — 23 Sep 2026, RULES.md §2.8. The attention card kept a
+           20% stroke around its whole body; that is a box around a
+           container, which is exactly what the ruling names. `bg-card` is
+           off-beige on the form's own soft-paper panel — the paper step
+           § 2.6 already prescribes — and the poppy dot, not an outline, is
+           what says this block is the urgent one. The narrow branch below
+           already dropped the stroke and kept only a tone, which is the
+           shape this line now takes at every width. */
+        "bg-card",
+        /* `max-sm:shadow-none` went with the stroke above: there is no
+           shadow left at any width for the narrow branch to cancel. What
+           narrow still does is swap the tone — soft paper, a strip rather
+           than a card — which is the half of ch27.35 that was never a
+           stroke. */
+        "max-sm:mx-[var(--space-4)] max-sm:bg-surface-panel",
       )}
     >
       <span

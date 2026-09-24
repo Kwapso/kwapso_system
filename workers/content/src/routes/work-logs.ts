@@ -17,6 +17,7 @@ import {
   requireText,
   TEXT_LIMITS,
 } from "@shared/workers/validate"
+import { splitFacet } from "@shared/facet-list"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -26,6 +27,7 @@ import {
   editWorkLog,
   getWorkLog,
   listWorkLogs,
+  logsDashboard,
   logTime,
   requireTarget,
   resolveRunaway,
@@ -50,7 +52,11 @@ function logFilterFrom(url: URL): LogFilter {
     scope: queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all",
     targetTable: queryText(url.searchParams.get("targetTable"), "Target"),
     targetId: queryText(url.searchParams.get("targetId"), "Target"),
-    userId: queryText(url.searchParams.get("userId"), "Person"),
+    // A SET SINCE 24 SEP 2026 — see `shared/facet-list.ts` for the spelling.
+    // The comma list is read off the ALREADY-VALIDATED string, so the boundary
+    // check stays where R20's census looks for it and the parameter's own name
+    // (what R19 mirrors on the machine surface) is unchanged.
+    userId: splitFacet(queryText(url.searchParams.get("userId"), "Person")),
     // WITH OR WITHOUT MEETING TIME (9.3). Anything but the two words means all
     // of it — a fail-safe default, because "everything" is the answer a mistyped
     // parameter should land you in.
@@ -66,6 +72,12 @@ function logFilterFrom(url: URL): LogFilter {
     // A CLOSED WINDOW ON WHEN — three words the door knows, anything else means
     // all time. Never a free-form pair of dates: see lib/work-logs's own note.
     period: period === "7d" || period === "30d" || period === "90d" ? period : undefined,
+    // WHOSE WORK IT WAS — the Logs toolbar's second filter (Aurora, 23 Sep
+    // 2026: "add toolbar w filters by person, account"). Parsed HERE, in the one
+    // place this door reads a filter, so the list, its totals and the dashboard
+    // are all asked the same question (R16) and the machine surface has one
+    // thing to mirror (R19).
+    accountId: splitFacet(queryText(url.searchParams.get("accountId"), "Account")),
   }
 }
 
@@ -143,6 +155,26 @@ export async function getWorkLogSummary(request: Request, env: Env): Promise<Res
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   return json(await summariseWorkLogs(cfg, guard, logFilterFrom(url), new Date()))
+}
+
+/** GET /api/content/work-logs/dashboard — THE PICTURE OVER THE SAME ROWS.
+ *
+ * Aurora's ruling, 23 Sep 2026: the Logs module gains two tabs, Dashboard first,
+ * and the toolbar above it filters by person and by account. Same gate, same
+ * portal refusal and the SAME `logFilterFrom` as the list and the summary beside
+ * it — which is the whole reason it lives in this file rather than getting a
+ * parser of its own: a dashboard narrowed by a different sentence from the
+ * Entries tab under the same toolbar would be two answers to one question (R16).
+ *
+ * `json`, not `pagedJson`: it answers one object and no rows, the same shape the
+ * summary door beside it takes. Every read behind it is bounded and says its
+ * ceiling at the query (`logsDashboard`, lib/work-logs.ts).
+ */
+export async function getLogsDashboard(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  return json(await logsDashboard(cfg, guard, logFilterFrom(url), new Date()))
 }
 
 /** GET /api/content/work-logs/running — what the caller has running RIGHT NOW.

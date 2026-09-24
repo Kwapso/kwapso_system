@@ -394,28 +394,210 @@ function braceSpan(src, from) {
   return null;
 }
 
-export function cvaTables(src) {
+/* ----------------------------------------------------------------------------
+   READING A VARIANT TABLE, 2026-09-24 — AND WHY THE REGEX COULD NOT.
+
+   The variant values used to be matched with `(?:\[[^\]]*\])|(?:"[^"]*")`, a
+   bracket run that stops at the FIRST `]`. Every class this kit writes for a
+   fill is an arbitrary value, and an arbitrary value closes with `]`:
+
+       default: [
+         "bg-[var(--btn-primary-fill)] text-[var(--btn-primary-label)]",
+         "enabled:hover:bg-[var(--btn-primary-hover)]",
+       ],
+
+   The run ended inside `bg-[var(--btn-primary-fill)]`, leaving an unterminated
+   quote, and `literalsIn` of an unterminated quote is nothing. MEASURED on
+   `components/button/button.tsx`, the kit's most-called control, 150 direct
+   call sites, before this function existed:
+
+       default     => ""      secondary => ""      destructive => ""
+       inverse     => ""      cancel    => ""
+       verbatim    => "Ghost / text link. Muted ink (fg3), darkens to…"
+
+   Five of the nine variants — every FILLED one — read as painting nothing, so
+   the contrast law measured no Button fill and no Button label anywhere in the
+   kit, and reported OK. The sixth line is the other half of the same failure:
+   `verbatim` is a word inside a doc comment that the key pattern took for a
+   variant name, so the table also held one variant that does not exist, whose
+   classes are English.
+
+   A SILENCE IS NOT A CLEAN BILL OF HEALTH — this file's own §3b says exactly
+   that about `COLUMN_DOT`, and this is the same failure in the neighbouring
+   reader. So the scan is balanced rather than pattern-matched: comments are
+   removed first (quote-aware, so a `//` inside a class string survives), then
+   keys are read at the table's own depth and each value is taken as a BALANCED
+   `[…]` or a whole quoted string.
+   ------------------------------------------------------------------------- */
+
+/** Remove `/* *​/` and `//` comments, leaving string literals intact. */
+function stripComments(src) {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const q = ch;
+      out += ch;
+      i++;
+      while (i < src.length) {
+        out += src[i];
+        if (src[i] === "\\") { i++; if (i < src.length) out += src[i]; i++; continue; }
+        if (src[i] === q) { i++; break; }
+        i++;
+      }
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end < 0 ? src.length : end + 2;
+      out += " ";
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") {
+      const end = src.indexOf("\n", i);
+      i = end < 0 ? src.length : end;
+      out += " ";
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/** A balanced `[ … ]` starting at `src[from] === "["`, quote-aware. */
+function bracketSpan(src, from) {
+  let depth = 0;
+  for (let i = from; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const q = ch;
+      i++;
+      while (i < src.length && src[i] !== q) { if (src[i] === "\\") i++; i++; }
+      continue;
+    }
+    if (ch === "[") depth++;
+    else if (ch === "]") { depth--; if (depth === 0) return src.slice(from, i + 1); }
+  }
+  return null;
+}
+
+/**
+ * `{ raised: "bg-card", inverse: [ "bg-…", "text-…" ] }` -> Map(name -> classes).
+ *
+ * Only keys at the table's OWN depth are read. A nested object — a compound
+ * variant, a size table that happened to be written inside — is skipped whole
+ * rather than having its keys mistaken for variant names.
+ */
+function variantEntries(span) {
+  const src = stripComments(span);
+  const out = new Map();
+  const open = src.indexOf("{");
+  if (open < 0) return out;
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const q = ch;
+      i++;
+      while (i < src.length && src[i] !== q) { if (src[i] === "\\") i++; i++; }
+      continue;
+    }
+    if (ch === "{") { depth++; continue; }
+    if (ch === "}") { depth--; if (depth === 0) break; continue; }
+    if (depth !== 1) continue;
+    /* A key at depth 1: `name:`, `"name":`, `'name':`. */
+    const key = /^\s*(?:["']([\w$-]+)["']|([A-Za-z_$][\w$-]*))\s*:/.exec(src.slice(i));
+    if (!key || !/[\w"'$]/.test(ch)) continue;
+    const name = key[1] ?? key[2];
+    let j = i + key[0].length;
+    while (j < src.length && /\s/.test(src[j])) j++;
+    let value = null;
+    if (src[j] === "[") value = bracketSpan(src, j);
+    else if (src[j] === '"' || src[j] === "'" || src[j] === "`") {
+      const q = src[j];
+      let k = j + 1;
+      while (k < src.length && src[k] !== q) { if (src[k] === "\\") k++; k++; }
+      value = src.slice(j, k + 1);
+    }
+    if (value === null) { i += key[0].length - 1; continue; }
+    out.set(name, literalsIn(value).join(" "));
+    i = j + value.length - 1;
+  }
+  return out;
+}
+
+/**
+ * The top-level arguments of a call whose `(` is at `from`, quote-aware.
+ *
+ * THE BASE IS THE FIRST ARGUMENT, AND NOTHING ELSE. It used to be "everything
+ * up to the next `{` in the file", which is only the same thing when the cva
+ * HAS an options object. `mode-toggle.tsx` writes `cva([ … ])` with no options
+ * at all, so the scan ran past the closing paren and took every string literal
+ * between the call and the next brace hundreds of lines below. MEASURED, the
+ * base it produced for `modeToggleVariants`:
+ *
+ *     .kw-seg … bg-[var(--surface-raised)] … text-ink-secondary
+ *     enabled:hover:text-foreground … bg-surface-inverse text-ink-on-inverse
+ *     enabled:hover:text-ink-on-inverse … text-[var(--btn-disabled-label)]
+ *     bg-[var(--btn-disabled-fill)] …
+ *
+ * — the track, the resting segment, the SELECTED segment and the DISABLED
+ * track, flattened onto one element that wears none of them together. The
+ * contrast law read that as the root `<div>` painting the disabled track's
+ * fill under the selected segment's hover ink and reported 1.420 light /
+ * 1.276 dark for a screen `SEGMENT_DISABLED` makes unreachable. A reader that
+ * invents a pair is worse than one that misses it: a false finding is how a
+ * law gets switched off.
+ */
+function callArgs(src, from) {
+  const open = src.indexOf("(", from);
+  if (open < 0) return [];
+  const args = [];
+  let depth = 0;
+  let argFrom = open + 1;
+  for (let i = open; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const q = ch;
+      i++;
+      while (i < src.length && src[i] !== q) { if (src[i] === "\\") i++; i++; }
+      continue;
+    }
+    if (ch === "(" || ch === "[" || ch === "{") { depth++; continue; }
+    if (ch === ")" || ch === "]" || ch === "}") {
+      depth--;
+      if (depth === 0) { args.push(src.slice(argFrom, i)); return args; }
+      continue;
+    }
+    if (ch === "," && depth === 1) { args.push(src.slice(argFrom, i)); argFrom = i + 1; }
+  }
+  return args;
+}
+
+export function cvaTables(rawSrc) {
+  /* COMMENTS FIRST, ONCE, FOR THE WHOLE FILE. Every capture below reads
+     literals, and a doc comment in this repo is prose in backticks and quotes
+     — `button.tsx`'s own header put the word `verbatim` in the variant table
+     and its sentence in the class list. Nothing downstream needs an index into
+     the original text, so the cheapest correct answer is to parse a text that
+     has no comments in it at all. */
+  const src = stripComments(rawSrc);
   const tables = new Map();
-  const re = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*cva\(/g;
+  const re = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*cva\s*\(/g;
   let m;
   while ((m = re.exec(src))) {
-    const start = m.index + m[0].length;
-    /* The base is everything up to the top-level comma before `{ variants`. */
-    const optionsIdx = src.indexOf("{", start);
-    const base = literalsIn(src.slice(start, optionsIdx < 0 ? start : optionsIdx)).join(" ");
-    const options = optionsIdx < 0 ? null : braceSpan(src, optionsIdx - 1);
+    const args = callArgs(src, m.index + m[0].length - 1);
+    const base = literalsIn(args[0] ?? "").join(" ");
+    const options = (args[1] ?? "").includes("{") ? args[1] : null;
     const table = { base, variants: new Map(), defaultVariant: null };
     if (options) {
-      const vIdx = options.indexOf("variant:");
+      const bare = options;
+      const vIdx = bare.search(/\bvariant\s*:/);
       if (vIdx >= 0) {
-        const span = braceSpan(options, vIdx);
-        if (span) {
-          const vre = /([A-Za-z_$][\w$"'-]*)\s*:\s*((?:\[[^\]]*\])|(?:"[^"]*")|(?:'[^']*'))/g;
-          let vm;
-          while ((vm = vre.exec(span))) {
-            table.variants.set(vm[1].replace(/["']/g, ""), literalsIn(vm[2]).join(" "));
-          }
-        }
+        const span = braceSpan(bare, vIdx);
+        if (span) for (const [name, cls] of variantEntries(span)) table.variants.set(name, cls);
       }
       const dm = /defaultVariants\s*:\s*\{[^}]*variant\s*:\s*["']([\w-]+)["']/.exec(options);
       if (dm) table.defaultVariant = dm[1];
@@ -557,8 +739,26 @@ export function buildRegistry(files) {
     for (let d = 0; d < defs.length - 1; d++) {
       const { name, index } = defs[d];
       const end = defs[d + 1].index;
-      const lineStart = parsed.rawSrc.slice(0, index).split("\n").length;
-      const lineEnd = parsed.rawSrc.slice(0, end).split("\n").length;
+      /* THE INDEX IS AN INDEX INTO `src`, SO THE LINE MUST BE COUNTED IN `src`.
+         These two lines counted it in `rawSrc`, and `decomment` removes the
+         comment BODIES while keeping their newlines — so the two texts agree
+         line for line and disagree by every comment character in length.
+         `button.tsx` is 14004 raw and 12998 decommented, and slicing the raw
+         text at a decommented index put `const Button`'s span a thousand
+         characters early: its only root, the `<button>` at line 289, fell
+         outside, `roots` came back empty, and the definition was dropped.
+
+         MEASURED, the registry built from `components/button/button.tsx`
+         alone, before this line changed:   names: [ 'BusyRing' ]
+
+         The kit's most-called control — 150 direct call sites, every filled
+         variant in the system — was not in the registry at all, so no Button
+         fill and no Button label was measured anywhere, in either palette, and
+         the law reported OK. `parseFile` already says this in as many words
+         one function up ("the two texts agree line for line"); it was only
+         ever true of the line, never of the index. */
+      const lineStart = parsed.src.slice(0, index).split("\n").length;
+      const lineEnd = parsed.src.slice(0, end).split("\n").length;
       const roots = parsed.roots.filter((n) => n.line >= lineStart && n.line < lineEnd);
       if (!roots.length) continue;
 

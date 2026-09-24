@@ -112,6 +112,17 @@ export interface SelectFace {
    * which is right for the common case (a person, a contact, a staff
    * member); an account or an app passes `square`. */
   shape?: "pill" | "square";
+  /** IS THIS PERSON FROM OUTSIDE? Forwarded straight to `Avatar`'s own
+   * `external` (see `components/avatar/avatar.tsx` for the ruling and why the
+   * fact is taken rather than guessed): an outside person's PHOTOGRAPH
+   * renders greyscale, one of our own in full colour. Aurora, 23 Sep 2026:
+   * "external photos (from contacts) gray scale. keep staff nirmal." It rides
+   * the face rather than the ITEM, so the TRIGGER inherits it for free
+   * through the same registry the photograph itself travels by — a chosen
+   * contact stays grey once the list closes, with no second prop for a call
+   * site to forget. Undefined reads as one of ours; a `square` face (a
+   * company, an app) never sets it. */
+  external?: boolean;
   /**
    * A GLYPH face; an icon standing in for a record that has neither a
    * photograph nor a name to initial, a ticket's TYPE being the case this
@@ -181,6 +192,7 @@ function SelectFaceMark({ face }: { face: SelectFace }) {
       size="sm"
       shape={face.shape ?? "pill"}
       variant={face.tone ?? "default"}
+      external={face.external}
       className="shrink-0"
       aria-hidden="true"
     >

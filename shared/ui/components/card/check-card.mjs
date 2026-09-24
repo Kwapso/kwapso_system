@@ -40,6 +40,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { decomment } from "../../foundations/rules/source.mjs";
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FILE = path.join(HERE, "card.tsx");
 
@@ -332,6 +334,39 @@ for (const [name, body] of [
   }
 }
 
+/* ── 9 · THE RETIRED `hairline` PROP, 23 SEP 2026 ────────────────────────
+      CLIENT RULING, VERBATIM: *"by rule no borders nowhere in the kit"*. A
+      card is a container and this prop drew a stroke around the whole of
+      one, so it was retired — but RETIRED IS NOT REMOVED. RULES.md §9.1
+      forbids dropping a prop outright: an app pinned to an older tag stops
+      compiling the day it upgrades.
+
+      So the pin has two halves and BOTH must hold. Half one on its own (the
+      prop is still accepted) is the old behaviour back. Half two on its own
+      (it paints nothing) is a compile error in every app that still passes
+      it. `foundations/rules/boxes.mjs` holds the same line from the other side,
+      across the whole kit and inside every app that vendors it; this one is
+      `card.tsx`'s own. */
+if (!/^\s*hairline\?: boolean;/m.test(src)) {
+  findings.push(
+    "`CardProps` no longer declares `hairline?: boolean`. It was RETIRED, not removed — RULES.md " +
+      "§9.1: an app pinned to an older tag stops compiling the day it upgrades. Keep the prop, keep " +
+      "it inert.",
+  );
+}
+
+{
+  /* Decommented: this file talks about the stroke it removed, at length. */
+  const painted = decomment(src);
+  if (/hairline\s*&&/.test(painted) || /shadow-\[var\(--hairline\)\]/.test(painted)) {
+    findings.push(
+      "`card.tsx` paints a four-edge hairline again. A card is told from its ground by the OTHER " +
+        "paper tone (RULES.md §2.6's table), by the gap between two of them, or — for two cards of " +
+        "the same tone that touch — by a `Separator`, which is what `plain` already reaches for.",
+    );
+  }
+}
+
 if (findings.length > 0) {
   console.error("FAIL card check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -345,5 +380,5 @@ console.log(
     "than the old `group-data-[variant=plain]/card:` descendant match, so a default Card nested inside " +
     "a plain Card keeps its own insets; `kanban.tsx`'s own, unrelated use of the `group/card` marker for " +
     "an ancestor-level read is untouched; CARD_CONTENT_INSET_X is still --space-3, so the boxed body " +
-    "inset did not follow the pane to --space-6; `default` is untouched: OK card check.",
+    "inset did not follow the pane to --space-6; `default` is untouched; and the retired `hairline` prop is still DECLARED (RULES.md 9.1) while card.tsx paints no four-edge hairline at all (the 23 Sep 2026 no-borders ruling): OK card check.",
 );

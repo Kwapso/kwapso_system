@@ -85,6 +85,9 @@ import { Agenda, type AgendaDay } from "@shared/ui/components/agenda/agenda"
 import { CalendarDots, CaretLeft, CaretRight } from "@shared/ui/foundations/icons"
 
 import { formatDate } from "@shared/web/format"
+// The face row `CalendarEntry.faces` below is typed against, and `RecordWeek`
+// draws with — one component, the meetings table's own Attendees row.
+import type { PersonFace } from "@shared/web/people-faces"
 import { useLanguage } from "@shared/web/language"
 import type { Language, Vars } from "@shared/i18n"
 // The same six dot tones `Badge`'s own `dot` prop and `Kanban`'s `ColumnDot`
@@ -203,6 +206,53 @@ export type CalendarEntry = {
    * as `detail`: a card with no time draws no eyebrow.
    */
   time?: string
+  /**
+   * WHO IS ON IT, AS FACES — Aurora's ruling, 23 Sep 2026, verbatim:
+   * *"meetings week view, show the avatars on whos in the meeting after
+   * title"*. Drawn by `RecordWeek`'s own card, AFTER the title, through
+   * `PeopleFaces` (`shared/web/people-faces.tsx`) — the same row of round
+   * `choice` marks with a "+N" tail the meetings TABLE's own Attendees
+   * column already draws, one component now rather than two copies.
+   *
+   * THE SAME CONTRACT `time` ABOVE MAKES, and for the same reason: the
+   * CALLER decides who counts. A meeting room is on Google's attendee list
+   * and is not a person (`meeting-detail.tsx`: "a room shown as a
+   * stakeholder is a stakeholder nobody can ring"), and only the screen that
+   * read the row knows which of its people are which. `RecordCalendar`'s own
+   * month grid and the day-view dialog do not read this field at all — it is
+   * `RecordWeek`'s alone. Absent or empty, same as `time`: the card draws no
+   * faces, and no placeholder in their place.
+   */
+  faces?: PersonFace[]
+  /**
+   * THE PARENT RECORDS, AS CHIPS — Aurora's ruling, 23 Sep 2026, choosing
+   * week-view variation One ("Open column"): she wants the week card to
+   * carry, besides the title and the faces, the app or the account it
+   * belongs to. Her example was a meeting.
+   *
+   * TWO FIELDS, NOT ONE "chips" NODE, because the ORDER is a law and not a
+   * call site's choice. R94 (`shared/web/chip-order.ts`) fixes it — id,
+   * status, type, MAIN PARENT, SECONDARY PARENT — and `RecordWeek`'s own
+   * card routes these two through `orderChips()` exactly as
+   * `TicketChips` does, so a screen that happens to build its entry object
+   * the other way round still draws the app before the account. A node prop
+   * would hand that decision back to three screens that would each have to
+   * remember it.
+   *
+   * THE APP IS THE MAIN PARENT and the account is the secondary one, which
+   * is the same reading `TicketChips` already takes (`kind: "mainParent"`
+   * on its own app chip).
+   *
+   * ABSENT IS ABSENT, the identical silence `time`, `detail` and `faces`
+   * above keep: a story has no account name on its row at all
+   * (`Story` carries `accountId` and no `accountName`), an internal
+   * meeting has no account, and a task filed against no app has no app —
+   * each simply draws one chip fewer, never an empty lozenge and never the
+   * word "None". `RecordCalendar`'s own month grid and its day dialog do
+   * not read either field; they are `RecordWeek`'s alone.
+   */
+  appName?: string
+  accountName?: string
 }
 
 /* --------------------------------- colour --------------------------------- */

@@ -406,6 +406,9 @@ export const listFetch = {
       primeCache(totalKey("apps", teamId), r.total)
       return r.apps
     }),
+  // THE ARCHIVED ONES, read whole like the live ones and just as bounded: an
+  // archived app is still one of an agency's tens of systems.
+  archivedApps: (_teamId: string) => tenancy.apps(undefined, undefined, "yes").then((r) => r.apps),
   // THE AGENCY'S OWN HOUSEKEEPING — two capped collections (R14: an authored
   // library and a settled taxonomy, not feeds), so each fetcher primes its
   // exact `total:` sidecar and there is no cursor to park.
@@ -710,6 +713,31 @@ export function appModulesKey(teamId: string): string {
   return `app-modules:${teamId}`
 }
 
+/** THE LOGS SCREEN'S DASHBOARD TAB — Aurora's ruling, 23 Sep 2026 ("tabs:
+ * dahsbaord, entries" … "add toolbar w filters by person, account").
+ *
+ * THE TWO FILTERS RIDE THE KEY, exactly as `helpDashboardKey`'s own do and for
+ * the identical reason: the toolbar narrows every section on the tab, so two
+ * different narrowings are two different answers and must never share a cache
+ * entry. Without them, picking a person and then a client would paint the first
+ * question's figures under the second question's toolbar, instantly, from cache,
+ * and correct itself only once the read landed.
+ *
+ * Both parts are ULIDs, never free text, so the key stays injective with no
+ * ordering trick needed (the search box is on the Entries tab and narrows the
+ * rows, not this picture).
+ *
+ * A DERIVED cache, dropped and re-read rather than patched — there is no row in
+ * it to patch. Dropped by PREFIX through `work_logs`' own `slicePrefix` below
+ * rather than named in its `deps`: a `work_logs` ping carries a log id and
+ * cannot know which filters anybody has on screen, and a timer started, stopped,
+ * corrected or binned on somebody else's screen is exactly when every figure on
+ * this tab stops being true, under every filter. */
+const LOGS_DASHBOARD_PREFIX = "logs-dashboard:"
+export function logsDashboardKey(teamId: string, userId = "", accountId = ""): string {
+  return `${LOGS_DASHBOARD_PREFIX}${teamId}:${userId}:${accountId}`
+}
+
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
@@ -897,6 +925,14 @@ export function accountImpactKey(accountId: string): string {
  * maps screen, and the names inside the value drill-down. */
 export function appsKey(teamId: string): string {
   return `apps:${teamId}`
+}
+/** THE ARCHIVED PILE, its OWN key (migration 0123). A separate key rather than a
+ * filter over the live one, for the reason R15 cares about: the two are two
+ * different server reads, and a listener that invalidated one would leave the
+ * other showing a row that has just moved between them. Both are named in the
+ * apps listener's own deps, so archiving an app refreshes both piles at once. */
+export function archivedAppsKey(teamId: string): string {
+  return `apps:archived:${teamId}`
 }
 /** THE CLIENT'S OWN ORGANISATION, keyed by TEAM rather than by client.
  *
@@ -2017,8 +2053,11 @@ export const TEAM_RESOURCES: Record<
       ...recordCountDeps("work_logs"),
     ],
     // …and the Time tab on whichever record this row was logged against, which
-    // the ping cannot name (recordTimeKey above says why it is a family drop).
-    slicePrefix: TIME_SLICE_PREFIX,
+    // the ping cannot name (recordTimeKey above says why it is a family drop)
+    // — AND the Logs screen's own Dashboard tab (23 Sep 2026), a derived cache
+    // keyed by the toolbar's two filters, which a ping carrying one log id
+    // cannot name either (see `logsDashboardKey`'s own header).
+    slicePrefix: [TIME_SLICE_PREFIX, LOGS_DASHBOARD_PREFIX],
   },
   // TO-DOS — row-level live, and the one work-engine resource a CLIENT hears
   // about too (the portal has its own listener map). A contact completing one in

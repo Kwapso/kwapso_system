@@ -280,4 +280,15 @@ body {
   overflow-x: clip;
   /* And nothing may make the page wider than the phone it is on. */
   max-width: 100vw;
+  /* THE BASE WEIGHT. Saans ships exactly two faces, Light 300 and Medium
+     500 (the @font-face block in the kit's tokens.css) — there is no 400
+     face. This element set no font-weight, so text fell back to the UA's
+     `normal` (400), and CSS font matching resolves an unavailable 400 to
+     the nearest AVAILABLE weight at or above it, which is 500 — every
+     weight in the portal rendered as Medium, the same bug measured and
+     fixed on the agency door's own globals.css. The kit's own demo sets
+     this token on its body (demo/demo.css), which is why the kit looks
+     right in isolation and was wrong here. Token, not a literal, so it
+     tracks the kit if the light weight ever changes. */
+  font-weight: var(--font-weight-light);
 }

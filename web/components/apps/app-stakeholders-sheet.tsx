@@ -47,7 +47,18 @@ export function AppStakeholdersSheet({
   /** required on every `updateApp` call (R20) — carried through unchanged. */
   appName: string
   lang: Language
-  contacts: { id: string; name: string }[]
+  contacts: {
+    id: string
+    name: string
+    /** THEIR PHOTOGRAPH, where the client's own record carries one —
+     *  `AccountLink.personLogoUrl`, straight off the door, never re-fetched.
+     *  Added 23 Sep 2026 for Aurora's "where there's avatar show it- only
+     *  initials when avatar is empty": both callers already held this field
+     *  and dropped it on the way in, so the checklist drew a letter tile for
+     *  contacts who have a face on file. `null` is the ordinary case and the
+     *  one the mark falls through to an initial for. */
+    photo?: string | null
+  }[]
   initialStakeholderContactIds: string[]
   /** "" when nobody is the main one */
   initialMainStakeholderContactId: string

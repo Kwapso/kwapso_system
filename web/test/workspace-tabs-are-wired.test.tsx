@@ -173,6 +173,48 @@ describe("the workspace tab strip", () => {
     expect(src, "the href must be gated on the active index").toContain("index === activeTabIndex")
   })
 
+  // ── iv · CLOSING THE LAST TAB GOES THROUGH THE STORE'S OWN DOOR ───────────
+  //
+  //   THE CLIENT, 23 SEP 2026, verbatim: "when i close the last folder tab, it
+  //   shoudl open a new screen (the one with search bar)"
+  //
+  // The RULE itself is proved against the real store in
+  // `workspace-tabs.test.ts` (`closeTabAndLand` — lands on `/new`, leaves one
+  // tab, survives a reload). What that suite cannot see is whether this spine
+  // still ROUTES through it, which is the identical join this whole file
+  // exists for: the store was once perfect and wired to nothing.
+  //
+  // The old shape is named negatively as well as the new one positively,
+  // because the regression is silent. `closeTab(id)` returns `null` on an
+  // empty set and the previous code fell to `?? sectionPath` — whereupon
+  // `visitTrail`, finding no active tab, seeded a fresh tab for that
+  // collection. Nothing looked broken; the strip simply refilled itself with
+  // a tab she never asked for. A revert would restore exactly that, with
+  // every other test in the repo still green.
+  it("closing a workspace tab goes through `closeTabAndLand`, so the last one opens the new-tab screen", () => {
+    const src = stripComments(spine())
+    expect(spine().length, "the deep-link spine was not read off disk").toBeGreaterThan(30_000)
+
+    expect(
+      src,
+      "the close handler must call the store's `closeTabAndLand`, the one door that keeps the " +
+        "tab set from ever going empty — see its own note in workspace-tabs.ts."
+    ).toContain("closeTabAndLand(id, t(\"New tab\"))")
+
+    // NARROWED TO THE CLOSE HANDLER'S OWN LINE, on purpose. The identical
+    // `landing ?? sectionPath` shape still lives, correctly, in
+    // `onRecordGone` a few hundred lines down — a record that was archived or
+    // deleted SHOULD leave you at its collection — and that one navigates
+    // with `replace`, not `go`. Asserting the bare phrase would fail on it
+    // and would be asserting the wrong thing besides.
+    expect(
+      src,
+      "the old `go(landing ?? sectionPath)` landing must be gone from the close handler: on the " +
+        "LAST tab it fell to the collection of whatever had just been closed, and `visitTrail` " +
+        "then seeded a fresh tab for it — the client's own complaint."
+    ).not.toContain("go(landing ?? sectionPath)")
+  })
+
   // ── THE STRIP'S OWN PINNED "+", AND CMD/CTRL-T ────────────────────────────
   //
   // The client's ruling, 17 Sep 2026, on the content strip growing the

@@ -43,7 +43,6 @@ import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FacetOption, FilterFacet } from "@shared/web/screen-engine/config"
-import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { COLLECTION_FILTERS } from "@/lib/collection-filters"
 import { BASE_RECIPES } from "@/lib/screens"
 
@@ -70,28 +69,33 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   } as unknown as typeof ResizeObserver
+  // THE WIDTH THESE TESTS ARE WRITTEN AT. `test/setup.ts`'s blanket
+  // `matchMedia` answers `false` to every query, which for `useHasRoom`
+  // (`shared/ui/lib/use-has-room.ts`) means "a phone" — so without this every
+  // assertion below would be made against the bottom-sheet form and never
+  // against the two this file is about. A `false` answer here is a real,
+  // separate case and it has its own file
+  // (`web/test/filters-open-as-an-overlay.test.tsx`, which drives all three).
+  answerRoom(true)
 })
 
-afterEach(cleanup)
+/** Say how wide the window is, the one way anything in this app asks: one
+ * media query, answered honestly. `(min-width: 45rem)` is the kit's own
+ * threshold and the only query these components read. */
+function answerRoom(hasRoom: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width: 45rem") ? hasRoom : false,
+    media: query,
+    onchange: null,
+    addListener() {},
+    removeListener() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+}
 
-/** THE TRACK'S SHAPE, with the one attribute that is SUPPOSED to change
- * normalised away.
- *
- * This assertion exists for the client's "one container" ruling: opening the
- * filter panel must not make the pill move, resize or repaint. `outerHTML`
- * was a fair proxy for that — until the add-filter button gained
- * `aria-expanded` (kit v1.2.42), which flips false→true precisely BECAUSE the
- * panel opened. That is a state announcement for a screen reader, not a
- * visual change: a person watching the pill sees nothing move, and a person
- * listening finally hears that the control expands something.
- *
- * So the comparison drops `aria-expanded` and keeps everything else byte for
- * byte — a class, a style, a structural change or a second attribute flipping
- * still fails it. Normalising the whole attribute (rather than asserting one
- * expected value) is deliberate: the point here is that the track did not
- * move, and the aria state has its own test elsewhere. */
-const trackShape = (el: HTMLElement) =>
-  el.outerHTML.replace(/ aria-expanded="(?:true|false)"/g, "")
+afterEach(cleanup)
 
 
 /** The knowledge base's own shape: a closed vocabulary and a facet over rows. */
@@ -119,13 +123,14 @@ const FACETS: FilterFacet[] = [
 /** The bar as a screen holds it: the selection is the SCREEN's state, which is
  * the only way `onChange` can be observed doing what it says.
  *
- * RENDERS `pill` AND `panel` AS PLAIN SIBLINGS (v1.2.27's `useFilterBar`
- * split) — correct for these standalone tests, which only ever query by ROLE
- * across the whole document rather than caring where the pill sits relative
- * to a track. `ToolbarRowHarness` below is the one that cares. */
+ * ONE NODE NOW (client ruling, 2026-09-23 — `useFilterBar` returns the Filter
+ * control WITH the overlay it opens, because the facets no longer land
+ * anywhere but a portaled surface). These standalone tests only ever query by
+ * ROLE across the whole document, so they never cared where the two halves
+ * went; `ToolbarRowHarness` below is the one that does. */
 function Harness({ facets = FACETS }: { facets?: FilterFacet[] }) {
   const [values, setValues] = React.useState<Record<string, string>>({})
-  const { pill, panel } = useFilterBar({
+  const filter = useFilterBar({
     facets,
     values,
     data: [],
@@ -140,36 +145,7 @@ function Harness({ facets = FACETS }: { facets?: FilterFacet[] }) {
   })
   return (
     <>
-      {pill}
-      {panel}
-      <span data-testid="values">{JSON.stringify(values)}</span>
-    </>
-  )
-}
-
-/** THE SAME HOOK, WIRED THE WAY A REAL SCREEN WIRES IT: `pill` to
- * `<ToolbarRow>`'s own `filters` slot, `panel` to its separate `toolbarPanel`
- * slot — never both folded into one `filters` node, which is exactly the
- * shape a plain `<Harness />` could no longer stand in for once the pill and
- * the panel became two values instead of one component's own markup. */
-function ToolbarRowHarness({ facets = FACETS }: { facets?: FilterFacet[] }) {
-  const [values, setValues] = React.useState<Record<string, string>>({})
-  const { pill, panel } = useFilterBar({
-    facets,
-    values,
-    data: [],
-    onChange: (field, value) =>
-      setValues((s) => {
-        const next = { ...s }
-        if (value === "") delete next[field]
-        else next[field] = value
-        return next
-      }),
-    onClearFacets: () => setValues({}),
-  })
-  return (
-    <>
-      <ToolbarRow empty={false} search={<input aria-label="Search" />} filters={pill} toolbarPanel={panel} />
+      {filter}
       <span data-testid="values">{JSON.stringify(values)}</span>
     </>
   )
@@ -203,9 +179,19 @@ async function pick(label: string, option: string) {
   fireEvent.click(within(facet).getByRole("button"))
   const listbox = await screen.findByRole("listbox")
   fireEvent.click(within(listbox).getByRole("option", { name: option }))
+  // A MULTI-SELECT FACET'S LIST STAYS OPEN after a pick (Aurora, 24 Sep 2026 —
+  // choosing three clients should not be three visits to the trigger), so the
+  // helper closes it rather than waiting for it to close itself. Escape shuts
+  // the innermost Radix layer, which is the facet's panel; the overlay behind
+  // it stays open, which is what the next `pick` expects to find.
+  if (screen.queryByRole("listbox")) {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull())
+  }
 }
 
-const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
+/** Open the overlay off the toolbar's own Filter control. */
+const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/, hidden: true }))
 
 /** WHAT THE TOOLBAR SAYS — the pill's own words, which since 2026-09-02 are
  * the only thing it says about what is narrowing the list. The label
@@ -228,7 +214,10 @@ const pillSays = () => {
 /** The kit's own chip, which this app must now never draw one of. */
 const chips = () => document.querySelectorAll('[data-slot="filter-chip"]')
 
-const panelNode = () => document.querySelector('[data-slot="filter-bar-row"]')
+/** THE OPEN OVERLAY, whichever of the three forms it took. One slot name for
+ * all three, so a test asks "are the facets on screen" without asking which
+ * geometry answered. */
+const panelNode = () => document.querySelector('[data-slot="filter-overlay"]')
 
 describe("the app's filter row is the design kit's", () => {
   it("every control in the filter row is one the kit draws, and none is ours", () => {
@@ -406,29 +395,49 @@ describe("the app's filter row is the design kit's", () => {
     await waitFor(() => expect(pillSays()).toEqual({ label: "Filter", count: "1" }))
   })
 
-  it("ONE VALUE PER FACET — a second pick REPLACES, it does not add", async () => {
-    // The kit's facet is MULTI-select and every door this feeds takes ONE value
-    // per query parameter, validated positionally (R20). If the adapter ever
-    // let the array grow, the extra word would be dropped on the way to the
-    // door and the pill would count two filters for a question that answered
-    // one — the same class of lie as a facet that narrows the loaded page.
+  it("A SECOND PICK ADDS — and two values in one facet is still ONE filter", async () => {
+    // SUPERSEDED, 24 SEP 2026. This test used to assert the opposite ("a second
+    // pick REPLACES"), on the reasoning that every door behind it took one word
+    // per query parameter and a growing array would be silently truncated on
+    // the way. That reasoning was TRUE and is now answered rather than ignored:
+    // Aurora ruled *"i shoudl be able to select multile for each filter type"*,
+    // so the six doors learned to carry a set (`splitFacet` at the boundary,
+    // `inClause` in the WHERE) and the value that reaches them is a comma list
+    // rather than one word. Nothing is dropped on the way any more, which is
+    // the only thing that made the old assertion right.
+    //
+    // THE PILL'S COUNT IS THE HALF THAT DID NOT CHANGE, and it is worth keeping
+    // here: it counts FACETS that are on, not values. Two clients is one
+    // question about clients, and a count that said "2" would be reporting a
+    // narrowing that is not two narrowings.
     render(<Harness />)
     await pick("Type", "From a meeting")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"meeting"}'))
     await pick("Type", "A note")
-    await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"note"}'))
+    // THE ORDER IS THE LIST'S, NOT THE TICKING'S — the kit rebuilds the set in
+    // the options' own order, and this app alphabetises a facet's options
+    // before handing them over (R75), so "A note" leads "From a meeting"
+    // whichever was ticked first. That is what keeps the closed field's summary
+    // from reshuffling under somebody who unticks and re-ticks one name.
+    await waitFor(() =>
+      expect(screen.getByTestId("values").textContent).toBe('{"kind":"note,meeting"}')
+    )
     openPanel()
     await waitFor(() =>
-      expect(pillSays(), "one facet, one count").toEqual({ label: "Filter", count: "1" })
+      expect(pillSays(), "two values, one facet, one count").toEqual({ label: "Filter", count: "1" })
     )
 
-    // …and TURNING THE FACET OFF is its own row, "Any type", which is what the
-    // field says while nothing is on. It used to be "pick the word that is
-    // already on"; a compact select (2026-09-02) has no such gesture — picking
-    // the chosen row again is a no-op in every select in the app, and inventing
-    // an exception here would make this one control behave unlike the rest. The
-    // value that reaches the caller is still `""`, never the sentinel the row
-    // carries so Radix will accept it.
+    // …and ONE VALUE LEAVES ON ITS OWN, which is the gesture a single-select
+    // facet genuinely does not have: picking a row that is already on turns
+    // that row off and takes nothing else with it.
+    await pick("Type", "From a meeting")
+    await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"note"}'))
+
+    // …and TURNING THE WHOLE FACET OFF is still its own row, "Any type", which
+    // is what the field says while nothing is on — the way out of four
+    // selections in one press rather than four. The value that reaches the
+    // caller is `""`, never the sentinel the row carries so Radix will accept
+    // it.
     await pick("Type", "Any type")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe("{}"))
     openPanel()
@@ -469,174 +478,6 @@ describe("the app's filter row is the design kit's", () => {
       document.querySelector('[data-slot="filter-bar-add"]')?.textContent,
       "the pill reports a NUMBER — never the value whose words just went away"
     ).not.toContain("a2")
-  })
-
-  it("THE PANEL EXPANDS THE SPACE, and the container grows rather than doubling", async () => {
-    // THE REGRESSION THAT HAS NOW HAPPENED THREE TIMES, and the reason this
-    // test exists at all.
-    //
-    //   PASS ONE — the panel was a flex child of the toolbar's own
-    //   `rounded-pill` track. It expanded the space, and a 999px-radius box
-    //   that tall draws a giant oval with the controls scattered round it.
-    //   Client: "lol what is this shit".
-    //   PASS TWO — `position: absolute`. The pill kept its shape and the panel
-    //   floated over the rows instead of moving them. Client, 2026-09-02:
-    //   "the expanded toolbar shoudl not be an overlay, but literaly expand
-    //   the space".
-    //   PASS THREE/FOUR — the panel became an in-flow sibling BENEATH the
-    //   track, in its own column: no overlay, and the track's own box was
-    //   provably untouched by how tall the panel got. That solved overlay and
-    //   left a new fault standing — the track and the panel were two
-    //   `bg-background` boxes with a gap between them, which reads as a
-    //   second toolbar. Client, 2026-09-03: "it kind of creates a second
-    //   toolbar... merge this with the main toolbar so that it's one single
-    //   background or container."
-    //
-    // Every one of the first three shipped green. PASS FIVE (this one) is
-    // asserted against ALL THREE failure modes at once: the panel is still
-    // never nested inside the track (pass one), still never positioned as an
-    // overlay (pass two), AND the track no longer paints a fill or shape of
-    // its own AT ALL — the single merged container does, and its shape is
-    // read off `Boolean(toolbarPanel)` rather than off anything's measured
-    // height, so it cannot repeat pass one's mistake by a different route.
-    //
-    // PASS SIX, 22 SEP 2026 — the merged container's own fill and radius are
-    // retired too (rulebook L43, her ruling over the Triage/Ready pair: "make
-    // sure that you make this exactly the same everywhere"), matching
-    // `<PagedFind>`'s own column, which dropped the identical pair a day
-    // earlier. The assertions below now hold the column to painting NOTHING,
-    // open or closed, rather than switching between two shapes.
-    render(<ToolbarRowHarness />)
-
-    const column = document.querySelector('[data-slot="toolbar-row-column"]')
-    expect(column, "the toolbar must be wrapped in its own merged container").toBeTruthy()
-    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
-    expect(track, "the track is a named child of the merged container").toBeTruthy()
-    expect(column!.contains(track), "the track lives inside the merged container").toBe(true)
-
-    // i · CLOSED: NO FILL, NO RADIUS, ANYWHERE — 22 Sep 2026, superseding the
-    // painted-pill shape this test used to hold the column to (her ruling
-    // over the Triage/Ready pair: "make sure that you make this exactly the
-    // same everywhere"). The column used to switch between `bg-surface-raised`
-    // + `rounded-pill` (collapsed) and `rounded-[var(--radius)]` (expanded);
-    // both are retired now, so there is nothing left to switch, and the track
-    // still paints nothing of its own either.
-    expect(panelNode(), "nothing is open yet").toBeNull()
-    expect(column!.className, "the column paints no background of its own").not.toMatch(
-      /\bbg-(?!clip|none)[\w-]+/
-    )
-    expect(column!.className, "the column carries no radius of its own").not.toMatch(
-      /\brounded-[\w[\]().,%/#-]+/
-    )
-    expect(
-      track.className,
-      "the track paints no fill or shape of its own either"
-    ).not.toMatch(/rounded-pill|bg-background|bg-\[var\(--surface-raised\)\]/)
-    const closedTrack = trackShape(track)
-
-    openPanel()
-    const panel = panelNode()
-    expect(panel, "the panel opens").toBeTruthy()
-
-    // ii · THE TRACK ITSELF STILL DID NOT MOVE — pass one's own guard,
-    // unweakened: opening the panel changes neither the track's markup nor
-    // its position relative to the panel.
-    expect(
-      trackShape(track),
-      "opening the panel changed the track's own markup — pass one put the " +
-        "panel inside a box like this one and it was drawn as a giant oval"
-    ).toBe(closedTrack)
-    expect(track.contains(panel!), "the panel must never be inside the track").toBe(false)
-
-    // iii · IT IS IN FLOW, UNDER THE TRACK. Not an overlay: no positioning, no
-    // stacking, no floating-surface elevation, and it FOLLOWS the track in
-    // the same merged container, which is what makes it push the collection
-    // down (pass two's own guard).
-    expect(
-      panel!.className,
-      "pass two floated the panel over the rows — an in-flow panel positions nothing"
-    ).not.toMatch(/(?:^|\s)(?:absolute|fixed|sticky|top-full|inset-x-0|z-\d+)(?:\s|$)/)
-    expect(panel!.className).not.toContain("shadow-[var(--shadow-overlay)]")
-    expect(column!.contains(panel!), "the panel lives in the merged container").toBe(true)
-    expect(
-      track.compareDocumentPosition(panel!) & Node.DOCUMENT_POSITION_FOLLOWING,
-      "…and beneath it, never before it"
-    ).toBeTruthy()
-
-    // iv · AND NEITHER THE PANEL NOR THE TRACK PAINTS ITS OWN SURFACE — the
-    // merged container is the only element with a background, which is the
-    // property pass three/four's "two boxes" shape broke. `panel` here is
-    // `filter-bar.tsx`'s own div; it must carry no fill or radius, or this
-    // regresses to two same-toned boxes with a gap read as a second card.
-    expect(
-      panel!.className,
-      "the open panel must not paint its own background — one surface, not two"
-    ).not.toMatch(/bg-background|bg-\[var\(--surface-raised\)\]/)
-    expect(
-      panel!.className,
-      "the open panel must not round its own corners — the merged container does"
-    ).not.toMatch(/rounded-\[var\(--radius\)\]/)
-
-    // v · OPEN: STILL NOTHING PAINTED. 22 Sep 2026 — the container used to
-    // switch to the box radius here; now it stays exactly as it was closed,
-    // since there is no fill or radius left to switch between.
-    expect(
-      column!.className,
-      "the container still owns no background, panel open or not"
-    ).not.toMatch(/\bbg-(?!clip|none)[\w-]+/)
-    expect(column!.className, "and no radius, panel open or not").not.toMatch(
-      /\brounded-[\w[\]().,%/#-]+/
-    )
-
-    // vi · AND IT CLOSES BACK TO EXACTLY THE SAME, STILL-UNPAINTED SHAPE.
-    openPanel()
-    await waitFor(() => expect(panelNode()).toBeNull())
-    expect(trackShape(track)).toBe(closedTrack)
-  })
-
-  it("EVERY `useFilterBar` CALL RENDERS BOTH ITS PILL AND ITS PANEL", () => {
-    // SUPERSEDED, v1.2.27. This census used to police the app's own
-    // `FilterPanelColumn`/`FilterPanelProvider` system — a `<FilterBar>` drawn
-    // with nowhere to publish its panel's outlet reproduced pass one's giant
-    // oval. That whole mechanism is gone: `useFilterBar` returns `{ pill,
-    // panel }` as two ordinary values, and a caller places each directly
-    // where it belongs (`filters`/`toolbarPanel` on `ToolbarRow` or the kit's
-    // `CollectionFrame`, or two plain siblings for a hand-built track). There
-    // is no longer a "did this file wrap its track in a column" question to
-    // ask; there is a NEW one with the identical failure mode — a host that
-    // destructures `panel` and never renders it drops the ruling just as
-    // silently as an orphaned `<FilterBar>` used to, because the panel simply
-    // never appears. Censused the same way, off the disk.
-    const files = sourceFiles(["web", "web-portal", "shared/web"].map((d) => join(ROOT, d)), {
-      extensions: [".tsx"],
-      relativeTo: ROOT,
-      skipTests: true,
-    })
-      .filter((f) => f.rel !== ADAPTER)
-      .map((f) => ({ rel: f.rel, src: stripComments(f.source) }))
-
-    const CALL =
-      /const\s*\{\s*pill\s*(?::\s*(\w+))?\s*,\s*panel\s*(?::\s*(\w+))?\s*\}\s*=\s*useFilterBar\(/g
-
-    const offenders: string[] = []
-    let scanned = 0
-    for (const f of files) {
-      for (const m of f.src.matchAll(CALL)) {
-        scanned++
-        const pillName = m[1] ?? "pill"
-        const panelName = m[2] ?? "panel"
-        const afterDecl = f.src.slice(m.index + m[0].length)
-        if (!new RegExp(`\\b${pillName}\\b`).test(afterDecl))
-          offenders.push(`${f.rel}: pill (\`${pillName}\`) is destructured but never rendered`)
-        if (!new RegExp(`\\b${panelName}\\b`).test(afterDecl))
-          offenders.push(`${f.rel}: panel (\`${panelName}\`) is destructured but never rendered`)
-      }
-    }
-    expect(scanned, "the useFilterBar census found nothing — it has stopped matching").toBeGreaterThan(2)
-    expect(
-      offenders,
-      `these hosts call useFilterBar and drop one of its two values on the floor:\n  ${offenders.join("\n  ")}`
-    ).toEqual([])
   })
 
   it("THE FILTER PILL'S BOX IS THE SORT AND VIEW PILLS' BOX", () => {
@@ -820,10 +661,21 @@ describe("a filter that hangs off another (client ruling, 2026-09-09)", () => {
       accountId: "a1",
       appId: "p1",
     })
-    // The reader now picks a DIFFERENT client. The app they chose is no longer
-    // a pair that can match — her own fault, arriving from the other direction
-    // — so the toolbar drops it rather than holding an impossible combination.
+    // The reader now MOVES the client: adds a second, then drops the first.
+    // (Adding one no longer strands anything — a set of parents offers every
+    // child of any of them, which is the cascade running down an ownership edge
+    // that now has several ends.) Once the first client is gone the app they
+    // chose is no longer a pair that can match — her own fault, arriving from
+    // the other direction — so the toolbar drops it rather than holding an
+    // impossible combination.
     await pick("Client", "Northwind Traders International Holdings Ltd.")
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({
+        accountId: "a1,a2",
+        appId: "p1",
+      })
+    )
+    await pick("Client", "Bergman S.A.")
     await waitFor(() =>
       expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({ accountId: "a2" })
     )
@@ -877,7 +729,7 @@ describe("a filter that hangs off another (client ruling, 2026-09-09)", () => {
     ]
     function DerivedHarness() {
       const [values, setValues] = React.useState<Record<string, string>>({})
-      const { pill, panel } = useFilterBar({
+      const filter = useFilterBar({
         facets: derived,
         values,
         data: rows,
@@ -890,12 +742,7 @@ describe("a filter that hangs off another (client ruling, 2026-09-09)", () => {
           }),
         onClearFacets: () => setValues({}),
       })
-      return (
-        <>
-          {pill}
-          {panel}
-        </>
-      )
+      return <>{filter}</>
     }
     render(<DerivedHarness />)
     openPanel()

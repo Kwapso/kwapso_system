@@ -167,7 +167,11 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
     // B0385 — "Stories" -> "Backlog", matching web/lib/pages.ts's own nav entry.
     { need: "work", title: t("Backlog"), desc: t("The work in hand"), icon: PuzzlePiece, href: "/stories" },
     { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: ChecksRegular, href: "/tasks" },
-    { need: "work", title: t("Work logs"), desc: t("Time logged, and the timers running"), icon: Timer, href: "/time" },
+    // B0386 IS REVERSED HERE — Aurora, 23 Sep 2026, verbatim: "word is logs
+    // only". One concept was wearing four words (Logs on the rail, "Work logs"
+    // on this tile and a meeting tab, "Time log" on a story/ticket/task, "Work
+    // log" in the glossary); it is LOGS everywhere now, and one entry is a LOG.
+    { need: "work", title: t("Logs"), desc: t("Time logged, and the timers running"), icon: Timer, href: "/time" },
     { need: "meetings", title: t("Meetings"), desc: t("The meetings list"), icon: Chat, href: "/meetings" },
     { need: "accounts", title: t("Accounts"), desc: t("The companies and contacts we work with"), icon: Briefcase, href: "/accounts" },
   ].filter((l) => can(l.need, "read"))

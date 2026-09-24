@@ -440,7 +440,7 @@ export function SprintsScreen({
       options: sprintKindOptions(loadedSprints, byKind, lang, t("No type said")),
     },
   ]
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets: sprintFacets,
     values: { state: sprintQuery.state, kind: sprintQuery.kind },
     // Empty on purpose: both facets carry their own options above, derived
@@ -499,8 +499,8 @@ export function SprintsScreen({
   // this row's own sibling below it — the same shape her Apps screenshot
   // caught (search+actions on one row, a stranded filter chip under it) —
   // so it is `<ToolbarRow>`'s own `filters` slot now (screen-bits.tsx), and
-  // its open panel is the separate `toolbarPanel` slot (v1.2.27's
-  // `useFilterBar` split) — never a second row this call site draws itself.
+  // the facets it opens float above the rows rather than landing anywhere in
+  // this column — never a second row, here or anywhere (Aurora, 2026-09-23).
   const sprintToolbar = (
     <ToolbarRow
       // `!sprintsLoading &&` — `sprints` defaults to `[]` before the read
@@ -521,7 +521,6 @@ export function SprintsScreen({
         />
       }
       filters={filterPill}
-      toolbarPanel={filterPanel}
       actions={canCreate && <AddButton label={t("Start a phase")} onClick={() => setAddOpen(true)} />}
     />
   )

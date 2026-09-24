@@ -243,7 +243,7 @@ export function AppFormDialog({
   )
   const contacts = (contactsQ.data?.links ?? [])
     .filter((l) => l.active)
-    .map((l) => ({ id: l.personAccountId, name: l.personName }))
+    .map((l) => ({ id: l.personAccountId, name: l.personName, photo: l.personLogoUrl }))
   /** A picked file becomes a data URL on the form, downsized in the browser
    * first — the same seam the account logo and the team logo use, so the body
    * that reaches the door is ~60 KB rather than a phone photo. */

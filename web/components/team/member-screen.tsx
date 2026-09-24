@@ -417,7 +417,26 @@ export function MemberScreen({
         // matching the picture `member-head.tsx` used to carry inside the
         // body — REMOVED from there now that the head itself draws it (see
         // that file's own note).
-        mark={<RecordMark picture={member.imageUrl} name={name} shape="round" size="tile" />}
+        mark={(
+          <RecordMark
+            picture={member.imageUrl}
+            name={name}
+            shape="round"
+            size="tile"
+            /* GREY IF THEY ARE NOT ONE OF OURS — Aurora, 23 Sep 2026: "external
+               photos (from contacts) gray scale. keep staff nirmal." A
+               client-portal login is an ORDINARY TEAM MEMBER (grant → invite →
+               accept is the only way to make a working one), so this page —
+               the member RECORD, the one screen that deliberately shows every
+               login on the team because somebody has to be able to change or
+               remove one — draws a client's own face at `tile` size beside our
+               colleagues'. `TeamMember.isClient` is on the record already; it
+               is the same field `members-gallery.tsx` filters this population
+               OUT with one screen over, which is why that wall needs no word
+               here and this page does. */
+            external={member.isClient}
+          />
+        )}
         // THE CHIP, ABOVE THE TITLE (R65, unchanged by the mark above — R65
         // put the pills row above the title and this only adds something
         // BESIDE it) — the SAME content the gallery card wears

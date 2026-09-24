@@ -71,7 +71,9 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { CalendarBlank, Columns, ListBullets, Plus, Rows } from "@shared/ui/foundations/icons"
+// NO `Rows` ANY MORE — it was the Agenda view's own switcher glyph, and the
+// Agenda view is removed (23 Sep 2026, the header block below).
+import { CalendarBlank, Columns, ListBullets, Plus } from "@shared/ui/foundations/icons"
 import { type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider, CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -86,7 +88,10 @@ import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
-import { RecordCalendar, RecordAgenda, type CalendarEntry, type AgendaEntry } from "@/components/records/record-calendar"
+// NO `RecordAgenda`/`AgendaEntry` ANY MORE — the Agenda view is removed
+// (23 Sep 2026, the header block above carries her words). The host and its
+// export stay where they are; this screen simply stopped being their caller.
+import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
 import { RecordWeek } from "@/components/records/record-week"
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordTable, type TableColumn } from "@/components/records/record-table"
@@ -224,8 +229,29 @@ import type { Language } from "@shared/i18n"
  * every tab, each card carrying the meeting's start time
  * (`CalendarEntry.time`). This week: Agenda / Calendar / Week / List; Mine:
  * Calendar / Week / List; Everyone's: List / Calendar / Week. `MeetingsWeek`
- * (below `MeetingsAgenda`) builds the rows and says why it reads `shown`
- * directly rather than a dedicated week-scoped door read.
+ * builds the rows and says why it reads `shown` directly rather than a
+ * dedicated week-scoped door read.
+ *
+ * ── THE AGENDA VIEW IS GONE, 23 SEP 2026 ────────────────────────────────────
+ *
+ * Aurora, verbatim: *"meetings: remove agenda view."* The VIEW MODE only —
+ * the meeting's own `agenda` FIELD is untouched, and so is the kit's
+ * `Agenda` component and `RecordAgenda`, the one host wired to it
+ * (`web/components/records/record-calendar.tsx`): the one-calendar law
+ * (`web/test/rules.test.ts`'s `one-calendar`) is about who may reach that
+ * component, not about who currently does, and a host with no caller today
+ * is still the only door the day a second screen wants one.
+ *
+ * WHAT WENT WITH IT. The switcher entry (`viewSlot`'s own first option on
+ * This week), the `MeetingsAgenda` shaper that turned rows into
+ * `AgendaEntry[]`, the `mode === "agenda"` branch in the body, and the
+ * `"agenda"` member of `weekMode`'s own union. This week's DEFAULT body is
+ * now Calendar — the first view left in her own order for that tab, the
+ * same "first-named is the default" rule the three slots have always
+ * followed. `useRemembered`'s `revive` guard already drops a stored
+ * `"agenda"` on the floor (it is no longer one of the three it accepts), so
+ * a reader who was last on the Agenda view lands on Calendar rather than on
+ * a strip with nothing selected.
  */
 
 /** THE CALENDAR VIEW'S OWN MONTH READ — its own component, and not a `const`
@@ -300,65 +326,6 @@ function MeetingsMonthCalendar({
   )
 }
 
-/** THE AGENDA — This week's own default body (ruling, 2026-09-15): the week's
- * meetings, chronological, grouped by day. Drawn through `RecordAgenda`
- * (web/components/records/record-calendar.tsx) rather than the kit's own
- * `Agenda` directly — the "ONE CALENDAR" law (`web/test/rules.test.ts`'s
- * `one-calendar`) requires every screen that wants that kit component to reach
- * it through that one host file, so a record on it is never a picture with no
- * click (UI-GAPS #22). This file only SHAPES the rows into `AgendaEntry[]`;
- * the grouping, the day headings, "Today" and the open-wiring are that file's.
- *
- * DOES NO FILTERING OF ITS OWN. `rows` is whatever `weekQ` (view=mine-week)
- * already answered — always this reader's own week, never the agency's — so
- * this component only shapes what it is handed; the same separation
- * `MeetingsMonthCalendar` above keeps between the door's question and the
- * grid's own drawing.
- *
- * THE KIT ROW IS THREE SLOTS (time / title / who), and the client asked for
- * four facts (day headings, time, title, type, attendees). Meeting type has no
- * column of its own, so it rides inside `title` as a quiet second line — the
- * same move `record-calendar.tsx`'s own month agenda makes to carry its accent
- * dot — and Attendees is `who`. A meeting with no guest list (typed in, not
- * synced) says nothing there rather than inventing a name to fill the slot. */
-function MeetingsAgenda({
-  rows,
-  lang,
-  onOpen,
-  emptyText,
-}: {
-  rows: Meeting[]
-  lang: Language
-  onOpen: (id: string) => void
-  emptyText: string
-}) {
-  const entries: AgendaEntry[] = rows.map((m) => ({
-    id: m.id,
-    day: m.startsAt.slice(0, 10),
-    time: formatTime(m.startsAt, lang),
-    dateTime: m.startsAt,
-    // A CANCELLED meeting still says so here — the same word `shape.tsx`'s
-    // own `shapeMeetingsList` appends to the calendar's title and to the
-    // List body's `name`/`nameText`, unwrapped there too (a template
-    // literal, not a sentence of its own for `t` to translate). AND THE SAME
-    // STRIP — a synced title's pictograph is removed at display here too
-    // (16 Sep 2026 ruling, `stripPictographs`'s own header), the same one
-    // `shapeMeetingsList` runs before building its own `name`.
-    title: (
-      <span className="flex min-w-0 flex-col">
-        <span className="min-w-0 truncate">
-          {m.active ? stripPictographs(m.title) : `${stripPictographs(m.title)} (cancelled)`}
-        </span>
-        {m.purposeName ? (
-          <span className="text-muted-foreground min-w-0 truncate text-xs">{m.purposeName}</span>
-        ) : null}
-      </span>
-    ),
-    who: m.googleGuests?.length ? m.googleGuests.map((g) => g.name || g.email).join(", ") : undefined,
-  }))
-  return <RecordAgenda entries={entries} onOpen={onOpen} emptyText={emptyText} />
-}
-
 /** WEEK — the fourth ruling, once the week lane's own `RecordWeek`
  * (web/components/records/record-week.tsx) landed: a view beside Calendar on
  * every tab, each card carrying the meeting's start time as its eyebrow
@@ -393,11 +360,42 @@ function MeetingsWeek({
     return {
       id: m.id,
       day: m.startsAt.slice(0, 10),
-      // A CANCELLED meeting still says so — the same suffix `MeetingsAgenda`
-      // and this screen's own List/Table rows both append, over the same
-      // stripped title (16 Sep 2026 ruling, `stripPictographs`'s own header).
+      // A CANCELLED meeting still says so — the same suffix this screen's own
+      // List/Table rows append, over the same stripped title (16 Sep 2026
+      // ruling, `stripPictographs`'s own header).
       title: m.active ? title : `${title} (cancelled)`,
       time: formatTime(m.startsAt, lang),
+      // WHO IS IN THE MEETING (Aurora, 23 Sep 2026) — drawn by `RecordWeek`'s
+      // own card AFTER the title, through the same `PeopleFaces` row the
+      // Attendees column of this screen's own table already uses
+      // (`shapeMeetingsList`, web/components/deep-link/shape.tsx).
+      //
+      // ROOMS ARE NOT STAKEHOLDERS — Google puts meeting rooms on the same
+      // attendee list as people, and the identical filter is applied here as
+      // in that cell and on the meeting's own screen: "a room shown as a
+      // stakeholder is a stakeholder nobody can ring" (meeting-detail.tsx).
+      //
+      // NO PICTURE ON THIS ROW. `googleGuests` is Google's own mirror — a
+      // display name and an address, never a photograph — so every face here
+      // is the mark's own initials. The same is true of the table's column,
+      // which is why both go through one component rather than one of them
+      // quietly growing a second lookup.
+      faces: (m.googleGuests ?? [])
+        .filter((g) => !g.resource)
+        .map((g) => ({ key: g.email, name: g.name || g.email })),
+      // WHOSE MEETING IT IS — Aurora, 23 Sep 2026, choosing week-view
+      // variation One ("Open column"). THIS SCREEN IS THE ONE SHE NAMED: her
+      // example was a meeting, and what she asked to see beside the faces was
+      // "the app or account chip". Drawn above the title by `EntryCard`
+      // (R65, chip-above-title) in R94's own fixed order, app before account.
+      //
+      // NAMES, NEVER IDS: the card draws a chip, not a link — a week card is
+      // already one big button that opens the meeting, and an anchor inside a
+      // button is invalid HTML. An INTERNAL meeting has no account and a
+      // meeting filed against no app has no app; each simply draws one chip
+      // fewer, the same silence this row already keeps about a missing face.
+      appName: m.appName ?? undefined,
+      accountName: m.accountName ?? undefined,
     }
   })
   return <RecordWeek entries={entries} onSelect={(entry) => onOpen(entry.id)} />
@@ -528,10 +526,16 @@ export function MeetingsScreen({
   // default is the FIRST view she named for that tab, the same rule the old
   // single slot followed ("start with list view", 2026-09-06) generalised to
   // three slots instead of one.
-  const [weekMode, setWeekMode] = useRemembered<"agenda" | "calendar" | "week" | "list">(
+  // NO `"agenda"` MEMBER ANY MORE (23 Sep 2026, "meetings: remove agenda
+  // view.") — the union is the three views This week still offers, and the
+  // default is the first of them in her own order. `revive` is what makes a
+  // remembered `"agenda"` harmless: it is no longer one of the three this
+  // guard accepts, so a reader who was last on that view lands on Calendar
+  // rather than on a strip with nothing selected.
+  const [weekMode, setWeekMode] = useRemembered<"calendar" | "week" | "list">(
     "meeting-view-week",
-    "agenda",
-    (r) => (r === "agenda" || r === "calendar" || r === "week" || r === "list" ? r : undefined)
+    "calendar",
+    (r) => (r === "calendar" || r === "week" || r === "list" ? r : undefined)
   )
   const [mineMode, setMineMode] = useRemembered<"calendar" | "week" | "list">(
     "meeting-view-mine",
@@ -639,7 +643,9 @@ export function MeetingsScreen({
       purposeId: values.purposeId || undefined,
       location: values.location || undefined,
       agenda: values.agenda || undefined,
-      notes: values.notes || undefined,
+      // NO `notes` — the Notes surface is removed from the meetings UI (23 Sep
+      // 2026, meeting-form-dialog.tsx's own header). A meeting being CREATED
+      // has none to preserve, so the field is simply not sent.
     })
     invalidate(meetingsKey(teamId))
     invalidate(meetingsKey(teamId, "mine-week"))
@@ -731,7 +737,8 @@ export function MeetingsScreen({
     views:
       tab === "week"
         ? [
-            { value: "agenda", label: t("Agenda"), icon: <Rows className="size-4" /> },
+            // NO "Agenda" ENTRY (23 Sep 2026) — the switcher lists exactly the
+            // three bodies This week still draws.
             { value: "calendar", label: t("Calendar"), icon: <CalendarBlank className="size-4" /> },
             { value: "week", label: t("Week"), icon: <Columns className="size-4" /> },
             { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
@@ -749,8 +756,7 @@ export function MeetingsScreen({
             ],
     value: mode,
     onValueChange: (v: string) => {
-      if (tab === "week")
-        setWeekMode(v === "calendar" ? "calendar" : v === "week" ? "week" : v === "list" ? "list" : "agenda")
+      if (tab === "week") setWeekMode(v === "week" ? "week" : v === "list" ? "list" : "calendar")
       else if (tab === "mine") setMineMode(v === "week" ? "week" : v === "list" ? "list" : "calendar")
       else setAllMode(v === "calendar" ? "calendar" : v === "week" ? "week" : "list")
     },
@@ -1125,18 +1131,6 @@ export function MeetingsScreen({
                   // month sentence.
                   emptyText={found.active ? found.emptyText : tab === "all" ? undefined : tabEmpty}
                   onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
-                />
-              ) : mode === "agenda" ? (
-                // THIS WEEK'S OWN DEFAULT (ruling, 2026-09-15) — `shown` is
-                // already the mine-this-week rows the tab reads at rest, or
-                // whatever `found` narrowed them to mid-search; `MeetingsAgenda`
-                // only groups and draws what it is handed, exactly the
-                // separation `MeetingsMonthCalendar` above keeps.
-                <MeetingsAgenda
-                  rows={shown}
-                  lang={lang}
-                  onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
-                  emptyText={found.emptyText ?? tabEmpty}
                 />
               ) : mode === "week" ? (
                 // WEEK — beside Calendar on every tab (the fourth ruling,

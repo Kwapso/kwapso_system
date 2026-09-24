@@ -71,6 +71,7 @@ import * as React from "react"
 import { cn } from "@shared/ui/lib/utils"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
+import { joinFacet, splitFacet } from "@shared/facet-list"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
@@ -208,25 +209,34 @@ export function invalidateFindsOf(listKey: string): void {
  * the next reader about whether anything was painted.
  *
  * IT STAYS ITS OWN COMPONENT even though it no longer reads context, because
- * `wrap` (below) receives an already-built element tree, and because the
- * filter panel's open state is the one thing this box still branches on. */
-function ToolbarColumn({
-  filterPanel,
-  children,
-}: {
-  filterPanel: React.ReactNode
-  children: React.ReactNode
-}) {
+ * `wrap` (below) receives an already-built element tree.
+ *
+ * ITS `filterPanel` PROP IS GONE — client ruling, 2026-09-23 ("filter drop
+ * sheet popover"). The facets open in a portaled overlay that rides with the
+ * Filter control itself, so this column has no second child left to place and
+ * no state left to branch on. A slot for an in-flow panel is exactly the shape
+ * the ruling forbids ("a temporary overlay not a second row"), so it is
+ * REMOVED rather than left unused: an empty slot is an invitation. */
+function ToolbarColumn({ children }: { children: React.ReactNode }) {
   return (
     <div data-slot="toolbar-row-column" className="flex min-w-0 flex-col">
-      <div data-slot="toolbar-row-track" className="flex flex-wrap items-center gap-2">
+      <div
+        data-slot="toolbar-row-track"
+        /* THE DROP SHEET'S ANCHOR — `FILTER_ANCHOR_ATTR`
+           (shared/ui/components/filter-bar/filter-bar.tsx). The sheet form's
+           width is a fact about THE TOOLBAR ("falls from the toolbar across
+           its full width"), and this is the box it means. One attribute on
+           each of the app's two toolbar tracks, never a ref threaded through
+           every screen with facets. */
+        data-filter-anchor=""
+        className="flex flex-wrap items-center gap-2"
+      >
         {/* THE TRACK — every control sits in one row. No fill, no radius and
             no inset of its own: the plain frame's own `CardContent` carries
             zero padding, so this row's edge IS the pane's edge, the same edge
             the table below it already sits flush against. */}
         {children}
       </div>
-      {filterPanel}
     </div>
   )
 }
@@ -479,7 +489,14 @@ export function PagedFind<T>({
         (was.values as Record<string, string>) ?? {}
       )) {
         const facet = facets.find((f) => f.field === field)
-        if (facet?.options?.some((o) => o.value === value)) kept[field] = value
+        if (!facet?.options) continue
+        // A FACET CARRIES A SET NOW (24 Sep 2026), so this prunes VALUE BY
+        // VALUE rather than dropping the whole facet the moment one of its
+        // words is retired. One value is a set of one, so a facet that still
+        // holds exactly one option behaves precisely as it did; a facet
+        // holding three keeps the two that are still real.
+        const survivors = splitFacet(value).filter((v) => facet.options?.some((o) => o.value === v))
+        if (survivors.length > 0) kept[field] = joinFacet(survivors)
       }
       return {
         text: typeof was.text === "string" ? was.text : "",
@@ -671,7 +688,7 @@ export function PagedFind<T>({
 
   // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
   // (v1.2.27), used below only when `showFilters` is true.
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+  const filterPill = useFilterBar({
     facets,
     values,
     // Empty on purpose: every facet above carries its own options, so there
@@ -725,7 +742,7 @@ export function PagedFind<T>({
     // (this component draws one itself, right at the bottom of this file), a
     // record's strip, or nothing. See shared/web/pinned-chrome.ts.
     <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-[var(--toolbar-content-gap)]")}>
-      <ToolbarColumn filterPanel={showFilters ? filterPanel : null}>
+      <ToolbarColumn>
             {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
                 the filter row's "Clear all" — one control quietly owning two
                 questions — and the kit's bar says "Clear filters" and now means

@@ -151,7 +151,14 @@ describe("the work-log summary door", () => {
     expect(head.totalSeconds).toBe(list.totalSeconds)
   })
 
-  it("splits by person and by kind in SECONDS, keeping the unnamed kind as its own bucket", async () => {
+  // "…AND BY KIND" WAS THE OTHER HALF OF THIS TEST, and it went with the read
+  // it was about (24 Sep 2026). `WorkLogSummary.kinds` grouped the free-text
+  // `kind` column; Aurora ruled the kind of work IS the related record type and
+  // then wiped the hand-typed words (team migration 0122), the one card drawing
+  // the breakdown was deleted, and the door stopped asking. The by-person half
+  // below is untouched, including the property that earned it: biggest by
+  // SECONDS, never by row count.
+  it("splits by person in SECONDS, biggest first, never by row count", async () => {
     logSeconds("A", { userId: "u-marta", userName: "Marta", kind: "Build", startedAt: thisWeek(), seconds: 7200 })
     logSeconds("B", { userId: "u-marta", userName: "Marta", kind: null, startedAt: thisWeek(), seconds: 1800 })
     logSeconds("C", { userId: "u-otto", userName: "Otto", kind: "Build", startedAt: thisWeek(), seconds: 600 })
@@ -168,16 +175,12 @@ describe("the work-log summary door", () => {
       ["Marta", 9000],
       ["Otto", 600],
     ])
-    // The kind nobody set is a bucket with a name, not a dropped row — most
-    // logged time has no kind, so dropping NULL would hide the majority.
-    expect(body.kinds).toEqual([
-      { kind: "Build", seconds: 7800 },
-      { kind: null, seconds: 1800 },
-    ])
-    // And the splits add up to the headline, which is what makes them a SPLIT
-    // rather than three separate reads that happen to be near each other.
+    // And the split adds up to the headline, which is what makes it a SPLIT
+    // rather than two separate reads that happen to be near each other.
     expect(body.people.reduce((n, p) => n + p.seconds, 0)).toBe(body.totalSeconds)
-    expect(body.kinds.reduce((n, k) => n + k.seconds, 0)).toBe(body.totalSeconds)
+    // THE DOOR NO LONGER ANSWERS WITH A `kinds` BREAKDOWN AT ALL — not an empty
+    // array, which would be a reader's problem waiting to happen, but nothing.
+    expect("kinds" in body, "the summary door still carries a kinds breakdown").toBe(false)
   })
 
   // R16, AND THE ONE FIGURE ON THIS DOOR THAT WAS A CEILING WEARING A TOTAL'S
@@ -233,7 +236,6 @@ describe("the work-log summary door", () => {
     // …the person count included: Otto's only row was binned, so he is not a
     // person who worked on this.
     expect(body.peopleTotal).toBe(1)
-    expect(body.kinds.map((k) => k.kind)).toEqual(["Build"])
     expect(body.weeks[PULSE_WEEKS - 1].seconds).toBe(600)
   })
 
@@ -248,7 +250,6 @@ describe("the work-log summary door", () => {
     expect(body.totalSeconds).toBe(0)
     expect(body.peopleTotal).toBe(0)
     expect(body.people).toEqual([])
-    expect(body.kinds).toEqual([])
     expect(body.weeks).toHaveLength(PULSE_WEEKS)
     expect(body.weeks.every((w) => w.seconds === 0)).toBe(true)
   })

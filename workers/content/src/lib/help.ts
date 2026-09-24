@@ -18,6 +18,7 @@
 
 import { listGaps, triageGaps } from "@shared/triage-readiness"
 import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
+import { inClause } from "@shared/workers/filter-in"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollection, countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -60,6 +61,11 @@ import { TRIAGE_AFTER_DAYS } from "./triage"
 // `logActivity` does.
 import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./help-stages"
 import { refuseWhileTimerRuns } from "./work-logs"
+import {
+  cascadeArchive,
+  cascadeRestore,
+  refuseIfParentArchived,
+} from "@shared/workers/archive-cascade"
 import { GuardError, hasRight, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { TITLE_MAX_CHARS } from "@shared/types"
@@ -557,10 +563,105 @@ function archiveClause(view: "live" | "archived"): string {
  * must never be hidden by a predicate about a company it was never raised
  * against. */
 export function accountArchivedClause(table = "help"): string {
-  const col = (name: string) => `${table}.${name}`
-  return `(${col("account_id")} IS NULL OR EXISTS (
-    SELECT 1 FROM accounts arc WHERE arc.id = ${col("account_id")} AND arc.archived_at IS NULL
+  return archivedParentClause({ parent: "accounts", table, column: "account_id" })
+}
+
+/** ── THE GENERAL LAW, AND WHY THE CLAUSE ABOVE IS NOW ONE LINE ──────────────
+ *
+ * Aurora, 23 Sep 2026, validating the account round and widening it in the same
+ * breath, verbatim: **"validated - this for everything when archived, not only
+ * accounts"**. So "archived means invisible" is not a fact about a company. It
+ * is a fact about ARCHIVING, and it reaches the rows that hang off whatever was
+ * archived, whichever record type that is.
+ *
+ * WHICH RECORD TYPES CAN BE ARCHIVED IS READ, NOT GUESSED. Exactly two tables in
+ * the team schema carry the archive quartet (`archived_at` + `archiver_id` /
+ * `archiver_email` / `archiver_name`): `help` (a ticket somebody put away,
+ * migration 0011's own `ALTER TABLE help ADD COLUMN archived_at`) and `accounts`
+ * (migration 0117). The thirty-two tables carrying `deactivated_at` are NOT in
+ * this set and must never be folded into it — that column is Aurora's INACTIVE,
+ * her own distinction the same week: "inactive have their own tab … i can still
+ * see them and acces everything underneath, archived however are completley
+ * invisible." `retired_at` (a ref alias), `removed_at` (a process step),
+ * `gone_at` (a sighting), `discarded_at` (a runaway timer) and `cancelled_at` (a
+ * to-do) were each read at their own migration before being left out: none of
+ * them is an archive wearing another word.
+ *
+ * `ARCHIVABLE` is DATA so the day a third record type gains the quartet it is one
+ * line here plus its own edges, never a second mechanism — and so the check
+ * (R112) can read the set rather than a hand-kept list.
+ *
+ * `parentArchivedClause` IS THE ACCOUNT CLAUSE'S OWN BODY, PARAMETERISED, and
+ * everything the account version's header argues holds for every parent because
+ * it is the SAME SQL: a correlated `EXISTS` with its OWN alias (never a bare
+ * `archived_at`, never a join of its own — see `archiveClause`'s header for the
+ * live "ambiguous column name: archived_at" this shape exists to make
+ * impossible), and the `IS NULL` short-circuit FIRST, because a row whose
+ * pointer is null has no parent's archived state to inherit. That short-circuit
+ * is load-bearing twice over now: four out of five stories in the real base have
+ * no ticket (`stories.ticket_id` is nullable on purpose, migration 0014's own
+ * header), exactly as most tickets have no account.
+ *
+ * THE ALIAS IS PER-PARENT (`arc` for accounts, `arh` for help) and scoped to its
+ * own subquery, so two of these clauses can ride the same WHERE — which
+ * `storyWhere` and `todoWhere` both now do — without either colliding with the
+ * other or with whatever the caller's own FROM/JOIN aliases those tables as. */
+export const ARCHIVABLE: Record<string, { alias: string }> = {
+  accounts: { alias: "arc" },
+  help: { alias: "arh" },
+  // WIDENED FROM TWO TO TEN, 24 Sep 2026, migration 0123. Aurora turned the
+  // ruling from hiding into CASCADING — "when archiving a parent item, always
+  // archive as well the child items" — so a child no longer merely fails a
+  // filter about its parent: it carries `archived_at` of its own, and every one
+  // of these tables can now be asked the same question `accounts` and `help`
+  // could. The aliases are per-table and scoped to their own subqueries, so any
+  // number of these clauses can ride one WHERE without colliding.
+  //
+  // `work_logs` IS NOT HERE AND NEVER WILL BE. Aurora, verbatim: "never archive
+  // work logs, time is logged and we must always know where it went."
+  apps: { alias: "arp" },
+  meetings: { alias: "arm" },
+  processes: { alias: "arr" },
+  sprints: { alias: "ars" },
+  stories: { alias: "art" },
+  tasks: { alias: "ark" },
+  todos: { alias: "ard" },
+  waves: { alias: "arw" },
+}
+
+export function archivedParentClause(opts: {
+  /** the ARCHIVABLE table the pointer points at */
+  parent: string
+  /** the table (or alias) holding the pointer */
+  table: string
+  /** the column on it */
+  column: string
+}): string {
+  const entry = ARCHIVABLE[opts.parent]
+  // A parent that is not archivable has no archived state to ask about, and a
+  // clause that quietly became `1 = 1` would be a fence that silently opened.
+  if (!entry) throw new Error(`archivedParentClause: ${opts.parent} is not archivable`)
+  const col = `${opts.table}.${opts.column}`
+  return `(${col} IS NULL OR EXISTS (
+    SELECT 1 FROM ${opts.parent} ${entry.alias} WHERE ${entry.alias}.id = ${col} AND ${entry.alias}.archived_at IS NULL
   ))`
+}
+
+/** THE TICKET'S OWN ARCHIVED STATE, asked of a row that hangs off one — the
+ * account clause above, one record type along, under Aurora's widening.
+ *
+ * A story answers a ticket (`stories.ticket_id`), and a to-do can be raised off
+ * one (`todos.ticket_id`). Until this round both kept showing after somebody put
+ * the ticket away: the ticket left the tickets list, the triage queue, the
+ * assistant's corpus and the record map, and its own work carried on being
+ * listed, counted and quoted — which is the identical leak the account round
+ * closed, one level down.
+ *
+ * `ticket_id IS NULL` SHORT-CIRCUITS FIRST, and here it is the COMMON case
+ * rather than the rare one: a story with no ticket is the agency's own enabler
+ * work, and hiding it would empty most of the board. */
+export function ticketArchivedClause(table: string, column = "ticket_id"): string {
+  return archivedParentClause({ parent: "help", table, column })
 }
 
 /** WHAT THE SEARCH BOX ON THE TICKETS SCREEN ASKS THE SERVER. It rides the list
@@ -577,8 +678,13 @@ export function accountArchivedClause(table = "help"): string {
  * accounts this caller may see at all, and this only says which of them they are
  * looking at. It rides the list AND its count, or the badge would answer a
  * different question from the rows (R16). */
-function accountClause(accountId: string | undefined): { sql: string; params: string[] } {
-  return accountId ? { sql: "account_id = ?", params: [accountId] } : { sql: "", params: [] }
+function accountClause(accountId: string[] | undefined): { sql: string; params: string[] } {
+  // A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to select multile for
+  // each filter type"). `inClause` carries the two properties this door's own
+  // `statusClause` argued first: one value is a set of one, so every existing
+  // caller (a client record's Tickets tab, the machine surface, a bookmark) is
+  // untouched; and an empty set narrows nothing rather than matching nothing.
+  return inClause("account_id", accountId)
 }
 
 /** WHICH SYSTEM — the app record's own Tickets tab (CHECKLIST 8.6). The same
@@ -586,8 +692,8 @@ function accountClause(accountId: string | undefined): { sql: string; params: st
  * of the fence, riding the list AND its count so the badge and the rows answer
  * one question (R16). A ticket that names no app never matches, which is right —
  * "tickets about this system" cannot include the ones nobody said were. */
-function appClause(appId: string | undefined): { sql: string; params: string[] } {
-  return appId ? { sql: "app_id = ?", params: [appId] } : { sql: "", params: [] }
+function appClause(appId: string[] | undefined): { sql: string; params: string[] } {
+  return inClause("app_id", appId)
 }
 
 /** WHICH KIND, AND WHICH STAGE — the sub-tabs under All / My / Archived
@@ -599,9 +705,12 @@ function appClause(appId: string | undefined): { sql: string; params: string[] }
  * not hard-coded — retiring "Bug" on the Dropdown values screen retires its tab),
  * and two name a STATUS. "All" sends neither.
  *
- * The status one is deliberately a single value and not a list: every tab in the
- * strip that names a stage names exactly one, and a door that accepted several
- * would be a filter language nobody asked for.
+ * BOTH ARE SETS NOW (24 Sep 2026). This note used to say the status one was
+ * "deliberately a single value" — it stopped being true on 2026-09-06 when the
+ * Open tab named three stages, and the TYPE one followed on 24 Sep when Aurora
+ * ruled the toolbar's facets multi-select ("i shoudl be able to select multile
+ * for each filter type"). A tab still names exactly one of each; a facet names
+ * as many as somebody ticked.
  *
  * Both ride the list AND the count, or the badge answers a different question
  * from the rows beneath it (R16). */
@@ -611,8 +720,8 @@ function moduleClause(moduleId: string | undefined): { sql: string; params: stri
   return moduleId ? { sql: "module_id = ?", params: [moduleId] } : { sql: "", params: [] }
 }
 
-function typeClause(helpType: string | undefined): { sql: string; params: string[] } {
-  return helpType ? { sql: "help_type = ?", params: [helpType] } : { sql: "", params: [] }
+function typeClause(helpType: string[] | undefined): { sql: string; params: string[] } {
+  return inClause("help_type", helpType)
 }
 
 /** FEEDBACK IS THE ONE KIND WITH A CONDITION ON IT, and this is the condition.
@@ -848,18 +957,21 @@ export type TicketFilter = {
   view: "live" | "archived"
   /** the search box, answered by the door (R14: the list pages) */
   q?: string
-  /** one client's tickets — a FILTER on top of the fence */
-  accountId?: string
-  /** one system's tickets — the app record's Tickets tab (8.6) */
-  appId?: string
+  /** ONE OR MORE clients' tickets — a FILTER on top of the fence. A set since
+   * 24 Sep 2026; one id is a set of one. */
+  accountId?: string[]
+  /** ONE OR MORE systems' tickets — the app record's Tickets tab (8.6), and the
+   * toolbar's App facet. A set since 24 Sep 2026; one id is a set of one. */
+  appId?: string[]
   /** ONE SECTION of one app — what "group all the tickets I am creating in an
    * organized way" actually asks for. Sits BESIDE `appId` rather than replacing
    * it: a module id already implies its app, but the two filters are chosen
    * independently on screen (pick the app, then narrow), and a module filter
    * with no app named still answers correctly. */
   moduleId?: string
-  /** one kind — the sub-tab strip's four type tabs */
-  helpType?: string
+  /** ONE OR MORE kinds — the sub-tab strip's four type tabs, and the toolbar's
+   * Type facet. A set since 24 Sep 2026; one word is a set of one. */
+  helpType?: string[]
   /** ONE OR MORE STAGES — the strip's Triage, Ready, Open, Waiting and Closed
    * tabs. A SET since 2026-09-06, because "Open" names three of them; see
    * `statusClause` for why the browser may not do this narrowing instead. */
@@ -2763,6 +2875,11 @@ export async function setTicketArchived(
   // running." Only ARCHIVING guards this: putting a ticket away is the close,
   // taking it back out never needs its own clock stopped first.
   if (archived) await refuseWhileTimerRuns(cfg, guard, { table: "help", id })
+  // NOTHING VISIBLE EVER HANGS UNDER SOMETHING INVISIBLE (0123). A ticket whose
+  // client or whose app is still archived cannot be restored on its own: its
+  // own Restore is refused and the way back is to restore that parent, which is
+  // also the only place this ticket's own marker can be honoured.
+  if (!archived) await refuseIfParentArchived(cfg, guard.databaseId, { table: "help", id })
   const now = new Date().toISOString()
   const fence = ticketFence(guard, scope, "all")
   const set = archived
@@ -2778,9 +2895,25 @@ export async function setTicketArchived(
   )
   if (!changed[0]) return { moved: false, accountId: row.account_id }
 
+  // THE CASCADE (0123) — her own example, verbatim: "if ticket archive - story
+  // archived as well", and the general form beside it, "when archiving a parent
+  // item, always archive as well the child items". The stories that answer this
+  // ticket and the to-dos raised off it go with it, each carrying its own
+  // archived state and a marker naming THIS ticket, so restoring the ticket
+  // restores exactly those and steps over a story somebody archived on its own.
+  //
+  // AFTER THE ROW ITSELF MOVED, never before: the `if (!changed[0])` above is
+  // R17, so a double-clicked Archive moves zero rows the second time and
+  // returns there rather than cascading twice.
+  const cascaded = archived
+    ? await cascadeArchive(cfg, guard.databaseId, actor, { table: "help", id }, now)
+    : await cascadeRestore(cfg, guard.databaseId, { table: "help", id })
+
   await logActivity(cfg, guard.databaseId, actor, {
     type: archived ? "Ticket archived" : "Ticket restored",
-    description: `${actor.name} ${archived ? "archived" : "restored"} ${row.ref ?? "a ticket"}`,
+    description: `${actor.name} ${archived ? "archived" : "restored"} ${row.ref ?? "a ticket"}${
+      cascaded.length ? ` and ${cascaded.length} record${cascaded.length === 1 ? "" : "s"} under it` : ""
+    }`,
     relatedTable: "help",
     relatedRowId: id,
   })

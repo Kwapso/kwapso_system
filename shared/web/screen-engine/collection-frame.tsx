@@ -652,7 +652,7 @@ function CollectionFrame<T>({
   // hook here (see the comment on `useKitPanel` below): `pill`/`panel` are
   // plain values either render path can use or ignore, never a hook called
   // inside one branch only.
-  const { pill: filterBarPill, panel: filterBarPanel } = useFilterBar({
+  const filterBarPill = useFilterBar({
     facets: config.filterFacets,
     values: facetValues,
     data,
@@ -752,21 +752,15 @@ function CollectionFrame<T>({
     // so there is no floating surface left here for a Dialog's scroll lock to
     // fight with. `modal` still gates the mobile Sort popover below, which is
     // unrelated and unchanged.
-    // NOTHING WRAPS IT ANY MORE. This slot used to carry a `relative` box for
-    // one reason: `FilterBar`'s open panel was `position: absolute` and needed
-    // a positioned ancestor to measure against. The panel is in NORMAL FLOW
-    // now (client ruling, 2 Sep 2026: "the expanded toolbar shoudl not be an
-    // overlay, but literaly expand the space"), so there is no anchor to
-    // provide and an empty wrapper would be a box with no argument behind it.
-    // WHERE THE PANEL LANDS IN THIS BRANCH is the kit's own `toolbarPanel`
-    // prop below (v1.2.27) — the upstream fix `filter-bar.tsx`'s header used
-    // to log for the design-kit pipeline, now landed: the kit's frame offers
-    // a real slot between its toolbar and its rows, so this branch hands it
-    // the panel directly instead of publishing a portal target for one.
-    // `filterBarPill`/`filterBarPanel` are the `useFilterBar` call made once,
-    // above the branch, alongside every other hook here.
+    // NOTHING WRAPS IT, AND THERE IS NO SECOND SLOT TO FILL — client ruling,
+    // 2026-09-23 ("filter drop sheet popover"), superseding the in-flow panel
+    // this branch used to hand the kit's own `toolbarPanel`. The facets open
+    // in a portaled, anchored overlay that `useFilterBar` returns as part of
+    // the one node below, so there is nothing left for a slot between the
+    // toolbar and the rows to hold, and the kit's `toolbarPanel` is passed by
+    // nobody in this app. `filterBarPill` is the `useFilterBar` call made
+    // once, above the branch, alongside every other hook here.
     const shownFilterBar = showFilterBar && !isEmptyState ? filterBarPill : null
-    const shownFilterPanel = showFilterBar && !isEmptyState ? filterBarPanel : null
     // THE VIEW-SWITCH SLOT, BY THE KIT'S OWN PRECEDENT: CH27.13 shares it
     // between the actual view switcher and "the sub-tab picker are controls"
     // — this frame has no view switcher, so `SortControl` takes the slot
@@ -797,12 +791,6 @@ function CollectionFrame<T>({
     return (
       // THE PANEL'S PLACE, HANDED TO THE KIT'S OWN SLOT — v1.2.27.
       // `FilterBar`'s open panel is normal-flow now (client ruling, 2 Sep
-      // 2026: it expands the space rather than floating over it), and the
-      // kit's own frame now offers a real slot for exactly that,
-      // `toolbarPanel`, directly under the toolbar and above the rows. No
-      // provider, no outlet, no portal: `useFilterBar` already handed this
-      // branch the panel as an ordinary value above, so it is passed straight
-      // through as a prop like every other slot here.
       <KitCollectionFrame
         // R63 — THE PIN, REACHED THROUGH THE KIT'S OWN SLOT NAME. This branch
         // draws no toolbar of its own: the vendored `CollectionFrame` draws it,
@@ -825,7 +813,6 @@ function CollectionFrame<T>({
         rule={Boolean(config.title)}
         search={searchBox}
         filters={shownFilterBar}
-        toolbarPanel={shownFilterPanel}
         viewSwitch={sortControl}
         actions={createButton}
       >
@@ -963,12 +950,11 @@ function CollectionFrame<T>({
               className="w-44"
             />
           ) : null
-          // `modal` no longer passed: `FilterBar` has no Popover left to gate
-          // (see the `useKitPanel` branch's own note above). `filterBarPill`/
-          // `filterBarPanel` are `useFilterBar`'s own values, called once
-          // above the branch alongside every other hook here.
+          // `filterBarPill` is `useFilterBar`'s own value, called once above
+          // the branch alongside every other hook here. It carries the facets'
+          // overlay with it (client ruling, 2026-09-23), so there is no second
+          // value to place and no in-flow panel left in this branch either.
           const filterBar = showFilterBar && !isEmptyState ? filterBarPill : null
-          const filterPanel = showFilterBar && !isEmptyState ? filterBarPanel : null
           const sortControl = showSort && !isEmptyState ? (
             <SortControl
               options={config.sortOptions}
@@ -1013,13 +999,12 @@ function CollectionFrame<T>({
                   legitimate second line here — connected to the row above
                   it rather than floating disconnected from "the toolbar",
                   and never present when there is nothing to filter.
-                  `filter-bar.tsx`'s OPEN panel is normal-flow now (client
-                  ruling, 2 Sep 2026: "the expanded toolbar shoudl not be an
-                  overlay, but literaly expand the space"), rendered directly
-                  below as `filterPanel` (v1.2.27's `useFilterBar` split, see
-                  that hook's own doc) — a plain sibling in this same flex
-                  column: under the whole phone header, at the header's own
-                  width, pushing the rows down. Nothing here is a
+                  `filter-bar.tsx`'s OPEN FACETS are an OVERLAY again (client
+                  ruling, 2026-09-23: "filter drop sheet popover", superseding
+                  the 2 Sep 2026 in-flow panel) — portaled, anchored, and on a
+                  phone the kit's own bottom sheet, so nothing lands in this
+                  column at all and nothing here pushes the rows down.
+                  Nothing here is a
                   `rounded-pill`, so the oval that shaped the desktop
                   toolbar's answer was never this block's risk. `gap-2` was
                   already this block's own and is unchanged. */}
@@ -1077,7 +1062,6 @@ function CollectionFrame<T>({
                   )}
                 </div>
                 {filterBar}
-                {filterPanel}
               </div>
 
               {/* ≥ sm: FILTERS NEVER ORPHAN INTO A ROW OF THEIR OWN ANY MORE
@@ -1107,15 +1091,11 @@ function CollectionFrame<T>({
                   (default) keeps it on its own row below, exactly as before
                   this fix — that split is a title/sort decision this bug is
                   not about, and it stays untouched.
-                  `filterPanel` (v1.2.27's `useFilterBar` split) is the OTHER
-                  half of `filter-bar.tsx`'s open panel, which is normal-flow
-                  now (client ruling, 2 Sep 2026: it expands the space rather
-                  than floating over it) — rendered as this column's own last
-                  child rather than either layout's inner row, so it lands
-                  under the whole desktop header in both — under "stacked"
-                  that means below the sort row rather than over it.
-                  `hidden sm:flex`: a flex column so `filterPanel` stacks
-                  below the header row rather than beside it. */}
+                  THE OPEN FACETS ARE NOT IN THIS COLUMN, and there is no
+                  longer a half of them that could be: they float (client
+                  ruling, 2026-09-23, "filter drop sheet popover"), so this
+                  column's last child is whichever layout it drew and nothing
+                  is stacked under it. */}
               <div className="hidden flex-col gap-2 sm:flex">
                 {config.headerLayout === "inline" ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -1142,7 +1122,6 @@ function CollectionFrame<T>({
                     )}
                   </div>
                 )}
-                {filterPanel}
               </div>
             </>
           )

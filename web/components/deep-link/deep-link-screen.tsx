@@ -60,6 +60,7 @@ import { consumeGoGuardSkip, guardNavigate, registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import {
   closeTab,
+  closeTabAndLand,
   reorderTab,
   setWorkspaceScope,
   useActiveTabId,
@@ -638,11 +639,27 @@ export function DeepLinkScreen() {
         return
       }
       guardNavigate(() => {
-        const landing = closeTab(id)
-        go(landing ?? sectionPath)
+        // CLOSING THE *LAST* TAB LANDS ON THE NEW-TAB SCREEN — the client's
+        // ruling, 23 Sep 2026, verbatim: *"when i close the last folder tab,
+        // it shoudl open a new screen (the one with search bar)"*. "The one
+        // with search bar" is `NewTabScreen` (`shell/new-tab-screen.tsx`, the
+        // `Where to?` page rendered for `module === "new"` further down this
+        // file) — the same screen the strip's "+" and cmd-T already open.
+        //
+        // THE WHOLE RULE LIVES IN THE STORE (`closeTabAndLand`), not here,
+        // because it is one fact about the tab SET — it never goes empty —
+        // rather than a choice this screen gets to make. See that function's
+        // own note for what closing the last tab used to do (fall through to
+        // `sectionPath`, whereupon `visitTrail` silently seeded a tab for the
+        // collection she had just closed), for why the answer is a real tab
+        // rather than an empty strip, and for why the persisted set cannot
+        // bring the closed tab back. It always returns a path now, so the
+        // `?? sectionPath` fallback this line used to carry is gone — there
+        // is no longer a "nothing is left" case for it to catch.
+        go(closeTabAndLand(id, t("New tab")))
       })
     },
-    [activeWorkspaceTabId, go, sectionPath]
+    [activeWorkspaceTabId, go, t]
   )
 
   // DRAG A TAB TO A NEW POSITION — client ruling 16 Sep 2026, "go with the

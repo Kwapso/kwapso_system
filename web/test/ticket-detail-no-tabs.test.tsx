@@ -429,8 +429,8 @@ describe("the two-column body renders all four panels", () => {
     expect(screen.getByText("Related stories")).toBeTruthy()
 
     // EFFORT, the panel's own title — a heading, disambiguated from the
-    // metrics grid's own "Time log" line inside the same card.
-    expect(screen.getByRole("heading", { name: /^Time log/ })).toBeTruthy()
+    // metrics grid's own "Logs" line inside the same card.
+    expect(screen.getByRole("heading", { name: /^Logs/ })).toBeTruthy()
 
     // STAKEHOLDERS — the panel's own title, and the people pill inside it.
     expect(screen.getByText("Stakeholders")).toBeTruthy()
@@ -443,7 +443,7 @@ describe("the two-column body renders all four panels", () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
-    const time = screen.getByRole("heading", { name: /^Time log/ }).closest('[data-slot="card"]')
+    const time = screen.getByRole("heading", { name: /^Logs/ }).closest('[data-slot="card"]')
     const stakeholders = screen.getByText("Stakeholders").closest('[data-slot="card"]')
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
@@ -493,15 +493,15 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   it("carries the record count beside the Effort title", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const heading = await screen.findByRole("heading", { name: /^Time log/ })
+    const heading = await screen.findByRole("heading", { name: /^Logs/ })
     // One WORK_LOG_ROW fixture.
-    expect(heading.textContent).toBe("Time log1")
+    expect(heading.textContent).toBe("Logs1")
   })
 
   // AMENDED, 22 Sep 2026 — Aurora, verbatim: "make the metrics cards inside
   // the container, like in the metrics artifact you did for me!" Real
   // `<StatGrid>` tiles now; the middle one reads "Hours logged" since the
-  // title's own count already answers "Time log".
+  // title's own count already answers "Logs".
   it("renders the door's own cycle time, effort hours and flow efficiency as stat tiles", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
@@ -535,16 +535,16 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     expect(tileCard?.getAttribute("data-variant")).toBe("default")
   })
 
-  it("reads 'Not started' and 'No time log' before any work is logged, with the record count beside the title", async () => {
+  it("reads 'Not started' and 'No logs' before any work is logged, with the record count beside the title", async () => {
     api.metrics = NO_TICKET_METRICS
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     expect(await screen.findByText("Not started")).toBeTruthy()
-    expect(await screen.findByText("No time log")).toBeTruthy()
+    expect(await screen.findByText("No logs")).toBeTruthy()
     // The one WORK_LOG_ROW fixture is still logged even though the metrics
     // door has nothing to say yet.
-    const heading = await screen.findByRole("heading", { name: /^Time log/ })
-    expect(heading.textContent).toBe("Time log1")
+    const heading = await screen.findByRole("heading", { name: /^Logs/ })
+    expect(heading.textContent).toBe("Logs1")
   })
 
   // DEFECT (live proof, 21 Sep 2026): the Effort card's own stat tiles
@@ -554,14 +554,14 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   // `refreshTimers` seam, `web/components/shell/timer-bar.tsx`, which
   // invalidated `recordTimeKey` (the ROWS) on every start/stop but never
   // `help:metrics:<id>` (the door behind these three TILES)).
-  it("moves off 'Not started' / 'No time log' once a short timer is stopped, no reload", async () => {
+  it("moves off 'Not started' / 'No logs' once a short timer is stopped, no reload", async () => {
     api.metrics = NO_TICKET_METRICS
     openTicket()
     await screen.findByRole("heading", { level: 1 })
 
     // BEFORE: the metrics door has nothing to say yet.
     await screen.findByText("Not started")
-    expect(screen.getByText("No time log")).toBeTruthy()
+    expect(screen.getByText("No logs")).toBeTruthy()
 
     const startButton = await screen.findByRole("button", { name: /^Start/ })
     fireEvent.click(startButton)
@@ -572,7 +572,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     // AFTER: real figures, not the stale placeholder words.
     await waitFor(() => {
       expect(screen.queryByText("Not started")).toBeNull()
-      expect(screen.queryByText("No time log")).toBeNull()
+      expect(screen.queryByText("No logs")).toBeNull()
     })
     expect(screen.getByText("100%")).toBeTruthy()
   })
@@ -580,7 +580,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   it("draws the individual time log rows with a face, name, date and duration", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const panel = screen.getByRole("heading", { name: /^Time log/ }).closest('[data-slot="card"]') as HTMLElement
+    const panel = screen.getByRole("heading", { name: /^Logs/ }).closest('[data-slot="card"]') as HTMLElement
     const list = panel.querySelector('[data-slot="effort-log-rows"]')
     expect(list, "the row list is drawn").toBeTruthy()
     const row = list!.querySelector('[role="listitem"]') as HTMLElement
@@ -596,7 +596,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   // AMENDED, 22 Sep 2026 — Aurora, from the task review, verbatim: "if no
   // time logged yet, hide that component." Stricter than R88's own
   // header-only drop: at zero rows the card renders NOTHING at all, not
-  // even the body's own "No time logged yet." sentence.
+  // even the body's own "No logsged yet." sentence.
   it("renders nothing at all — no card, no sentence — once the ticket has no time at all", async () => {
     api.metrics = NO_TICKET_METRICS
     api.workLogs = []
@@ -604,8 +604,8 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
     await screen.findByRole("heading", { level: 1 })
     // The rest of the page still settles.
     await screen.findByText("Stakeholders")
-    expect(screen.queryByText("No time logged yet.")).toBeNull()
-    expect(screen.queryByRole("heading", { name: /^Time log/ })).toBeNull()
+    expect(screen.queryByText("No logsged yet.")).toBeNull()
+    expect(screen.queryByRole("heading", { name: /^Logs/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Add the first" })).toBeNull()
   })
 
@@ -623,7 +623,7 @@ describe("Effort — the ticket gets the same card, metrics and rows and no add 
   it("draws no pencil — clicking a row opens the slide-in sheet, and Save corrects it through the same update door", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const panel = screen.getByRole("heading", { name: /^Time log/ }).closest('[data-slot="card"]') as HTMLElement
+    const panel = screen.getByRole("heading", { name: /^Logs/ }).closest('[data-slot="card"]') as HTMLElement
     const row = panel.querySelector('[data-slot="effort-log-rows"] [role="listitem"] button') as HTMLElement
     expect(row, "the row itself is a button now, not a pencil beside it").toBeTruthy()
     fireEvent.click(row)

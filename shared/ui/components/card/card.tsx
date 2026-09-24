@@ -372,10 +372,27 @@ export interface CardProps
   extends React.ComponentPropsWithoutRef<"div">,
     VariantProps<typeof cardVariants> {
   /**
-   * `.kw-card--hairline` — the same-tone separation case, and the only reason
-   * a card may carry a stroke at all. Off by default: the kit separates
-   * blocks with colour and reaches for the hairline only when two cards of
-   * the SAME tone sit against each other.
+   * RETIRED, 23 SEP 2026 — ACCEPTED AND IGNORED. CLIENT RULING, VERBATIM:
+   * *"by rule no borders nowhere in the kit"*. A card is a CONTAINER, and
+   * this prop drew the one thing that ruling is about: a stroke around the
+   * whole of one. `docs/RULES.md` §2.8 is the law and `foundations/rules/boxes.mjs` is what
+   * enforces it — a census that makes every remaining four-edge stroke in
+   * this kit say which of §2.8's four exceptions it falls under.
+   *
+   * WHAT REPLACES IT IS ALREADY IN THE FILE, and has been since §2.6: a card
+   * takes THE OTHER PAPER TONE from the band it sits in. `default` is soft
+   * paper, `raised` is off-beige, and the table in §2.6 says which belongs
+   * where. Two cards of the SAME tone against each other — the one case this
+   * prop existed for — separate the way `plain` already separates two
+   * sections after her 21 Sep ruling: a `Separator`, or the gap between
+   * them. Neither is a box, and both are the kit's own devices.
+   *
+   * THE PROP STAYS IN THE API AND DOES NOTHING. `docs/RULES.md` §9.1: never
+   * rename or drop an export, a component, or a variant value, because an
+   * app pinned to an older tag stops compiling the day it upgrades. It is
+   * still destructured below rather than left in `...props`, so it cannot
+   * reach the DOM as an unknown attribute. `components/card/check-card.mjs`
+   * pins both halves: the prop is still accepted, and it paints nothing.
    */
   hairline?: boolean;
   /**
@@ -486,7 +503,10 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       data-selected={selected ? "true" : undefined}
       className={cn(
         cardVariants({ variant }),
-        hairline && "shadow-[var(--hairline)]",
+        /* NO BOX AROUND A CARD — 23 Sep 2026, RULES.md §2.8. `hairline` used
+           to add `shadow-[var(--hairline)]` here. It is read above only so
+           that it never reaches the DOM; see the prop's own note for the
+           two devices that replaced it. */
         /* Precedence, written down rather than left to emission order
            (PATTERN §4): selected > hover. A selected card is the loudest one
            on the screen already. */

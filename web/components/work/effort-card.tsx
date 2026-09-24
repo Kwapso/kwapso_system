@@ -236,7 +236,8 @@ export function EffortCard({
       startedAt: values.startedAt,
       endedAt: values.endedAt,
       note: values.note,
-      kind: values.kind,
+      // NO `kind` — see `time-form-dialog.tsx`. Omitting it preserves whatever
+      // the row already holds rather than wiping it.
     })
     refresh()
     toast.success(t("Time corrected."))
@@ -269,7 +270,7 @@ export function EffortCard({
           2026 and EmptyGatedPanel's own default is plain. The forwarding prop
           this card carried for the tickets-only experiment had exactly one
           caller, which passed the value that is now the default. */}
-      <EmptyGatedPanel title={t("Time log")} count={formatCount(recordCount)} empty={false}>
+      <EmptyGatedPanel title={t("Logs")} count={formatCount(recordCount)} empty={false}>
         {rows === undefined ? (
           <Skeleton variant="list" lines={3} />
         ) : (
@@ -332,11 +333,13 @@ export function EffortCard({
                 </Card>
                 <Card variant="default">
                   <CardContent>
-                    {/* "Hours logged", not "Time log" — the title's own count is
+                    {/* "Hours logged", not "Logs" — the title's own count is
                         the record count now, so the tile answers a different
                         question beside it rather than repeating the word.
-                        B0386 (Effort -> Time log): this tile's own word moved
-                        with it, from "Effort hours". */}
+                        The section title itself went Effort -> "Time log"
+                        (B0386, 22 Sep 2026) -> "Logs" (Aurora, 23 Sep 2026:
+                        "word is logs only"); this tile's own word has been
+                        "Hours logged" through both and is unchanged. */}
                     <StatGrid
                       items={[
                         {
@@ -360,7 +363,11 @@ export function EffortCard({
                           value:
                             metrics.flowEfficiency !== null
                               ? `${Math.round(metrics.flowEfficiency)}%`
-                              : t("No time log"),
+                              // "No logs", not "No time log" — Aurora, 23 Sep
+                              // 2026, "word is logs only". Flow efficiency is
+                              // hours divided by cycle time, so with no hours
+                              // logged there is nothing to divide.
+                              : t("No logs"),
                         },
                       ]}
                       surface="bare"
@@ -394,7 +401,7 @@ export function EffortCard({
                 `"listitem"` keep the list semantics a plain `<div>` would
                 otherwise drop, since a `Separator` between `<li>` siblings is
                 not valid inside a `<ul>`. */}
-            <div role="list" aria-label={t("Time log")} data-slot="effort-log-rows" className="flex flex-col">
+            <div role="list" aria-label={t("Logs")} data-slot="effort-log-rows" className="flex flex-col">
               {rows.map((l, index) => {
                 const name = staffNameFromSnapshot(l.userName) || t("Someone who has left")
                 const editable = canEdit && !!l.endedAt && !l.discarded

@@ -8374,6 +8374,451 @@ ALTER TABLE accounts ADD COLUMN lat REAL;
 ALTER TABLE accounts ADD COLUMN lng REAL;
 `,
   },
+  {
+    // THE INDUSTRY BECOMES A REAL DROPDOWN, AND THE COUNTRY FINALLY BECOMES ONE
+    // TOO. Aurora, 23 Sep 2026, verbatim: "make it a drop down, adjustable on
+    // settings."
+    //
+    // IT WAS ALREADY HALF A DROPDOWN, WHICH IS WHY IT DRIFTED. The account form
+    // has picked the industry from an "Industry" group since it was built,
+    // `VOCABULARY_HOMES` names `accounts.industry` as that group's home, and
+    // Settings > Accounts > "Industries and countries" already edits it. What
+    // never existed is the other two halves: the WRITE DOOR took free text
+    // (`optionalText(body.industry, ...)`, routes/accounts.ts), and the group
+    // was never seeded from the column, so on a live team the picker could be
+    // empty while the column held words. The live book holds "Insurance" and
+    // "Insurance Broker" as two spellings of one trade because of exactly that.
+    //
+    // THIS MIGRATION IS THE SEED; `requirePickedAccountValues`
+    // (workers/tenancy/src/lib/accounts.ts) is the door that closes behind it.
+    // The order matters and is the whole reason the two ship together: closing
+    // the door FIRST would strand every account whose stored word is not yet an
+    // option, because an edit that re-sends it would be refused.
+    //
+    // NOTHING IS MERGED, AND THAT IS DELIBERATE. Every distinct stored spelling
+    // becomes its own row, near-duplicates included. "Insurance" and "Insurance
+    // Broker" may be two real trades, and a migration is the worst possible
+    // place to guess: it runs once, per team, with nobody watching. They are
+    // reported to Aurora instead, and merging two words is already an ordinary
+    // act on the Choices screen -- a rename there REWRITES the stored words
+    // through `storedWordColumns` (shared/selectable-homes.ts), which is
+    // precisely the seam that makes a merge safe and a migration unnecessary.
+    //
+    // THE COUNTRY GETS THE IDENTICAL TREATMENT. Its group has been seeded with
+    // ten labels since 0018, but its door was open the whole time, which is how
+    // "Osterreich" got in beside "Austria" on the live team. Seeding from the
+    // column is what lets the door close without stranding those rows; the two
+    // spellings survive as two options, for Aurora to merge or keep.
+    //
+    // ONLY ACTIVE ROWS COUNT AS "ALREADY THERE". `NOT EXISTS` matches on
+    // (type, value) regardless of state, so a word a team RETIRED on purpose is
+    // not quietly revived -- the same restraint `ensureSelectableValue`'s own
+    // header states. A record still holding a retired word stays editable
+    // anyway, because the door compares against the stored value before it
+    // compares against the group.
+    //
+    // IDEMPOTENT AND RE-RUNNABLE: every INSERT is guarded, there is no schema
+    // change, and a second run inserts nothing.
+    //
+    // NUMBERED 0120, read live rather than recalled (CLAUDE.md, "team migration
+    // numbers are read, never recalled"): `git fetch origin`, then the tail of
+    // this file on every remote ref -- 0119 is the highest version on the local
+    // tree, on `origin/main` and on `origin/feat/ui-ux`, and no other remote
+    // branch carries anything at or above it, as of 23 Sep 2026.
+    version: "0120_an_accounts_industry_is_a_dropdown",
+    sql: `
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.industry)}, stored.word, 0, datetime('now'), NULL, NULL, 'System'
+  FROM (SELECT DISTINCT TRIM(industry) AS word FROM accounts
+         WHERE industry IS NOT NULL AND TRIM(industry) <> '') AS stored
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s
+    WHERE s.type = ${sqlString(SELECTABLE_GROUPS.industry)} AND s.value = stored.word
+ );
+
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.country)}, stored.word, 0, datetime('now'), NULL, NULL, 'System'
+  FROM (SELECT DISTINCT TRIM(country) AS word FROM accounts
+         WHERE country IS NOT NULL AND TRIM(country) <> '') AS stored
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s
+    WHERE s.type = ${sqlString(SELECTABLE_GROUPS.country)} AND s.value = stored.word
+ );
+`,
+  },
+  {
+    // THE NOTES BECOME THE AGENDA -- Aurora, 23 Sep 2026, verbatim: "moved
+    // existing notes to agenda", alongside the ruling that took the Notes
+    // surface off the meetings UI ("on meetings: rmeove notes (we have
+    // transcript for that)").
+    //
+    // WHY THIS IS A MIGRATION AND NOT A CLEAN-UP. The UI removal alone left
+    // real content unreachable: `meetings.notes` is the ONE column in this
+    // module that only a person writes -- no sync ever touches it (0035's own
+    // note) -- so nothing regenerates it if it is lost. Measured in the app's
+    // own source against the live staging base (`whereFor`'s search comment,
+    // workers/content/src/lib/meetings.ts): of 458 live meetings, 75 carry
+    // notes and 4 carry an agenda. Three quarters of the prose this module
+    // exists to keep was about to have no door.
+    //
+    // THE BACKUP COMES FIRST, AND IT IS RESTORABLE. `meeting_notes_backup`
+    // holds one row per meeting that had notes: the meeting's id, the notes
+    // EXACTLY as stored, and when they were copied. Restoring is one
+    // statement against that table, and it survives the merge because nothing
+    // below ever deletes from it. Deactivate-never-delete, applied to a column
+    // rather than a row.
+    //
+    // WHAT THE MERGE DOES, in her three cases:
+    //   * BOTH -- the agenda stays FIRST and the notes follow under a visible
+    //     divider. The divider is a bare `<hr>`: both fields are rich text and
+    //     `HR` is on the editor's own allow-list (shared/web/notes-editor/
+    //     logic.ts), so it survives the sanitiser on the way back out. It
+    //     carries NO WORDS on purpose -- a sentence written here would be
+    //     English in the DATA, shown to a German reader on a screen the
+    //     translation laws cannot reach (R28 reads the catalogue, not a
+    //     migration).
+    //   * AGENDA EMPTY -- the notes simply become the agenda.
+    //   * NOTES EMPTY -- nothing happens at all; the row is not even backed up.
+    //
+    // `notes` IS NOT CLEARED, and the column is not dropped. Deactivate-
+    // never-delete: the door still reads and writes it, the knowledge sweep
+    // still ingests it (knowledge-ingest.ts), and a merge that also wiped the
+    // source would make the backup the only copy of something we had just
+    // decided to keep two copies of.
+    //
+    // IDEMPOTENT, AND THE MARKER IS WHAT MAKES IT SO. `merged_at` on the
+    // backup row is the record of "this one has already been folded in": the
+    // INSERT skips a meeting already backed up, and the UPDATE only touches
+    // rows whose backup says `merged_at IS NULL`, setting it in the same
+    // breath. Run it twice and the second run changes nothing -- which matters
+    // because the alternative guard (does the agenda already contain the
+    // notes?) is a substring test over prose, and prose repeats itself.
+    //
+    // NUMBERED 0121, read live rather than recalled (CLAUDE.md, "team
+    // migration numbers are read, never recalled"): `git fetch origin`, then
+    // the tail of this file -- 0119 is the highest on `origin/main`, and 0120
+    // is taken by another lane's uncommitted entry directly above this one in
+    // the shared working tree, as of 23 Sep 2026. Two lines mint against one
+    // estate; if 0120 lands under a different name, this renumbers behind it.
+    version: "0121_meeting_notes_become_the_agenda",
+    sql: `
+CREATE TABLE IF NOT EXISTS meeting_notes_backup (
+  meeting_id TEXT PRIMARY KEY REFERENCES meetings(id),
+  notes TEXT NOT NULL,
+  saved_at TEXT NOT NULL,
+  merged_at TEXT
+);
+
+-- THE BACKUP. Only meetings that actually hold words, and only once: a second
+-- run matches every row it already wrote and inserts nothing.
+INSERT INTO meeting_notes_backup (meeting_id, notes, saved_at, merged_at)
+SELECT m.id, m.notes, datetime('now'), NULL
+  FROM meetings m
+ WHERE m.notes IS NOT NULL AND TRIM(m.notes) <> ''
+   AND NOT EXISTS (SELECT 1 FROM meeting_notes_backup b WHERE b.meeting_id = m.id);
+
+-- THE MERGE. Agenda first where there is one, then the divider, then the
+-- notes; the notes alone where there is not. Only rows the backup has not
+-- already marked as merged.
+UPDATE meetings
+   SET agenda = CASE
+         WHEN agenda IS NULL OR TRIM(agenda) = '' THEN notes
+         ELSE agenda || '<hr>' || notes
+       END
+ WHERE id IN (SELECT meeting_id FROM meeting_notes_backup WHERE merged_at IS NULL);
+
+-- AND THE MARKER, in the same run, so the UPDATE above can never fire twice
+-- on one meeting.
+UPDATE meeting_notes_backup
+   SET merged_at = datetime('now')
+ WHERE merged_at IS NULL;
+`,
+  },
+  {
+    // THE HAND-TYPED KINDS OF WORK ARE WIPED. Aurora's ruling, 24 Sep 2026,
+    // verbatim: "wipe them".
+    //
+    // The day before, she ruled that the kind of work is AUTOMATIC -- "on logs
+    // this kind of work shoudl not be manual, but automatic to where it was
+    // created: if it was creted in a story its stories, in a ticket its a
+    // ticke, in a meeting its a meeting, etc" -- and the free-text box came off
+    // the log form and the correction sheet the same round. That left the words
+    // people had already typed sitting in `work_logs.kind`, shown on no screen
+    // and asked for by nothing. This is the data half: she was asked whether to
+    // keep them, and said to wipe them.
+    //
+    // ── WHAT IS SPARED, AND WHY IT CANNOT BE TOLD APART BY THE COLUMN ───────
+    //
+    // The column has exactly TWO writers, and only one of them is a person:
+    //
+    //   * the TRANSCRIPT CAPTURE (`workers/content/src/lib/meetings.ts`) stamps
+    //     the literal `MEETING_LOG_KIND` ('Meeting') on one log per staff
+    //     attendee, always with `target_table = 'meetings'`;
+    //   * the three write doors, from a request body -- which until 23 Sep 2026
+    //     carried whatever somebody typed into a text box whose placeholder was
+    //     "Development, design, project management...", and still carries
+    //     whatever an MCP caller passes to `start_timer` or `log_time`.
+    //
+    // SO 'Meeting' IS NOT A SIGNATURE. A person could type the word themselves,
+    // and on a MEETING they could: `<WorkLogsPanel targetTable="meetings">`
+    // (meeting-detail.tsx) opens the same log dialog with the meeting fixed as
+    // the target, and that dialog carried the free-text box like every other.
+    // `target_table` is the discriminator everywhere else -- a hand-typed
+    // 'Meeting' on a story, a ticket or a task is distinguishable and IS wiped
+    // -- but `target_table = 'meetings' AND kind = 'Meeting'` is a genuinely
+    // AMBIGUOUS SET, and no column in this table separates a captured row from
+    // a person who typed the same word on the same kind of record.
+    //
+    // IT IS SPARED WHOLE, and the asymmetry is the argument. Sparing costs a
+    // handful of invisible words on meeting logs. Wiping costs the capture's
+    // own de-duplication guard, which matches on `kind = 'Meeting'`: a guard
+    // that stops matching lets a re-capture write the hours again, and that
+    // exact failure added 18.25 hours across 21 work logs that nobody worked on
+    // 2026-08-31 (the incident is written up beside the guard itself). The
+    // `meetingTime` filter reads the same literal.
+    //
+    // AND IT IS SPARED EVEN THOUGH BOTH READERS MOVE OFF IT THIS ROUND. The
+    // filter is re-pointed at `target_table = 'meetings'` and the guard drops
+    // its `AND kind = ?` in the same change -- but a migration runs BEFORE the
+    // content worker that carries those two edits is deployed (OPERATIONS.md's
+    // own order: tenancy, then migrate-teams, then content). In that window the
+    // OLD code is live and still reading the literal. A migration that wiped it
+    // would open the 18.25-hour window by construction, for the length of one
+    // deploy.
+    //
+    // THE BACKUP COMES FIRST, AND IT IS RESTORABLE -- `meeting_notes_backup`
+    // one migration above is the shape, and this is the same discipline:
+    // `work_log_kinds_backup` holds one row per log whose kind is being
+    // cleared, the word EXACTLY as stored, the target table it sat on, and when
+    // it was copied. Restoring is one statement:
+    //
+    //   UPDATE work_logs SET kind =
+    //     (SELECT b.kind FROM work_log_kinds_backup b WHERE b.work_log_id = work_logs.id)
+    //    WHERE id IN (SELECT work_log_id FROM work_log_kinds_backup);
+    //
+    // Nothing below ever deletes from it. Deactivate-never-delete, applied to a
+    // value rather than a row.
+    //
+    // NOTHING ELSE CHANGES. The COLUMN stays (0115 dropped `billable` outright;
+    // this does not, because the capture still writes here and the constant is
+    // still the thing the filter will be moved off), no index is touched
+    // (`idx_work_logs_live` names `kind` in its column list and is unaffected
+    // by a value going NULL), and no other table is read or written.
+    //
+    // IDEMPOTENT, AND THE MARKER IS WHAT MAKES IT SO -- 0121's own idiom, one
+    // migration up. `cleared_at` on the backup row is the record of "this one
+    // has already been wiped": the INSERT skips a log already backed up AND
+    // skips any row whose kind is now NULL, and the UPDATE only touches rows
+    // whose backup says `cleared_at IS NULL`, setting it in the same breath.
+    // Run it twice and the second run moves zero rows in all three statements.
+    //
+    // NUMBERED 0122, read live rather than recalled (CLAUDE.md, "team migration
+    // numbers are read, never recalled"): `git fetch origin`, then the tail of
+    // this file on that ref -- 0121 is the highest version on BOTH `origin/main`
+    // and this working tree as of 24 Sep 2026, and the manager reports 0121 as
+    // applied on both staging teams. Two lines mint against one estate; if 0122
+    // lands under a different name first, this renumbers behind it.
+    version: "0122_hand_typed_work_log_kinds_are_wiped",
+    sql: `
+CREATE TABLE IF NOT EXISTS work_log_kinds_backup (
+  work_log_id TEXT PRIMARY KEY REFERENCES work_logs(id),
+  kind TEXT NOT NULL,
+  target_table TEXT NOT NULL,
+  saved_at TEXT NOT NULL,
+  cleared_at TEXT
+);
+
+-- THE BACKUP. Every log carrying a kind EXCEPT the ambiguous meeting set --
+-- see the header for why 'Meeting' on a meeting cannot be told from a captured
+-- row, and why the safe reading of an ambiguity is to keep it. An empty string
+-- is backed up like any other value: it is not the constant, so it goes, and
+-- backing it up is what makes the wipe fully reversible.
+-- Only once: a second run finds the kind already NULL and inserts nothing.
+INSERT INTO work_log_kinds_backup (work_log_id, kind, target_table, saved_at, cleared_at)
+SELECT w.id, w.kind, w.target_table, datetime('now'), NULL
+  FROM work_logs w
+ WHERE w.kind IS NOT NULL
+   AND NOT (w.target_table = 'meetings' AND w.kind = 'Meeting')
+   AND NOT EXISTS (SELECT 1 FROM work_log_kinds_backup b WHERE b.work_log_id = w.id);
+
+-- THE WIPE, driven entirely by the backup table, so nothing can be cleared
+-- that was not copied first.
+UPDATE work_logs
+   SET kind = NULL
+ WHERE id IN (SELECT work_log_id FROM work_log_kinds_backup WHERE cleared_at IS NULL);
+
+-- AND THE MARKER, in the same run, so the UPDATE above can never fire twice on
+-- one log.
+UPDATE work_log_kinds_backup
+   SET cleared_at = datetime('now')
+ WHERE cleared_at IS NULL;
+`,
+  },
+  {
+    // ARCHIVING CASCADES, AND THE CASCADE REMEMBERS WHO CAUSED IT. Aurora's
+    // ruling, 23-24 Sep 2026, in two messages, verbatim:
+    //
+    //   "wdym by vanish? should stay in the system, but invisible. just in case
+    //    we need to in the future recover it. if ticket archive - story
+    //    archived as well"
+    //   "when archiving a parent item, always archive as well the child items"
+    //
+    // WHAT THIS REPLACES. 0117 gave `accounts` an archived state, and the round
+    // after it made a child of an archived parent invisible by FILTERING: the
+    // child's own row was untouched and a clause on every read hid it. That is
+    // not what she asked for. A cascaded child now carries its OWN archived
+    // state, so it is invisible for the reason anything archived is invisible,
+    // it can be found wherever archived things are found, and it can be
+    // recovered. The filter stays as a belt (R112) for the one case a cascade
+    // cannot reach: a child created AFTER its parent was archived.
+    //
+    // ── THE AUDIT FOUR, ON EIGHT MORE TABLES ────────────────────────────────
+    //
+    // `archived_at` + `archiver_id`/`archiver_email`/`archiver_name`, the exact
+    // shape 0117 gave `accounts` and 0011 gave `help`, because a cascaded row
+    // has to answer "who put this away, and when" like any other.
+    //
+    // WHICH EIGHT, and the rule that picked them: a table gains them if it sits
+    // on an OWNING edge below something archivable AND has its own door a
+    // person can reach. The sub-parts are deliberately absent — `help_threads`,
+    // `help_status_events`, `story_status_events`, `story_processes`,
+    // `wave_phase_days`, `process_steps`, `process_versions`,
+    // `client_tool_prices` and `knowledge_chunks` are never listed and never
+    // opened on their own, so hiding their parent hides them and a column would
+    // buy nothing but thirty more cascade steps.
+    //
+    // ── AND `work_logs` IS NOT HERE, AT ANY DEPTH, FROM ANY PARENT ──────────
+    //
+    // Aurora, 24 Sep 2026, verbatim: "never archive work logs, time is logged
+    // and we must always know where it went." It is a PRINCIPLE and not a
+    // preference, so it is written at the place that decides rather than
+    // inferred from an absence: the record of where time went must survive
+    // whatever happens to the thing it was spent on. `work_logs` gains no
+    // column here and appears in no edge in
+    // `shared/workers/archive-cascade.ts`, whose own check fails the build if
+    // it ever does.
+    //
+    // ── THE MARKER: WHO ARCHIVED THIS, NOT MERELY WHEN ──────────────────────
+    //
+    // `archived_via_table` + `archived_via_id`, on the eight above AND on
+    // `accounts` and `help`, which already had the audit four and can now
+    // themselves be archived BY something: an account by its parent account, a
+    // ticket by its account or its app.
+    //
+    // A TIMESTAMP IS NOT ENOUGH, and this pair is the whole reason why. If a
+    // story was archived on its own merits BEFORE its ticket was archived,
+    // un-archiving the ticket must not restore it, and nothing in a timestamp
+    // can tell those two stories apart. So the cascade records its cause, and
+    // three states fall out with no value overloaded onto one column, which is
+    // 0117's own argument for two independent timestamps over one three-value
+    // column:
+    //
+    //   archived_at IS NULL                          -> live
+    //   archived_at set, archived_via_table IS NULL  -> somebody archived THIS
+    //   archived_at set, archived_via_* set          -> the cascade from that
+    //                                                   row archived it
+    //
+    // TWO COLUMNS RATHER THAN ONE 'help:H_123' STRING, because a composite key
+    // is a second spelling that must be parsed before it can be compared, and
+    // because this base already has exactly this polymorphic pair and this
+    // matches it: `work_logs.target_table`/`target_id` (0014). A SIDE TABLE was
+    // the other candidate and loses for the reason `record-map.ts`'s own header
+    // gives about a shared attachments table — a polymorphic pair is something
+    // "no fence in this base is shaped to clause over" — and because every hot
+    // read would have grown a join to ask what a local column answers for free.
+    //
+    // THE PARTIAL INDEX is the restore's own query and nothing else
+    // (`WHERE archived_via_table = ? AND archived_via_id = ?`). Partial on
+    // `archived_via_id IS NOT NULL` because the overwhelming majority of rows
+    // are live and carry NULL, so the index holds only the rows a restore can
+    // ever visit.
+    //
+    // NUMBERED 0123, read live off this file's own tail at the moment of
+    // appending (CLAUDE.md: team migration numbers are read, never recalled):
+    // 0122 (`hand_typed_work_log_kinds_are_wiped`) is the highest on the local
+    // tree and on `origin/main`, and is already applied to both staging teams,
+    // so 0123 is the next free number.
+    version: "0123_archiving_cascades_to_the_children",
+    sql: `
+-- The audit four, on the eight tables that gain an archived state of their own.
+ALTER TABLE apps ADD COLUMN archived_at TEXT;
+ALTER TABLE apps ADD COLUMN archiver_id TEXT;
+ALTER TABLE apps ADD COLUMN archiver_email TEXT;
+ALTER TABLE apps ADD COLUMN archiver_name TEXT;
+ALTER TABLE meetings ADD COLUMN archived_at TEXT;
+ALTER TABLE meetings ADD COLUMN archiver_id TEXT;
+ALTER TABLE meetings ADD COLUMN archiver_email TEXT;
+ALTER TABLE meetings ADD COLUMN archiver_name TEXT;
+ALTER TABLE tasks ADD COLUMN archived_at TEXT;
+ALTER TABLE tasks ADD COLUMN archiver_id TEXT;
+ALTER TABLE tasks ADD COLUMN archiver_email TEXT;
+ALTER TABLE tasks ADD COLUMN archiver_name TEXT;
+ALTER TABLE todos ADD COLUMN archived_at TEXT;
+ALTER TABLE todos ADD COLUMN archiver_id TEXT;
+ALTER TABLE todos ADD COLUMN archiver_email TEXT;
+ALTER TABLE todos ADD COLUMN archiver_name TEXT;
+ALTER TABLE stories ADD COLUMN archived_at TEXT;
+ALTER TABLE stories ADD COLUMN archiver_id TEXT;
+ALTER TABLE stories ADD COLUMN archiver_email TEXT;
+ALTER TABLE stories ADD COLUMN archiver_name TEXT;
+ALTER TABLE sprints ADD COLUMN archived_at TEXT;
+ALTER TABLE sprints ADD COLUMN archiver_id TEXT;
+ALTER TABLE sprints ADD COLUMN archiver_email TEXT;
+ALTER TABLE sprints ADD COLUMN archiver_name TEXT;
+ALTER TABLE waves ADD COLUMN archived_at TEXT;
+ALTER TABLE waves ADD COLUMN archiver_id TEXT;
+ALTER TABLE waves ADD COLUMN archiver_email TEXT;
+ALTER TABLE waves ADD COLUMN archiver_name TEXT;
+ALTER TABLE processes ADD COLUMN archived_at TEXT;
+ALTER TABLE processes ADD COLUMN archiver_id TEXT;
+ALTER TABLE processes ADD COLUMN archiver_email TEXT;
+ALTER TABLE processes ADD COLUMN archiver_name TEXT;
+
+-- The marker, on those eight AND on the two that already had the audit four.
+ALTER TABLE apps ADD COLUMN archived_via_table TEXT;
+ALTER TABLE apps ADD COLUMN archived_via_id TEXT;
+ALTER TABLE meetings ADD COLUMN archived_via_table TEXT;
+ALTER TABLE meetings ADD COLUMN archived_via_id TEXT;
+ALTER TABLE tasks ADD COLUMN archived_via_table TEXT;
+ALTER TABLE tasks ADD COLUMN archived_via_id TEXT;
+ALTER TABLE todos ADD COLUMN archived_via_table TEXT;
+ALTER TABLE todos ADD COLUMN archived_via_id TEXT;
+ALTER TABLE stories ADD COLUMN archived_via_table TEXT;
+ALTER TABLE stories ADD COLUMN archived_via_id TEXT;
+ALTER TABLE sprints ADD COLUMN archived_via_table TEXT;
+ALTER TABLE sprints ADD COLUMN archived_via_id TEXT;
+ALTER TABLE waves ADD COLUMN archived_via_table TEXT;
+ALTER TABLE waves ADD COLUMN archived_via_id TEXT;
+ALTER TABLE processes ADD COLUMN archived_via_table TEXT;
+ALTER TABLE processes ADD COLUMN archived_via_id TEXT;
+ALTER TABLE accounts ADD COLUMN archived_via_table TEXT;
+ALTER TABLE accounts ADD COLUMN archived_via_id TEXT;
+ALTER TABLE help ADD COLUMN archived_via_table TEXT;
+ALTER TABLE help ADD COLUMN archived_via_id TEXT;
+
+-- The restore's own read, and nothing else.
+CREATE INDEX idx_apps_archived_via ON apps (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_meetings_archived_via ON meetings (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_tasks_archived_via ON tasks (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_todos_archived_via ON todos (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_stories_archived_via ON stories (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_sprints_archived_via ON sprints (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_waves_archived_via ON waves (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_processes_archived_via ON processes (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_accounts_archived_via ON accounts (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_help_archived_via ON help (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

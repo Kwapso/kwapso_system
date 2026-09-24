@@ -1,10 +1,18 @@
 "use client"
 
-// THE APPEARANCE PANEL — ONE container, four ROWS: Language, Size,
+// THE APPEARANCE PANEL — four ROWS on the page itself: Language, Size,
 // Appearance, Background. Each row is the setting's name and a short line on
 // the left, its choices on the right, and every choice carries its own
 // preview chip. A click applies at once — there is no pending state, no
 // preview pane and no Save button.
+//
+// NO CONTAINER SINCE 23 SEP 2026. This read "ONE container, four ROWS" until
+// Aurora ruled on it: "settings appearacne shoudl not have card - thats not
+// minimal." The box was `SettingsSection`'s, and it came off there
+// (`shared/web/settings-section.tsx`'s own header has the full account); what
+// changed HERE is the row rule, from a `divide-y` stroke to the kit
+// `<Separator>` — see the note at the return below for why the two had to
+// move together.
 //
 // ── THE RULING THAT PUT THIS SHAPE BACK, AURORA, 22 SEP 2026 ───────────────
 //
@@ -94,6 +102,7 @@
 
 import * as React from "react"
 
+import { Separator } from "@shared/ui/components/separator/separator"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ScaleSection, applyScale } from "./scale-section"
@@ -231,20 +240,56 @@ export function AppearancePanel({
   }
 
   return (
-    <SettingsSection title={t("Appearance")} hideTitle>
-      <div className="divide-border flex flex-col divide-y">
-        <SettingsRow title={t("Language")} description={t("What the app speaks to you.")}>
-          <LanguageSection value={lang} onChange={(next) => void chooseLanguage(next)} disabled={languageBusy} />
-        </SettingsRow>
-        <SettingsRow title={t("Size")} description={t("Text and controls, throughout the app.")}>
-          <ScaleSection value={scale} onChange={(next) => void chooseScale(next)} disabled={scaleBusy} />
-        </SettingsRow>
-        <SettingsRow title={t("Appearance")} description={t("Follow the system, or choose light or dark.")}>
-          <ThemeSection value={theme} onChange={chooseTheme} />
-        </SettingsRow>
-        <SettingsRow title={t("Background")} description={t("The ground the whole window stands on.")}>
-          <SpineSection value={spine} onChange={(next) => void chooseSpine(next)} disabled={spineBusy} />
-        </SettingsRow>
+    <SettingsSection title={t("Appearance")}>
+      {/* NO BOX, AND THE ROW RULE IS A `<Separator>` RATHER THAN A STROKE —
+          Aurora, 23 Sep 2026: "settings appearacne shoudl not have card -
+          thats not minimal." `settings-section.tsx`'s own header carries the
+          ruling and what came off. Two things had to move together, not one.
+          The fill/radius/inset went there; the row rule had to change HERE,
+          because `divide-y` (which is what this column drew) is a literal CSS
+          border between children, and R67's surviving half is that separation
+          is a fill or an inset shadow, NEVER a stroke — the same finding
+          `web/test/settings-minimal.test.ts`'s third census already fails
+          eleven other settings files for. Inside a box it was invisible
+          enough to survive; on the bare page it is the one thing the ruling
+          was against. The kit `<Separator>` is the house's own answer and is
+          already shipped in exactly this shape by R107
+          (`web/components/work/effort-card.tsx`'s work-log rows: no fill, one
+          `<Separator>` between adjacent rows and never above the first or
+          below the last). It is a 1px `bg-border` ELEMENT, not a border and
+          not a four-edge inset shadow, so it is untouched by the kit's own
+          container-box law of the same day.
+
+          `index > 0` RATHER THAN A SEPARATOR PER ROW: a rule belongs BETWEEN
+          two rows, so there is none above the first and none below the last,
+          and `SettingsRow`'s own `first:pt-0 last:pb-0` still lands — the
+          first row is still this column's `:first-child` and the last is
+          still its `:last-child`, because a `<Separator>` only ever sits
+          between them. */}
+      <div className="flex flex-col">
+        {[
+          <SettingsRow key="language" title={t("Language")} description={t("What the app speaks to you.")}>
+            <LanguageSection value={lang} onChange={(next) => void chooseLanguage(next)} disabled={languageBusy} />
+          </SettingsRow>,
+          <SettingsRow key="size" title={t("Size")} description={t("Text and controls, throughout the app.")}>
+            <ScaleSection value={scale} onChange={(next) => void chooseScale(next)} disabled={scaleBusy} />
+          </SettingsRow>,
+          <SettingsRow
+            key="appearance"
+            title={t("Appearance")}
+            description={t("Follow the system, or choose light or dark.")}
+          >
+            <ThemeSection value={theme} onChange={chooseTheme} />
+          </SettingsRow>,
+          <SettingsRow key="background" title={t("Background")} description={t("The ground the whole window stands on.")}>
+            <SpineSection value={spine} onChange={(next) => void chooseSpine(next)} disabled={spineBusy} />
+          </SettingsRow>,
+        ].map((row, index) => (
+          <React.Fragment key={row.key}>
+            {index > 0 && <Separator />}
+            {row}
+          </React.Fragment>
+        ))}
       </div>
     </SettingsSection>
   )

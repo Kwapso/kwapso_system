@@ -113,7 +113,15 @@ const ENOUGH_TO_CHART = 4
  * zero, which is right above a tab (no rows, no badge) and wrong inside a card
  * that has already committed a label to the screen. The same expression the pulse
  * band's tiles use. */
-function Numbers({ summary }: { summary: WorkLogSummary }) {
+function Numbers({
+  summary,
+  showEntriesTile,
+}: {
+  summary: WorkLogSummary
+  /** See `WorkLogsPanel`'s own prop of the same name — `false` drops the
+   *  Entries tile and leaves the other two untouched. */
+  showEntriesTile: boolean
+}) {
   const t = useT()
   const items = [
     // THE GLYPH UNDER EACH NUMBER. The kit's StatItem (v1.2.63) has no `icon`
@@ -134,12 +142,25 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       value: hoursSpoken(summary.totalSeconds),
       icon: <Icon name={CONCEPT_ICON.time as IconName} className="size-4" aria-hidden />,
     },
-    {
-      id: "entries",
-      label: t("Entries"),
-      value: formatCount(summary.total) || "0",
-      icon: <Icon name={CONCEPT_ICON.entries as IconName} className="size-4" aria-hidden />,
-    },
+    // THE ENTRIES TILE IS OPT-OUT SINCE 23 SEP 2026 — Aurora, verbatim, over
+    // the meeting record's own Time log section: "for time log do not show the
+    // kpi card entries count". A count of rows is exactly what R97 says does
+    // not deserve a card of its own ("just a count next to the title"), and on
+    // that page the count already sits beside the section's title. Dropped
+    // here rather than hidden with a class, so the kit's own grid sizes itself
+    // to the two tiles that remain rather than leaving a gap where a third
+    // used to be. Every other caller keeps it (the prop defaults to `true`)
+    // until she rules on those surfaces too.
+    ...(showEntriesTile
+      ? [
+          {
+            id: "entries",
+            label: t("Entries"),
+            value: formatCount(summary.total) || "0",
+            icon: <Icon name={CONCEPT_ICON.entries as IconName} className="size-4" aria-hidden />,
+          },
+        ]
+      : []),
     {
       id: "people",
       label: t("Members on it"),
@@ -162,8 +183,16 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
  * information, and a bar chart of two bars is a sentence with a frame around it.
  * Every one of these three has its own test and its own honest sentence, because
  * they fail independently: a record can have plenty of hours spread over one
- * person (nothing to say about who), all of one kind (nothing to say about what),
- * and all of it before the window opened (nothing to say about when). */
+ * person (nothing to say about who) and all of it before the window opened
+ * (nothing to say about when).
+ *
+ * THERE WERE THREE, AND "HOURS BY KIND OF WORK" IS THE ONE THAT WENT (Aurora,
+ * 23 Sep 2026): the kind of work is the RELATED RECORD TYPE now, and this panel
+ * is hung on ONE record, so that split can only ever have a single bar in it.
+ * Its own guard already drew the honest sentence in that case; under the ruling
+ * the case is every case, so the card is gone rather than left to say "nothing
+ * to report" for ever. The team-wide split, across all four types, is the donut
+ * on the Logs screen's own Dashboard tab. */
 function Pictures({ summary }: { summary: WorkLogSummary }) {
   const { t, lang } = useLanguage()
   if (summary.total < ENOUGH_TO_CHART) return null
@@ -177,12 +206,6 @@ function Pictures({ summary }: { summary: WorkLogSummary }) {
     // same word for the same person, which is why both go through the seam.
     label: staffNameFromSnapshot(p.userName) || t("Someone who has left"),
     hours: Math.round((p.seconds / 3600) * 10) / 10,
-  }))
-  // A kind nobody set is the honest majority of logged time, so it is a bar with
-  // a name rather than a row quietly dropped from the picture.
-  const kinds = summary.kinds.map((k) => ({
-    label: k.kind ?? t("Not said"),
-    hours: Math.round((k.seconds / 3600) * 10) / 10,
   }))
 
   return (
@@ -205,16 +228,6 @@ function Pictures({ summary }: { summary: WorkLogSummary }) {
           />
         ) : (
           <HoursByChart rows={people} label={t("Hours")} />
-        )}
-      </BandCard>
-      <BandCard title={t("Hours by kind of work")}>
-        {kinds.length < 2 ? (
-          <NothingYet
-            what={t("Every entry here is the same kind of work.")}
-            how={t("Say what kind an entry is when you log it, and the split shows here.")}
-          />
-        ) : (
-          <HoursByChart rows={kinds} label={t("Hours")} />
         )}
       </BandCard>
     </div>
@@ -242,6 +255,7 @@ export function WorkLogsPanel({
   canLog,
   onActivityChanged,
   showAddButton = true,
+  showEntriesTile = true,
   addTrigger,
   onEmptyChange,
 }: {
@@ -271,6 +285,17 @@ export function WorkLogsPanel({
    * what the title-row one reaches for instead.
    */
   showAddButton?: boolean
+  /**
+   * Defaults to `true` — every caller keeps the three-tile row it has always
+   * drawn. `false` drops the ENTRIES tile only (hours and members stay), for
+   * Aurora's ruling of 23 Sep 2026 over the meeting record's own Time log
+   * section: "for time log do not show the kpi card entries count". R97's own
+   * sentence about a count ("just a count next to the title") is the reason it
+   * can go there: that section already badges the same number beside its
+   * title, so the tile was the number said twice. A PROP rather than a rule
+   * applied here, because the other three callers have not been ruled on.
+   */
+  showEntriesTile?: boolean
   /**
    * THE HOST'S OWN OPENER — this panel writes "start a new log" into it every
    * render, so an OUTSIDE control (a title-row "+") can open the SAME dialog
@@ -369,7 +394,8 @@ export function WorkLogsPanel({
       startedAt: values.startedAt,
       endedAt: values.endedAt,
       note: values.note,
-      kind: values.kind,
+      // NO `kind` — see `time-form-dialog.tsx`. Omitting it preserves whatever
+      // the row already holds rather than wiping it.
     })
     refresh()
     toast.success(t("Time corrected."))
@@ -386,7 +412,6 @@ export function WorkLogsPanel({
       startedAt: values.startedAt,
       endedAt: values.endedAt,
       note: values.note,
-      kind: values.kind,
     })
     refresh()
     toast.success(t("Time logged."))
@@ -492,7 +517,7 @@ export function WorkLogsPanel({
           summaryQ.data &&
           summaryQ.data.total > 0 && (
             <>
-              <Numbers summary={summaryQ.data} />
+              <Numbers summary={summaryQ.data} showEntriesTile={showEntriesTile} />
               <Pictures summary={summaryQ.data} />
             </>
           )
@@ -533,11 +558,15 @@ export function WorkLogsPanel({
                 <span className="min-w-0 flex-1 truncate text-sm">
                   {[staffNameFromSnapshot(l.userName), l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
                 </span>
-                {l.kind && (
-                  <Badge variant="secondary" className="shrink-0 text-badge">
-                    {l.kind}
-                  </Badge>
-                )}
+                {/* THE FREE-TEXT KIND BADGE STOOD HERE AND IS GONE (Aurora,
+                    23 Sep 2026: the kind of work is automatic now, and it is
+                    the RELATED RECORD TYPE). This panel is hung on ONE record,
+                    so every row in it shares that record's type by
+                    construction: drawing it here would be the same word on
+                    every line of the list, which is a badge that says nothing.
+                    The Logs screen's own Entries tab, where the rows are mixed,
+                    draws the type instead. */
+                }
                 {l.discarded && (
                   <Badge variant="secondary" className="text-muted-foreground shrink-0 text-badge">
                     {t("Discarded")}

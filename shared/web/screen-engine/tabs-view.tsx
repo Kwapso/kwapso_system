@@ -180,7 +180,12 @@ export const TAB_ICONS: Record<string, IconName> = {
   permissions: "shield-check",
   source: "file-text",
   files: "paperclip",
-  notes: "note-pencil",
+  // "AGENDA", RENAMED FROM "notes" 23 Sep 2026 — Aurora's ruling on Meetings
+  // ("on meetings: rmeove notes (we have transcript for that)") took the notes
+  // half of that record's first tab away, and the tab's own VALUE went with the
+  // word. The GLYPH is unchanged: the same pencil-over-a-note this concept has
+  // always drawn, and `meeting-detail.tsx` is the one strip that resolves it.
+  agenda: "note-pencil",
   // ONE CONCEPT, drawn by two tab strips that both use the value "roles": the
   // draft review's own list of proposed member roles (draft-review.tsx) and
   // Settings' own top-level Roles tab (settings-screen.tsx). WAS "user-gear",

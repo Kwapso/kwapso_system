@@ -1313,12 +1313,25 @@ export function AppTicketsPanel({
                   {/* `choice` — a table row's face fits the text line, never
                       the other way round (client ruling, 18 Sep 2026: "make
                       the avatar smaller. should not be the cause of more
-                      height to the overall row"). */}
+                      height to the overall row").
+
+                      GREY IF THEY ARE NOT OURS — Aurora, 23 Sep 2026:
+                      "external photos (from contacts) gray scale. keep staff
+                      nirmal." `raiserIsClient` is the fact this row already
+                      carries and the line below already reads to decide
+                      whether to trim the name to a first name (R54); the face
+                      now answers the same question off the same field, the
+                      identical pairing `tickets-collection.tsx`'s own raiser
+                      cell makes. The RESOLVER cell a few lines down passes
+                      nothing on purpose: closing a ticket is a staff act
+                      (SCOPE ch.06), so there is no second population there to
+                      tell apart. */}
                   <RecordMark
                     picture={memberAvatar(ticket.raiserId)}
                     name={ticket.raiserName}
                     shape="round"
                     size="choice"
+                    external={ticket.raiserIsClient}
                   />
                   <span className="min-w-0 truncate">
                     {ticket.raiserIsClient ? ticket.raiserName : staffNameFromSnapshot(ticket.raiserName)}
