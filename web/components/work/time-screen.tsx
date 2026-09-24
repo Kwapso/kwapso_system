@@ -35,18 +35,26 @@
 // ONE PER TAB, because each narrows its own body and the two bodies are not the
 // same shape. Entries' toolbar is `<PagedFind>`'s own, which it has always
 // drawn — search, facets, sort and "Log time" — and the account facet simply
-// joins the three already there. The Dashboard's is a `<ToolbarRow>` carrying
-// the two filters and nothing else: there is no search box because there is
-// nothing on that tab for a browser to sieve, and no sort because a set of
-// grouped pictures has no row order to offer. Both are reasoned, named lines in
-// `TOOLBAR_EXEMPT` and `TOOLBAR_SORT_EXEMPT` rather than silent omissions
-// (R48/R53), and the row's own `empty` is DERIVED from the collection's exact
-// server count (R50) rather than hardcoded.
+// joins the three already there. The Dashboard's is a `<ToolbarRow>` carrying a
+// DISABLED search box and the two filters: her ruling, 24 Sep 2026, "add full
+// toolbar, even if search is diasbled". The box is the kit's own field in its
+// own disabled state, and its placeholder names the tab that does search.
+//
+// NO SORT, and that is the one slot still absent. A set of grouped pictures has
+// no row order to offer: a donut is ordered by share, a line by time, a rank by
+// hours, and a chip over that would have to pick one picture to reorder and
+// leave the other five. It is a reasoned, named line in `TOOLBAR_SORT_EXEMPT`
+// rather than a silent omission (R53) — and `TOOLBAR_EXEMPT` no longer names
+// this file at all, because the search slot is filled now.
+//
+// The row's own `empty` is DERIVED from the collection's exact server count
+// (R50) rather than hardcoded.
 
 import * as React from "react"
 
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { RecordMark } from "@shared/web/record-mark"
 import { useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -196,12 +204,44 @@ export function TimeScreen({
         })}
         {logsTab === DASHBOARD ? (
           <div className="flex flex-col gap-[var(--toolbar-lead-gap)]">
-            {/* HER TOOLBAR, TWO FILTERS, NOTHING ELSE. `empty` is DERIVED from
-                the collection's own exact server count (R50) — a team with no
-                time logged at all gets no row, and the dashboard below it draws
-                its own honest empty state. */}
+            {/* HER TOOLBAR, IN FULL — 24 Sep 2026, verbatim: "add full toolbar,
+                even if search is diasbled." It used to draw the two filters and
+                nothing else, and a toolbar missing its most recognisable
+                control reads as a broken one rather than a deliberate one.
+
+                THE SEARCH BOX IS REAL AND REALLY DISABLED. `SearchInput` is the
+                kit's own field and it ships a disabled state (its own state 5:
+                `--hair-faint` fill, `--ink-disabled` ink, no shadow, the clear
+                control withdrawn), so this is the kit drawing "off" rather than
+                a grey div pretending to be a search box — there is no kit gap
+                here to work around. The PLACEHOLDER is what stops it being a
+                dead end: it names the tab that does search, so a reader who
+                reaches for it is sent one click away instead of left wondering.
+                It carries no `value` and no `onChange` on purpose: a field
+                nobody can type in needs no state, and `disabled` is what makes
+                that shape legal rather than a React warning.
+
+                WHY IT IS OFF RATHER THAN WIRED. There is nothing on this tab for
+                a search box to narrow: six grouped pictures come off one door
+                read, and the rows a person would be searching are the Entries
+                tab's, whose `<PagedFind>` asks the DOOR (R14 — 2,940 rows
+                arrived from two years of the previous system). A box here that
+                filtered the pictures would be answering a different question
+                from the one it looks like it is answering.
+
+                `empty` is DERIVED from the collection's own exact server count
+                (R50) — a team with no time logged at all gets no row at all, and
+                the dashboard below draws its own honest empty state. */}
             <ToolbarRow
               empty={total === 0}
+              search={
+                <SearchInput
+                  disabled
+                  label={t("Search")}
+                  placeholder={t("Search is on the Entries tab")}
+                  className="w-full"
+                />
+              }
               filters={dashboardFacets.length > 0 ? filterBar : undefined}
             />
             <LogsDashboard

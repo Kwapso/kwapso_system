@@ -284,6 +284,25 @@ export interface FilterFacet {
    * (shared/rules/registry.ts) — a flag with no registry line is a silent
    * exception nobody can audit, the exact shape R75 exists to close. */
   ordered?: boolean
+  /**
+   * THIS FACET TAKES EXACTLY ONE VALUE, and that is a fact about its
+   * VOCABULARY rather than a preference.
+   *
+   * Aurora, 24 Sep 2026: *"i shoudl be able to select multile for each filter
+   * type"* — so multi-select is the DEFAULT here and this is the narrow, named
+   * exception. It is set on a two-word facet whose words are opposites: Status
+   * (Active / Inactive), Archived (live / put away). Ticking both of a pair is
+   * asking for no narrowing at all, so a multi-select control would offer a
+   * third state its door cannot express and a person a choice that does
+   * nothing. The doors are defensive about it anyway (`oneOfPair`,
+   * shared/workers/filter-in.ts, collapses both to no filter) — this is what
+   * stops the control offering it in the first place.
+   *
+   * A facet over RECORDS (an account, an app, a person) or over an OPEN
+   * vocabulary (a country, a ticket type) is never `single`: those are exactly
+   * the ones her ruling is about.
+   */
+  single?: boolean
   /** THE FACET THIS ONE HANGS OFF — client ruling, 2026-09-09, on a screenshot
    * of her own tickets toolbar reading Client "Any client", App "Kwapso Portal"
    * and, underneath, "Nothing matched. Try fewer words, or clear the filters."

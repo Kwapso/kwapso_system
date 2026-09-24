@@ -1421,8 +1421,20 @@ again, which is the only property that matters here.
   looks correct and strands the embedded copy for ever. Leave the door that is
   allowed to see it (an Archive view, an Archived tab, a record's own map)
   alone, and never refuse staff. `deactivated_at` is NOT this; it is the
-  reachable INACTIVE state and hides nobody's children. The check is
-  `workers/content/test/archived-hides-its-children.test.ts`.
+  reachable INACTIVE state and hides nobody's children. **Amended 24 Sep 2026
+  (migration 0123): archiving CASCADES.** If your table can be a child of
+  something archivable, it carries the audit four AND
+  `archived_via_table`/`archived_via_id`, and its parent's archive door calls
+  `cascadeArchive`/`cascadeRestore` (`shared/workers/archive-cascade.ts`) after
+  its own row has moved, never before — R17's zero-row return is what stops a
+  second archive cascading twice. Declare the owning edge in `ARCHIVE_CASCADE`;
+  do NOT infer it from a foreign key, because most foreign keys are references
+  (a ticket's `raised_by_contact_id` points at the same table as its
+  `account_id` and only one of them is ownership). Restoring a row whose parent
+  is still archived is refused through `refuseIfParentArchived`. And nothing
+  cascades into `work_logs`, ever, at any depth. The checks are
+  `workers/content/test/archived-hides-its-children.test.ts` and
+  `workers/tenancy/test/archiving-cascades.test.ts`.
 
 **The words** (the ones that catch every new module, every time)
 

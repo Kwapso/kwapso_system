@@ -41,6 +41,7 @@
 //   POST /api/tenancy/apps                 -> record an app (agency only)
 //   POST /api/tenancy/apps/update          -> edit an app (agency only)
 //   POST /api/tenancy/apps/active          -> archive / restore an app
+//   POST /api/tenancy/apps/archived        -> archive / restore an app, and everything under it
 //   GET  /api/tenancy/apps/attachments     -> the files and links on an app (?id=), fenced not refused
 //   POST /api/tenancy/apps/attachments     -> attach a file or a link (agency only)
 //   POST /api/tenancy/apps/attachments/update -> rename, or swap a file's bytes / a link's address (agency only)
@@ -226,6 +227,7 @@ import {
   postAddStep,
   postAuditDate,
   postAppActive,
+  postAppArchived,
   postCreateApp,
   postCreateProcess,
   postCutVersion,
@@ -375,6 +377,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/apps": { handler: postCreateApp, kind: "mutation" },
   "POST /api/tenancy/apps/update": { handler: postUpdateApp, kind: "mutation" },
   "POST /api/tenancy/apps/active": { handler: postAppActive, kind: "mutation" },
+  "POST /api/tenancy/apps/archived": { handler: postAppArchived, kind: "mutation" },
   "GET /api/tenancy/apps/attachments": { handler: getAppAttachments, kind: "read" },
   "POST /api/tenancy/apps/attachments": { handler: postAppAttachment, kind: "mutation" },
   "POST /api/tenancy/apps/attachments/update": { handler: postAppAttachmentUpdate, kind: "mutation" },

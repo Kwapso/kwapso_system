@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.167",
-  "sha": "0980626015bcae890086bced18289c7e36b2f86b",
+  "tag": "v1.2.168",
+  "sha": "d4350be204a9d0300038d62f10b8a928fffaab59",
   "syncedAt": "2026-09-24"
  },
- "generatedAt": "2026-09-24T07:06:32.102Z",
+ "generatedAt": "2026-09-24T09:49:26.228Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -15,11 +15,11 @@
   "variantGroups": 82,
   "variantOptions": 274,
   "typedEnumProps": 54,
-  "typedBooleanProps": 323,
+  "typedBooleanProps": 324,
   "compositions": 47,
   "icons": 1514,
-  "tokens": 376,
-  "tokenDeclarations": 587,
+  "tokens": 390,
+  "tokenDeclarations": 615,
   "unresolved": 0
  },
  "components": [
@@ -4262,6 +4262,12 @@
        "optional": true,
        "kind": "boolean",
        "note": "Draw no visible heading — the facet is then named to assistive technology by `label` alone. For a compact field standing IN a toolbar row, where a caption stacked over a 44 pill would make it two rows tall."
+      },
+      {
+       "name": "multiple",
+       "optional": true,
+       "kind": "boolean",
+       "note": "SEVERAL AT ONCE. Aurora, 24 Sep 2026, validating the filter overlay: *\"validated, but i shoudl be able to select multile for each filter type\"*. Within one facet the chosen values mean OR; across facets a toolbar still means AND, which is the host's arithmetic and not this component's. ADDITIVE, AND OFF BY DEFAULT, so every existing call site is byte-identical with it omitted: `value`/`onValueChange` keep their single-valued contract and this file keeps drawing exactly what it drew. Turning it on swaps THREE things and nothing else — the value pair becomes `values`/`onValuesChange`, each row's mark becomes `SearchableFacet`'s checkbox (the box that says \"several of these may be on\", which is the distinction the single-valued tick's own note already draws), and a pick no longer closes the panel, because somebody choosing three clients should not have to reopen the list twice. WHY NOT `SearchableFacet` INSTEAD, which has been multi-valued all along: that component is an ALWAYS-EXPANDED panel — a heading, a search pill, then every option as a row — and a consuming app measured two of them as a screenful of controls hanging off a toolbar. The ruling that produced this component was \"one short labelled field, not an expanded list\"; taking several values is not a reason to give that up."
       },
       {
        "name": "searchable",

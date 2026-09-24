@@ -23,10 +23,13 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
+import { orderChips } from "@shared/web/chip-order"
+import { RecordRef } from "@shared/web/record-ref"
 import { LanguageProvider } from "@shared/web/language"
 import { PersonCard } from "@shared/web/person-card"
 import { RECORD_TABS_SINGLE_PANEL, NO_NESTED_SCROLL_EXEMPT } from "@shared/rules/registry"
 import {
+  attendeeName,
   MeetingLocationSection,
   MeetingTranscriptSection,
   meetingIsInPerson,
@@ -172,6 +175,66 @@ describe('the chips are "id, department, app/account (with link)", through the o
     expect(dept, "secondary, never a status tone").toMatch(/variant="secondary"/)
     expect(dept, "the one coloured chip on a record is its status").not.toMatch(/dot=/)
     expect(dept, "the glyph rides beside the word").toMatch(/departmentGlyph\(/)
+  })
+
+  // ── "MISSING CHIPS", AND WHICH KIND OF PROBLEM IT IS ──────────────────────
+  //
+  // Aurora said "missing chips" twice, 24 Sep 2026, against this head. The row
+  // is built correctly and renders every chip it is given, in her order — the
+  // first case below proves that with real data. What she is seeing is the
+  // SECOND case: a meeting that arrived from Google Calendar has no reference,
+  // no purpose, no app and no account, so every one of the five slots is empty
+  // and the row draws NOTHING AT ALL. That is a data problem, and these two
+  // cases are here so nobody re-reads it as a render one and "fixes" a
+  // component that is already right.
+  it("with real data, every chip she named renders, in her order", () => {
+    const { container } = wrap(
+      <>
+        {orderChips([
+          { kind: "id" as const, node: <RecordRef key="id" value="BERG-M0007" /> },
+          { kind: "type" as const, node: <span key="d">Sales</span> },
+          { kind: "mainParent" as const, node: <span key="a">Northwind</span> },
+          { kind: "secondaryParent" as const, node: <span key="c">Bergmann</span> },
+        ])}
+      </>
+    )
+    expect(container.textContent).toBe("BERG-M0007SalesNorthwindBergmann")
+  })
+
+  it("a meeting swept in from Google has NOTHING to put in any of the five slots", () => {
+    // Every one of these nulls is a fact about the door, asserted below rather
+    // than assumed:
+    //   · `ref` is minted in ONE place, `createMeeting`, and only when the
+    //     meeting has an account; the calendar sweep never sets it.
+    //   · the department comes off the meeting's PURPOSE, and a swept meeting
+    //     has none.
+    //   · app and account are both null on a swept row until somebody files it.
+    const { container } = wrap(
+      <>
+        {orderChips([
+          { kind: "id" as const, node: null },
+          { kind: "type" as const, node: null },
+          { kind: "mainParent" as const, node: null },
+          { kind: "secondaryParent" as const, node: null },
+        ])}
+      </>
+    )
+    expect(container.textContent, "the head's chip row is empty, and the row is not at fault").toBe("")
+  })
+
+  it("…and the door really is why: a reference is minted only with an account, never by the sweep", () => {
+    const door = read("workers/content/src/lib/meetings.ts")
+    // ONE mint, gated on the account.
+    expect(door).toMatch(/const ref = v\.accountId \? await nextTeamRef\([^)]*\) : null/)
+    expect(
+      (door.match(/nextTeamRef\(/g) ?? []).length,
+      "a reference is minted in exactly one place in this module"
+    ).toBe(1)
+    // And the sweep's own INSERT names no `ref` column at all.
+    const sweepAt = door.indexOf("INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at,")
+    expect(sweepAt, "the sweep's own insert is where this test expects it").toBeGreaterThan(-1)
+    const sweepInsert = door.slice(sweepAt, door.indexOf(";`", sweepAt))
+    expect(sweepInsert, "a swept meeting is inserted without a reference").not.toMatch(/\bref\b/)
   })
 
   it("the department is DERIVED from the meeting's purpose, never a new column", () => {
@@ -427,6 +490,56 @@ describe("the side column is her four sections, in her order, and no Details", (
     expect(container.querySelector("[data-external]")).toBeNull()
   })
 
+  it("the attendee rows carry a face and a name and NOTHING else", () => {
+    // Aurora, 24 Sep 2026: "rmeove the tag one of us, one of them - we know.
+    // show name, not email. remove coming/noreply whatever - we can see it in
+    // calendar". The faces and the greyscale flag from the round before stay —
+    // this strips the words beside them, not the people.
+    const panel = src.slice(src.indexOf("const attendeesPanel = ("), src.indexOf("const logsPanel"))
+    expect(panel, "no One of us / account / Organiser tag").not.toMatch(/chip=\{/)
+    expect(panel, "no RSVP line").not.toMatch(/secondary=\{/)
+    expect(panel, "…and the RSVP vocabulary has no reader left at all").toBeTruthy()
+    expect(src).not.toMatch(/\bRESPONSE\b\s*\[/)
+    expect(src, "the response map itself is deleted").not.toMatch(
+      /const RESPONSE: Record<string, string>/
+    )
+    // The two that survive, asserted so a later tidy cannot take them with it.
+    expect(panel).toMatch(/picture=\{memberFace\(/)
+    expect(panel).toMatch(/external=\{Boolean\(known\?\.accountId\)\}/)
+  })
+
+  it("a name, not an address — and an address in FULL when there is genuinely no name", () => {
+    // ONE OF OURS wears their own record's spelling, first name only, because
+    // a staff name is a first name everywhere else in this app (R54).
+    expect(attendeeName({ email: "ana@kwapso.app", name: "Ana From Google" }, { memberName: "Ana Ruiz" })).toBe(
+      "Ana"
+    )
+    // EVERYBODY ELSE keeps Google's own display name, un-trimmed: R54 is about
+    // our people, and a client is known by their whole name.
+    expect(attendeeName({ email: "bo@northwind.test", name: "Bo Meyer" }, undefined)).toBe("Bo Meyer")
+    expect(
+      attendeeName({ email: "bo@northwind.test", name: "Bo Meyer" }, { memberName: null }),
+      "a link that matched nobody is the same as no link"
+    ).toBe("Bo Meyer")
+    // NOBODY AT ALL, AND NO NAME FROM GOOGLE — the whole address.
+    expect(attendeeName({ email: "someone@elsewhere.test", name: null }, undefined)).toBe(
+      "someone@elsewhere.test"
+    )
+    expect(attendeeName({ email: "someone@elsewhere.test" }, undefined)).toBe("someone@elsewhere.test")
+    expect(attendeeName({ email: "someone@elsewhere.test", name: "   " }, undefined)).toBe(
+      "someone@elsewhere.test"
+    )
+  })
+
+  it("the fallback address is never truncated — it is a whole address or a real name", () => {
+    // "ana@…" is not a name, it is a name-shaped thing that cannot be
+    // searched, copied or recognised. The address at least is all three, and a
+    // reader can see at once that this is somebody we do not know.
+    const long = "a.very.long.local.part@some-rather-long-domain.example.test"
+    expect(attendeeName({ email: long, name: null }, undefined)).toBe(long)
+    expect(attendeeName({ email: long, name: null }, undefined)).not.toContain("…")
+  })
+
   it("Attendees is her word, counted beside its own title, and drops its header when empty", () => {
     expect(side || src).toBeTruthy()
     const panel = src.slice(src.indexOf("const attendeesPanel = ("), src.indexOf("const logsPanel"))
@@ -470,7 +583,17 @@ describe("Join disappears once the meeting is over; Google Calendar stays", () =
     expect(gated.length, "the actions row and the folded menu item").toBe(2)
   })
 
-  it("Google Calendar is deliberately NOT gated — it still opens something real", () => {
+  it("the second button says exactly \"Calendar\"", () => {
+    // Renamed twice, each time by her: "Open in Google Calendar" -> "Google
+    // Calendar" (23 Sep) -> "Calendar" (24 Sep, "rename google calendar to
+    // just 'calendar'"). Both retired labels are gone from the file.
+    const body = code(MEETING_DETAIL)
+    expect(body).toMatch(/t\("Calendar"\)/)
+    expect(body).not.toContain("Google Calendar")
+    expect(body).not.toContain("Open in Google Calendar")
+  })
+
+  it("Calendar is deliberately NOT gated on the clock — it still opens something real", () => {
     const src = code(MEETING_DETAIL)
     const at = src.indexOf("item.googleEventUrl")
     const window = src.slice(Math.max(0, at - 200), at + 200)

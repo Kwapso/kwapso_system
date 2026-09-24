@@ -21,8 +21,14 @@
 // at creation and never edited (there is no move-app door — see the migration).
 
 import { logActivity, writeActivity, describeChanges, type Actor } from "@shared/workers/activity"
+import { inClause } from "@shared/workers/filter-in"
 import { supersededMedia } from "@shared/workers/image"
 import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
+import {
+  cascadeArchive,
+  cascadeRestore,
+  refuseIfParentArchived,
+} from "@shared/workers/archive-cascade"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
@@ -123,7 +129,7 @@ async function insertRow(
 
 function appsWhere(
   scope: AccountScope,
-  opts: { accountId?: string; q?: string }
+  opts: { accountId?: string; q?: string; archived?: "yes" | "no" }
 ): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "account_id")
     // AND THE APP FENCE (SCOPE ch.03 "per-person restriction"). A client login
@@ -133,6 +139,14 @@ function appsWhere(
   const apps = appScopeClause(scope, "id")
   const filters = [fence.sql, apps.sql]
   const params = [...fence.params, ...apps.params]
+  // ARCHIVED IS INVISIBLE (0123, R112), and an app is the one table in this
+  // round that a person can archive DIRECTLY as well as by cascade — so this is
+  // a two-word allow-list like the accounts door's, not an unconditional clause:
+  // the Apps screen's own Archived tab asks for `yes` and gets exactly the pile,
+  // and every other read gets the live ones. Matched against literals because it
+  // arrives off a query string where `"false"` is truthy.
+  if (opts.archived === "yes") filters.push("archived_at IS NOT NULL")
+  else filters.push("archived_at IS NULL")
   if (opts.accountId) {
     filters.push("account_id = ?")
     params.push(opts.accountId)
@@ -205,7 +219,7 @@ export async function countApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string; q?: string } = {}
+  opts: { accountId?: string; q?: string; archived?: "yes" | "no" } = {}
 ): Promise<number> {
   const q = appsWhere(scope, opts)
   const rows = await d1Query<{ n: number }>(
@@ -224,7 +238,7 @@ export async function listApps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string; q?: string } = {}
+  opts: { accountId?: string; q?: string; archived?: "yes" | "no" } = {}
 ): Promise<{ rows: AppRow[]; total: number }> {
   const { sql, params } = appsWhere(scope, opts)
   const [rows, counted] = await Promise.all([
@@ -242,6 +256,7 @@ export async function listApps(
       solution: string | null
       key_actors: string | null
       deactivated_at: string | null
+      archived_at: string | null
       created_at: string
       creator_name: string | null
       updated_at: string | null
@@ -256,7 +271,7 @@ export async function listApps(
       // the record out of the same cache the list filled, and a second door for
       // four columns would be a round trip that buys a page nothing.
       `SELECT id, ref, account_id, name, url, stage, logo_url, tool_cost_cents_per_month,
-              about, client_context, solution, key_actors, deactivated_at,
+              about, client_context, solution, key_actors, deactivated_at, archived_at,
               created_at, creator_name, updated_at, editor_name
          FROM apps${sql} ORDER BY (deactivated_at IS NULL) DESC, name ASC LIMIT ${LIST_HARD_CAP}`,
       params
@@ -366,6 +381,7 @@ export async function listApps(
         staff: canOpen ? (people.staff.get(r.id) ?? []) : [],
         stakeholders: canOpen ? (people.stakeholders.get(r.id) ?? []) : [],
         active: r.deactivated_at == null,
+        archived: r.archived_at != null,
         createdAt: r.created_at,
         createdByName: scope.kind === "portal" ? null : r.creator_name,
         updatedAt: r.updated_at,
@@ -819,6 +835,73 @@ export async function setAppActive(
   return true
 }
 
+/** ARCHIVE / RESTORE AN APP — her ARCHIVED, a second and STRONGER state than
+ * `setAppActive` above and independent of it, exactly as `setAccountArchived`
+ * stands beside `setAccountActive`. This touches `archived_at`/`archiver_*` and
+ * never `deactivated_at`, so restoring hands the app back the active/inactive
+ * state it carried before, never a guess reconstructed from one merged column.
+ *
+ * NOTE THE WORDS `setAppActive` USES one screen away: its activity sentence has
+ * said "App archived" for INACTIVE since long before the word had a stronger
+ * meaning. That is a vocabulary bug this round did not widen — the door, the
+ * column and the tab here are the real archive, and the older sentence is left
+ * for the lane that owns the Apps screen's copy.
+ *
+ * AN APP IS AN OWNING PARENT, Aurora's ruling of 24 Sep 2026, verbatim: "yes,
+ * archiving th eparent archive the child." So this is the third door in the base
+ * that cascades, and everything the app owns — its tickets, meetings, tasks,
+ * to-dos, stories, phases, waves and process maps — goes with it, each carrying
+ * its own archived state and a marker naming this app.
+ *
+ * R17: the current-state predicate rides the UPDATE, so a double-clicked Archive
+ * moves zero rows the second time and cannot cascade twice. */
+export async function setAppArchived(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  archived: boolean
+): Promise<boolean> {
+  const app = await appOrThrow(cfg, guard, scope, id)
+  const fence = accountScopeClause(scope, "account_id")
+  const now = new Date().toISOString()
+
+  // NOTHING VISIBLE EVER HANGS UNDER SOMETHING INVISIBLE (0123): an app whose
+  // client is still archived cannot be restored on its own.
+  if (!archived) await refuseIfParentArchived(cfg, guard.databaseId, { table: "apps", id })
+
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    archived
+      ? `UPDATE apps SET archived_at = ?, archiver_id = ?, archiver_email = ?,
+           archiver_name = ?, updated_at = ?
+         ${where([fence.sql, "id = ?", "archived_at IS NULL"])} RETURNING id`
+      : `UPDATE apps SET archived_at = NULL, archiver_id = NULL, archiver_email = NULL,
+           archiver_name = NULL, archived_via_table = NULL, archived_via_id = NULL, updated_at = ?
+         ${where([fence.sql, "id = ?", "archived_at IS NOT NULL"])} RETURNING id`,
+    archived
+      ? [now, actor.id, actor.email, actor.name, now, ...fence.params, id]
+      : [now, ...fence.params, id]
+  )
+  if (!changed[0]) return false
+
+  const cascaded = archived
+    ? await cascadeArchive(cfg, guard.databaseId, actor, { table: "apps", id }, now)
+    : await cascadeRestore(cfg, guard.databaseId, { table: "apps", id })
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: archived ? "App archived" : "App unarchived",
+    description: `${actor.name} ${archived ? "archived" : "unarchived"} ${app.name}${
+      cascaded.length ? ` and ${cascaded.length} record${cascaded.length === 1 ? "" : "s"} under it` : ""
+    }`,
+    relatedTable: "apps",
+    relatedRowId: id,
+  })
+  return true
+}
+
 // ── processes ────────────────────────────────────────────────────────────────
 
 /** WHAT A CALLER MAY NARROW a processes read to — the fence plus the two filters,
@@ -1151,7 +1234,13 @@ export async function setAppModuleActive(
 
 // ── processes ────────────────────────────────────────────────────────────────
 
-export type ProcessFilters = { q?: string; appId?: string; archived?: string }
+/** `appId` IS A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to select
+ * multile for each filter type") — the process map collection's App facet takes
+ * several systems at once. `archived` stays a single word: it is a two-value
+ * facet (live / put away) where asking for both is asking for no narrowing, so
+ * there is nothing for a set to say. One id is a set of one, so every existing
+ * caller is untouched. */
+export type ProcessFilters = { q?: string; appId?: string[]; archived?: string }
 
 function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "p.account_id")
@@ -1171,9 +1260,10 @@ function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: strin
     const like = `%${likeLiteral(opts.q)}%`
     params.push(like, like)
   }
-  if (opts.appId) {
-    filters.push("p.app_id = ?")
-    params.push(opts.appId)
+  const systems = inClause("p.app_id", opts.appId)
+  if (systems.sql) {
+    filters.push(systems.sql)
+    params.push(...systems.params)
   }
   // PUT AWAY, OR STILL IN USE. A map is archived and never deleted (the savings
   // computed from its baseline have to stay checkable years later), so the
@@ -1183,6 +1273,15 @@ function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: strin
   // reaches the statement is our SQL and never the caller's text.
   if (opts.archived === "yes") filters.push("p.deactivated_at IS NOT NULL")
   if (opts.archived === "no") filters.push("p.deactivated_at IS NULL")
+  // AND THE OTHER ARCHIVE, WHICH IS A DIFFERENT WORD WEARING THE SAME SPELLING.
+  // `opts.archived` above is the MAPS module's own put-away, and it has meant
+  // `deactivated_at` since long before Aurora's 22 Sep 2026 ruling gave the word
+  // a stronger meaning everywhere else. `archived_at` (0123) is THAT one: the
+  // cascade from an archived account or app, invisible rather than merely put
+  // away, and therefore hidden from BOTH of this filter's two words. A map
+  // asking for the put-away pile still gets it; nobody gets a map whose client
+  // has been archived.
+  filters.push("p.archived_at IS NULL")
   return { sql: where([fence.sql, ...filters]), params }
 }
 

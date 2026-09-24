@@ -406,6 +406,9 @@ export const listFetch = {
       primeCache(totalKey("apps", teamId), r.total)
       return r.apps
     }),
+  // THE ARCHIVED ONES, read whole like the live ones and just as bounded: an
+  // archived app is still one of an agency's tens of systems.
+  archivedApps: (_teamId: string) => tenancy.apps(undefined, undefined, "yes").then((r) => r.apps),
   // THE AGENCY'S OWN HOUSEKEEPING — two capped collections (R14: an authored
   // library and a settled taxonomy, not feeds), so each fetcher primes its
   // exact `total:` sidecar and there is no cursor to park.
@@ -922,6 +925,14 @@ export function accountImpactKey(accountId: string): string {
  * maps screen, and the names inside the value drill-down. */
 export function appsKey(teamId: string): string {
   return `apps:${teamId}`
+}
+/** THE ARCHIVED PILE, its OWN key (migration 0123). A separate key rather than a
+ * filter over the live one, for the reason R15 cares about: the two are two
+ * different server reads, and a listener that invalidated one would leave the
+ * other showing a row that has just moved between them. Both are named in the
+ * apps listener's own deps, so archiving an app refreshes both piles at once. */
+export function archivedAppsKey(teamId: string): string {
+  return `apps:archived:${teamId}`
 }
 /** THE CLIENT'S OWN ORGANISATION, keyed by TEAM rather than by client.
  *

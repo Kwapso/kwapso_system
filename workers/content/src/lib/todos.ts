@@ -241,7 +241,14 @@ function todoSearchClause(q: string | undefined): { sql: string | null; params: 
  *
  * Said once so the list and both counts cannot drift (R16). */
 function todoArchivedClauses(alias = "t"): string[] {
-  return [accountArchivedClause(alias), ticketArchivedClause(alias)]
+  // ITS OWN ARCHIVED STATE FIRST (0123). Aurora widened the ruling from hiding
+  // to CASCADING — "when archiving a parent item, always archive as well the
+  // child items" — so a row whose parent was archived now carries `archived_at`
+  // of its own, and this is what hides it. The two parent clauses below stay as
+  // the BELT for the one case a cascade cannot reach: a row created AFTER its
+  // parent was archived is born live under an invisible parent, and only a
+  // clause about the parent can see that.
+  return [`${alias}.archived_at IS NULL`, accountArchivedClause(alias), ticketArchivedClause(alias)]
 }
 
 /** The WHERE both the page and its counts are built from — the fence, the

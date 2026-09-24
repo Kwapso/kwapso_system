@@ -27,7 +27,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { useRemembered } from "@shared/web/remembered"
 import { ModulesPanel } from "@/components/apps/modules-panel"
-import { Power, PencilSimple } from "@shared/ui/foundations/icons"
+import { Archive, Power, PencilSimple } from "@shared/ui/foundations/icons"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
@@ -330,6 +330,9 @@ export function AppDetailScreen({
       />
     )
 
+  // THE WEAKER STATE, unchanged: inactive. It drops the app out of the everyday
+  // lists and the value figures and leaves everything under it exactly where it
+  // was. The wording below is the wording this control has always had.
   function archiveApp() {
     ask({
       title: t("Archive {name}?", { name: app!.name }),
@@ -341,6 +344,34 @@ export function AppDetailScreen({
 
   async function restoreApp() {
     await run(() => tenancy.setAppActive(appId, true), t("App restored."), t("Couldn't restore that app."))
+  }
+
+  // AND THE STRONGER ONE, HER ARCHIVED (migration 0123). Its own door, its own
+  // column, and the warning says the one thing the weaker control's does not:
+  // that it takes everything the app owns with it. R59 — a yes/no question about
+  // something that already exists is a centred warning, which `ask` draws.
+  function putAwayApp() {
+    ask({
+      title: t("Archive {name} and everything on it?", { name: app!.name }),
+      body: t(
+        "The app and everything on it, its tickets, meetings, tasks, to-dos, stories, phases, waves and process maps, stop showing anywhere. Nothing is deleted and the time logged against any of it is untouched. Restoring the app brings all of it back."
+      ),
+      action: t("Archive"),
+      run: () =>
+        run(
+          () => tenancy.setAppArchived(appId, true),
+          t("App archived, with everything on it."),
+          t("Couldn't archive that app.")
+        ),
+    })
+  }
+
+  async function bringBackApp() {
+    await run(
+      () => tenancy.setAppArchived(appId, false),
+      t("App restored, with everything on it."),
+      t("Couldn't restore that app.")
+    )
   }
 
   // THE REAL NAME, NEVER "A CLIENT" WHILE A REAL ACCOUNT IS LINKED — client
@@ -606,6 +637,27 @@ export function AppDetailScreen({
               icon: <Power className="size-3.5" />,
               disabled: busy,
               onSelect: () => void restoreApp(),
+            },
+        // HER ARCHIVED, THE STRONGER STATE, and a SECOND item rather than a
+        // widening of the one above: they write different columns, and an app
+        // can be inactive and archived at once, so one control could not
+        // truthfully offer both. The words tell them apart — this one says what
+        // it takes with it.
+        app.archived
+          ? {
+              key: "bring-back",
+              label: t("Restore with everything on it"),
+              icon: <Archive className="size-3.5" />,
+              disabled: busy,
+              onSelect: () => void bringBackApp(),
+            }
+          : {
+              key: "put-away",
+              label: t("Archive with everything on it"),
+              icon: <Archive className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: putAwayApp,
             },
       ]
     : []

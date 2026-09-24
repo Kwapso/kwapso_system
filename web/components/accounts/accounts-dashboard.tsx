@@ -25,7 +25,7 @@
 // AND A FIFTH, LATER THE SAME DAY: "add metric industry (side of where they
 // are , so in the same row country & industry)." So the country split has a
 // twin beside it now, read through the identical fence and drawn through the
-// identical component (`SplitDonut`), in ONE grid row that stacks below `lg`
+// their own components, in ONE grid row that stacks below `lg`
 // the way every panel row on the ticket dashboard already does. Her second
 // ruling of the pair — "make it a drop down, adjustable on settings" — is not
 // in this file at all: it is the account FORM, the write DOOR and team
@@ -82,6 +82,7 @@ import * as React from "react"
 
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Donut } from "@shared/ui/components/donut/donut"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import {
   HoverCard,
   HoverCardContent,
@@ -93,6 +94,7 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { formatMonth } from "@shared/web/format"
+import { RecordMark } from "@shared/web/record-mark"
 import type { Language } from "@shared/i18n"
 
 import { tenancy } from "@/lib/api"
@@ -106,7 +108,7 @@ type T = (s: string, vars?: Record<string, string | number>) => string
  * beside it is the one thing on this tab that takes data hues. */
 const LINE_COLOUR = "var(--ink-tertiary)"
 
-/** `donut.tsx`'s own `SEGMENT_COLOURS`, in the same order — see `SplitDonut`'s
+/** `donut.tsx`'s own `SEGMENT_COLOURS`, in the same order — see `CountrySplit`'s
  * legend comment for why it is restated rather than imported, and for the
  * check that keeps the two from drifting. */
 const DONUT_SEGMENT_COLOURS = [
@@ -143,31 +145,39 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className="text-micro text-muted-foreground uppercase">{children}</h3>
 }
 
-/** ONE FIGURE — the kit's own stat register, by hand and deliberately not
- * through `<StatGrid>`.
+/** ONE FIGURE — THE KIT'S OWN STAT TILE, IN THE KIT'S OWN CARD.
  *
- * WHY NOT THE KIT PRIMITIVE. `StatGrid` is a number-and-label CARD by
- * construction, and R97 is explicit that a count never gets one ("just a
- * count next to the title … same as related tickets or related stories or
- * stakeholders"); its own census (`web/test/counts-beside-titles.test.ts`)
- * names every call site that draws one and requires an exemption with a
- * reason. Three counts on a dashboard are not the named exception, and
- * asking for one would be asking to overturn her rule rather than obey it.
+ * Aurora, 23 Sep 2026, verbatim: "the cards kpi need some kind of background,
+ * like effort." So this is `effort-card.tsx`'s treatment, not a third one:
+ * `<StatGrid surface="bare">` (the kit's eyebrow-over-figure register) inside
+ * a `<Card variant="default">`, which is the card background `StatGrid` itself
+ * cannot give a tile nested this deep — her own word for what a tile is, the
+ * same session she named it: "this is a metric, like in kit".
  *
- * SO THE REGISTER IS BORROWED AND THE BOX IS NOT. The two type steps are
- * `stat-grid.tsx`'s own, verbatim — `text-micro` / 500 / uppercase for the
- * eyebrow (its "11 / 500 / uppercase / 0.08em" comment) and `text-4xl` / 500
- * for the figure (its "44 / 500 / -0.025em / 1.04") — so a reader sees one
- * treatment for "a headline number" whether it arrived through the kit
- * component or through this tab. */
+ * IT IS A TONE, NOT A BOX, so the kit's newest law is not in tension with her
+ * ruling. §2.8 (kit docs/RULES.md, her own 23 Sep ruling "by rule no borders
+ * nowhere in the kit") forbids a container told from its ground by a STROKE —
+ * a `border`, or the hairline shadow the kit used as its remedy for one.
+ * `Card variant="default"` draws neither: it is soft paper, `.kw-card`, a
+ * FILL. Checked rather than assumed, because "give it a background" is the
+ * one instruction a reader could answer with an outline.
+ *
+ * AND IT OVERTURNS R97 FOR THIS TAB, WHICH IS HER CALL AND NOT THIS FILE'S.
+ * R97 is "a count never gets its own card, UNLESS EXPLICITLY SAID" — the
+ * exception its own text leaves open, and which the law's own exemption table
+ * has carried as "pending her word" for the three dashboard-shaped `StatGrid`
+ * sites since it shipped. She has now said it, of this exact tab, so
+ * `accounts-dashboard.tsx` joins that table with her sentence as the reason
+ * rather than a guess. The previous shape of this component — the same two
+ * type steps by hand, no card — is what she was looking at when she asked for
+ * the background. */
 function Figure({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-micro text-muted-foreground font-[var(--font-weight-medium)] uppercase">
-        {label}
-      </span>
-      <span className="text-4xl font-[var(--font-weight-medium)] tabular-nums">{value}</span>
-    </div>
+    <Card variant="default">
+      <CardContent>
+        <StatGrid items={[{ id: label, label, value }]} surface="bare" label={label} />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -182,108 +192,193 @@ function tenureText(days: number | null, t: T): string {
   return t("{count} months", { count: months })
 }
 
-/** A SPLIT OF THE BOOK, AS A DONUT — her item 2, verbatim: "make the where as
- * a donut graphic (when hover show)", and, the same day, "add metric industry
- * (side of where they are, so in the same row country & industry)".
- *
- * ONE COMPONENT, TWO SECTIONS, because they are one reading of two columns:
- * how the active company book divides by a single word each account carries.
- * A second hand-drawn legend would have been a second chance to disagree with
- * the ring beside it about what a colour means.
+/** WHERE THEY ARE, AS A DONUT, AND THE HOVER SAYS WHO — her 23 Sep 2026
+ * rulings, verbatim: "make the where as a donut graphic (when hover show)" and
+ * then "when hover in donut in country, show which aacounts with name adn
+ * logo".
  *
  * THE RING IS THE KIT'S OWN `Donut` and nothing here draws a second one. It
- * supplies the ring, the `--chart-1..5` sequence and the empty register; this
- * file supplies only the data and the reading.
+ * supplies the ring, the `--chart-1..5` sequence, the empty register — and,
+ * since v1.2.167, the ACTIVE SEGMENT: `activeId`/`onActiveChange` report which
+ * slice a pointer is on, which is what makes her second ruling answerable at
+ * all. The kit's own header used to read "hover — none drawn"; the lane that
+ * changed that is why this component can ask the question.
  *
- * THE LEGEND IS THIS FILE'S, AND THAT IS THE WHOLE OF THE DEVIATION — a
- * REPORTED KIT GAP, not a preference. `donut.tsx`'s own state table says it
- * in its own words: "2. hover — none drawn … it is switched off here (chapter
- * 18 and 19 draw no hover state on either specimen)". There is no
- * per-segment callback, no `activeIndex`, and the ring is rendered inside the
- * component, so a hover target cannot be handed in from outside either. Her
- * ruling asks for exactly the affordance the kit declines to draw. So the
- * ring comes from the kit (`legend={false}`) and the legend is drawn here as
- * real `<button>`s under the kit's `HoverCard` — the SAME hover language
- * `tickets-dashboard.tsx`'s `TallyBar` and `ClosureTrend` already use, rather
- * than a third one invented for this tab. A kit lane is building the real
- * per-segment hover; when it lands this legend collapses back into
- * `legend`/`showPercent`.
+ * SO THE READOUT IS DRIVEN BY THE RING, not by a second control beside it.
+ * Hovering a slice (or focusing its legend row, which sets the same state)
+ * names the companies in it, each with the face the app already draws for a
+ * company — `RecordMark` over the account's own `logoUrl`, falling back to its
+ * letter tile where there is no picture. Nothing here invents a second
+ * fallback; a company with no logo looks the way it looks everywhere else.
  *
- * AT REST THE PICTURE IS WHOLE — the ring and every word and colour. What
- * HOVER adds is the VALUE: how many accounts that slice is, and what share of
- * the book. Nothing is hidden that a reader needs to identify the picture;
- * the figure behind a slice is the thing they have to ask for. */
-function SplitDonut({
+ * BOUNDED, AND HONEST ABOUT IT. The door names at most
+ * `ACCOUNTS_COUNTRY_FACES_PER_ROW` companies per country while `n` stays
+ * exact, so a slice with more says how many more rather than showing eight and
+ * implying that is all of them.
+ *
+ * THE LEGEND ROWS ARE STILL REAL `<button>`s, because a hover is not an
+ * affordance everybody has: they are in the tab order, they set the same
+ * active slice on focus, and each carries its own whole readout as its
+ * accessible NAME — `ClosureTrend`'s own rule, one translation read twice. */
+function CountrySplit({
   rows,
-  label,
-  empty,
   t,
 }: {
-  /** already busiest-first, from the door — never re-sorted here. */
-  rows: { word: string; n: number }[]
-  /** the figure's own accessible name, the section title it sits under. */
-  label: string
-  /** the one sentence a split with nothing in it says. */
-  empty: string
+  rows: AccountsDashboardData["byCountry"]
   t: T
 }) {
-  if (rows.length === 0) return <p className="text-muted-foreground text-xs">{empty}</p>
+  const [active, setActive] = React.useState<string | null>(null)
+
+  if (rows.length === 0)
+    return (
+      <p className="text-muted-foreground text-xs">
+        {t("No country is set on an active account yet.")}
+      </p>
+    )
 
   const total = rows.reduce((sum, r) => sum + r.n, 0)
-  const segments = rows.map((r) => ({ id: r.word, label: r.word, value: r.n }))
+  const segments = rows.map((r) => ({ id: r.country, label: r.country, value: r.n }))
   const shareOf = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
-  /** One row's whole readout as one sentence — the accessible NAME of its own
-   * hit area, in the same words and the same order the card prints them, so
-   * what a screen reader hears and what a sighted reader sees can never be
-   * two different claims (`ClosureTrend`'s own rule, this file's header). */
-  const said = (word: string, n: number) =>
-    `${word} · ${t("{count} accounts, {percent}% of the book", { count: n, percent: shareOf(n) })}`
+  const said = (country: string, n: number) =>
+    `${country} · ${t("{count} accounts, {percent}% of the book", { count: n, percent: shareOf(n) })}`
+  const shown = rows.find((r) => r.country === active) ?? null
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-[var(--space-4)]">
-      <Donut
-        data={segments}
-        legend={false}
-        size="8.5rem"
-        label={label}
-        summary={rows.map((r) => said(r.word, r.n)).join(" · ")}
-      />
-      {/* THE LEGEND'S DOTS READ THE SAME SEQUENCE THE RING DOES, by position
-          — `donut.tsx`'s `SEGMENT_COLOURS` is `--chart-1..5` cycled by index
-          and is not exported, so the sequence is restated here rather than
-          reached for privately across a module boundary that was never made
-          public (the kit's own file says the same thing about copying
-          `chart.tsx`'s list). It is pinned by
-          `web/test/accounts-dashboard-tab.test.ts`, which reads BOTH files
-          off disk and fails if they ever disagree — a colour key that drifts
-          from its own ring is worse than no key. */}
-      <div className="flex min-w-0 flex-col gap-1">
-        {rows.map((r, i) => (
-          <HoverCard key={r.word} openDelay={60} closeDelay={60}>
-            <HoverCardTrigger asChild>
-              <button
-                type="button"
-                aria-label={said(r.word, r.n)}
-                data-slot="split-slice"
-                className="flex min-w-0 items-center gap-2 rounded-[var(--radius-sm)] px-1 text-start text-xs hover:bg-muted data-[state=open]:bg-muted"
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-[0.5625rem] shrink-0 rounded-pill"
-                  style={{ background: DONUT_SEGMENT_COLOURS[i % DONUT_SEGMENT_COLOURS.length] }}
-                />
-                <span className="min-w-0 truncate">{r.word}</span>
-              </button>
-            </HoverCardTrigger>
-            <HoverCardContent className="flex flex-col gap-1">
-              <p className="text-sm">{r.word}</p>
-              <p className="text-muted-foreground text-xs tabular-nums">
-                {t("{count} accounts, {percent}% of the book", { count: r.n, percent: shareOf(r.n) })}
-              </p>
-            </HoverCardContent>
-          </HoverCard>
-        ))}
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-[var(--space-4)]">
+        <Donut
+          data={segments}
+          legend={false}
+          size="8.5rem"
+          /* CONTROLLED AT ALL TIMES, and `null` is a VALUE here rather than
+             an absence. `donut.tsx` decides control with `activeId !==
+             undefined`, so handing it `undefined` when nothing is hovered
+             would flip the ring back to its own internal state mid-life and
+             leave the two disagreeing about which slice is lit. `active` is
+             `string | null` and is passed straight through. */
+          activeId={active}
+          onActiveChange={setActive}
+          label={t("Where they are")}
+          summary={rows.map((r) => said(r.country, r.n)).join(" · ")}
+        />
+        {/* THE LEGEND'S DOTS READ THE SAME SEQUENCE THE RING DOES, by position
+            — `donut.tsx`'s `SEGMENT_COLOURS` is `--chart-1..5` cycled by index
+            and is not exported, so the sequence is restated here rather than
+            reached for privately across a module boundary that was never made
+            public. Pinned by `web/test/accounts-dashboard-tab.test.ts`, which
+            reads BOTH files off disk. */}
+        <div className="flex min-w-0 flex-col gap-1">
+          {rows.map((r, i) => (
+            <button
+              key={r.country}
+              type="button"
+              aria-label={said(r.country, r.n)}
+              data-slot="split-slice"
+              onMouseEnter={() => setActive(r.country)}
+              onMouseLeave={() => setActive(null)}
+              onFocus={() => setActive(r.country)}
+              onBlur={() => setActive(null)}
+              className="flex min-w-0 items-center gap-2 rounded-[var(--radius-sm)] px-1 text-start text-xs hover:bg-muted"
+            >
+              <span
+                aria-hidden="true"
+                className="size-[0.5625rem] shrink-0 rounded-pill"
+                style={{ background: DONUT_SEGMENT_COLOURS[i % DONUT_SEGMENT_COLOURS.length] }}
+              />
+              <span className="min-w-0 truncate">{r.country}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* WHO IS IN THE SLICE — under the picture rather than floating over it.
+          A hover card would cover the ring the pointer is ON, and the list is
+          faces rather than one line, so it wants room a popover does not have.
+          The row keeps its own height whether or not anything is hovered (an
+          empty `min-h`), so the panels beneath it do not jump as a pointer
+          crosses the ring. */}
+      <div className="min-h-9" data-slot="country-accounts">
+        {shown ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            {shown.accounts.map((a) => (
+              <span key={a.id} className="flex min-w-0 items-center gap-1.5 text-xs">
+                <RecordMark picture={a.logoUrl} name={a.name} />
+                <span className="min-w-0 truncate">{a.name}</span>
+              </span>
+            ))}
+            {shown.n > shown.accounts.length ? (
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {t("and {count} more", { count: shown.n - shown.accounts.length })}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/** WHAT THEY DO, AS BARS — her 23 Sep 2026 ruling, verbatim: "make industry a
+ * bar chart."
+ *
+ * COUNTRY STAYS A DONUT AND THEY STILL SHARE THE ROW, which is the whole of
+ * the instruction: two readings of the book side by side, told apart by their
+ * MARK rather than by their place. A donut answers "what share of the whole",
+ * which is the question about where clients are; a ranked bar answers "which
+ * is biggest, and by how much", which is the question about what they do — and
+ * an industry list is longer and its words are longer, so a legend of eleven
+ * countries' worth of colour would have been unreadable where a column of
+ * eleven named bars is not.
+ *
+ * ONE NEUTRAL INK, NOT THE CHART SEQUENCE. A ranked bar chart is a SINGLE
+ * SERIES: the name is beside every bar, so a hue would be a second encoding of
+ * a fact already written down. The same mark `tickets-dashboard.tsx`'s own
+ * `RaisedByRow` uses, and the same argument the arrivals line beside it makes.
+ *
+ * THE VALUE IS NOT BEHIND A HOVER HERE. Her "(when hover show)" was said of
+ * the donut, where a slice has nowhere to write a number; a bar has its own
+ * row and the count sits at the end of it, which is what every other ranked
+ * bar in this app already does. */
+function IndustryBars({
+  rows,
+  t,
+}: {
+  rows: AccountsDashboardData["byIndustry"]
+  t: T
+}) {
+  if (rows.length === 0)
+    return (
+      <p className="text-muted-foreground text-xs">
+        {t("No industry is set on an active account yet.")}
+      </p>
+    )
+  const scale = Math.max(1, ...rows.map((r) => r.n))
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5" data-slot="industry-bars">
+      {rows.map((r) => (
+        <div key={r.industry} className="flex min-w-0 items-center gap-2">
+          <span className="w-28 shrink-0 truncate text-xs" title={r.industry}>
+            {r.industry}
+          </span>
+          {/* A BAR ON A TRACK — the shape `tickets-dashboard.tsx`'s own `Bar`
+              draws, written out here rather than imported: it is four lines,
+              and pulling a ticket-shaped internal into an accounts screen
+              would tie two modules together for a primitive neither owns. */}
+          <div
+            data-slot="industry-bar"
+            className="bg-muted h-5 min-w-0 flex-1 overflow-hidden rounded-[var(--radius-bar)]"
+          >
+            <div
+              className="h-full rounded-[var(--radius-bar)]"
+              style={{
+                width: `${Math.max((r.n / scale) * 100, r.n > 0 ? 3 : 0)}%`,
+                backgroundColor: LINE_COLOUR,
+              }}
+            />
+          </div>
+          <span className="w-6 shrink-0 text-right text-xs tabular-nums">{r.n}</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -558,12 +653,7 @@ export function AccountsDashboard({ teamId, lang }: { teamId: string; lang: Lang
       <div className="grid min-w-0 gap-6 lg:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-3">
           <SectionTitle>{t("Where they are")}</SectionTitle>
-          <SplitDonut
-            rows={data.byCountry.map((r) => ({ word: r.country, n: r.n }))}
-            label={t("Where they are")}
-            empty={t("No country is set on an active account yet.")}
-            t={t}
-          />
+          <CountrySplit rows={data.byCountry} t={t} />
         </div>
         <div className="flex min-w-0 flex-col gap-3">
           {/* "WHAT THEY DO", not "Industry" — the neighbouring title is a
@@ -573,12 +663,7 @@ export function AccountsDashboard({ teamId, lang }: { teamId: string; lang: Lang
               form's label, the Choices group, the record's own fact line), so
               nothing here invents a second word for the thing itself. */}
           <SectionTitle>{t("What they do")}</SectionTitle>
-          <SplitDonut
-            rows={data.byIndustry.map((r) => ({ word: r.industry, n: r.n }))}
-            label={t("What they do")}
-            empty={t("No industry is set on an active account yet.")}
-            t={t}
-          />
+          <IndustryBars rows={data.byIndustry} t={t} />
         </div>
       </div>
 

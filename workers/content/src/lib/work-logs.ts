@@ -21,6 +21,7 @@
 //     answers on Monday morning instead (see resolveRunaway).
 
 import { logActivity, type Actor } from "@shared/workers/activity"
+import { inClause } from "@shared/workers/filter-in"
 import { boundedInner, countCollection, isCapped, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
@@ -220,7 +221,7 @@ async function targetOrThrow(
 export type LogFilter = {
   targetTable?: string
   targetId?: string
-  userId?: string
+  userId?: string[]
   /** "mine" narrows to the caller — the everyday "what have I done today". */
   scope?: "mine" | "all"
   /** WITH OR WITHOUT MEETING TIME (CHECKLIST 9.3). "exclude" drops every log
@@ -255,7 +256,7 @@ export type LogFilter = {
    * work, which is the honest reading of "show me Bergman's hours"; the
    * dashboard's own client section keeps a separate row for the no-client pile
    * rather than folding it into somebody's total. */
-  accountId?: string
+  accountId?: string[]
 }
 
 /** Escaped, case-folded and wrapped for a `LIKE`, or nothing at all — the same
@@ -320,9 +321,16 @@ function logWhere(
   if (filter.scope === "mine") {
     parts.push("w.user_id = ?")
     params.push(guard.userId)
-  } else if (filter.userId) {
-    parts.push("w.user_id = ?")
-    params.push(filter.userId)
+  } else {
+  // A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to select multile for
+  // each filter type"). `inClause` carries the two properties this change rests
+  // on: one value is a set of one, so every existing caller is untouched, and an
+  // empty set narrows nothing rather than matching nothing.
+    const people = inClause("w.user_id", filter.userId)
+    if (people.sql) {
+      parts.push(people.sql)
+      params.push(...people.params)
+    }
   }
   if (filter.targetTable) {
     parts.push("w.target_table = ?")
@@ -336,9 +344,10 @@ function logWhere(
   // inherited column rather than through a join to the target — the whole point
   // of `account_id` living on the row is that "Bergman's hours" is one indexed
   // predicate over four different target tables.
-  if (filter.accountId) {
-    parts.push("w.account_id = ?")
-    params.push(filter.accountId)
+  const whose = inClause("w.account_id", filter.accountId)
+  if (whose.sql) {
+    parts.push(whose.sql)
+    params.push(...whose.params)
   }
   const search = searchClause(filter.q)
   if (search.sql) {

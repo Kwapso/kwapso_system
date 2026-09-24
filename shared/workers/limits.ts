@@ -466,6 +466,19 @@ export const ACCOUNTS_DASHBOARD_GROUP_CAP = 100
  * hard ceiling: 800 rows, whatever the book does. */
 export const ACCOUNTS_ARRIVAL_NAMES_PER_MONTH = 8
 
+/** HOW MANY COMPANIES ONE COUNTRY SLICE MAY NAME (R14) — Aurora, 23 Sep 2026,
+ * of the accounts dashboard's country donut: "when hover in donut in country,
+ * show which aacounts with name adn logo".
+ *
+ * THE SAME CEILING AS AN ARRIVAL MONTH'S, and deliberately the same number:
+ * both are "who is behind this mark", both are read in a floating panel that
+ * cannot scroll, and two different answers to one question would be two
+ * numbers to remember. The slice's own exact `n` rides beside the list, so a
+ * busier country says how many more it holds rather than pretending eight was
+ * all of them. Multiplied by `ACCOUNTS_DASHBOARD_GROUP_CAP` this is the whole
+ * read's hard ceiling: 800 rows, whatever the book does. */
+export const ACCOUNTS_COUNTRY_FACES_PER_ROW = ACCOUNTS_ARRIVAL_NAMES_PER_MONTH
+
 /** Files AND links one ticket may carry (CHECKLIST 5.10). "Several" is the ask,
  * from both front doors; a ceiling turns "several" into something a list can be
  * read to the end of and a count can be trusted. */

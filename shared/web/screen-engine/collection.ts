@@ -5,6 +5,7 @@
 // inside a component) means it's deterministic and unit-tested.
 
 import { type CollectionConfig, evaluateRules, type Rule } from "./config"
+import { splitFacet } from "@shared/facet-list"
 import { parseRange } from "./range"
 
 export interface CollectionSlice<T> {
@@ -68,8 +69,10 @@ export function selectRows<T>(
     .filter(([, v]) => v != null && v !== "")
     .flatMap(([field, value]): Rule[] => {
       const facet = config.filterFacets?.find((f) => f.field === field)
-      if (facet?.control !== "range")
-        return [{ source: "row", field, op: "is", value }]
+      // A SET IS NOT A RULE HERE — see `facetMatches` below. Only the range
+      // facet still compiles to rules, because its two bounds are genuinely an
+      // AND of two comparisons over one field.
+      if (facet?.control !== "range") return []
       const { min, max } = parseRange(value)
       const out: Rule[] = []
       if (min != null)
@@ -85,6 +88,38 @@ export function selectRows<T>(
         row: row as Record<string, unknown>,
         user: {},
         app: {},
+      })
+    )
+  }
+
+  /* ── SEVERAL VALUES IN ONE FACET MEAN OR; TWO FACETS MEAN AND ─────────────
+     Aurora, 24 Sep 2026: "i shoudl be able to select multile for each filter
+     type". The browser's own narrowing has to say the same sentence the doors
+     now say in SQL (`inClause`, shared/workers/filter-in.ts), or the same
+     collection would answer two different questions depending on whether it
+     pages.
+
+     IT IS NOT A `Rule`, AND THAT IS THE WHOLE REASON THIS IS A SEPARATE PASS.
+     `Rule` is the app's own visibility grammar — it is also what a recipe's
+     builder filters, a screen's visibility conditions and the process map's
+     own conditions are written in, and `evaluateRules` ANDs the list it is
+     given. Teaching it an `isOneOf` operator would widen a type four other
+     features read, to express something only a facet needs. So the facet
+     narrowing is its own predicate, ANDed with whatever the rules already
+     decided, and the OR lives inside one facet where it belongs.
+
+     AN EMPTY SET NARROWS NOTHING, the same answer `inClause` gives for the
+     same reason: "named no value" and "did not ask" are one state. */
+  const setFacets = Object.entries(facetValues).filter(([field, value]) => {
+    if (value == null || value === "") return false
+    return config.filterFacets?.find((f) => f.field === field)?.control !== "range"
+  })
+  if (setFacets.length > 0) {
+    rows = rows.filter((row) =>
+      setFacets.every(([field, value]) => {
+        const wanted = splitFacet(value)
+        if (wanted.length === 0) return true
+        return wanted.includes(String(get(row, field) ?? ""))
       })
     )
   }

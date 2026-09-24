@@ -40,6 +40,7 @@ export function FactRow({
   picture,
   mark,
   shape = "square",
+  external = false,
   className = "",
 }: {
   /** Wires the field's `<label htmlFor>` to this row, same as any control. */
@@ -56,6 +57,17 @@ export function FactRow({
    * ticket, sprint, wave — is a rounded square (R31), `RecordMark`'s own
    * default. */
   shape?: "square" | "round"
+  /** IS THE PERSON IN THAT MARK FROM OUTSIDE — a client contact rather than
+   * one of ours? Aurora, 23 Sep 2026: *"external photos (from contacts) gray
+   * scale. keep staff nirmal."* Handed straight to `RecordMark`'s own
+   * `external`; see that prop for the ruling and for why the safe default is
+   * colour. A `square` fact (an app, an account, a ticket) never sets it.
+   *
+   * CARRIED BECAUSE THIS IS A SEAM, NOT BECAUSE A CALLER ASKS TODAY. A shared
+   * row that drops a fact is how the next person-shaped caller ships
+   * untreated with nothing visible at its own call site to show for it — the
+   * same argument `list-compat.tsx` makes about the kit's `List`. */
+  external?: boolean
   className?: string
 }) {
   return (
@@ -63,7 +75,7 @@ export function FactRow({
       id={id}
       className={`bg-surface-panel flex items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm ${className}`}
     >
-      <RecordMark picture={picture} mark={mark} name={name} shape={shape} size="choice" />
+      <RecordMark picture={picture} mark={mark} name={name} shape={shape} size="choice" external={external} />
       <span className="min-w-0 flex-1 truncate">{name}</span>
     </p>
   )

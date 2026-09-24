@@ -2725,6 +2725,7 @@ export const SEED: Catalogue = {
     es: "{count} a la semana",
     ca: "{count} a la setmana",
   },
+  "{what} +{count}": { de: "{what} +{count}", es: "{what} +{count}", ca: "{what} +{count}" },
   "{count} a year": { de: "{count} pro Jahr", es: "{count} al año", ca: "{count} a l'any" },
   "{count} results": {
     de: "{count} Ergebnisse",
@@ -3521,6 +3522,44 @@ export const SEED: Catalogue = {
   "Any {what}": { de: "Alle {what}", es: "Cualquier {what}", ca: "Qualsevol {what}" },
   "Archive this ticket?": { de: "Dieses Ticket archivieren?", es: "¿Archivar este ticket?", ca: "Vols arxivar aquest tiquet?" },
   "Archive {name}?": { de: "„{name}“ archivieren?", es: "¿Archivar «{name}»?", ca: "Vols arxivar «{name}»?" },
+  // MIGRATION 0123 — her ARCHIVED, the state that takes everything under it.
+  // The words have to say that, in every language, or the warning is a
+  // different promise from the one the door keeps.
+  "Archive {name} and everything on it?": {
+    de: "„{name}“ und alles darauf archivieren?",
+    es: "¿Archivar «{name}» y todo lo que contiene?",
+    ca: "Vols arxivar «{name}» i tot el que conté?",
+  },
+  "Archive with everything on it": {
+    de: "Mit allem darauf archivieren",
+    es: "Archivar con todo lo que contiene",
+    ca: "Arxiva amb tot el que conté",
+  },
+  "Restore with everything on it": {
+    de: "Mit allem darauf wiederherstellen",
+    es: "Restaurar con todo lo que contiene",
+    ca: "Restaura amb tot el que conté",
+  },
+  "App archived, with everything on it.": {
+    de: "App archiviert, mit allem darauf.",
+    es: "Aplicación archivada, con todo lo que contiene.",
+    ca: "Aplicació arxivada, amb tot el que conté.",
+  },
+  "App restored, with everything on it.": {
+    de: "App wiederhergestellt, mit allem darauf.",
+    es: "Aplicación restaurada, con todo lo que contiene.",
+    ca: "Aplicació restaurada, amb tot el que conté.",
+  },
+  "Nothing is archived yet.": {
+    de: "Es ist noch nichts archiviert.",
+    es: "Todavía no hay nada archivado.",
+    ca: "Encara no hi ha res arxivat.",
+  },
+  "The app and everything on it, its tickets, meetings, tasks, to-dos, stories, phases, waves and process maps, stop showing anywhere. Nothing is deleted and the time logged against any of it is untouched. Restoring the app brings all of it back.": {
+    de: "Die App und alles darauf, ihre Tickets, Meetings, Aufgaben, To-dos, Stories, Phasen, Wellen und Prozesskarten, werden nirgendwo mehr angezeigt. Nichts wird gelöscht, und die darauf erfasste Zeit bleibt unberührt. Wenn du die App wiederherstellst, kommt alles zurück.",
+    es: "La aplicación y todo lo que contiene, sus tickets, reuniones, tareas, pendientes, historias, fases, oleadas y mapas de proceso, dejan de aparecer en cualquier sitio. No se borra nada y el tiempo registrado sobre cualquiera de ellos queda intacto. Al restaurar la aplicación vuelve todo.",
+    ca: "L'aplicació i tot el que conté, els seus tiquets, reunions, tasques, pendents, històries, fases, onades i mapes de procés, deixen d'aparèixer enlloc. No s'esborra res i el temps registrat sobre qualsevol d'ells queda intacte. En restaurar l'aplicació, torna tot.",
+  },
   "Assign": { de: "Zuweisen", es: "Asignar", ca: "Assignar" },
   "Awaiting your input": { de: "Wartet auf Ihre Angaben", es: "Pendiente de tu aportación", ca: "Pendent de la teva aportació" },
   "Background": { de: "Hintergrund", es: "Fondo", ca: "Fons" },
@@ -4800,7 +4839,6 @@ export const SEED: Catalogue = {
    * already in the generated catalogue as "Agenda" in all three, so nothing
    * here invents a second word for it. */
   "Join": { de: "Beitreten", es: "Unirse", ca: "Unir-se" },
-  "Google Calendar": { de: "Google Calendar", es: "Google Calendar", ca: "Google Calendar" },
   "Save agenda": { de: "Agenda speichern", es: "Guardar la agenda", ca: "Desar l'agenda" },
   "Agenda saved.": { de: "Agenda gespeichert.", es: "Agenda guardada.", ca: "Agenda desada." },
   "Couldn't save the agenda.": { de: "Die Agenda konnte nicht gespeichert werden.", es: "No se pudo guardar la agenda.", ca: "No s'ha pogut desar l'agenda." },
@@ -4847,6 +4885,24 @@ export const SEED: Catalogue = {
    * efficiency is hours divided by cycle time, so with no hours there is
    * nothing to divide. */
   "No logs": { de: "Keine Protokolle", es: "Sin registros", ca: "Sense registres" },
+  /* HER 24 SEP REVIEW OF THE LOGS DASHBOARD — three sentences, same register as
+   * the round above.
+   *
+   * "Search is on the Entries tab" is the DISABLED search field's own
+   * placeholder ("add full toolbar, even if search is diasbled"): the tab name
+   * is "Entries", which is already seeded, so the sentence reuses that word
+   * rather than inventing a second name for the same tab.
+   *
+   * The two "others" sentences belong to the weekly chart's cap. The short one
+   * rides a hover card beside a figure; the long one is the legend's own
+   * admission, and its second clause is the load-bearing half: the people it
+   * names ARE in the area behind the lines, they simply have no line. German
+   * keeps the two clauses in that order ("im Gesamtwert enthalten, aber nicht
+   * gezeichnet") because reversing them would make the omission sound like an
+   * exclusion. */
+  "Search is on the Entries tab": { de: "Die Suche ist im Tab Einträge", es: "La búsqueda está en la pestaña Entradas", ca: "La cerca és a la pestanya Entrades" },
+  "and {count} others": { de: "und {count} weitere", es: "y {count} más", ca: "i {count} més" },
+  "and {count} others, in the total but not drawn": { de: "und {count} weitere, in der Summe enthalten, aber nicht gezeichnet", es: "y {count} más, incluidos en el total pero no dibujados", ca: "i {count} més, inclosos en el total però no dibuixats" },
 
   /* THE MEETING'S LOCATION SECTION, 23 Sep 2026 — Aurora's in-person section,
    * view One (the address block; the map thumbnail is blocked on a key and a

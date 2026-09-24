@@ -84,26 +84,47 @@ const SCREEN = join(WEB, "components/accounts/accounts-screen.tsx")
  * `:not([data-slot="card"])`), so the outcome cannot depend on source order. */
 const RULES = [
   {
-    what: "the strip pays the lead when its body is not a card",
+    key: "pays-no-toolbar",
+    what: "a body with no toolbar gets the LARGER lead",
     selector: '.pinned-strip:has(+ *:not([data-slot="card"]))',
+    declaration: /padding-bottom:\s*var\(--tab-content-gap\)/,
+  },
+  {
+    key: "pays-toolbar",
+    what: "a bare body that LEADS with a toolbar keeps the ruled 10px",
+    selector: '.pinned-strip:has(+ * > [data-slot="toolbar-row-pin"]:first-child)',
     declaration: /padding-bottom:\s*var\(--toolbar-lead-gap\)/,
   },
   {
-    what: "and takes it back for the wrapper whose first child IS a card",
+    key: "cancel-card",
+    what: "and the wrapper whose first child IS a card pays nothing here",
     selector: '.pinned-strip:has(+ * > [data-slot="card"]:first-child)',
     declaration: /padding-bottom:\s*0/,
   },
   {
-    what: "the pinned-toolbar offset grows with the strip",
+    key: "offset-no-toolbar",
+    what: "the pinned offset grows by the larger lead",
     selector: '*:has(> .pinned-strip.pinned-strip-tight + *:not([data-slot="card"]))',
+    declaration: /--pinned-chrome-h:\s*calc\(var\(--tab-strip-h\)\s*\+\s*var\(--tab-content-gap\)\)/,
+  },
+  {
+    key: "offset-toolbar",
+    what: "and by the smaller one where a toolbar leads",
+    selector: '*:has(> .pinned-strip.pinned-strip-tight + * > [data-slot="toolbar-row-pin"]:first-child)',
     declaration: /--pinned-chrome-h:\s*calc\(var\(--tab-strip-h\)\s*\+\s*var\(--toolbar-lead-gap\)\)/,
   },
   {
-    what: "and is put back for that same wrapper",
+    key: "offset-card",
+    what: "and not at all for the wrapper around a card",
     selector: '*:has(> .pinned-strip.pinned-strip-tight + * > [data-slot="card"]:first-child)',
     declaration: /--pinned-chrome-h:\s*var\(--tab-strip-h\)/,
   },
 ] as const
+
+/** Read a rule out of the table by name rather than by index — the table grew
+ * from four entries to six the day the no-toolbar case was split off, and an
+ * index would have quietly re-pointed every case that used one. */
+const rule = (key: (typeof RULES)[number]["key"]) => RULES.find((r) => r.key === key)!
 
 /** Strip comments before looking for a rule — every block in `globals.css`
  * carries a long prose header, and a selector QUOTED in one (this block's own
@@ -153,6 +174,22 @@ function hasArguments(code: string): string[] {
 describe("R83 — a tab whose body is not a card still gets the lead", () => {
   const code = cssCode(readFileSync(GLOBALS, "utf8"))
 
+  it("really writes every rule this suite reasons about", () => {
+    // THE CASE THAT CLOSES THE LOOP, and it was earned: every other case here
+    // reads a selector out of the table above, so a rule DELETED from
+    // `globals.css` while its entry stayed in the table was invisible — the
+    // effect case would keep matching the string, happily, against markup.
+    // That is the same fault as the string searches this suite replaced, one
+    // level along: a check reasoning about the text of the fix rather than the
+    // fix. Proved by deleting the toolbar-led rule and watching the other
+    // seven cases stay green.
+    for (const { what, selector, declaration } of RULES) {
+      const body = ruleBody(code, selector)
+      expect(body, `${what}: this rule is not in web/app/globals.css at all — ${selector}`).not.toBeNull()
+      expect(body, `${what}: the rule is there but does not say what it must`).toMatch(declaration)
+    }
+  })
+
   it("writes selectors a real parser accepts", () => {
     // THE CASE THE FIRST VERSION OF THIS SUITE WAS MISSING. A prelude the
     // grammar refuses is discarded whole, silently, and the rule that is not
@@ -177,23 +214,22 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
       ).not.toThrow()
   })
 
-  it("matches the four real shapes, and only the right ones", () => {
-    // THE HALF THE FIRST VERSION OF THIS SUITE HAD NO ANSWER FOR: not "is the
-    // rule written" but "does it reach what it is about". Four shapes, built
-    // as the app really builds them, each a strip followed by one of the four
-    // bodies a tab can have:
+  it("matches the five real shapes, and only the right ones", () => {
+    // THE HALF A TEXT SEARCH HAS NO ANSWER FOR: not "is the rule written" but
+    // "does it reach what it is about". Five shapes, built as the app really
+    // builds them, each a strip followed by one of the bodies a tab can have:
     //
-    //   A  a bare column           the dashboards (`AccountsDashboard`)
-    //   B  a bare <section>        a state register, `TeamPanel`
-    //   C  a card, next sibling    every `<CollectionCard>` collection
-    //   D  a wrapper > card        `paged-find.tsx`'s own unconditional div
+    //   A  a bare column              the dashboards (`AccountsDashboard`)
+    //   B  a bare <section>           Settings > Appearance
+    //   C  a card, next sibling       a `<CollectionCard>` collection
+    //   D  a wrapper > card           `paged-find.tsx`'s own flow div
+    //   E  a bare div LEADING with a toolbar   Settings > Team (`TeamPanel`)
     //
-    // A and B must be PAID by the strip; C must not (the card pays itself, on
-    // its own `card-content`); D must be paid and then CANCELLED, because the
-    // card inside it is already paying. jsdom evaluates `:has()` for real, so
-    // this is a statement about what the selectors do rather than what they
-    // say. What it cannot do is cascade a Tailwind build, so the last word on
-    // the pixels is still a browser against the deployed bundle.
+    // A and B get the LARGER lead — Aurora, 23 Sep 2026: "needs to be a bit
+    // mor ein case withous toolbar!". E is the shape that keeps the ruled 10px,
+    // because a toolbar under the strip is exactly the relationship the 21 Sep
+    // "10 above and below" ruling was about. C pays nothing here (its own
+    // card-content pays), and D is cancelled for the same reason.
     const shape = (body: string) =>
       `<div class="col"><div class="pinned-strip pinned-strip-tight"></div>${body}</div>`
     document.body.innerHTML = [
@@ -201,35 +237,86 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
       shape('<section class="body-b"></section>'),
       shape('<div class="body-c" data-slot="card"><div data-slot="card-content"></div></div>'),
       shape('<div class="body-d"><div data-slot="card"><div data-slot="card-content"></div></div></div>'),
+      shape('<div class="body-e"><div data-slot="toolbar-row-pin"></div></div>'),
     ].join("")
 
     const stripIn = (bodyClass: string) =>
       document.querySelector(`.col:has(> .${bodyClass}) > .pinned-strip`) as Element
-    const pays = (bodyClass: string) => stripIn(bodyClass).matches(RULES[0].selector)
-    const cancelled = (bodyClass: string) => stripIn(bodyClass).matches(RULES[1].selector)
+    const colOf = (bodyClass: string) => document.querySelector(`.col:has(> .${bodyClass})`) as Element
+    const hits = (bodyClass: string, key: Parameters<typeof rule>[0]) =>
+      (key.startsWith("offset") ? colOf(bodyClass) : stripIn(bodyClass)).matches(rule(key).selector)
 
-    expect(pays("body-a"), "a bare dashboard column is not paid — this is exactly what she reported").toBe(true)
-    expect(cancelled("body-a"), "the bare column's lead is cancelled again").toBe(false)
-    expect(pays("body-b"), "a bare <section> body is not paid").toBe(true)
-    expect(cancelled("body-b"), "the <section>'s lead is cancelled again").toBe(false)
-    expect(pays("body-c"), "a card sibling is paid by the strip AS WELL as by its own card-content").toBe(false)
-    expect(cancelled("body-c"), "a card sibling is matched by the cancelling rule, which is not its job").toBe(false)
-    expect(pays("body-d"), "the paged-find wrapper is not reached at all").toBe(true)
+    // A · THE DASHBOARD — the shape she reported, and the whole point.
+    expect(hits("body-a", "pays-no-toolbar"), "a bare dashboard column is not paid at all").toBe(true)
+    expect(hits("body-a", "pays-toolbar"), "the dashboard is given the small, toolbar-sized lead").toBe(false)
+    expect(hits("body-a", "cancel-card"), "the dashboard's lead is cancelled again").toBe(false)
+
+    // B · SETTINGS > APPEARANCE — a bare <section>, measured at 0 by another
+    // lane before this law existed. It is the same shape as A and must be paid
+    // the same way; that it is a <section> rather than a <div> must not matter.
+    expect(hits("body-b", "pays-no-toolbar"), "a bare <section> body is not paid").toBe(true)
+    expect(hits("body-b", "cancel-card")).toBe(false)
+
+    // C · A CARD SIBLING — the strip must not pay, or every collection in the
+    // app pays twice.
+    expect(hits("body-c", "pays-no-toolbar"), "a card sibling is paid by the strip AS WELL as by its own card-content").toBe(false)
+    expect(hits("body-c", "cancel-card")).toBe(false)
+
+    // D · THE PAGED-FIND WRAPPER — paid by the first rule and cancelled by the
+    // last, because the card inside it is already paying.
+    expect(hits("body-d", "pays-no-toolbar")).toBe(true)
     expect(
-      cancelled("body-d"),
-      "the paged-find wrapper is paid and never cancelled — every paged collection would pay 20px where the law says 10"
+      hits("body-d", "cancel-card"),
+      "the paged-find wrapper is paid and never cancelled — every paged collection would pay twice"
     ).toBe(true)
 
-    // AND THE OFFSET PAIR ASKS THE SAME QUESTION OF THE CONTAINER. Same four
-    // shapes, read one level up, so a pinned toolbar's `top` can never
-    // disagree with the height the strip actually paints.
-    const colOf = (bodyClass: string) => document.querySelector(`.col:has(> .${bodyClass})`) as Element
-    expect(colOf("body-a").matches(RULES[2].selector)).toBe(true)
-    expect(colOf("body-a").matches(RULES[3].selector)).toBe(false)
-    expect(colOf("body-c").matches(RULES[2].selector)).toBe(false)
-    expect(colOf("body-c").matches(RULES[3].selector)).toBe(false)
-    expect(colOf("body-d").matches(RULES[2].selector)).toBe(true)
-    expect(colOf("body-d").matches(RULES[3].selector)).toBe(true)
+    // E · A BARE BODY THAT LEADS WITH A TOOLBAR — the one shape that is not a
+    // card and still has a toolbar under the strip, so it keeps the small
+    // lead. Without this the 21 Sep "10 above and below" ruling would be
+    // silently overturned on Settings > Team.
+    expect(hits("body-e", "pays-no-toolbar")).toBe(true)
+    expect(
+      hits("body-e", "pays-toolbar"),
+      "a toolbar-led body is given the no-toolbar lead — that overturns the 10px ruling on Settings > Team"
+    ).toBe(true)
+    expect(hits("body-e", "cancel-card")).toBe(false)
+
+    // AND THE OFFSET TRIPLE ASKS THE SAME QUESTIONS ONE LEVEL UP, so a pinned
+    // toolbar's `top` can never disagree with the height the strip paints.
+    expect(hits("body-a", "offset-no-toolbar")).toBe(true)
+    expect(hits("body-a", "offset-toolbar")).toBe(false)
+    expect(hits("body-a", "offset-card")).toBe(false)
+    expect(hits("body-c", "offset-no-toolbar")).toBe(false)
+    expect(hits("body-c", "offset-card")).toBe(false)
+    expect(hits("body-d", "offset-no-toolbar")).toBe(true)
+    expect(hits("body-d", "offset-card")).toBe(true)
+    expect(hits("body-e", "offset-toolbar")).toBe(true)
+  })
+
+  it("gives a no-toolbar tab MORE than a toolbar one, from the scale", () => {
+    // Aurora, 23 Sep 2026: "needs to be a bit mor ein case withous toolbar!".
+    // Two different tokens, both steps on the spacing scale, never a typed
+    // pixel — and the no-toolbar one is the larger of the two. It is
+    // `--tab-content-gap` rather than a new token on purpose: 20px is the
+    // number THIS relationship (tabs to the content they label) carried until
+    // 21 Sep, when the "10 above and below" toolbar ruling took it away from
+    // every strip including the ones with no toolbar under them. Giving it
+    // back where there is no toolbar is restoring its own meaning, not
+    // minting a third number.
+    const value = (token: string) => {
+      const m = code.match(new RegExp(`${token}:\\s*var\\((--space-[\\w-]+)\\)`))
+      expect(m, `${token} is not declared as a step on the spacing scale`).not.toBeNull()
+      return m![1]
+    }
+    const noToolbar = value("--tab-content-gap")
+    const withToolbar = value("--toolbar-lead-gap")
+    expect(
+      noToolbar,
+      "a tab with no toolbar now gets the same lead as one with a toolbar — she asked for more"
+    ).not.toBe(withToolbar)
+    // Both must be real steps; the scale is `--space-N` / `--space-Nh`, so a
+    // literal would have failed the match above rather than reaching here.
+    for (const step of [noToolbar, withToolbar]) expect(step).toMatch(/^--space-\d+h?$/)
   })
 
   it("never nests :has() inside :has(), anywhere in globals.css", () => {
@@ -247,7 +334,7 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
   })
 
   it("pays the lead, from the same token the card rule reads", () => {
-    const paying = RULES[0]
+    const paying = rule("pays-no-toolbar")
     const body = ruleBody(code, paying.selector)
     expect(
       body,
@@ -256,7 +343,7 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
     ).not.toBeNull()
     expect(
       body,
-      "the lead is paid, but not from `--toolbar-lead-gap` — a second number for one distance is what R83 exists to forbid"
+      "the lead is paid, but not from `--tab-content-gap` — a second number for one distance is what R83 exists to forbid"
     ).toMatch(paying.declaration)
     // A MARGIN WOULD BE THE BUG ONE ELEMENT LOWER. A margin between two
     // siblings is never painted, so the moment the strip pins, the body
@@ -275,7 +362,7 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
     // does, and is cancelled. Without the second, every collection in the app
     // would pay 20px where the law says 10.
     expect(code).toContain('.pinned-strip + [data-slot="card"] > [data-slot="card-content"]')
-    const cancel = RULES[1]
+    const cancel = rule("cancel-card")
     const body = ruleBody(code, cancel.selector)
     expect(
       body,
@@ -289,7 +376,7 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
     expect(
       code.indexOf(cancel.selector),
       "the cancelling rule no longer follows the paying one — at equal specificity the wrapper would pay twice"
-    ).toBeGreaterThan(code.indexOf(RULES[0].selector))
+    ).toBeGreaterThan(code.indexOf(rule("pays-no-toolbar").selector))
   })
 
   it("moves the pinned-toolbar offset under the same conditions", () => {
@@ -299,7 +386,7 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
     // itself. A strip 10px taller with a stale offset lets a pinned toolbar
     // land 10px inside it. It is a real call site, not a hypothetical:
     // Settings › Team draws its toolbar inside `TeamPanel`, a bare `<div>`.
-    for (const { what, selector, declaration } of RULES.slice(2)) {
+    for (const { what, selector, declaration } of RULES.filter((r) => r.key.startsWith("offset"))) {
       const body = ruleBody(code, selector)
       expect(body, `${what}: no such rule in globals.css`).not.toBeNull()
       expect(body, `${what}: the rule does not say what it must`).toMatch(declaration)
@@ -307,8 +394,9 @@ describe("R83 — a tab whose body is not a card still gets the lead", () => {
     // THE PAIRS ASK THE SAME QUESTION. The offset's two conditions are the
     // lead's two conditions with the strip reached through its container, so
     // the two properties can never disagree about which shape is which.
-    expect(RULES[2].selector).toContain(':not([data-slot="card"])')
-    expect(RULES[3].selector).toContain('[data-slot="card"]:first-child')
+    expect(rule("offset-no-toolbar").selector).toContain(':not([data-slot="card"])')
+    expect(rule("offset-toolbar").selector).toContain('[data-slot="toolbar-row-pin"]:first-child')
+    expect(rule("offset-card").selector).toContain('[data-slot="card"]:first-child')
   })
 
   it("leaves the Accounts dashboard nothing of its own to pay", () => {

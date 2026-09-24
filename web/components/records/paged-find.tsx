@@ -71,6 +71,7 @@ import * as React from "react"
 import { cn } from "@shared/ui/lib/utils"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
+import { joinFacet, splitFacet } from "@shared/facet-list"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
@@ -488,7 +489,14 @@ export function PagedFind<T>({
         (was.values as Record<string, string>) ?? {}
       )) {
         const facet = facets.find((f) => f.field === field)
-        if (facet?.options?.some((o) => o.value === value)) kept[field] = value
+        if (!facet?.options) continue
+        // A FACET CARRIES A SET NOW (24 Sep 2026), so this prunes VALUE BY
+        // VALUE rather than dropping the whole facet the moment one of its
+        // words is retired. One value is a set of one, so a facet that still
+        // holds exactly one option behaves precisely as it did; a facet
+        // holding three keeps the two that are still real.
+        const survivors = splitFacet(value).filter((v) => facet.options?.some((o) => o.value === v))
+        if (survivors.length > 0) kept[field] = joinFacet(survivors)
       }
       return {
         text: typeof was.text === "string" ? was.text : "",

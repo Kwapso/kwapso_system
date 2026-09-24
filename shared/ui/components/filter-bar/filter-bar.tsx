@@ -1102,6 +1102,21 @@ export interface SearchableFacetProps
   readOnly?: boolean;
 }
 
+/** WHAT A MULTI-VALUED FIELD SAYS WHEN IT HOLDS MORE THAN ONE. The first
+ * chosen option's own label, and how many more there are — the shortest true
+ * thing a 20rem field can say, and the one shape that does not go stale when a
+ * later option is added. A host with a translator passes `formatSummary`
+ * instead: "+2" is a number and a plus in every language this kit has been
+ * asked about, but a host that wants words is entitled to them. */
+function defaultSummary(chosen: FacetOption[]): React.ReactNode {
+  return (
+    <>
+      <span className="truncate">{chosen[0].label}</span>
+      <span className="shrink-0 tabular-nums"> +{chosen.length - 1}</span>
+    </>
+  );
+}
+
 function defaultFilterOption(option: FacetOption, query: string): boolean {
   if (query.trim() === "") return true;
   const text = typeof option.label === "string" ? option.label : option.value;
@@ -1423,6 +1438,44 @@ export interface CompactFacetProps
   /** Fires with the chosen option's `value`, or `null` when the facet is turned off. */
   onValueChange?: (value: string | null) => void;
   /**
+   * SEVERAL AT ONCE. Aurora, 24 Sep 2026, validating the filter overlay:
+   * *"validated, but i shoudl be able to select multile for each filter
+   * type"*. Within one facet the chosen values mean OR; across facets a
+   * toolbar still means AND, which is the host's arithmetic and not this
+   * component's.
+   *
+   * ADDITIVE, AND OFF BY DEFAULT, so every existing call site is byte-identical
+   * with it omitted: `value`/`onValueChange` keep their single-valued contract
+   * and this file keeps drawing exactly what it drew. Turning it on swaps THREE
+   * things and nothing else — the value pair becomes `values`/`onValuesChange`,
+   * each row's mark becomes `SearchableFacet`'s checkbox (the box that says
+   * "several of these may be on", which is the distinction the single-valued
+   * tick's own note already draws), and a pick no longer closes the panel,
+   * because somebody choosing three clients should not have to reopen the list
+   * twice.
+   *
+   * WHY NOT `SearchableFacet` INSTEAD, which has been multi-valued all along:
+   * that component is an ALWAYS-EXPANDED panel — a heading, a search pill, then
+   * every option as a row — and a consuming app measured two of them as a
+   * screenful of controls hanging off a toolbar. The ruling that produced this
+   * component was "one short labelled field, not an expanded list"; taking
+   * several values is not a reason to give that up.
+   */
+  multiple?: boolean;
+  /** Controlled value in `multiple` mode. An empty array is the facet off. */
+  values?: string[];
+  /** Uncontrolled starting values in `multiple` mode. */
+  defaultValues?: string[];
+  /** Fires with the whole set, in the order the options are declared. */
+  onValuesChange?: (values: string[]) => void;
+  /**
+   * WHAT THE CLOSED FIELD SAYS when several are chosen. The default is the
+   * first chosen option's own label with a ` +N` after it, which is the
+   * shortest true thing a 20rem field can say; a host with a translator passes
+   * its own. Never called with fewer than two.
+   */
+  formatSummary?: (chosen: FacetOption[]) => React.ReactNode;
+  /**
    * What the closed field says while nothing is chosen — the kit's own example
    * is "Any client". Tertiary ink, exactly as a select's placeholder is.
    * Translatable.
@@ -1543,6 +1596,11 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
       value,
       defaultValue,
       onValueChange,
+      multiple = false,
+      values,
+      defaultValues,
+      onValuesChange,
+      formatSummary,
       placeholder = "Any",
       anyLabel,
       searchable = false,
@@ -1578,6 +1636,16 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
     const valueControlled = value !== undefined;
     const selected = valueControlled ? value : uncontrolledValue;
 
+    /* THE SET, in `multiple` mode. Held beside the single value rather than
+       instead of it so the two contracts cannot leak into each other: a host
+       that never passes `multiple` cannot reach this state at all, and every
+       read below asks `multiple` first. */
+    const [uncontrolledValues, setUncontrolledValues] = React.useState<string[]>(
+      () => defaultValues ?? [],
+    );
+    const valuesControlled = values !== undefined;
+    const selectedMany = valuesControlled ? values : uncontrolledValues;
+
     const [uncontrolledQuery, setUncontrolledQuery] = React.useState(defaultQuery);
     const queryControlled = query !== undefined;
     const currentQuery = queryControlled ? query : uncontrolledQuery;
@@ -1604,6 +1672,25 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
        `label` for). */
     const chosen = selected === null ? undefined : options.find((o) => o.value === selected);
 
+    /* THE SAME QUESTION IN `multiple` MODE, answered off the options for the
+       same reason: a value whose option has gone away must not be named at the
+       reader as a stored id. Ordered by the OPTIONS rather than by the order
+       they were ticked, so the field's summary does not change under somebody
+       who unticks and re-ticks the same name. */
+    const chosenMany = multiple ? options.filter((o) => selectedMany.includes(o.value)) : [];
+    const chosenSays: React.ReactNode = !multiple
+      ? chosen
+        ? chosen.label
+        : placeholder
+      : chosenMany.length === 0
+        ? placeholder
+        : chosenMany.length === 1
+          ? chosenMany[0].label
+          : formatSummary
+            ? formatSummary(chosenMany)
+            : defaultSummary(chosenMany);
+    const isOff = multiple ? chosenMany.length === 0 : !chosen;
+
     const setOpen = (next: boolean) => {
       if (!openControlled) setUncontrolledOpen(next);
       onOpenChange?.(next);
@@ -1612,6 +1699,34 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
     const commit = (next: string | null) => {
       if (!valueControlled) setUncontrolledValue(next);
       onValueChange?.(next);
+      setOpen(false);
+    };
+
+    /* TOGGLE, AND THE PANEL STAYS OPEN. Two properties, both deliberate.
+       A row that is already on turns itself OFF, which is how a reader drops
+       one value out of four without hunting for a separate control — the
+       coordinate answer to "do not let the only way out of four selections be
+       four clicks" is the off row below, which drops all of them at once.
+       And the panel does not close, because closing after each pick would make
+       choosing three clients three round trips through the trigger.
+
+       The set is rebuilt in the OPTIONS' own order rather than appended to, so
+       what the host receives, what the field summarises and what the list shows
+       are one order and cannot disagree. */
+    const toggle = (optionValue: string) => {
+      const wanted = new Set(selectedMany);
+      if (wanted.has(optionValue)) wanted.delete(optionValue);
+      else wanted.add(optionValue);
+      const next = options.filter((o) => wanted.has(o.value)).map((o) => o.value);
+      if (!valuesControlled) setUncontrolledValues(next);
+      onValuesChange?.(next);
+    };
+
+    /* THE WAY OUT OF A WHOLE FACET, in one press. Closes the panel, because
+       unlike a toggle this one is finished. */
+    const clearMany = () => {
+      if (!valuesControlled) setUncontrolledValues([]);
+      onValuesChange?.([]);
       setOpen(false);
     };
 
@@ -1654,12 +1769,29 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
           <span className="shrink-0 text-badge tabular-nums text-ink-tertiary">{count}</span>
         ) : null}
 
-        {/* The tick at the reading end, which is how `SelectItem` marks the
-            chosen row — NOT the checkbox mark `SearchableFacet` draws. That
-            box says "several of these may be on"; this facet holds one. */}
-        <span aria-hidden="true" className="grid size-[var(--icon-button)] shrink-0 place-content-center">
-          {isSelected ? <CheckFat className="size-[var(--icon-button)]" /> : null}
-        </span>
+        {/* THE MARK SAYS WHICH KIND OF FACET THIS IS. Single: the tick at the
+            reading end, the way `SelectItem` marks a chosen row. Multiple: the
+            checkbox `SearchableFacet` draws, at `--radius-select` (ruling 03),
+            because that box is the one shape in the system that says "several
+            of these may be on" — and a reader who cannot tell the two apart
+            will not know that a second press adds rather than replaces. */}
+        {multiple ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "order-first grid size-4 shrink-0 place-content-center rounded-select",
+              isSelected
+                ? "bg-surface-inverse text-ink-on-inverse"
+                : "shadow-[var(--hairline-strong)] bg-background",
+            )}
+          >
+            {isSelected ? <CheckFat size={12} /> : null}
+          </span>
+        ) : (
+          <span aria-hidden="true" className="grid size-[var(--icon-button)] shrink-0 place-content-center">
+            {isSelected ? <CheckFat className="size-[var(--icon-button)]" /> : null}
+          </span>
+        )}
       </button>
     );
 
@@ -1697,8 +1829,14 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
             {/* Tertiary ink while nothing is chosen — the same thing
                 `data-[placeholder]` does on a real select, said in JS because
                 Radix is not the one rendering this value. */}
-            <span className={cn("min-w-0 truncate text-start", chosen ? undefined : "text-muted-foreground")}>
-              {chosen ? chosen.label : placeholder}
+            <span
+              data-slot="compact-facet-value"
+              className={cn(
+                "flex min-w-0 items-baseline truncate text-start",
+                isOff && "text-muted-foreground",
+              )}
+            >
+              {chosenSays}
             </span>
             <CaretDown
               aria-hidden="true"
@@ -1766,6 +1904,10 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
                 data-slot="compact-facet-list"
                 role="listbox"
                 aria-label={label}
+                /* SAID OUT LOUD, because the mark alone is a picture. A
+                   listbox that takes several is a different control to a
+                   screen-reader reader and has to announce itself as one. */
+                aria-multiselectable={multiple || undefined}
                 style={{ maxHeight }}
                 className={cn("flex flex-col gap-1 overflow-y-auto", searchable && "mt-2")}
               >
@@ -1774,13 +1916,18 @@ const CompactFacet = React.forwardRef<HTMLDivElement, CompactFacetProps>(
                     the filters, not hunted for at the end of 131 of them. */}
                 {offLabel === null
                   ? null
-                  : row("__any__", selected === null, () => commit(null), offLabel)}
+                  : row(
+                      "__any__",
+                      isOff,
+                      multiple ? clearMany : () => commit(null),
+                      offLabel,
+                    )}
 
                 {visible.map((option) =>
                   row(
                     option.value,
-                    selected === option.value,
-                    () => commit(option.value),
+                    multiple ? selectedMany.includes(option.value) : selected === option.value,
+                    multiple ? () => toggle(option.value) : () => commit(option.value),
                     option.label,
                     option.count,
                     option.disabled,

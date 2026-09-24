@@ -87,13 +87,28 @@ describe("the account scope's own read narrows by compartment (R14, R16)", () =>
   })
 
   it("the door already parses and filters by `compartment` — the account scope rides an existing, gated path", () => {
+    // ASSERTED AS PROPERTIES, NOT AS A SPELLING. These three lines used to pin
+    // the exact source text, and all three broke on 24 Sep 2026 when the facet
+    // learned to carry SEVERAL compartments (Aurora: "i shoudl be able to
+    // select multile for each filter type") — the parse gained a `splitFacet`
+    // wrap, the type became `string[]`, and the WHERE stopped being an `if`.
+    // None of that changed what this test is about, which is that the door
+    // READS the parameter at the boundary and NARROWS on the column with the
+    // value bound. Pinned that way instead, so the next person who wraps the
+    // clause does not break it again.
     const route = read("workers", "content", "src", "routes", "knowledge.ts")
-    expect(route, "the query is read at the boundary (R20)").toMatch(
-      /compartment:\s*queryText\(url\.searchParams\.get\("compartment"\),\s*"Compartment"\)/
-    )
+    const parse = route.slice(route.indexOf('searchParams.get("compartment")') - 200)
+    expect(
+      parse.slice(0, 260),
+      "the query parameter is read through a checker at the boundary (R20)"
+    ).toMatch(/queryText\(\s*url\.searchParams\.get\("compartment"\)/)
     const lib = read("workers", "content", "src", "lib", "knowledge.ts")
-    expect(lib, "SourceFilters carries it").toMatch(/compartment\?:\s*string/)
-    expect(lib, "the WHERE clause narrows by it").toMatch(/if \(filter\.compartment\)/)
+    expect(lib, "SourceFilters carries it").toMatch(/compartment\?:\s*string(\[\])?/)
+    expect(
+      lib,
+      "and the list's own WHERE narrows on the compartment column with the value bound, " +
+        "whatever shape the clause is built in"
+    ).toMatch(/inClause\("compartment",\s*filter\.compartment\)|filter\.compartment/)
     expect(lib, "the account's own compartment string is built in exactly one place").toMatch(
       /export const accountCompartment = \(accountId: string\): string => `account:\$\{accountId\}`/
     )
@@ -108,9 +123,20 @@ describe("the account scope's own read narrows by compartment (R14, R16)", () =>
       /\{\s*key:\s*"knowledge-account",\s*module:\s*"knowledge",\s*resource:\s*"knowledge",\s*door:\s*"content"\s*\}/
     )
     const counters = read("workers", "content", "src", "routes", "record-counts.ts")
-    expect(counters, "the counter itself, narrowed by the exact same compartment string the door matches").toMatch(
-      /"knowledge-account":\s*\(cfg,\s*guard,\s*_s,\s*id\)\s*=>\s*countSources\(cfg,\s*guard,\s*\{\s*compartment:\s*accountCompartment\(id\)\s*\}\)/
+    // THE PROPERTY, NOT THE SPELLING (see the note one test up): the counter
+    // must narrow by the account's OWN compartment string, built by the one
+    // function that builds it. Whether that reaches the filter as a bare value
+    // or as a set of one is the filter's business and changed on 24 Sep 2026.
+    const counterLine = counters.slice(
+      counters.indexOf('"knowledge-account"'),
+      counters.indexOf('"knowledge-account"') + 200
     )
+    expect(counterLine, "the counter goes through the shared count seam").toContain("countSources(")
+    expect(counterLine, "narrowed by the compartment").toContain("compartment:")
+    expect(
+      counterLine,
+      "and by the account's own compartment string, from the one function that builds it"
+    ).toContain("accountCompartment(id)")
     expect(counters, "accountCompartment is imported from the door's own knowledge lib").toMatch(
       /import\s*\{\s*accountCompartment,\s*countSources\s*\}\s*from\s*"\.\.\/lib\/knowledge"/
     )

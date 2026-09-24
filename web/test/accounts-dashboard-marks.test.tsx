@@ -18,7 +18,7 @@
 // panel that only exists once a pointer is in it.
 
 import * as React from "react"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { AccountsDashboard as AccountsDashboardData } from "@/lib/api/tenancy"
@@ -49,9 +49,19 @@ const FULL: AccountsDashboardData = {
   // fails on a wrong CONVERSION rather than flickering on one.
   medianTenureDays: 947,
   byCountry: [
-    { country: "Spain", n: 7 },
-    { country: "Germany", n: 4 },
-    { country: "Austria", n: 3 },
+    // Spain names MORE accounts than the door's own per-slice cap would, so
+    // the "and N more" clause is exercised rather than assumed: 7 in the
+    // slice, 2 named.
+    {
+      country: "Spain",
+      n: 7,
+      accounts: [
+        { id: "a1", name: "Madrid Co", logoUrl: "/media/madrid.png" },
+        { id: "a2", name: "Sevilla Co", logoUrl: null },
+      ],
+    },
+    { country: "Germany", n: 4, accounts: [{ id: "a3", name: "Berlin Co", logoUrl: null }] },
+    { country: "Austria", n: 3, accounts: [{ id: "a4", name: "Wien Co", logoUrl: null }] },
   ],
   // HER SECOND ADDITION, 23 Sep 2026: "add metric industry (side of where they
   // are , so in the same row country & industry)". Deliberately a DIFFERENT set
@@ -77,7 +87,7 @@ function show(view: AccountsDashboardData = FULL): HTMLElement {
 
 // ── 1 · THE FIGURES ─────────────────────────────────────────────────────────
 
-describe("the figures row (R97: a count never gets its own card)", () => {
+describe("the figures row (R97, with her own explicit exception)", () => {
   it("adds the median tenure, in the same unit the picture under it uses", () => {
     show()
     // MONTHS, because the arrivals line's x-axis is one point per calendar
@@ -87,43 +97,53 @@ describe("the figures row (R97: a count never gets its own card)", () => {
     expect(screen.getByText("Median tenure")).toBeTruthy()
   })
 
-  it("draws no card around any of the three", () => {
-    // Her standing rule, R97, verbatim: "when it's a count … it doesn't
-    // deserve its own card." The kit's own `<StatGrid>` is a number-and-label
-    // CARD by construction, so the register is borrowed and the box is not —
-    // the whole point of item 1 being a LOOK fix rather than a new component.
+  it("gives each figure Effort's own card background, and no stroke", () => {
+    // Aurora, 23 Sep 2026: "the cards kpi need some kind of background, like
+    // effort." Effort's tiles are `<Card variant="default">` around a bare
+    // `<StatGrid>` (`web/components/work/effort-card.tsx`), so this asserts
+    // the SAME two components rather than a third treatment that merely looks
+    // similar.
     const container = show()
     const figure = screen.getAllByText("Active accounts")[0]!
+    const card = figure.closest('[data-slot="card"]')
+    expect(card, "a KPI figure has no card around it — she asked for a background like Effort").not.toBeNull()
     expect(
-      figure.closest('[data-slot="card"]'),
-      "a figure on the accounts dashboard sits inside a card, which R97 forbids"
-    ).toBeNull()
-    expect(container.querySelectorAll('[data-slot="stat-grid"]').length).toBe(0)
+      container.querySelectorAll('[data-slot="stat-grid"]').length,
+      "the figures are not drawn through the kit's own stat register"
+    ).toBe(3)
+    // AND IT IS A TONE, NOT A BOX. The kit's §2.8 (her own "by rule no borders
+    // nowhere in the kit") forbids a container told from its ground by a
+    // stroke, which is the one way a reader could answer "give it a
+    // background" wrongly. `variant="default"` is soft paper; anything that
+    // draws a hairline shadow or a border here would be the refused shape.
+    expect(card?.className ?? "", "the KPI card is drawn as a stroke, which the kit's §2.8 refuses").not.toMatch(
+      /\bborder(-|\b)|shadow-\[/
+    )
+    // Each tile is its OWN card — three figures, three cards, the shape Effort
+    // draws rather than one card holding a row of numbers.
+    expect(container.querySelectorAll('[data-slot="card"]').length).toBe(3)
   })
 })
 
-// ── 2 · WHERE THEY ARE, AS A DONUT ──────────────────────────────────────────
+// ── 2 · WHERE THEY ARE, AS A DONUT, AND WHO IS IN THE SLICE ────────────────
 
-describe("where they are is a donut, and the value is behind the hover", () => {
+describe("where they are is a donut, and the hover says which accounts", () => {
   it("draws the KIT's donut, not a second one by hand", () => {
     const container = show()
     expect(
       container.querySelector('[data-slot="donut"]'),
       "the country split is not drawn through the kit's own `Donut` (shared/ui/components/donut/donut.tsx)"
     ).toBeTruthy()
+    // ONE RING ONLY NOW. Industry is a bar chart since her 23 Sep ruling, so a
+    // second donut on this tab would be the old shape left behind.
+    expect(container.querySelectorAll('[data-slot="donut"]').length).toBe(1)
   })
 
   it("names every country at rest and keeps the figure for the hover", () => {
     show()
-    // AT REST the picture is whole: every country has its own row, with its
-    // own colour, and a reader can identify every slice without touching
-    // anything. Her "(when hover show)" is about the VALUE.
     for (const row of FULL.byCountry) expect(screen.getByText(row.country)).toBeTruthy()
-    // THE FIGURE IS NOT PRINTED AT REST. `getByText` reads rendered TEXT and
-    // never an `aria-label`, so this is the honest test of "you do not see the
-    // number until you ask for it" — the same distinction
-    // `dashboard-says-what-it-left-out.test.tsx` draws for the closing-time
-    // readout she moved behind a hover.
+    // `getByText` reads rendered TEXT and never an `aria-label`, so this is the
+    // honest test of "you do not see the number until you ask for it".
     expect(
       screen.queryByText("7 accounts, 50% of the book"),
       "the slice's figure is printed at rest — she asked for it on hover"
@@ -132,52 +152,100 @@ describe("where they are is a donut, and the value is behind the hover", () => {
 
   it("puts the figure on a real, focusable hit area", () => {
     show()
-    // A REAL `<button>`, so it is in the tab order and the kit's hover card
-    // (Radix) opens on FOCUS as well as on hover — and the whole readout is
-    // its accessible NAME, so a screen reader hears the figure whether or not
-    // the floating panel ever opens. 7 of 14 is 50%.
-    const spain = screen.getByRole("button", { name: /^Spain/ })
-    expect(spain.getAttribute("aria-label")).toBe("Spain · 7 accounts, 50% of the book")
-    // Austria is 3 of 14 — 21% once rounded, never 20 or 25.
+    // 7 of 14 is 50%; Austria is 3 of 14, which is 21% once rounded.
+    expect(screen.getByRole("button", { name: /^Spain/ }).getAttribute("aria-label")).toBe(
+      "Spain · 7 accounts, 50% of the book"
+    )
     expect(screen.getByRole("button", { name: /^Austria/ }).getAttribute("aria-label")).toBe(
       "Austria · 3 accounts, 21% of the book"
     )
   })
+
+  it("shows WHICH accounts, with name and face, only once a slice is active", () => {
+    // Her second ruling of the pair, verbatim: "when hover in donut in
+    // country, show which aacounts with name adn logo". At rest the readout is
+    // empty; hovering a slice fills it.
+    const container = show()
+    const readout = () => container.querySelector('[data-slot="country-accounts"]')!
+    expect(readout().textContent?.trim(), "the accounts are listed before anything is hovered").toBe("")
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^Spain/ }))
+    expect(screen.getByText("Madrid Co")).toBeTruthy()
+    expect(screen.getByText("Sevilla Co")).toBeTruthy()
+    // THE FACE IS THE APP'S OWN, not a second fallback: `RecordMark` draws the
+    // picture where there is one and the letter tile where there is not.
+    const img = readout().querySelector("img")
+    expect(img, "the account with a logo draws no picture").not.toBeNull()
+    expect(readout().textContent, "the company with no logo draws no letter tile").toContain("S")
+
+    // AND IT SAYS WHAT IT COULD NOT SHOW. The door caps the faces per slice
+    // while `n` stays exact, so 7 in the slice and 2 named is "and 5 more".
+    expect(readout().textContent).toContain("and 5 more")
+
+    // Germany names one of its four, so it says so too.
+    fireEvent.mouseLeave(screen.getByRole("button", { name: /^Spain/ }))
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^Germany/ }))
+    expect(readout().textContent).toContain("Berlin Co")
+    expect(readout().textContent).toContain("and 3 more")
+  })
+
+  it("says nothing extra for a country whose slice names everything", () => {
+    // THE OTHER HALF OF THE SAME CLAUSE, and it needs its own book: a slice
+    // whose `n` equals the number of names it carries must not print a
+    // dangling "and 0 more".
+    const container = show({
+      ...FULL,
+      byCountry: [{ country: "Austria", n: 2, accounts: [
+        { id: "a1", name: "Wien Co", logoUrl: null },
+        { id: "a2", name: "Graz Co", logoUrl: null },
+      ] }],
+    })
+    fireEvent.mouseEnter(screen.getByRole("button", { name: /^Austria/ }))
+    const text = container.querySelector('[data-slot="country-accounts"]')!.textContent ?? ""
+    expect(text).toContain("Wien Co")
+    expect(text).toContain("Graz Co")
+    expect(text, "a fully named slice still prints an \"and N more\" tail").not.toContain("more")
+  })
+
+  it("empties the readout again when the pointer leaves", () => {
+    const container = show()
+    const spain = screen.getByRole("button", { name: /^Spain/ })
+    fireEvent.mouseEnter(spain)
+    fireEvent.mouseLeave(spain)
+    expect(
+      container.querySelector('[data-slot="country-accounts"]')!.textContent?.trim(),
+      "the slice's accounts stay on screen after the pointer has gone"
+    ).toBe("")
+  })
 })
 
-// ── 2b · WHAT THEY DO, BESIDE IT ────────────────────────────────────────────
+// ── 2b · WHAT THEY DO, AS BARS, BESIDE IT ──────────────────────────────────
 
-describe("the industry split sits beside the country one, in one row", () => {
-  it("draws a second donut, with its own words and its own figures", () => {
+describe("the industry split is a bar chart beside the country donut", () => {
+  it("draws bars, not a second donut", () => {
+    // Aurora, 23 Sep 2026: "make industry a bar chart." Country stays a donut;
+    // they still share the row.
     const container = show()
-    // TWO RINGS, not one — the whole of her "side of where they are". A test
-    // that only counted legend rows would pass on a single donut with six of
-    // them.
     expect(
-      container.querySelectorAll('[data-slot="donut"]').length,
-      "the accounts dashboard draws only one donut — the industry split is missing or is not a donut"
-    ).toBe(2)
-    for (const row of FULL.byIndustry) expect(screen.getByText(row.industry)).toBeTruthy()
-    // 6 of 14 is 43%. Counted over the INDUSTRY total (14), not the country
-    // one, which this fixture keeps deliberately different.
-    expect(screen.getByRole("button", { name: /^Insurance ·/ }).getAttribute("aria-label")).toBe(
-      "Insurance · 6 accounts, 43% of the book"
+      container.querySelector('[data-slot="industry-bars"]'),
+      "the industry split is not a bar chart"
+    ).toBeTruthy()
+    expect(container.querySelectorAll('[data-slot="industry-bar"]').length).toBe(
+      FULL.byIndustry.length
     )
-    // AND THE NEAR-DUPLICATE STAYS ITS OWN SLICE. "Insurance" and "Insurance
-    // Broker" are two live spellings on the real book and may be two real
-    // trades; nothing in this app merges them on its own judgement, so the
-    // picture must not either.
-    expect(
-      screen.getByRole("button", { name: /^Insurance Broker/ }).getAttribute("aria-label")
-    ).toBe("Insurance Broker · 5 accounts, 36% of the book")
+    for (const row of FULL.byIndustry) expect(screen.getByText(row.industry)).toBeTruthy()
+    // THE COUNT IS ON THE ROW, not behind a hover: a bar has somewhere to
+    // write it, which a slice does not.
+    expect(screen.getAllByText("6").length).toBeGreaterThan(0)
+    // AND THE NEAR-DUPLICATE STAYS ITS OWN BAR. "Insurance" and "Insurance
+    // Broker" are two live spellings and may be two real trades; nothing in
+    // this app merges them on its own judgement.
+    expect(screen.getByText("Insurance")).toBeTruthy()
+    expect(screen.getByText("Insurance Broker")).toBeTruthy()
   })
 
   it("puts the two in ONE row, stacking at the same breakpoint the ticket dashboard uses", () => {
     const container = show()
-    // HER WORDS ARE ABOUT THE ROW: "so in the same row country & industry". A
-    // grid is the only thing that makes that true at a width and stackable
-    // below it, and the breakpoint is the one `tickets-dashboard.tsx` already
-    // answers this question with rather than a new one invented here.
     const spain = screen.getAllByText("Spain")[0]!
     const insurance = screen.getAllByText("Insurance")[0]!
     const row = spain.closest(".grid")
@@ -190,9 +258,7 @@ describe("the industry split sits beside the country one, in one row", () => {
       row?.className,
       "the pair does not stack into one column below lg, which every panel row on the ticket dashboard does"
     ).toMatch(/\blg:grid-cols-2\b/)
-    expect(container.querySelectorAll('[data-slot="split-slice"]').length).toBe(
-      FULL.byCountry.length + FULL.byIndustry.length
-    )
+    expect(container.querySelectorAll('[data-slot="split-slice"]').length).toBe(FULL.byCountry.length)
   })
 })
 

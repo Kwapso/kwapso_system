@@ -2368,6 +2368,7 @@ export function HelpDetailScreen({
               accountId={ticket.accountId}
               raisedByContactId={ticket.raisedByContactId}
               raisedByContactName={ticket.raisedByContactName}
+              raiserIsClient={ticket.raiserIsClient}
               canEditRaisedBy={canEdit}
               onChangeRaisedBy={(raisedByContactId) =>
                 editTicket({ description: ticket.description, raisedByContactId })

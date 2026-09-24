@@ -158,7 +158,10 @@ export async function buildShape(
   // seam, so the number under this picture and the number over the list beside
   // it can never disagree.
   const total = await countSources(cfg, guard, {
-    compartment: compartment ?? undefined,
+    // ONE notebook, as a set of one — this shape screen is always scoped to a
+    // single compartment, and the filter grew a set for the toolbar's facet
+    // (24 Sep 2026) rather than for this position.
+    compartment: compartment ? [compartment] : undefined,
     active: "yes",
   })
 

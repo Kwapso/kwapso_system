@@ -252,7 +252,10 @@ describe("c · Join and Google Calendar sit in the record's own title row", () =
 
   it("both buttons are declared inside the `actions` node", () => {
     expect(actions).toMatch(/t\("Join"\)/)
-    expect(actions).toMatch(/t\("Google Calendar"\)/)
+    // SHORTENED AGAIN 24 Sep 2026, her own second pass: "rename google
+    // calendar to just 'calendar'". `meeting-one-page.test.tsx` holds the
+    // assertion that both retired labels are gone from the file.
+    expect(actions).toMatch(/t\("Calendar"\)/)
     expect(actions).toMatch(/item\.googleJoinUrl/)
     expect(actions).toMatch(/item\.googleEventUrl/)
   })
@@ -291,6 +294,10 @@ describe("c · Join and Google Calendar sit in the record's own title row", () =
     const folded = between(src, "const foldedActions: HeadActionItem[] = [", "\n  return (")
     expect(folded).toMatch(/key: "join"/)
     expect(folded).toMatch(/key: "google-calendar"/)
+    // The KEY is a stable identifier and deliberately not renamed with the
+    // label — nothing a person reads, and moving it would churn a menu item's
+    // identity for a word change.
+    expect(folded).toMatch(/label: t\("Calendar"\)/)
   })
 
   // ── THE LAW, CITED AND OBEYED ──────────────────────────────────────────────

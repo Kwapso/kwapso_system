@@ -51,19 +51,19 @@ const COUNTERS: Record<string, RecordCounter> = {
   // behind the moment somebody presses Done — R16 in its quietest form.
   "todos-account": (cfg, guard, scope, id) => countTodos(cfg, guard, scope, { accountId: id }).then((c) => c.all),
   "tickets-account": (cfg, guard, scope, id) =>
-    countTickets(cfg, guard, scope, { tab: "all", view: "live", accountId: id }).then((r) => r.total),
-  "meetings-account": (cfg, guard, _s, id) => countMeetings(cfg, guard, { view: "all", accountId: id }),
+    countTickets(cfg, guard, scope, { tab: "all", view: "live", accountId: [id] }).then((r) => r.total),
+  "meetings-account": (cfg, guard, _s, id) => countMeetings(cfg, guard, { view: "all", accountId: [id] }),
   // EVERYTHING WE KNOW ABOUT THIS CLIENT — the same exact count the tab's own
   // gallery badges through `<PagedFind>` (R16), over the same filter
   // (`compartment`, `account:<id>`) the door's own "Filed under" facet and
   // this account's own knowledge-screen.tsx scope already use.
-  "knowledge-account": (cfg, guard, _s, id) => countSources(cfg, guard, { compartment: accountCompartment(id) }),
+  "knowledge-account": (cfg, guard, _s, id) => countSources(cfg, guard, { compartment: [accountCompartment(id)] }),
   // A system's record.
   "sprints-app": (cfg, guard, _s, id) => countSprints(cfg, guard, { appId: id }),
   "stories-app": (cfg, guard, _s, id) => countStories(cfg, guard, { appId: id, view: "all" }).then((r) => r.total),
-  "meetings-app": (cfg, guard, _s, id) => countMeetings(cfg, guard, { view: "all", appId: id }),
+  "meetings-app": (cfg, guard, _s, id) => countMeetings(cfg, guard, { view: "all", appId: [id] }),
   "tickets-app": (cfg, guard, scope, id) =>
-    countTickets(cfg, guard, scope, { tab: "all", view: "live", appId: id }).then((r) => r.total),
+    countTickets(cfg, guard, scope, { tab: "all", view: "live", appId: [id] }).then((r) => r.total),
   // WHAT WE HANDED OVER on it — the whole shelf, archived rows included, because
   // the tab shows those too: a superseded handover doc is still something we sent.
   "deliverables-app": (cfg, guard, _s, id) => countDeliverables(cfg, guard, { appId: id }),

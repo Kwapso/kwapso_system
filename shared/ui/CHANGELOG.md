@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Added - `CompactFacet` takes several values at once - 2026-09-24
+
+Aurora, validating the filter overlay: *"validated, but i shoudl be able to select multile for each filter type"*. A facet takes a SET now: three clients, two stages. Within one facet those values mean OR; across facets a toolbar still means AND, which is the host's arithmetic and not this component's.
+
+**`multiple` is additive and off by default**, so every existing call site is byte-identical with it omitted and `value`/`onValueChange` keep their single-valued contract. Turning it on swaps three things and nothing else: the value pair becomes `values`/`onValuesChange`, each row's mark becomes `SearchableFacet`'s checkbox at `--radius-select` (the one shape in the system that says "several of these may be on", which is the distinction the single-valued tick's own note already drew), and a pick no longer closes the panel, because choosing three clients should not be three round trips through the trigger.
+
+**Clearing has two grains, and both are in the list.** A row that is already on turns itself off, which is how one value leaves a set of four; the "Any …" row at the head of the list drops the whole facet in one press and closes the panel. Neither needs a second control beside the field.
+
+**The closed field summarises.** Nothing chosen is the placeholder, one is that option's own label, several is the first label with a ` +N` after it. `formatSummary` replaces that for a host with a translator. The summary is ordered by the OPTIONS rather than by the order values were ticked, so the field does not change under somebody who unticks and re-ticks the same name.
+
+**Why not `SearchableFacet`, which has been multi-valued all along:** it is an always-expanded panel, and a consuming app measured two of them as a screenful of controls hanging off a toolbar. The ruling that produced `CompactFacet` was "one short labelled field, not an expanded list"; taking several values is not a reason to give that up.
+
+**The listbox says so out loud** (`aria-multiselectable`), because a mark alone is a picture and a listbox that takes several is a different control to a screen-reader reader.
+
+**The overlay's own form decision is unaffected.** `FACET_SPAN` costs a closed field one row whether it holds one value or five: the list is behind the field in both modes, so a multi-select facet is exactly as tall as a single-select one and `filterOverlayForm` reads the same number.
+
 ### Added - `Donut` gets a first-class active segment: hover by pointer, hover by keyboard, and a reported/controllable value - 2026-09-23
 
 Aurora's ruling, verbatim: *"make the where as a donut graphic (when hover show)."* The kit could draw the ring and nothing else. `donut.tsx`'s own state table said so in its own words - hover was *"switched off here"* and focus-visible was *"not here; the SVG is not focusable"* - and the component exposed no per-segment callback and no active-segment input, with the ring rendered inside it where a call site could not reach. So the consuming application answered her ruling by drawing a SECOND legend of its own (real `<button>`s under a `HoverCard`, beside a `legend={false}` ring) and restating this file's private `SEGMENT_COLOURS` sequence by hand in two screens so the keys and the ring could not drift. Under the standing rule that the kit is the only UI input, that is a defect HERE, and this is it fixed.

@@ -27,9 +27,11 @@ import { countCollection } from "@shared/workers/count"
 import { requireActiveSelectableValue } from "@shared/workers/vocabulary"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
+import { inClause } from "@shared/workers/filter-in"
 import { ulid } from "@shared/workers/id"
 import {
   ACCOUNTS_ARRIVAL_NAMES_PER_MONTH,
+  ACCOUNTS_COUNTRY_FACES_PER_ROW,
   ACCOUNTS_DASHBOARD_GROUP_CAP,
   EXPORT_HARD_CAP,
   LIST_HARD_CAP,
@@ -37,6 +39,11 @@ import {
 } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
+import {
+  cascadeArchive,
+  cascadeRestore,
+  refuseIfParentArchived,
+} from "@shared/workers/archive-cascade"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 import { addressChanged, geocodeAddress, type GeocodeAddressFields } from "./geocode"
@@ -503,15 +510,26 @@ export type AccountFilters = {
    * "portal"`, exactly the way an unasked filter is always dropped: never a
    * 400, because "you asked about someone else's staffing" is not a malformed
    * request, it is a request answered as if the question had not been asked
-   * (R21). */
-  manager?: string
+   * (R21).
+   *
+   * A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to select multile for
+   * each filter type"). Several managers mean OR; `shared/facet-list.ts` holds
+   * the spelling and `inClause` the SQL, and one name is a set of one, so no
+   * existing caller changed. */
+  manager?: string[]
   /** WHERE THE ACCOUNT IS — the same value `country` already carries on the
    * row, matched exactly against the team's own "Country" vocabulary
    * (`shared/selectable-groups.ts`). Open to every caller inside the fence,
    * staff and portal alike: unlike the manager, there is no staffing fact to
    * enumerate through it — a client narrowing their OWN world by country
-   * learns nothing they could not already read on the rows in front of them. */
-  country?: string
+   * learns nothing they could not already read on the rows in front of them.
+   *
+   * A SET SINCE 24 SEP 2026, like `manager` above. This is one of the two
+   * facets whose vocabulary is the team's OWN typing rather than a closed list,
+   * so it is also the reason `joinFacet` percent-encodes each value: "Bonaire,
+   * Sint Eustatius and Saba" is a real country and a plain comma join would
+   * turn it into three that match nothing. */
+  country?: string[]
 }
 
 /** MAY THIS CALLER LIST PEOPLE? — the `contacts` right, arriving as a boolean
@@ -703,15 +721,19 @@ function accountsWhere(
   // than folded into `opts` upstream, because this is the one place a caller's
   // KIND decides whether a FILTER is even asked — the same place the fence
   // itself is built, so "was this narrowed by scope?" has one place to look.
-  if (opts.manager && scope.kind === "staff") {
-    filters.push("account_manager_user_id = ?")
-    params.push(opts.manager)
+  if (scope.kind === "staff") {
+    const managers = inClause("account_manager_user_id", opts.manager)
+    if (managers.sql) {
+      filters.push(managers.sql)
+      params.push(...managers.params)
+    }
   }
   // THE COUNTRY — an exact match against the team's own vocabulary value,
   // honoured for every caller inside the fence (see `AccountFilters.country`).
-  if (opts.country) {
-    filters.push("country = ?")
-    params.push(opts.country)
+  const countries = inClause("country", opts.country)
+  if (countries.sql) {
+    filters.push(countries.sql)
+    params.push(...countries.params)
   }
   return { sql: where([fence.sql, ...filters]), params }
 }
@@ -870,8 +892,17 @@ export type AccountsDashboard = {
    * makes; see this function's own header for why the even case is a mean. */
   medianTenureDays: number | null
   /** one row per country an active company names, busiest first — a country
-   * nobody set is not a row here (see this function's own header). */
-  byCountry: { country: string; n: number }[]
+   * nobody set is not a row here (see this function's own header).
+   *
+   * `accounts` IS WHO, AND IT IS BOUNDED — her 23 Sep 2026 ruling, "when hover
+   * in donut in country, show which aacounts with name adn logo". At most
+   * `ACCOUNTS_COUNTRY_FACES_PER_ROW` per country, A→Z, so the read stays
+   * R14-bounded however many companies one country holds; `n` is still the
+   * EXACT count, so a screen can always say how many more there were than it
+   * can show. `logoUrl` is the account's own stored picture or `null`, and a
+   * `null` is not a second kind of answer: the app's own `RecordMark` draws
+   * the letter tile it already draws for a company with no picture. */
+  byCountry: { country: string; n: number; accounts: { id: string; name: string; logoUrl: string | null }[] }[]
   /** one row per industry an active company names, busiest first — read
    * EXACTLY like `byCountry` beside it, and drawn beside it too (Aurora, 23
    * Sep 2026: "add metric industry (side of where they are, so in the same row
@@ -901,6 +932,7 @@ export async function readAccountsDashboard(
   const params = [...fence.params]
   const cap = ACCOUNTS_DASHBOARD_GROUP_CAP
   const namesPerMonth = ACCOUNTS_ARRIVAL_NAMES_PER_MONTH
+  const facesPerRow = ACCOUNTS_COUNTRY_FACES_PER_ROW
   // A COUNTRY NOBODY SET IS NOT A ROW — both country reads add the identical
   // extra clause on top of the shared active-company fence above, so the
   // header count and the bars beneath it can never disagree about which rows
@@ -911,7 +943,8 @@ export async function readAccountsDashboard(
   // industry nobody set is not a row, over the same active-company fence.
   const knownIndustry = `${base} AND industry IS NOT NULL AND TRIM(industry) <> ''`
 
-  const [activeCount, countryCount, byCountry, byIndustry, arrivals, arrivalNames] = await Promise.all([
+  const [activeCount, countryCount, byCountry, countryFaces, byIndustry, arrivals, arrivalNames] =
+    await Promise.all([
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${base}`, params),
     countCollection(
       cfg,
@@ -928,6 +961,21 @@ export async function readAccountsDashboard(
     ),
     // BOUNDED THE SAME WAY (R14), by the same constant — an industry list is
     // open-ended in principle for exactly the reason a country list is.
+    // WHO IS IN EACH COUNTRY — bounded twice, the identical shape the arrival
+    // months' own names read through: `ROW_NUMBER()` inside the country keeps
+    // at most `facesPerRow` per slice, and the outer LIMIT keeps at most `cap`
+    // slices' worth, so the worst case is a fixed cap × facesPerRow rows
+    // however large the book grows.
+    d1Query<{ country: string; id: string; name: string; logo_url: string | null }>(
+      cfg,
+      guard.databaseId,
+      `SELECT country, id, name, logo_url FROM (
+         SELECT country, id, name, logo_url,
+                ROW_NUMBER() OVER (PARTITION BY country ORDER BY name ASC, id ASC) AS rn
+           FROM accounts${knownCountry}
+       ) WHERE rn <= ${facesPerRow} ORDER BY country ASC, name ASC LIMIT ${cap * facesPerRow}`,
+      params
+    ),
     d1Query<{ industry: string; n: number }>(
       cfg,
       guard.databaseId,
@@ -999,6 +1047,17 @@ export async function readAccountsDashboard(
   // fell outside the two caps above keeps an EMPTY array rather than losing
   // its row: `n` is the exact count either way, so the picture never drops a
   // point because the hover has nothing to say.
+  // ONE `accounts` ARRAY PER COUNTRY, stitched onto the counted rows the same
+  // way the months' names are — a country whose faces all fell outside the two
+  // caps keeps an EMPTY array rather than losing its row.
+  const facesByCountry = new Map<string, { id: string; name: string; logoUrl: string | null }[]>()
+  for (const r of countryFaces) {
+    const face = { id: r.id, name: r.name, logoUrl: r.logo_url }
+    const list = facesByCountry.get(r.country)
+    if (list) list.push(face)
+    else facesByCountry.set(r.country, [face])
+  }
+
   const namesByMonth = new Map<string, string[]>()
   for (const r of arrivalNames) {
     const list = namesByMonth.get(r.month)
@@ -1010,7 +1069,7 @@ export async function readAccountsDashboard(
     activeCount,
     countryCount,
     medianTenureDays,
-    byCountry,
+    byCountry: byCountry.map((r) => ({ ...r, accounts: facesByCountry.get(r.country) ?? [] })),
     byIndustry,
     arrivals: arrivals.map((r) => ({ ...r, names: namesByMonth.get(r.month) ?? [] })),
   }
@@ -1749,6 +1808,12 @@ export async function setAccountArchived(
   const fence = accountScopeClause(scope, "id")
   const now = new Date().toISOString()
 
+  // NOTHING VISIBLE EVER HANGS UNDER SOMETHING INVISIBLE (0123). A nested
+  // business whose holding company is still archived cannot be restored on its
+  // own — its own Restore is refused and the way back is to restore the parent,
+  // which is also the only place its marker can be honoured.
+  if (!archived) await refuseIfParentArchived(cfg, guard.databaseId, { table: "accounts", id })
+
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
@@ -1765,9 +1830,25 @@ export async function setAccountArchived(
   )
   if (!changed[0]) return false
 
+  // THE CASCADE (0123). Aurora, 24 Sep 2026: "when archiving a parent item,
+  // always archive as well the child items." Everything hanging off this
+  // company goes with it, carrying its OWN archived state and a marker naming
+  // this account as the cause, so restoring the account restores exactly what
+  // the cascade took and walks past anything archived on its own merits.
+  //
+  // AFTER THE ROW ITSELF MOVED, never before, and the `if (!changed[0])` above
+  // is what makes that load-bearing: R17 means a second archive of an
+  // already-archived account moves zero rows and returns here, so the cascade
+  // cannot run twice over one company.
+  const cascaded = archived
+    ? await cascadeArchive(cfg, guard.databaseId, actor, { table: "accounts", id }, now)
+    : await cascadeRestore(cfg, guard.databaseId, { table: "accounts", id })
+
   await logActivity(cfg, guard.databaseId, actor, {
     type: archived ? "Account archived" : "Account unarchived",
-    description: `${actor.name} ${archived ? "archived" : "unarchived"} ${account.name}`,
+    description: `${actor.name} ${archived ? "archived" : "unarchived"} ${account.name}${
+      cascaded.length ? ` and ${cascaded.length} record${cascaded.length === 1 ? "" : "s"} under it` : ""
+    }`,
     relatedTable: "accounts",
     relatedRowId: id,
   })

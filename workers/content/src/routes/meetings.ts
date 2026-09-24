@@ -17,6 +17,7 @@
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { requireRight } from "@shared/workers/gating"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { splitFacet } from "@shared/facet-list"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -43,9 +44,13 @@ import type { Env } from "../env"
  * check (R19) has one shape to derive from. */
 function filterFrom(url: URL): MeetingFilter {
   return {
-    accountId: queryText(url.searchParams.get("accountId"), "Client") ?? undefined,
-    appId: queryText(url.searchParams.get("appId"), "App") ?? undefined,
-    purposeId: queryText(url.searchParams.get("purposeId"), "Purpose") ?? undefined,
+    // A SET SINCE 24 SEP 2026 — the comma list is read off the ALREADY-VALIDATED
+    // string, so the boundary check stays exactly where R20's census looks for
+    // it and only the value's spelling grew. The parameter NAME is unchanged,
+    // so R19's mirror on the machine surface is untouched too.
+    accountId: splitFacet(queryText(url.searchParams.get("accountId"), "Client")),
+    appId: splitFacet(queryText(url.searchParams.get("appId"), "App")),
+    purposeId: splitFacet(queryText(url.searchParams.get("purposeId"), "Purpose")),
     view: queryText(url.searchParams.get("view"), "View") ?? undefined,
     // R20 on the query half: through the seam FIRST, then shape-checked. A month
     // reaches a date comparison, so anything that is not exactly four digits, a

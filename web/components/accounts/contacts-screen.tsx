@@ -334,6 +334,23 @@ function contactGalleryBody({
                     picture={row.logoUrl}
                     mark={nameInitials(row.name)}
                     markName={row.name}
+                    /* GREY, AND NOT LOOKED UP — Aurora, 23 Sep 2026: "external
+                       photos (from contacts) gray scale. keep staff nirmal.",
+                       and her correction the next day against this very wall:
+                       "no. in contacts they are not yet in grayscale."
+
+                       A CONSTANT, BECAUSE THIS SCREEN IS THE DEFINITION. Every
+                       row here is an `accountType: "individual"` account linked
+                       to a company — that is what a contact IS (SCOPE ch.03),
+                       and it is the one thing `ContactsScreen` selects for. So
+                       there is nothing to resolve: asking a members cache
+                       whether one of these people is external would be
+                       re-deriving a fact the screen's own name already states,
+                       and it would fail open the moment the cache were cold.
+                       The two walls this cell shares with `PersonCard`
+                       (`members-gallery.tsx`, staff, passes nothing) now differ
+                       by exactly this word, which is the whole ruling. */
+                    external
                     chip={row.account ? <Badge>{row.account}</Badge> : undefined}
                     title={<CardTitle className="text-sm">{row.name}</CardTitle>}
                     secondary={row.status}

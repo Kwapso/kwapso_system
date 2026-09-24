@@ -713,7 +713,16 @@ export function shapeAccountsList(
           return m ? (
             <span className="flex items-center gap-2">
               {/* THE SMALLEST SIZE, IN A TABLE ROW — see `name`'s own note a
-                  few lines up (client ruling, 18 Sep 2026). */}
+                  few lines up (client ruling, 18 Sep 2026).
+
+                  NO `external`, AND THAT IS THE DECISION RATHER THAN A MISS
+                  (Aurora, 23 Sep 2026: "external photos (from contacts) gray
+                  scale. keep staff nirmal."). An account MANAGER is one of
+                  ours by construction: `managerById` is built from the
+                  `PickablePerson[]` this function is handed, which comes off
+                  `assignableMembers` (web/lib/members.ts) — a list whose whole
+                  reason to exist is dropping every client login. Greying a
+                  face here would be a false statement about a colleague. */}
               <RecordMark picture={m.photo} name={m.name} shape="round" size="choice" />
               {m.name}
             </span>
@@ -839,9 +848,28 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
       // height is set by the picture rather than by what a person reads;
       // `choice` is the kit's own smallest size and is what a single text
       // line already needs.
+      //
+      // AND GREY — Aurora, 23 Sep 2026: "external photos (from contacts) gray
+      // scale. keep staff nirmal.", corrected against this very screen the
+      // next day: "no. in contacts they are not yet in grayscale." A CONSTANT,
+      // because `shapeContactsTable` shapes CONTACTS: every row is an
+      // `accountType: "individual"` account linked to a company, which is what
+      // a contact IS (SCOPE ch.03). Nothing to resolve.
+      //
+      // THIS MARK IS A SQUARE, AND THAT IS WHY IT NEEDED FINDING BY HAND. The
+      // R110 census (`web/test/photo-beats-initials.test.ts`) reads
+      // `shape="round"` as the app's own declaration that a mark is "a person
+      // in their own right", and a contact deliberately does NOT carry it —
+      // `record-mark.tsx`'s own header settles that on 19 Aug 2026: "A CLIENT
+      // is a rounded square, whether it is a company or a sole trader, because
+      // both sit in one column of one list and two shapes there read as two
+      // kinds of thing when the product has one." So the box says "client" and
+      // the photograph is still a person's face: 31 of 110 hold a real one, per
+      // the note above. A census keyed on the SHAPE cannot see this row, which
+      // is written down here rather than left as the census's silence.
       person: (
         <span className={REF_LEADS_NAME}>
-          <RecordMark picture={a.logoUrl} name={a.name} size="choice" />
+          <RecordMark picture={a.logoUrl} name={a.name} size="choice" external />
           <span className="min-w-0 truncate">
             {a.name}
           </span>

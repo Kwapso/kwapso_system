@@ -25,6 +25,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
+import { ACCOUNTS_COUNTRY_FACES_PER_ROW } from "@shared/workers/limits"
 import { readAccountsDashboard } from "../src/lib/accounts"
 import { buildSpineDb, IDS } from "./spine-harness"
 
@@ -116,10 +117,27 @@ describe("readAccountsDashboard", () => {
 
     // TWO COUNTRIES, SPAIN BUSIEST FIRST — NOCOUNTRY sits in neither row.
     expect(after.countryCount).toBe(2)
+    // BUSIEST FIRST, and each row now carries WHO — her 23 Sep 2026 ruling,
+    // "when hover in donut in country, show which aacounts with name adn
+    // logo". The names are A→Z inside the country, the exact `n` rides beside
+    // them, and `logoUrl` is `null` where the company has no picture (the app
+    // draws its own letter tile for that; the door invents no second answer).
     expect(after.byCountry).toEqual([
-      { country: "Spain", n: 2 },
-      { country: "Germany", n: 1 },
+      {
+        country: "Spain",
+        n: 2,
+        accounts: [
+          { id: "DASH_ES1", name: "Madrid Co", logoUrl: null },
+          { id: "DASH_ES2", name: "Sevilla Co", logoUrl: null },
+        ],
+      },
+      { country: "Germany", n: 1, accounts: [{ id: "DASH_DE1", name: "Berlin Co", logoUrl: null }] },
     ])
+    // AND THE FENCE REACHES THE FACES TOO: the inactive, the archived and the
+    // person all name Spain, and none of them is in the list above.
+    const spain = after.byCountry.find((r) => r.country === "Spain")!
+    for (const hidden of ["Inactive Co", "Archived Co", "Someone"])
+      expect(spain.accounts.map((a) => a.name)).not.toContain(hidden)
 
     // ONE ROW PER MONTH AN ACTIVE COMPANY ARRIVED IN, oldest first — the
     // fixture's own baseline contributes "2026-01": 4 (unaffected by anything
@@ -138,6 +156,37 @@ describe("readAccountsDashboard", () => {
     // Oldest first.
     const months = after.arrivals.map((r) => r.month)
     expect(months).toEqual([...months].sort())
+  })
+
+  it("caps the faces per country while the count stays exact (R14)", async () => {
+    // Her ruling asks a slice to name WHO is in it, which is a list off a
+    // growing collection — so it needs a ceiling, and the ceiling must not
+    // become a lie about the count. `n` is the exact number of active
+    // companies in the country; `accounts` is at most
+    // `ACCOUNTS_COUNTRY_FACES_PER_ROW` of them, A→Z, and the screen says how
+    // many more it could not show rather than implying eight was all of them.
+    const over = ACCOUNTS_COUNTRY_FACES_PER_ROW + 2
+    for (let i = 0; i < over; i++)
+      seedAccount({
+        id: `CAP_${i}`,
+        type: "entity",
+        // Zero-padded so A→Z order is the same order a person would read.
+        name: `Cap Co ${String(i).padStart(2, "0")}`,
+        country: "Portugal",
+        createdAt: "2025-01-01",
+      })
+
+    const data = await readAccountsDashboard(cfg, guard, staff)
+    const row = data.byCountry.find((r) => r.country === "Portugal")!
+    expect(row.n, "the count is capped along with the list, which would understate the slice").toBe(over)
+    expect(row.accounts.length, "the per-slice list is not bounded").toBe(
+      ACCOUNTS_COUNTRY_FACES_PER_ROW
+    )
+    // THE FIRST N BY NAME, not an arbitrary N: the order has to be the one the
+    // screen prints, or "and 2 more" hides a different two every read.
+    expect(row.accounts.map((a) => a.name)).toEqual(
+      Array.from({ length: ACCOUNTS_COUNTRY_FACES_PER_ROW }, (_, i) => `Cap Co ${String(i).padStart(2, "0")}`)
+    )
   })
 
   it("splits the book by industry the same way it splits it by country", async () => {

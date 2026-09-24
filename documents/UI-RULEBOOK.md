@@ -10266,6 +10266,53 @@ library, not a synthesised weight in the host.
 
 ## Rulings awaiting implementation
 
+**The Logs dashboard, her review (2026-09-24):** four rulings over the tab built the day
+before, verbatim: *"add full toolbar, even if search is diasbled. kpi need background. put who
+logged it next to where they went 1/2 and 1/2. HOURS A WEEK, show multiple lines, one per staff
+and area for total."* **Status: built.**
+
+1. **A full toolbar, with the search shown and off.** It drew two filters and nothing else, and
+   a toolbar missing its most recognisable control reads as broken rather than deliberate. It is
+   the KIT'S OWN `SearchInput` in the kit's own disabled state (its state 5: `--hair-faint` fill,
+   `--ink-disabled` ink, no shadow, clear control withdrawn), so nothing here fakes a field with
+   a div, and there is no kit gap to report. The placeholder says where search does live ("Search
+   is on the Entries tab") so the control is not a dead end. `TOOLBAR_EXEMPT` no longer names this
+   screen; the list shrank, which is the only direction it may move. **The sort slot is still
+   empty and still reasoned** (`TOOLBAR_SORT_EXEMPT`): a donut is ordered by share, a line by
+   time, a rank by hours, so a sort chip would have to pick one picture to reorder and leave the
+   other five.
+
+2. **The KPI figures get their background, and it is Effort's.** Her word was "like effort", so
+   the tile is `effort-card.tsx`'s part for part: `<Card variant="default">` + `<CardContent>` +
+   `<StatGrid surface="bare">`, on the same `gap-[var(--space-4)]` grid. A FILL, never a stroke
+   (R67 as amended forbids the box drawn as an outline), and the four are written out as literal
+   elements rather than mapped, because R65 reads a keyed kit `<Card>` as a per-record row. This
+   is her own "unless explicitly said" clause in R97, said: `COUNT_REGISTER_EXEMPT` records it as
+   SETTLED rather than pending, beside the identical Effort entry.
+
+3. **Where the hours went sits beside Who logged it, half and half.** One `lg:grid-cols-2` row at
+   `gap-6`, the same arrangement the accounts overview uses for country beside industry. The
+   weekly chart keeps its own full-width row: a line is read across the whole measure.
+
+4. **Hours a week is one line per person over an area for the total.** The door already hands
+   back every person's own share of the same eight windows from ONE grouped read, so this costs
+   no second round trip and emphatically no read per person. **The cap is five, and it is the
+   palette's rather than a taste:** `--chart-1..5` is how many hues this system can tell apart, so
+   a sixth line would repeat one (two people drawn identically) or invent one (R32 forbids it).
+   **Nobody is quietly dropped.** The AREA is everybody, because it is the door's exact total
+   computed without the grouping cap, so an undrawn person is still inside the shape their
+   colleagues' lines sit under; the legend then carries "and N others, in the total but not
+   drawn", and each week's hover carries those others' own hours so the rows add up to the total
+   above them. N comes from the door's exact `activePeople`, not from the capped array, so it
+   does not under-report past `WORK_LOG_GROUP_CAP`. Who is drawn is ranked by hours IN THE WINDOW,
+   never by the all-time total the door sorts on, or a chart of eight weeks could draw five flat
+   lines at zero.
+
+**A stale kit comment found on the way:** `chart.tsx`'s header still warns that `--chart-4` and
+`--chart-5` "currently resolve to `--chart-1` and `--chart-2`". At the pinned kit (v1.2.167)
+`tokens.css` resolves them to `--kw-lavender` #B1A3CF and `--kw-orange` #F7953E, both admitted
+2026-09-02 and both distinct. Reported upstream; nothing app-side works around it.
+
 **The Logs module (2026-09-23):** five rulings, verbatim: *"tabs: dahsbaord, entries."* ·
 *"word is logs only"* · *"kind of work is what its related to"* · *"implement everything you
 suggested for dashboard - exclude running now. add toolbar w filters by person, account."* ·
@@ -10436,6 +10483,57 @@ missing"*. **Status: built.**
    the stored words through `storedWordColumns` - Aurora's call, and safe to make whenever she
    wants. Checked by `workers/tenancy/test/accounts-picked-vocabulary.test.ts` (the seed and the
    door, called for real) and `web/test/account-fields-are-picked.test.ts` (the wiring).
+
+**Her review of the built overview (2026-09-23, same tab).** Verbatim: *"the cards kpi need some
+kind of background, like effort. also there's margin missing under tabs. make industry a bar
+chart. when hover in donut in country, show which aacounts with name adn logo"*, and separately
+*"needs to be a bit mor ein case withous toolbar!"* **Status: built.**
+
+8. **The KPI tiles get Effort's own background.** `<Card variant="default">` around a bare
+   `<StatGrid>`, which is `effort-card.tsx`'s own treatment rather than a third one that nearly
+   agrees with it. **It is a tone, not a box** - checked against the kit's newest law rather than
+   assumed, because "give it a background" is the one instruction a reader could answer with an
+   outline: §2.8 (her own "by rule no borders nowhere in the kit", the same day) forbids a
+   container told from its ground by a STROKE, and `variant="default"` is soft paper, a fill.
+   **It also overturns R97 for this tab, which is her call and not the lane's**: R97 reads "a
+   count never gets its own card, UNLESS EXPLICITLY SAID", and every line in its exemption table
+   has said "pending her word" since it shipped. She has now said it, so
+   `accounts-dashboard.tsx` joins that table with her sentence as the reason, and joins
+   `PAPER_ON_PURPOSE` beside Effort's own tiles.
+
+9. **Industry becomes a bar chart; country stays a donut; they still share the row.** A donut
+   answers "what share of the whole", which is the question about where clients are; a ranked bar
+   answers "which is biggest and by how much", which is the question about what they do - and an
+   industry list is longer with longer words, so eleven named bars read where eleven legend
+   colours would not. One neutral ink, not the chart sequence: the name is beside every bar, so a
+   hue would encode a fact already written down. The count sits at the end of its own row rather
+   than behind a hover, because a bar has somewhere to write it and a slice does not.
+
+10. **Hovering a country slice names the accounts in it, with their faces.** The kit's `Donut`
+    reports the active segment since v1.2.167 (`activeId`/`onActiveChange`), so the readout is
+    driven by the ring rather than by a second control beside it; the legend rows stay real
+    buttons and set the same state on focus. The door now returns the accounts per country,
+    **bounded** by `ACCOUNTS_COUNTRY_FACES_PER_ROW` (8, the same ceiling an arrival month's names
+    carry, because both are "who is behind this mark" read in a panel that cannot scroll) while
+    `n` stays exact - so a country with more says "and N more" rather than showing eight and
+    implying that is all. **A company with no logo falls back to the app's own letter tile**:
+    the readout draws `RecordMark`, the same face every account list already draws, and invents
+    no second fallback. The readout sits under the picture rather than in a popover, because a
+    floating panel would cover the ring the pointer is on.
+
+11. **The tab-to-content lead is now two numbers, and the smaller one was never her complaint.**
+    Measured in a browser against the real compiled stylesheet before changing anything: the lead
+    was **not missing** - it was 10px, correctly, on all four shapes including the Accounts
+    dashboard and Settings > Appearance. Her two sentences read together say what that means:
+    10px is the number she ruled for the space **above a toolbar** (21 Sep, "the 10pc above and
+    below"), and a tab with no toolbar under the strip inherited it by accident. So the law splits
+    three ways by what follows the strip: a body that is a card, or a wrapper around one, is
+    unchanged (the card pays 10px on its own `card-content`); a bare body that **leads with a
+    toolbar** (`[data-slot="toolbar-row-pin"]`, Settings > Team) keeps the ruled 10px; and a bare
+    body with **no toolbar** (every dashboard, Settings > Appearance) gets 20px -
+    `--tab-content-gap`, which is the number this exact relationship carried until the toolbar
+    ruling took it from every strip. No new token. Measured after: 18.75px, 18.75px, 9.375px,
+    9.375px, 9.375px across the five shapes at the app's own 15px root.
 
 
 **Assistant conversations (2026-09-15):** A "+" tab is always visible in the assistant's tab

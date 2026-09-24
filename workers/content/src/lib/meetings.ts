@@ -20,6 +20,7 @@
 // never touches. Keyset, newest first, exactly like the ticket list.
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { inClause } from "@shared/workers/filter-in"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { mendMojibake } from "@shared/workers/mojibake"
@@ -256,13 +257,13 @@ function toMeeting(r: MeetingRow): Meeting {
  * surface must expose too (R19) — the list is derived from this type's own
  * fields at the door. */
 export type MeetingFilter = {
-  accountId?: string
+  accountId?: string[]
   /** WHICH SYSTEM IT WAS ABOUT. The app record's own Meetings tab asks the
    * SERVER by this rather than narrowing a loaded page in the browser — the
    * meetings list is paged, and "this app's meetings among the newest fifty" is an
    * answer that looks like an answer. */
-  appId?: string
-  purposeId?: string
+  appId?: string[]
+  purposeId?: string[]
   /** 'upcoming' is what has not started yet, BY THE CLOCK — it used to be
    * "everything nobody has ticked", which is a different set the moment somebody
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
@@ -342,6 +343,14 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   // A cancelled meeting is hidden from every view but `all` — it is retired, not
   // deleted, so it stays readable by id and by asking for everything.
   if (filter.view !== "all") where.push("m.deactivated_at IS NULL")
+  // ARCHIVED IS INVISIBLE (0123, R112). A meeting the cascade archived carries
+  // its OWN archived state now, so this door hides it by its own column rather
+  // than by a clause about its account or its app. UNCONDITIONAL, unlike
+  // `deactivated_at` above: a CANCELLED meeting stays readable by asking for
+  // everything, because cancelling is her INACTIVE; an archived one does not,
+  // because archived is "not visible anywhere". It is cascade-only this round,
+  // so the way back is to restore the account or app that took it.
+  where.push("m.archived_at IS NULL")
   // STILL TO COME, BY THE CLOCK. It used to read `m.status <> 'held'`, which is
   // a different question wearing the same clothes: it answered "has anybody
   // ticked this", so a meeting from March that nobody ticked sat in "upcoming"
@@ -513,17 +522,20 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     where.push("m.starts_at >= ? AND m.starts_at < ?")
     params.push(from, to)
   }
-  if (filter.accountId) {
-    where.push("m.account_id = ?")
-    params.push(filter.accountId)
-  }
-  if (filter.appId) {
-    where.push("m.app_id = ?")
-    params.push(filter.appId)
-  }
-  if (filter.purposeId) {
-    where.push("m.purpose_id = ?")
-    params.push(filter.purposeId)
+  // A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to select multile for
+  // each filter type"). `inClause` carries the two properties this change rests
+  // on: one value is a set of one, so every existing caller is untouched, and an
+  // empty set narrows nothing rather than matching nothing.
+  for (const [column, values] of [
+    ["m.account_id", filter.accountId],
+    ["m.app_id", filter.appId],
+    ["m.purpose_id", filter.purposeId],
+  ] as const) {
+    const clause = inClause(column, values)
+    if (clause.sql) {
+      where.push(clause.sql)
+      params.push(...clause.params)
+    }
   }
   // WHETHER ANYBODY EVER WROTE DOWN WHAT WAS SAID. The captured stamp, not the
   // file id — see the field's own note. Anything that is not exactly 'yes' or

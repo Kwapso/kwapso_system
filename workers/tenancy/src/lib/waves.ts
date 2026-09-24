@@ -167,7 +167,8 @@ const WAVE_COLUMNS = `w.id, w.ref, w.account_id, a.name AS account_name, w.name,
             w.starts_on, w.ends_on, w.deactivated_at,
             w.created_at, w.creator_name, w.updated_at, w.editor_name,
             (SELECT COUNT(*) FROM sprints s
-              WHERE s.wave_id = w.id AND s.deactivated_at IS NULL) AS sprint_count`
+              WHERE s.wave_id = w.id AND s.deactivated_at IS NULL
+                AND s.archived_at IS NULL) AS sprint_count`
 const WAVE_JOINS = `LEFT JOIN accounts a ON a.id = w.account_id
        LEFT JOIN apps ap ON ap.id = w.app_id`
 
@@ -230,6 +231,11 @@ export async function listWaves(
   const fence = accountScopeClause(scope, "w.account_id")
   const where = [
     fence.sql,
+    // ARCHIVED IS INVISIBLE (0123, R112). A wave the cascade archived carries its
+    // OWN archived state now, so this hides it by its own column. Cascade-only
+    // this round: no door archives a wave directly, so the way back is to
+    // restore the account or the app that took it.
+    "w.archived_at IS NULL",
     accountId ? `w.account_id = ${sqlString(accountId)}` : "",
     sprintTypeExistsClause("w.id", sprintType),
     // CHEAP, UNLIKE THE SPRINT TYPE FACET ABOVE — `app_id` is a real column on
@@ -268,6 +274,9 @@ export async function countWaves(
   const fence = accountScopeClause(scope, "account_id")
   const where = [
     fence.sql,
+    // R16: the same clause the list above opens with, so the badge counts what
+    // the list can show.
+    "archived_at IS NULL",
     accountId ? `account_id = ${sqlString(accountId)}` : "",
     // No `w.` alias on this query (bare `waves`), so the EXISTS reaches back
     // to it by the table's own name — the one identifier this statement has.
@@ -500,7 +509,7 @@ async function listWaveSprints(
     // row draws beside each sprint (task A, 16 Sep 2026).
     `SELECT s.id, s.wave_id, s.account_id, s.ref, s.name, s.sprint_type, s.starts_on, s.ends_on, s.deactivated_at
        FROM sprints s
-      WHERE s.wave_id = ${sqlString(waveId)}
+      WHERE s.wave_id = ${sqlString(waveId)} AND s.archived_at IS NULL
       ORDER BY (s.deactivated_at IS NOT NULL), COALESCE(s.starts_on, s.created_at), s.name
       LIMIT ${LIST_HARD_CAP}`
   )

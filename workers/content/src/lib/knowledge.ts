@@ -105,6 +105,7 @@
 // permission.
 
 import { recordWorkerError } from "@shared/workers/error-log"
+import { inClause } from "@shared/workers/filter-in"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { addTokens, logUsage, NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
 import { countCollection } from "@shared/workers/count"
@@ -1201,7 +1202,18 @@ export const KNOWLEDGE_SORTS: SortMenu<KnowledgeSource> = {
  * app by hand (the `apps` JSON array `createSource`/`createFileSource` write).
  * Either counts: the client's ruling was "everything we have about this", not
  * only what mirrors the app row itself. */
-export type SourceFilters = { kind?: string; compartment?: string; q?: string; active?: string; appId?: string }
+/** `compartment` IS A SET SINCE 24 SEP 2026 (Aurora: "i shoudl be able to
+ * select multile for each filter type") — "Filed under" is the knowledge
+ * collection's one facet and a person may now name several notebooks at once.
+ * One value is a set of one, so every existing caller, including a record
+ * tab's own count, is untouched. */
+export type SourceFilters = {
+  kind?: string
+  compartment?: string[]
+  q?: string
+  active?: string
+  appId?: string
+}
 
 /** THE FENCE PLUS THE FILTERS, built ONCE — because the list and the COUNT have
  * to be the same question. They were not: the count was the fence alone, so a
@@ -1216,9 +1228,10 @@ function sourcesWhere(guard: MemberGuard, filter: SourceFilters): { sql: string[
     sql.push("kind = ?")
     params.push(filter.kind)
   }
-  if (filter.compartment) {
-    sql.push("compartment = ?")
-    params.push(filter.compartment)
+  const notebooks = inClause("compartment", filter.compartment)
+  if (notebooks.sql) {
+    sql.push(notebooks.sql)
+    params.push(...notebooks.params)
   }
   if (filter.appId) {
     // TWO WAYS A SOURCE IS "ABOUT" AN APP: the mirror's own `app_id` column, and

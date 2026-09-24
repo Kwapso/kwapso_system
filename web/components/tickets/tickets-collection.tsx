@@ -2577,6 +2577,17 @@ export function ticketBoardCard(
           picture={raiserPicture}
           mark={nameInitials(raiserName)}
           markName={raiserName}
+          /* GREY IF THEY ARE NOT OURS — Aurora, 23 Sep 2026: "external photos
+             (from contacts) gray scale. keep staff nirmal." TWO WAYS this card
+             is theirs, and `raiserName` three lines up already reads both to
+             decide how to spell the name: `raiserIsClient` (a client login
+             typed it) or `raisedByContactName` (no login at all, so the ticket
+             names the client's own CONTACT). The name knew and the face did
+             not — the same pairing the LIST view of this very collection
+             already makes one screen over, which is what makes this a gap
+             rather than a difference of opinion: one ticket, two views, two
+             answers. */
+          external={r.raiserIsClient || Boolean(r.raisedByContactName)}
           title={<span className="min-w-0 truncate text-sm">{raiserName}</span>}
         />
       ) : undefined,

@@ -14,6 +14,7 @@
 // has been made twice in this codebase and caught twice.
 
 import type { Actor, MemberGuard } from "@shared/workers/gating"
+import { splitFacet } from "@shared/facet-list"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { TITLE_MAX_CHARS } from "@shared/types"
@@ -97,7 +98,10 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     // and narrowing by a word that is not a kind would answer "nothing" as if
     // the base were empty.
     kind: kind && (KNOWLEDGE_KINDS as readonly string[]).includes(kind) ? kind : undefined,
-    compartment: queryText(url.searchParams.get("compartment"), "Compartment"),
+    // A SET SINCE 24 SEP 2026 — the comma list is read off the ALREADY-VALIDATED
+    // string, so the boundary check stays where R20's census looks for it and the
+    // parameter's own name (R19's mirror) is unchanged.
+    compartment: splitFacet(queryText(url.searchParams.get("compartment"), "Compartment")),
     q: queryText(url.searchParams.get("q"), "Search"),
     active: active === "yes" || active === "no" ? active : undefined,
     // THE APP RECORD'S OWN KNOWLEDGE TAB (client ruling, 17 Sep 2026): "everything

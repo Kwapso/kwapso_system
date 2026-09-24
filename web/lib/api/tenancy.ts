@@ -65,7 +65,11 @@ export type AccountsDashboard = {
   /** `null`, and only `null`, when there is no active account to be in the
    * middle of — never 0, which would read as "we have had them no time". */
   medianTenureDays: number | null
-  byCountry: { country: string; n: number }[]
+  /** `accounts` is WHO — bounded by the door (`ACCOUNTS_COUNTRY_FACES_PER_ROW`)
+   * while `n` stays exact, so a slice can always say how many more it holds
+   * than it can show. `logoUrl` is `null` for a company with no picture; the
+   * app's own `RecordMark` draws the letter tile it already draws elsewhere. */
+  byCountry: { country: string; n: number; accounts: { id: string; name: string; logoUrl: string | null }[] }[]
   /** beside `byCountry`, not under it — her "in the same row country &
    * industry" (23 Sep 2026), read through the identical fence and clause. */
   byIndustry: { industry: string; n: number }[]
@@ -623,15 +627,23 @@ export const tenancy = {
    * the total of what matched (R16) rather than of everything. Narrowing a
    * loaded list in the browser would have left the heading counting rows the
    * screen was no longer showing. */
-  apps: (accountId?: string, q?: string) =>
+  apps: (accountId?: string, q?: string, archived?: "yes" | "no") =>
     api<{ apps: AppRow[]; total: number }>(
-      `/api/tenancy/apps${listQuery({ accountId, q })}`
+      `/api/tenancy/apps${listQuery({ accountId, q, archived })}`
     ),
   createApp: (input: Record<string, unknown>) => api<{ id: string }>("/api/tenancy/apps", post(input)),
   updateApp: (input: Record<string, unknown> & { id: string }) =>
     api<{ ok: true }>("/api/tenancy/apps/update", post(input)),
   setAppActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/apps/active", post({ id, active })),
+
+  /** ARCHIVE / RESTORE AN APP — her ARCHIVED, and a DIFFERENT door from
+   * `setAppActive` above, which is the weaker inactive state. This one CASCADES
+   * (migration 0123): the app's tickets, meetings, tasks, to-dos, stories,
+   * phases, waves and process maps go with it, each carrying its own archived
+   * state, and restoring the app brings back exactly those. */
+  setAppArchived: (id: string, archived: boolean) =>
+    api<{ ok: true }>("/api/tenancy/apps/archived", post({ id, archived })),
 
   /* -------------------- what an app shows for itself (T3850) ---------------- */
   /** The files and links on an app — the Files tab. */

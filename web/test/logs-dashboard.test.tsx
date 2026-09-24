@@ -35,6 +35,8 @@ import { fileURLToPath } from "node:url"
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
+import { TOOLBAR_EXEMPT, TOOLBAR_SORT_EXEMPT } from "@shared/rules/registry"
 import type { LogsDashboard as LogsDashboardData } from "@shared/types"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -274,12 +276,58 @@ describe("ruling 4 — the sections she asked for, and the one she excluded", ()
     expect(screen.getByText("Quarterly VAT return")).toBeTruthy()
   })
 
-  it("puts no figure inside a card (R97: a count never gets its own card)", () => {
+  // INVERTED 24 SEP 2026, and the inversion is the ruling. This case used to
+  // assert the OPPOSITE — "puts no figure inside a card (R97)" — which was the
+  // right reading of "a count never gets its own card" until Aurora exercised
+  // her own "unless explicitly said" clause: "kpi need background".
+  it("gives each figure the kit's own paper, the same tile Effort draws", () => {
     show()
+    const tile = screen.getByText("Hours this week").closest('[data-slot="card"]')
     expect(
-      screen.getByText("Hours this week").closest('[data-slot="card"]'),
-      "a figure on the Logs dashboard sits inside a card, which R97 forbids"
-    ).toBeNull()
+      tile,
+      'a figure on the Logs dashboard has no card. Aurora, 24 Sep 2026: "kpi need background".'
+    ).not.toBeNull()
+    // A FILL, NEVER A STROKE (R67 as amended, §2.8): the kit's `default` Card is
+    // soft paper. A `border`/`ring` utility here would be the box drawn as an
+    // outline that the law forbids.
+    expect(
+      /\b(border|ring)(-|\b)/.test(tile?.className ?? ""),
+      "the figure's background is drawn as a stroke rather than a paper tone"
+    ).toBe(false)
+  })
+
+  it("draws the SAME tile Effort does, part for part, not one that nearly agrees", () => {
+    // Her words were "like effort", so the proof is against that file rather
+    // than against a shape written down here: both must be a kit `Card`
+    // (unvaried default) wrapping `CardContent` wrapping a bare `StatGrid`, and
+    // both must space their tiles on the kit's own `--space-4`.
+    const ours = read("web/components/work/logs-dashboard.tsx")
+    const effort = read("web/components/work/effort-card.tsx")
+    for (const [name, src] of [["the Logs dashboard", ours], ["the Effort card", effort]] as const) {
+      expect(/<Card variant="default">/.test(src), `${name} does not use the kit's default Card`).toBe(true)
+      expect(/surface="bare"/.test(src), `${name} does not draw a bare StatGrid inside it`).toBe(true)
+      expect(
+        /gap-\[var\(--space-4\)\]/.test(src),
+        `${name} does not space its tiles on the kit's own --space-4`
+      ).toBe(true)
+    }
+  })
+
+  it("writes the four tiles out rather than mapping them (R65 reads a keyed Card as a record row)", () => {
+    // `effort-card.tsx` writes its three out by hand and says why: R65's census
+    // reads any kit `<Card>` carrying React's own `key=` as a per-row RECORD
+    // card and demands a `<CardTitle>`. The `<Card>` here lives inside `Figure`,
+    // where no key is ever spelled, and the call sites are literal elements.
+    // COMMENTS STRIPPED FIRST — this file's own prose says "<Figure>" while
+    // explaining the rule, and a census that counted its own documentation
+    // would be measuring the wrong thing.
+    const src = stripComments(read("web/components/work/logs-dashboard.tsx"))
+    const figureCalls = src.match(/<Figure\b/g) ?? []
+    expect(figureCalls.length, "the four figures are no longer four literal elements").toBe(4)
+    expect(
+      /<Figure[^>]*\bkey=/.test(src),
+      "a figure carries a React key, which means it is being mapped — R65 would read its Card as a record row"
+    ).toBe(false)
   })
 
   it("says one honest sentence when there is no time at all, never six empty pictures", () => {
@@ -470,13 +518,30 @@ describe("ruling 4 — 'add toolbar w filters by person, account'", () => {
   })
 
   it("the DOOR parses `accountId`, so the filter is answered over the whole collection", () => {
+    // R20's own shape: the query value must sit INSIDE a checker. It is wrapped
+    // in `splitFacet(...)` now — the same 24 Sep widening to multi-select sets
+    // the lib assertion below accounts for — so what is pinned is that the
+    // parameter is READ and VALIDATED here, not the exact call nesting.
     const route = read("workers/content/src/routes/work-logs.ts")
+    const parsed = route.match(/accountId:\s*[^\n]*queryText\(url\.searchParams\.get\("accountId"\)[^\n]*/)
     expect(
-      /accountId:\s*queryText\(url\.searchParams\.get\("accountId"\)/.test(route),
-      "the work-logs door does not parse `accountId`, so the account filter would narrow nothing"
-    ).toBe(true)
+      parsed,
+      "the work-logs door does not parse `accountId` through `queryText`, so the account filter would narrow nothing (and R20 would be unmet)"
+    ).not.toBeNull()
+    // ASSERTED AGAINST `logWhere`'S OWN BODY, not against one spelling of the
+    // predicate. Another lane widened both people and account filters to SETS
+    // on 24 Sep 2026 ("i shoudl be able to select multile for each filter
+    // type"), so the clause is built through `inClause` now rather than a bare
+    // `parts.push("w.account_id = ?")`. What has to stay true is the PROPERTY:
+    // `filter.accountId` reaches a predicate on the log's own inherited column,
+    // inside the one WHERE builder the list, the totals and the dashboard all
+    // share — not which helper happens to assemble it today.
     const lib = read("workers/content/src/lib/work-logs.ts")
-    expect(lib.includes('parts.push("w.account_id = ?")')).toBe(true)
+    const at = lib.indexOf("function logWhere(")
+    expect(at, "could not find `logWhere`").toBeGreaterThan(-1)
+    const body = lib.slice(at, lib.indexOf("\nexport ", at))
+    expect(body.includes("w.account_id"), "logWhere builds no predicate on w.account_id").toBe(true)
+    expect(body.includes("filter.accountId"), "logWhere never reads filter.accountId").toBe(true)
   })
 })
 
@@ -539,6 +604,190 @@ describe("ruling 2 — one concept, one word", () => {
   })
 })
 
+/* ═══════════════ 8 · HER 24 SEP REVIEW, FOUR RULINGS ════════════════════ */
+
+describe("'add full toolbar, even if search is diasbled'", () => {
+  const screenSrc = () => read("web/components/work/time-screen.tsx")
+
+  it("draws the kit's own search field, disabled, rather than no field at all", () => {
+    const src = stripComments(screenSrc())
+    expect(
+      src.includes("<SearchInput"),
+      "the Logs dashboard toolbar draws no search field. A toolbar missing its most recognisable control reads as broken."
+    ).toBe(true)
+    // THE KIT'S OWN DISABLED STATE, not a grey div pretending. `SearchInput`
+    // ships one (its state 5), so there is no kit gap to work around here.
+    const field = src.slice(src.indexOf("<SearchInput"), src.indexOf("/>", src.indexOf("<SearchInput")))
+    expect(field.includes("disabled"), "the search field is not disabled").toBe(true)
+    // A dead end is worse than an absence, so it says where search lives.
+    expect(field.includes("Search is on the Entries tab")).toBe(true)
+  })
+
+  it("carries no `value`/`onChange` — a field nobody can type in needs no state", () => {
+    const src = stripComments(screenSrc())
+    const field = src.slice(src.indexOf("<SearchInput"), src.indexOf("/>", src.indexOf("<SearchInput")))
+    expect(field.includes("onChange"), "a disabled field was given a change handler that can never fire").toBe(false)
+  })
+
+  it("is off R48's exemption list now, because the slot is filled", () => {
+    // The entry that named this file is DELETED rather than left standing:
+    // R48's own rot-check fails an exemption whose file no longer matches the
+    // condition it was pinned for, and the list may only shrink.
+    expect(
+      Object.keys(TOOLBAR_EXEMPT),
+      "the Logs screen is still named in TOOLBAR_EXEMPT, but it passes a `search` prop now"
+    ).not.toContain("web/components/work/time-screen.tsx")
+  })
+
+  it("still declares no sort, and says why in the registry rather than silently", () => {
+    // The one slot still absent. A set of grouped pictures has no row order to
+    // offer; the reason is on file where a reviewer reads it (R53).
+    expect(
+      Object.keys(TOOLBAR_SORT_EXEMPT),
+      "the Logs dashboard's missing sort control is no longer reasoned anywhere"
+    ).toContain("web/components/work/time-screen.tsx#TimeScreen")
+  })
+})
+
+describe("'put who logged it next to where they went 1/2 and 1/2'", () => {
+  it("puts the two sections in ONE two-column row, at equal width", () => {
+    const src = stripComments(read("web/components/work/logs-dashboard.tsx"))
+    const row = src.indexOf('lg:grid-cols-2')
+    expect(row, "the dashboard draws no two-column row at all").toBeGreaterThan(-1)
+    const where = src.indexOf('t("Where the hours went")', row)
+    const who = src.indexOf('t("Who logged it")', row)
+    const nextRow = src.indexOf('t("Hours a week, the last eight")', row)
+    expect(where, "'Where the hours went' is not inside the paired row").toBeGreaterThan(row)
+    expect(who, "'Who logged it' is not inside the paired row").toBeGreaterThan(where)
+    // …and the weekly chart is NOT in it: a line is read across the whole
+    // measure, so it keeps its own row below.
+    expect(nextRow, "the weekly chart was folded into the pair").toBeGreaterThan(who)
+  })
+
+  it("draws them both, side by side, over one payload", () => {
+    show()
+    expect(screen.getByText("Where the hours went")).toBeTruthy()
+    expect(screen.getByRole("list", { name: "Who logged it" })).toBeTruthy()
+  })
+})
+
+describe("'HOURS A WEEK, show multiple lines, one per staff and area for total'", () => {
+  it("draws one line per person AND an area for the total", () => {
+    const container = show()
+    expect(
+      container.querySelectorAll('[data-slot="weeks-person-line"]').length,
+      "there is not a line per person"
+    ).toBe(2) // FULL has two people, both with hours in the window
+    expect(
+      container.querySelector('[data-slot="weeks-total-area"]'),
+      "the total is not drawn as an area behind the lines"
+    ).not.toBeNull()
+  })
+
+  it("the AREA is the total, drawn before the lines so they sit on it", () => {
+    const container = show()
+    const marks = [...container.querySelectorAll("[data-slot]")]
+      .map((n) => n.getAttribute("data-slot"))
+      .filter((n) => n === "weeks-total-area" || n === "weeks-person-line")
+    expect(marks[0], "a person's line is painted before the total's area").toBe("weeks-total-area")
+  })
+
+  it("ranks by hours IN THE WINDOW, never by the all-time total the door sorts on", () => {
+    // Bea is second all-time and FIRST over these eight weeks. A chart that
+    // ranked on the door's own order would draw the wrong person's colour first.
+    const container = show({
+      ...FULL,
+      people: [
+        { userId: "u1", userName: "Alex Rivera", seconds: 900000, weekSeconds: [0, 0, 0, 0, 0, 0, 0, 3600] },
+        { userId: "u2", userName: "Bea Marín", seconds: 54000, weekSeconds: [3600, 3600, 3600, 3600, 3600, 3600, 3600, 3600] },
+      ],
+    })
+    // READ OFF THE LEGEND ITSELF, never off the page: "Bea" also appears in the
+    // "Who logged it" rank beside it, which is ordered by the all-time total on
+    // purpose — the two orders differ, and that is the whole point of the case.
+    const legend = container.querySelector('[data-slot="weeks-legend"]')
+    expect(legend, "the weekly chart draws no legend").not.toBeNull()
+    const names = [...legend!.querySelectorAll("span.truncate")].map((n) => n.textContent)
+    expect(
+      names[0],
+      "the all-time leader was drawn first, not the person who logged most in the window"
+    ).toBe("Bea")
+  })
+
+  it("drops anybody with nothing in the window rather than drawing a flat zero", () => {
+    const container = show({
+      ...FULL,
+      people: [
+        { userId: "u1", userName: "Alex Rivera", seconds: 90000, weekSeconds: [0, 0, 0, 0, 0, 0, 0, 3600] },
+        { userId: "u2", userName: "Bea Marín", seconds: 54000, weekSeconds: [0, 0, 0, 0, 0, 0, 0, 0] },
+      ],
+    })
+    expect(container.querySelectorAll('[data-slot="weeks-person-line"]').length).toBe(1)
+  })
+
+  it("CAPS AT FIVE, because five is how many data colours the palette has", () => {
+    // A sixth line would repeat a hue (two people drawn identically) or invent
+    // one (R32 forbids it). The cap is the palette's, not a taste.
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      userId: `u${i}`,
+      userName: `Person ${i}`,
+      seconds: (9 - i) * 3600,
+      weekSeconds: [0, 0, 0, 0, 0, 0, 0, (9 - i) * 3600],
+    }))
+    const container = show({ ...FULL, people: many, activePeople: 9 })
+    expect(container.querySelectorAll('[data-slot="weeks-person-line"]').length).toBe(5)
+  })
+
+  it("SAYS how many it did not draw — a silent top five is a lie of omission", () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      userId: `u${i}`,
+      userName: `Person ${i}`,
+      seconds: (9 - i) * 3600,
+      weekSeconds: [0, 0, 0, 0, 0, 0, 0, (9 - i) * 3600],
+    }))
+    const container = show({ ...FULL, people: many, activePeople: 9 })
+    const others = container.querySelector('[data-slot="weeks-others"]')
+    expect(others, "nine people, five lines, and the page says nothing about the other four").not.toBeNull()
+    expect(others?.textContent).toContain("4")
+    // …and it says they are IN the total, which is the honest part: the area
+    // behind the lines is everybody.
+    expect(others?.textContent).toContain("in the total but not drawn")
+  })
+
+  it("counts the others off the door's EXACT figure, not off the capped array", () => {
+    // `people` stops at WORK_LOG_GROUP_CAP, so its length is a ceiling. On a
+    // team of 60, five drawn and 55 others must read 55, never 45.
+    const fifty = Array.from({ length: 50 }, (_, i) => ({
+      userId: `u${i}`,
+      userName: `Person ${i}`,
+      seconds: 3600,
+      weekSeconds: [0, 0, 0, 0, 0, 0, 0, 3600],
+    }))
+    const container = show({ ...FULL, people: fifty, activePeople: 60 })
+    expect(container.querySelector('[data-slot="weeks-others"]')?.textContent).toContain("55")
+  })
+
+  it("shows the others' own hours on the hover, so the rows add up to the total", () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      userId: `u${i}`,
+      userName: `Person ${i}`,
+      seconds: 3600,
+      weekSeconds: [0, 0, 0, 0, 0, 0, 0, 3600],
+    }))
+    // Nine people at 1 h each in the last week; the week's own total is 9 h.
+    show({
+      ...FULL,
+      people: many,
+      activePeople: 9,
+      weeks: FULL.weeks.map((w, i) => (i === 7 ? { ...w, seconds: 9 * 3600 } : w)),
+    })
+    const week = screen.getByRole("button", { name: /Sep 21|21 Sep/ })
+    const said = week.getAttribute("aria-label") ?? ""
+    expect(said, "the week's own total is missing").toContain("9 h")
+    expect(said, "the undrawn people's hours are missing, so the rows cannot add up").toContain("and 4 others")
+  })
+})
+
 /* ═══════════════ 7 · THE LEGEND'S COLOURS ARE THE RING'S ═════════════════ */
 
 describe("the donut's legend cannot drift from its own ring", () => {
@@ -553,7 +802,7 @@ describe("the donut's legend cannot drift from its own ring", () => {
       return [...src.slice(at, src.indexOf("]", at)).matchAll(/var\(--chart-\d\)/g)].map((m) => m[0])
     }
     const kit = seq(read("shared/ui/components/donut/donut.tsx"), "const SEGMENT_COLOURS = [")
-    const ours = seq(read("web/components/work/logs-dashboard.tsx"), "const DONUT_SEGMENT_COLOURS = [")
+    const ours = seq(read("web/components/work/logs-dashboard.tsx"), "const SERIES_COLOURS = [")
     expect(kit.length).toBeGreaterThan(0)
     expect(ours, "the legend's dots no longer read the same sequence the ring does").toEqual(kit)
   })

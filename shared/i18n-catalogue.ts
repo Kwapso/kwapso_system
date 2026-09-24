@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 734 strings · 3 languages · 1597 of the entries below are hand-written seed.
+// 732 strings · 3 languages · 1603 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -390,7 +390,6 @@ export const CATALOGUE: Catalogue = {
   "On": { de: "An", es: "En", ca: "Activat" },
   "One file": { de: "Eine Datei", es: "Un archivo", ca: "Un fitxer" },
   "One of ours": { de: "Einer von uns", es: "Uno de los nuestros", ca: "Un dels nostres" },
-  "One of us": { de: "Einer von uns", es: "Uno de nosotros", ca: "Un de nosaltres" },
   "Only me": { de: "Nur ich", es: "Solo yo", ca: "Només jo" },
   "Only the folders you share below, nothing else in your Drive.": { de: "Nur die Ordner, die Sie unten freigeben, nichts anderes auf Ihrem Drive.", es: "Solo las carpetas que compartes abajo, nada más en tu Drive.", ca: "Només les carpetes que comparteixes més avall, res més a la teva Drive." },
   "Only the spaces you share below, nothing else in Chat.": { de: "Nur die Bereiche, die Sie unten freigeben, nichts anderes im Chat.", es: "Solo los espacios que compartes abajo, nada más en Chat.", ca: "Només els espais que comparteixes més avall, res més a Chat." },
@@ -402,7 +401,6 @@ export const CATALOGUE: Catalogue = {
   "Open tickets": { de: "offene Tickets", es: "Tickets abiertos", ca: "Tiquets oberts" },
   "Open where this came from": { de: "Quelle öffnen", es: "Abrir de dónde vino esto", ca: "Obrir d'on va venir" },
   "Operations": { de: "Operationen", es: "Operaciones", ca: "Operacions" },
-  "Organiser": { de: "Organisator", es: "Organizador", ca: "Organitzador" },
   "Our details": { de: "Unsere Angaben", es: "Nuestros detalles", ca: "Els nostres detalls" },
   "Our own admin": { de: "unsere eigene Verwaltung", es: "Nuestra propia administración", ca: "La nostra pròpia administració" },
   "Our own admin. Time can be logged against it.": { de: "Unsere eigene Verwaltung. Zeit kann dagegen erfasst werden.", es: "Nuestro propio administrador. Se puede registrar tiempo contra él.", ca: "La nostra pròpia administració. Es pot registrar el temps contra ella." },

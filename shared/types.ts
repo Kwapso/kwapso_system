@@ -1926,6 +1926,12 @@ export type AppRow = {
    * `accounts` row of type individual — a contact is a person's own account row
    * (there is no contacts table, and CHECKLIST 15.1 says why). */
   stakeholders: { contactId: string; isMain: boolean }[]
+  /** HER ARCHIVED, the stronger state beside `active`'s inactive (migration
+   * 0123). An archived app is not visible anywhere, and archiving one CASCADES
+   * to everything it owns. Independent of `active`, never merged with it:
+   * restoring hands the app back exactly the active/inactive state it carried
+   * before it was archived. */
+  archived: boolean
   active: boolean
   createdAt?: string | null
   createdByName?: string | null

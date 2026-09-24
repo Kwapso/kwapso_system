@@ -56,7 +56,7 @@ const COUNTERS: Record<string, RecordCounter> = {
   // registry line all went together: a counter with no line in
   // `shared/record-counts.ts` is one nothing can ask for, and a line with no
   // counter answers `null` and reads exactly like a missing permission.
-  "processes-app": (cfg, guard, scope, id) => countProcesses(cfg, guard, scope, { appId: id }),
+  "processes-app": (cfg, guard, scope, id) => countProcesses(cfg, guard, scope, { appId: [id] }),
   "modules-app": (cfg, guard, scope, id) => countAppModules(cfg, guard, scope, { appId: id }),
   // WHAT THE APP SHOWS FOR ITSELF (T3850) — the Files tab's own badge.
   "files-app": (cfg, guard, scope, id) => countAppAttachments(cfg, guard, scope, id),

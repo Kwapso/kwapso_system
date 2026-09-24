@@ -96,7 +96,7 @@ import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { useAccountNames } from "@/lib/account-names"
 import { tenancy } from "@/lib/api"
-import { accountsKey, appsKey, listFetch, impactKey } from "@/lib/live-resources"
+import { accountsKey, appsKey, archivedAppsKey, listFetch, impactKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { APP_STAGES, NO_STAGE, appStageDotTone, appStageIsActive } from "@shared/app-stages"
 import type { Account, AppRow } from "@shared/types"
@@ -290,6 +290,14 @@ export function AppsScreen({
 }) {
   const t = useT()
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
+  // THE ARCHIVED PILE, its own read (migration 0123). Her ruling made archiving
+  // CASCADE, and a person has to be able to find an archived app again to
+  // restore it — "should stay in the system, but invisible. just in case we need
+  // to in the future recover it." The live door hides them by default, so this
+  // is the one call that asks for them.
+  const archivedQ = useCached<AppRow[]>(archivedAppsKey(teamId), () =>
+    listFetch.archivedApps(teamId)
+  )
   // The accounts an app can belong to, for the add-app picker below — page one
   // is plenty for a picker (the same cache the accounts screen holds), and a
   // picker searches rather than trusting page one to hold everything anyway.
@@ -425,7 +433,17 @@ export function AppsScreen({
   const narrowed = needle !== "" || Object.keys(facetValues).length > 0
   const active = matching.filter(appIsActive)
   const inactive = matching.filter((a) => !appIsActive(a))
-  const preSort = tab === "inactive" ? inactive : active
+  // ARCHIVED IS A THIRD PILE, NOT A SLICE OF THE OTHER TWO. `appsQ` never
+  // carries an archived row (the door hides them), so this comes from its own
+  // read and is narrowed by the same search and facets the other two are, or the
+  // badge above it would count a different question from the rows beneath it.
+  const archived = (archivedQ.data ?? []).filter(
+    (a) =>
+      (needle === "" || a.name.toLowerCase().includes(needle)) &&
+      (!facetValues.accountId || a.accountId === facetValues.accountId) &&
+      (!facetValues.stage || a.stage === facetValues.stage)
+  )
+  const preSort = tab === "archived" ? archived : tab === "inactive" ? inactive : active
   // …AND THE SORT LAST — it reorders what is left, it never narrows it, so it
   // has no business in the counts above. On the Board this is the order
   // CARDS read inside a column; which column a card lands in is the app's
@@ -571,11 +589,15 @@ export function AppsScreen({
 
   const activeBadge = formatCount(active.length)
   const inactiveBadge = formatCount(inactive.length)
+  const archivedBadge = formatCount(archived.length)
   const tabsConfig = {
     ...defaultTabsConfig,
     tabs: [
       { value: "active", label: t("Active"), icon: "check-circle", badge: activeBadge, badgeVariant: "" as const },
       { value: "inactive", label: t("Inactive"), icon: "prohibit", badge: inactiveBadge, badgeVariant: "" as const },
+      // HER ARCHIVED, the stronger state, and the reason this tab exists at all:
+      // an archived app has to be findable to be restorable.
+      { value: "archived", label: t("Archived"), icon: "archive", badge: archivedBadge, badgeVariant: "" as const },
     ],
   }
 
@@ -698,6 +720,11 @@ export function AppsScreen({
                "Nothing matched." instead, because "No apps yet." is a claim
                about the collection and it is untrue mid-search. */
             <CollectionEmptyState filtered title={t("No apps yet.")} />
+          ) : tab === "archived" ? (
+            // Same register as the other two, and no act: an app reaches this
+            // pile from its own screen or by its client being archived, never
+            // by being added here.
+            <CollectionEmptyState title={t("Nothing is archived yet.")} />
           ) : tab === "inactive" ? (
             // The same register as the Active tab below (owner ruling,
             // 2026-09-07: empty states for everything), with no act — an app

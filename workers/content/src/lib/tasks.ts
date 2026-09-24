@@ -179,7 +179,12 @@ function taskWhere(filter: TaskFilter): { sql: string; params: string[] } {
   // Sep 2026 ruling. The same clause `taskWhere` and `countTasks` both open
   // with, so a badge and the list under it can never disagree about a row
   // that was deleted between the two reads (R16).
-  const clauses: string[] = ["t.deactivated_at IS NULL"]
+  // ARCHIVED IS INVISIBLE (0123, R112). A row the cascade archived carries its
+  // OWN archived state now, so this door hides it by its own column rather
+  // than by a clause about its parent. It is cascade-only this round — no
+  // door archives one of these directly — so the way back is to restore the
+  // parent that took it, which is where its marker is honoured.
+  const clauses: string[] = ["t.deactivated_at IS NULL", "t.archived_at IS NULL"]
   const params: string[] = []
   const view = viewClause(filter.view ?? "open")
   if (view.sql) {
@@ -335,7 +340,7 @@ export async function getTask(cfg: D1Rest, guard: MemberGuard, id: string): Prom
   const rows = await d1Query<TaskRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? AND t.deactivated_at IS NULL LIMIT 1`,
+    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? AND t.deactivated_at IS NULL AND t.archived_at IS NULL LIMIT 1`,
     [id]
   )
   const row = rows[0]
@@ -349,7 +354,9 @@ export async function countTasks(
 ): Promise<TaskCounts> {
   // SAME CLAUSE `taskWhere` OPENS WITH (team migration 0113): a deleted task
   // counts in nobody's badge, the same way it lists on nobody's view.
-  const clauses: string[] = ["t.deactivated_at IS NULL"]
+  // R16: the same pair `taskWhere` opens with, so a badge counts what the list
+  // can show.
+  const clauses: string[] = ["t.deactivated_at IS NULL", "t.archived_at IS NULL"]
   // ONE MORE `todayIso()` FOR `planned_n`, inserted where its own SUM sits in
   // the SELECT below (right after `upcoming_n`) — the params array is
   // positional, so the two must move together.
@@ -612,7 +619,7 @@ export async function setTaskDone(
   const rows = await d1Query<TaskRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? AND t.deactivated_at IS NULL LIMIT 1`,
+    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? AND t.deactivated_at IS NULL AND t.archived_at IS NULL LIMIT 1`,
     [id]
   )
   const row = rows[0]

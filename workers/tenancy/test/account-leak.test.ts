@@ -554,6 +554,19 @@ const BURGLARIES: Burglary[] = [
     honest: () => req("POST /api/tenancy/apps/active", { id: IDS.victimApp, active: false }),
     expect: "refused",
   },
+  {
+    route: "POST /api/tenancy/apps/archived",
+    // THE STRONGER DOOR, AND THE MORE DAMAGING BURGLARY. `/apps/active` takes
+    // one app out of the value figure; this one CASCADES (0123, Aurora's 24 Sep
+    // 2026 ruling) and takes the app's tickets, meetings, tasks, to-dos,
+    // stories, phases, waves and process maps with it — a whole client's world,
+    // invisible, from one call. It refuses a portal caller at the door like
+    // every other write here, and the account fence rides the UPDATE besides.
+    why: "archive the victim's system AND everything under it, from one call",
+    attack: () => req("POST /api/tenancy/apps/archived", { id: IDS.victimApp, archived: true }),
+    honest: () => req("POST /api/tenancy/apps/archived", { id: IDS.victimApp, archived: true }),
+    expect: "refused",
+  },
   // WHAT THE APP SHOWS FOR ITSELF (T3850) — the Files tab. Fenced, not
   // refused, on the READ (a client reads their own apps' files in the
   // portal's Impact accordion); every WRITE refuses a portal caller outright.

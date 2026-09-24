@@ -97,6 +97,25 @@ export type CollectionFacet = {
    * `emptyText` is ENGLISH here like every other word in this file and goes
    * through `t()` in `translatedFacets` below, the same as `label`. */
   dependsOn?: { field: string; emptyText: string }
+  /**
+   * THIS FACET TAKES EXACTLY ONE VALUE, and that is a fact about its
+   * VOCABULARY rather than a preference.
+   *
+   * Aurora, 24 Sep 2026: *"i shoudl be able to select multile for each filter
+   * type"* — so multi-select is the DEFAULT here and this is the narrow, named
+   * exception. It is set on a two-word facet whose words are opposites: Status
+   * (Active / Inactive), Archived (live / put away). Ticking both of a pair is
+   * asking for no narrowing at all, so a multi-select control would offer a
+   * third state its door cannot express and a person a choice that does
+   * nothing. The doors are defensive about it anyway (`oneOfPair`,
+   * shared/workers/filter-in.ts, collapses both to no filter) — this is what
+   * stops the control offering it in the first place.
+   *
+   * A facet over RECORDS (an account, an app, a person) or over an OPEN
+   * vocabulary (a country, a ticket type) is never `single`: those are exactly
+   * the ones her ruling is about.
+   */
+  single?: boolean
 }
 
 /** Yes and no, which four of these facets need and none of them should spell
@@ -153,7 +172,7 @@ const ACCOUNT_STATUS: FacetOption[] = [
  * vocabulary the account form offers. */
 export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   accounts: [
-    { field: "inactive", label: "Status", options: ACCOUNT_STATUS },
+    { field: "inactive", label: "Status", options: ACCOUNT_STATUS, single: true },
     // WHO IS RESPONSIBLE — a ROW facet: the door matches a `team_members` user
     // id (`AccountFilters.manager`), so this file declares no options and the
     // screen fills them in from `assignableMembers`, the same staff picker the
@@ -284,7 +303,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     // the words `helpTabFacets` says the open tab spans, taken from
     // `HELP_STATUSES` and never from the rows on the page.
     { field: "status", label: "Status" },
-    { field: "view", label: "Archived", options: [
+    { field: "view", label: "Archived", single: true, options: [
       { value: "live", label: "No" },
       { value: "archived", label: "Yes" },
     ] },
@@ -331,7 +350,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   ],
   processes: [
     { field: "appId", label: "App" },
-    { field: "archived", label: "Archived", options: YES_NO },
+    { field: "archived", label: "Archived", options: YES_NO, single: true },
   ],
   // THE "stories" ENTRY THAT STOOD HERE IS GONE, 15 Sep 2026 — deleted along
   // with the door-side `<PagedFind>` it excused rather than left to rot the
@@ -470,6 +489,11 @@ export function translatedFacets(
       // an App filter whichever client is picked, and a client with none gets
       // the kit's own empty register inside the control rather than a control
       // that comes and goes as they change clients.
+      // ONE VALUE OR SEVERAL — a fact about this facet's vocabulary, carried
+      // through unchanged (see `CollectionFacet.single`). Multi-select is the
+      // default since Aurora's 24 Sep 2026 ruling; `single` is the narrow,
+      // named exception for a two-word facet whose words are opposites.
+      ...(facet.single ? { single: true } : {}),
       ...(facet.dependsOn
         ? { dependsOn: { field: facet.dependsOn.field, emptyText: t(facet.dependsOn.emptyText) } }
         : {}),

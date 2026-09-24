@@ -56,6 +56,7 @@ import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Donut } from "@shared/ui/components/donut/donut"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@shared/ui/components/hover-card/hover-card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useCached } from "@shared/web/store"
@@ -79,12 +80,18 @@ type T = (s: string, vars?: Record<string, string | number>) => string
  * the donut beside them is the one thing on this tab that takes data hues. */
 const INK = "var(--ink-tertiary)"
 
-/** `donut.tsx`'s own `SEGMENT_COLOURS`, in the same order. RESTATED rather than
+/** THE DATA SEQUENCE, SERVING BOTH MARKS ON THIS TAB — the donut's legend dots
+ * and the weekly chart's one line per person.
+ *
+ * `donut.tsx`'s own `SEGMENT_COLOURS`, in the same order. RESTATED rather than
  * imported because the kit does not export it — the identical decision
  * `accounts-dashboard.tsx` made and wrote down, and `web/test/logs-dashboard.test.tsx`
  * reads BOTH files off disk and fails if they ever disagree. A colour key that
- * has drifted from its own ring is worse than no key. */
-const DONUT_SEGMENT_COLOURS = [
+ * has drifted from its own ring is worse than no key.
+ *
+ * ONE ARRAY RATHER THAN TWO, because two marks reading two copies of one
+ * sequence is exactly the drift that check exists to catch, one file in. */
+const SERIES_COLOURS = [
   "var(--chart-1)",
   "var(--chart-2)",
   "var(--chart-3)",
@@ -102,25 +109,45 @@ function hours(seconds: number): number {
   return Math.round((seconds / 3600) * 10) / 10
 }
 
-/** ONE FIGURE — the kit's own stat register, by hand and deliberately NOT
- * through `<StatGrid>`, which is a number-and-label CARD by construction where
- * R97 is explicit that a count never gets one. The two type steps are
- * `stat-grid.tsx`'s own, verbatim, so a reader sees one treatment for "a
- * headline number" whether it arrived through the kit component or through this
- * tab — the identical borrowing `accounts-dashboard.tsx` documents.
+/** ONE FIGURE — THE EFFORT SECTION'S OWN TILE, PART FOR PART.
  *
- * `note` is the half that file did not need: three of the four figures here
- * carry something the number alone would misrepresent (which way it moved, how
- * many people, and — the one that matters most — WHO the denominator is). */
+ * Aurora's ruling, 24 Sep 2026, verbatim: "kpi need background". This used to
+ * be a bare column — the kit's stat REGISTER borrowed with the BOX left behind,
+ * which is what `accounts-dashboard.tsx` still draws. She has now asked for the
+ * background, so the tile is the one this app already has rather than a second
+ * one that nearly agrees with it: `<Card variant="default">` + `<CardContent>`
+ * + `<StatGrid surface="bare">`, which is `effort-card.tsx`'s own three tiles
+ * exactly (R107, and `PAPER_ON_PURPOSE`'s own entry for them).
+ *
+ * IT IS A FILL, NOT A STROKE. R67 as amended forbids separation drawn as a
+ * stroke around a container, so "a background" can only mean a paper TONE, and
+ * `Card variant="default"` is the kit's own soft paper. Nothing here draws a
+ * border.
+ *
+ * R97 IS NOT BROKEN BY THIS, it is exercised. "A count never gets its own card,
+ * UNLESS EXPLICITLY SAID" is her own wording, and this is the saying — the same
+ * clause `COUNT_REGISTER_EXEMPT`'s `effort-card.tsx` entry already records for
+ * the identical tiles, where she asked for them by name.
+ *
+ * NOT `.map()`-ED AT THE CALL SITE, and that is load-bearing rather than
+ * stylistic: R65's census reads any kit `<Card>` carrying React's own `key=` as
+ * a per-row RECORD card and requires a `<CardTitle>` a chip could sit above.
+ * `effort-card.tsx` writes its three tiles out by hand for exactly this reason
+ * and says so; this component keeps the `<Card>` inside itself, where no `key`
+ * is ever spelled, and the four call sites below are four literal elements.
+ *
+ * `note` rides the kit's own `support` slot — `stat-grid.tsx`'s caption step,
+ * one ink tier below the figure. Three of the four figures carry something the
+ * number alone would misrepresent (which way it moved, how many people, and —
+ * the one that matters most — WHO the denominator is), and inventing a third
+ * type step for it would be a register this app does not have. */
 function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-micro text-muted-foreground font-[var(--font-weight-medium)] uppercase">
-        {label}
-      </span>
-      <span className="text-4xl font-[var(--font-weight-medium)] tabular-nums">{value}</span>
-      {note ? <span className="text-muted-foreground text-xs">{note}</span> : null}
-    </div>
+    <Card variant="default">
+      <CardContent>
+        <StatGrid items={[{ id: "figure", label, value, support: note }]} surface="bare" label={label} />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -238,7 +265,7 @@ function WhereTheHoursWent({ rows, t }: { rows: LogsDashboardData["targets"]; t:
                 <span
                   aria-hidden="true"
                   className="rounded-pill size-[0.5625rem] shrink-0"
-                  style={{ background: DONUT_SEGMENT_COLOURS[i % DONUT_SEGMENT_COLOURS.length] }}
+                  style={{ background: SERIES_COLOURS[i % SERIES_COLOURS.length] }}
                 />
                 <span className="min-w-0 truncate">{word(r.targetTable)}</span>
               </button>
@@ -259,53 +286,118 @@ function WhereTheHoursWent({ rows, t }: { rows: LogsDashboardData["targets"]; t:
   )
 }
 
-/** HOURS A WEEK, LAST EIGHT — the line that replaces the bar card this screen
- * used to draw above its timesheet (`HoursByWeekCard`, which stays on Home,
- * where it is the only picture of the week anybody has).
+/** HOURS A WEEK, LAST EIGHT — the total as an AREA, with one LINE per person
+ * over it. Aurora's ruling, 24 Sep 2026, verbatim: "HOURS A WEEK, show multiple
+ * lines, one per staff and area for total."
  *
- * Her ruling: "a line, hovering a point gives that week's hours and who logged
- * them." It is `ClosureTrend`'s arrangement, copied rather than re-invented — a
- * unit-square `viewBox` under `preserveAspectRatio="none"` with the strokes kept
- * honest by `vector-effect`, the weeks drawn as rules BEHIND the mark, and one
- * HTML hit area per week laid over the plot (an element hit area keeps its own
- * geometry where an SVG `<rect>` would be stretched with everything else).
+ * ── THE DATA IS ALREADY IN HAND, AND THAT IS NOT LUCK ──────────────────────
  *
- * WHO LOGGED THEM comes off `people[].weekSeconds`, the door's own per-person
- * share of each of the same eight windows, so the names under a point and the
- * height of the point are one read of one grouping. That list is the top
- * `WORK_LOG_GROUP_CAP` people by hours (R14), which is why the card names the
- * people it has rather than claiming to be the whole week: the TOTAL above them
- * is the exact figure and is computed without the cap. */
+ * The door hands back `people[].weekSeconds` — every person's own share of each
+ * of the SAME eight windows the total is cut on — from ONE grouped read
+ * (`GROUP BY w.user_id` with eight conditional sums, `logsDashboard`,
+ * workers/content/src/lib/work-logs.ts). So a line per person costs nothing:
+ * there is no second round trip, and emphatically no read per person in a loop,
+ * which is the shape this would otherwise have taken. It was written that way
+ * in the first place to give the hover its names; the ruling asks the same
+ * grouping to be DRAWN rather than merely read out.
+ *
+ * ── THE CAP IS THE PALETTE'S, NOT A TASTE ─────────────────────────────────
+ *
+ * A line per head is readable at four and unreadable at fifteen, so there has to
+ * be a ceiling, and the honest one is the number of colours this design system
+ * can tell apart: FIVE (`--chart-1..5`). A sixth line would have to repeat a hue
+ * — two people drawn identically, which is worse than not drawing one of them —
+ * or invent one, which R32 forbids outright. So `DRAWN_LINES` is 5 because the
+ * palette is 5, and it moves when the palette does.
+ *
+ * (The kit's own `chart.tsx` still warns in its header that `--chart-4` and
+ * `--chart-5` "currently resolve to `--chart-1` and `--chart-2`". That comment
+ * is STALE as of the pinned kit: `tokens.css` at v1.2.167 resolves them to
+ * `--kw-lavender` #B1A3CF and `--kw-orange` #F7953E, both admitted 2026-09-02
+ * and both distinct from the first three. Read the tokens, not the warning —
+ * and the stale warning is reported upstream rather than worked around here.)
+ *
+ * ── AND NOBODY IS QUIETLY DROPPED ─────────────────────────────────────────
+ *
+ * A silent top-five would be a lie of omission: the picture would look like the
+ * whole team. Two things stop it, and the first is structural rather than
+ * editorial. THE AREA IS EVERYBODY — it is `weeks[]`, the door's own exact
+ * total over every person, computed without the grouping cap — so a person who
+ * gets no line of their own is still inside the shape their colleagues' lines
+ * sit under. Then it is SAID, twice: the legend carries an "and N others" row,
+ * and every week's hover card carries those others' hours for that week as its
+ * own line. N comes from `activePeople`, the door's own exact count of distinct
+ * people with time in these eight weeks, so it counts the people past the
+ * grouped read's own `WORK_LOG_GROUP_CAP` too.
+ *
+ * WHO IS DRAWN is ranked by hours IN THE WINDOW (the sum of their eight
+ * buckets), never by their all-time total, which is what `people` arrives
+ * ordered by: a chart of the last eight weeks that drew the five biggest
+ * all-time loggers could draw five flat lines at zero while the people who
+ * actually worked these eight weeks went unnamed.
+ *
+ * The mechanics are `ClosureTrend`'s, unchanged: a unit-square `viewBox` under
+ * `preserveAspectRatio="none"` with the strokes kept honest by `vector-effect`,
+ * the weeks drawn as rules BEHIND the marks, and one HTML hit area per week laid
+ * over the plot (an element hit area keeps its own geometry where an SVG `<rect>`
+ * would be stretched with everything else). */
+const DRAWN_LINES = 5
+
 function WeeksLine({
   weeks,
   people,
+  activePeople,
   lang,
   t,
 }: {
   weeks: LogsDashboardData["weeks"]
   people: LogsDashboardData["people"]
+  /** the door's own exact count of people with time in these eight weeks — the
+   * denominator behind "and N others", see this component's own header. */
+  activePeople: number
   lang: Language
   t: T
 }) {
   if (!weeks.some((w) => w.seconds > 0))
     return <p className="text-muted-foreground text-xs">{t("No time has been logged yet.")}</p>
 
+  // RANKED BY THE WINDOW, not by the all-time total the door ordered them by.
+  // Anybody with nothing in these eight weeks is dropped before the cap is
+  // applied, so a flat line at zero is never one of the five.
+  const inWindow = people
+    .map((p) => ({ ...p, windowSeconds: p.weekSeconds.reduce((n, sec) => n + sec, 0) }))
+    .filter((p) => p.windowSeconds > 0)
+    .sort((a, b) => b.windowSeconds - a.windowSeconds)
+  const drawn = inWindow.slice(0, DRAWN_LINES)
+  // EVERYONE NOT DRAWN, counted off the door's own exact figure rather than off
+  // the capped array — `people` stops at WORK_LOG_GROUP_CAP, so its length is a
+  // ceiling and would under-report on a big team.
+  const others = Math.max(0, activePeople - drawn.length)
+
+  // THE TOTAL IS THE CEILING OF THE PLOT, because every line sits inside it by
+  // construction: one person's week can never exceed the week's own total.
   const top = Math.max(1, ...weeks.map((w) => w.seconds)) * 1.15
   const x = (i: number) => (weeks.length === 1 ? 50 : (i / (weeks.length - 1)) * 100)
   const y = (v: number) => 100 - (v / top) * 100
-  const points = weeks.map((w, i) => `${x(i)},${y(w.seconds)}`)
+  const totalPoints = weeks.map((w, i) => `${x(i)},${y(w.seconds)}`)
+  const linePoints = (p: { weekSeconds: number[] }) =>
+    weeks.map((_, i) => `${x(i)},${y(p.weekSeconds[i] ?? 0)}`).join(" ")
 
-  /** Who put time into week `i`, biggest first — the door already ordered
-   * `people` by their whole-filter total, so this only drops the ones who
-   * logged nothing that week rather than re-sorting anything. */
-  const whoIn = (i: number) =>
-    people.filter((p) => (p.weekSeconds[i] ?? 0) > 0).map((p) => ({ ...p, seconds: p.weekSeconds[i] ?? 0 }))
+  /** What the others put in, in week `i` — the total minus the drawn lines.
+   * Exact whichever way the cap falls, because the total is exact. */
+  const othersIn = (i: number) =>
+    Math.max(0, (weeks[i]?.seconds ?? 0) - drawn.reduce((n, p) => n + (p.weekSeconds[i] ?? 0), 0))
 
   const said = (i: number) =>
     [
       formatDayMonth(weeks[i]!.weekStart, lang),
       t("{count} h", { count: hours(weeks[i]!.seconds) }),
-      ...whoIn(i).map((p) => `${staffNameFromSnapshot(p.userName)} ${t("{count} h", { count: hours(p.seconds) })}`),
+      ...drawn
+        .filter((p) => (p.weekSeconds[i] ?? 0) > 0)
+        .map((p) => `${staffNameFromSnapshot(p.userName)} ${t("{count} h", { count: hours(p.weekSeconds[i] ?? 0) })}`),
+      ...(others > 0 && othersIn(i) > 0
+        ? [t("and {count} others", { count: others }) + ` ${t("{count} h", { count: hours(othersIn(i)) })}`]
+        : []),
     ].join(" · ")
 
   return (
@@ -331,31 +423,44 @@ function WeeksLine({
               vectorEffect="non-scaling-stroke"
             />
           ))}
+          {/* THE TOTAL, AS AN AREA — her word. It is everybody's hours, the
+              door's own exact figure, and it is drawn FIRST so every line sits
+              on top of it. One neutral ink and no stroke of its own: it is the
+              ground the lines are read against, not a sixth series competing
+              with them for a colour. */}
           <polygon
-            points={`${x(0)},100 ${points.join(" ")} ${x(weeks.length - 1)},100`}
+            data-slot="weeks-total-area"
+            points={`${x(0)},100 ${totalPoints.join(" ")} ${x(weeks.length - 1)},100`}
             fill={INK}
-            opacity={0.2}
+            opacity={0.18}
           />
-          <polyline
-            data-slot="weeks-line"
-            points={points.join(" ")}
-            fill="none"
-            stroke={INK}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
+          {/* ONE LINE PER PERSON, in the data sequence's own order — the same
+              five hues the donut's legend above reads, so a colour means one
+              thing on this tab. */}
+          {drawn.map((p, i) => (
+            <polyline
+              key={p.userId}
+              data-slot="weeks-person-line"
+              points={linePoints(p)}
+              fill="none"
+              stroke={SERIES_COLOURS[i % SERIES_COLOURS.length]}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
         </svg>
-        {/* ONE HIT AREA PER WEEK, IN HTML, OVER THE PLOT. Each band runs from
-            the midpoint of the gap before its week to the midpoint of the gap
-            after it, so the area a pointer has to find is centred on the point
-            it is about. `ClosureTrend`'s own shape and its own reasons. */}
+        {/* ── ONE HIT AREA PER WEEK, IN HTML, OVER THE PLOT ────────────────
+            Each band runs from the midpoint of the gap before its week to the
+            midpoint of the gap after it, so the area a pointer has to find is
+            centred on the point it is about. `ClosureTrend`'s own shape. */}
         <div className="absolute inset-0">
           {weeks.map((w, i) => {
             const left = i === 0 ? 0 : (x(i - 1) + x(i)) / 2
             const right = i === weeks.length - 1 ? 100 : (x(i) + x(i + 1)) / 2
-            const who = whoIn(i)
+            const mine = drawn.filter((p) => (p.weekSeconds[i] ?? 0) > 0)
+            const rest = othersIn(i)
             return (
               <HoverCard key={w.weekStart} openDelay={60} closeDelay={60}>
                 <HoverCardTrigger asChild>
@@ -372,20 +477,56 @@ function WeeksLine({
                   <p className="text-muted-foreground text-xs tabular-nums">
                     {t("{count} h", { count: hours(w.seconds) })}
                   </p>
-                  {who.length === 0 ? (
+                  {mine.length === 0 && rest === 0 ? (
                     <p className="text-muted-foreground text-xs">{t("Nobody logged anything.")}</p>
                   ) : (
-                    who.map((p) => (
-                      <p key={p.userId} className="text-xs tabular-nums">
-                        {staffNameFromSnapshot(p.userName)} · {t("{count} h", { count: hours(p.seconds) })}
+                    mine.map((p) => (
+                      <p key={p.userId} className="flex items-center gap-1.5 text-xs tabular-nums">
+                        <span
+                          aria-hidden="true"
+                          className="rounded-pill size-[0.5625rem] shrink-0"
+                          style={{ background: SERIES_COLOURS[drawn.indexOf(p) % SERIES_COLOURS.length] }}
+                        />
+                        {staffNameFromSnapshot(p.userName)} · {t("{count} h", { count: hours(p.weekSeconds[i] ?? 0) })}
                       </p>
                     ))
                   )}
+                  {/* THE OTHERS' OWN HOURS FOR THIS WEEK. Without this line the
+                      card's per-person rows would not add up to the total above
+                      them, which is a picture inviting somebody to do arithmetic
+                      that comes out wrong. */}
+                  {others > 0 && rest > 0 ? (
+                    <p className="text-muted-foreground text-xs tabular-nums">
+                      {t("and {count} others", { count: others })} ·{" "}
+                      {t("{count} h", { count: hours(rest) })}
+                    </p>
+                  ) : null}
                 </HoverCardContent>
               </HoverCard>
             )
           })}
         </div>
+      </div>
+      {/* THE KEY, AND THE ADMISSION BESIDE IT. A legend naming five people over
+          a picture that covers twenty would be the lie the cap invites; the last
+          row is what stops it, and it is drawn in the same register as the names
+          rather than tucked into a footnote. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1" data-slot="weeks-legend">
+        {drawn.map((p, i) => (
+          <span key={p.userId} className="flex min-w-0 items-center gap-1.5 text-xs">
+            <span
+              aria-hidden="true"
+              className="rounded-pill size-[0.5625rem] shrink-0"
+              style={{ background: SERIES_COLOURS[i % SERIES_COLOURS.length] }}
+            />
+            <span className="min-w-0 truncate">{staffNameFromSnapshot(p.userName)}</span>
+          </span>
+        ))}
+        {others > 0 ? (
+          <span className="text-muted-foreground text-xs" data-slot="weeks-others">
+            {t("and {count} others, in the total but not drawn", { count: others })}
+          </span>
+        ) : null}
       </div>
       <div className="text-muted-foreground flex justify-between text-xs">
         <span>{formatDayMonth(weeks[0]!.weekStart, lang)}</span>
@@ -505,10 +646,14 @@ export function LogsDashboard({
 
   return (
     <div className="flex min-w-0 flex-col gap-6" data-slot="logs-dashboard">
-      {/* THE FOUR FIGURES. A real grid so they line up on one baseline and each
-          owns a column at every width; no card and no `<StatGrid>` (R97), the
-          register borrowed from the kit and the box left behind. */}
-      <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* THE FOUR FIGURES, EACH ON ITS OWN PAPER — her ruling, "kpi need
+          background". The grid is `effort-card.tsx`'s own, part for part:
+          `grid-cols-1` with `gap-[var(--space-4)]`, widening to a column each.
+          Four rather than Effort's three, because there are four figures; the
+          GAP and the TILE are the same, which is what "one treatment across
+          both screens" means. Four literal `<Figure>` elements and no `.map()`
+          — see `Figure`'s own note on R65. */}
+      <div className="grid min-w-0 grid-cols-1 gap-[var(--space-4)] sm:grid-cols-2 lg:grid-cols-4">
         <Figure
           label={t("Hours this week")}
           value={String(hours(data.thisWeekSeconds))}
@@ -532,22 +677,30 @@ export function LogsDashboard({
         <Figure label={t("Records worked on")} value={String(data.recordsTouched)} />
       </div>
 
-      <div className="flex min-w-0 flex-col gap-3">
-        <SectionTitle>{t("Where the hours went")}</SectionTitle>
-        <WhereTheHoursWent rows={data.targets} t={t} />
-      </div>
+      {/* TWO SECTIONS IN ONE ROW, HALF AND HALF — her ruling, verbatim: "put
+          who logged it next to where they went 1/2 and 1/2". `lg:grid-cols-2`
+          and one column below it, which is the SAME arrangement
+          `accounts-dashboard.tsx` keeps for its own paired row (country beside
+          industry) and `tickets-dashboard.tsx` before it: a stacking rule
+          invented here would be a second opinion about a question those screens
+          have already answered. The gap is this column's own `gap-6`, so a pair
+          side by side is exactly as far apart as two sections stacked.
 
-      <div className="flex min-w-0 flex-col gap-3">
-        <SectionTitle>{t("Hours a week, the last eight")}</SectionTitle>
-        <WeeksLine weeks={data.weeks} people={data.people} lang={lang} t={t} />
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-3">
-        <SectionTitle>{t("Who logged it")}</SectionTitle>
-        {data.people.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t("No time has been logged yet.")}</p>
-        ) : (
-          <BarRank
+          THEY ARE THE SAME QUESTION ASKED TWO WAYS, which is why the pairing
+          reads: where the hours went (by the kind of record) and who put them
+          there. Both are a split of one total, and both are drawn against the
+          same five-colour sequence. */}
+      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-3">
+          <SectionTitle>{t("Where the hours went")}</SectionTitle>
+          <WhereTheHoursWent rows={data.targets} t={t} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-3">
+          <SectionTitle>{t("Who logged it")}</SectionTitle>
+          {data.people.length === 0 ? (
+            <p className="text-muted-foreground text-xs">{t("No time has been logged yet.")}</p>
+          ) : (
+            <BarRank
             label={t("Who logged it")}
             t={t}
             rows={data.people.map((p) => {
@@ -564,7 +717,22 @@ export function LogsDashboard({
               }
             })}
           />
-        )}
+          )}
+        </div>
+      </div>
+
+      {/* HOURS A WEEK, ON ITS OWN ROW — a line chart is read left to right
+          across the whole measure, so it is the one section on this tab that
+          does not pair. */}
+      <div className="flex min-w-0 flex-col gap-3">
+        <SectionTitle>{t("Hours a week, the last eight")}</SectionTitle>
+        <WeeksLine
+          weeks={data.weeks}
+          people={data.people}
+          activePeople={data.activePeople}
+          lang={lang}
+          t={t}
+        />
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">

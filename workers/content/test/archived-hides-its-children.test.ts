@@ -176,12 +176,34 @@ describe("the law's own subject — which record types can be archived at all", 
         (c) => c.name === "archived_at"
       )
     )
-    // TWO, AND THE LIST IS THE LAW'S SCOPE. A third table gaining the column
-    // turns this red on the day it lands, which is the day somebody has to
-    // decide what hangs off it and what must therefore hide with it — rather
-    // than a law that quietly goes on covering two things for ever.
-    expect(carrying.sort()).toEqual(["accounts", "help"])
+    // TEN, AND THE LIST IS THE LAW'S SCOPE. An eleventh table gaining the
+    // column turns this red on the day it lands, which is the day somebody has
+    // to decide what hangs off it and what must therefore go with it — rather
+    // than a law that quietly goes on covering the same set for ever.
+    //
+    // WIDENED FROM TWO TO TEN, 24 Sep 2026, migration 0123, when Aurora turned
+    // the ruling from hiding into cascading.
+    expect(carrying.sort()).toEqual([
+      "accounts",
+      "apps",
+      "help",
+      "meetings",
+      "processes",
+      "sprints",
+      "stories",
+      "tasks",
+      "todos",
+      "waves",
+    ])
     expect(Object.keys(ARCHIVABLE).sort()).toEqual(carrying.sort())
+    // AND THE ONE THAT MUST NEVER BE ON IT. Aurora, 24 Sep 2026, verbatim:
+    // "never archive work logs, time is logged and we must always know where it
+    // went." Asserted as a negative because an absence from a list is
+    // indistinguishable from an oversight, and this is a principle rather than
+    // a preference: the record of where time went must survive whatever happens
+    // to the thing it was spent on.
+    expect(carrying).not.toContain("work_logs")
+    expect(Object.keys(ARCHIVABLE)).not.toContain("work_logs")
 
     // …and it is a QUARTET on each of them, not a lone flag: the audit block is
     // what makes an archive answerable ("who put this away, and when").

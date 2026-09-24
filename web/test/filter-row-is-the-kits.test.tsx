@@ -179,6 +179,15 @@ async function pick(label: string, option: string) {
   fireEvent.click(within(facet).getByRole("button"))
   const listbox = await screen.findByRole("listbox")
   fireEvent.click(within(listbox).getByRole("option", { name: option }))
+  // A MULTI-SELECT FACET'S LIST STAYS OPEN after a pick (Aurora, 24 Sep 2026 —
+  // choosing three clients should not be three visits to the trigger), so the
+  // helper closes it rather than waiting for it to close itself. Escape shuts
+  // the innermost Radix layer, which is the facet's panel; the overlay behind
+  // it stays open, which is what the next `pick` expects to find.
+  if (screen.queryByRole("listbox")) {
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull())
+  }
 }
 
 /** Open the overlay off the toolbar's own Filter control. */
@@ -386,29 +395,49 @@ describe("the app's filter row is the design kit's", () => {
     await waitFor(() => expect(pillSays()).toEqual({ label: "Filter", count: "1" }))
   })
 
-  it("ONE VALUE PER FACET — a second pick REPLACES, it does not add", async () => {
-    // The kit's facet is MULTI-select and every door this feeds takes ONE value
-    // per query parameter, validated positionally (R20). If the adapter ever
-    // let the array grow, the extra word would be dropped on the way to the
-    // door and the pill would count two filters for a question that answered
-    // one — the same class of lie as a facet that narrows the loaded page.
+  it("A SECOND PICK ADDS — and two values in one facet is still ONE filter", async () => {
+    // SUPERSEDED, 24 SEP 2026. This test used to assert the opposite ("a second
+    // pick REPLACES"), on the reasoning that every door behind it took one word
+    // per query parameter and a growing array would be silently truncated on
+    // the way. That reasoning was TRUE and is now answered rather than ignored:
+    // Aurora ruled *"i shoudl be able to select multile for each filter type"*,
+    // so the six doors learned to carry a set (`splitFacet` at the boundary,
+    // `inClause` in the WHERE) and the value that reaches them is a comma list
+    // rather than one word. Nothing is dropped on the way any more, which is
+    // the only thing that made the old assertion right.
+    //
+    // THE PILL'S COUNT IS THE HALF THAT DID NOT CHANGE, and it is worth keeping
+    // here: it counts FACETS that are on, not values. Two clients is one
+    // question about clients, and a count that said "2" would be reporting a
+    // narrowing that is not two narrowings.
     render(<Harness />)
     await pick("Type", "From a meeting")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"meeting"}'))
     await pick("Type", "A note")
-    await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"note"}'))
+    // THE ORDER IS THE LIST'S, NOT THE TICKING'S — the kit rebuilds the set in
+    // the options' own order, and this app alphabetises a facet's options
+    // before handing them over (R75), so "A note" leads "From a meeting"
+    // whichever was ticked first. That is what keeps the closed field's summary
+    // from reshuffling under somebody who unticks and re-ticks one name.
+    await waitFor(() =>
+      expect(screen.getByTestId("values").textContent).toBe('{"kind":"note,meeting"}')
+    )
     openPanel()
     await waitFor(() =>
-      expect(pillSays(), "one facet, one count").toEqual({ label: "Filter", count: "1" })
+      expect(pillSays(), "two values, one facet, one count").toEqual({ label: "Filter", count: "1" })
     )
 
-    // …and TURNING THE FACET OFF is its own row, "Any type", which is what the
-    // field says while nothing is on. It used to be "pick the word that is
-    // already on"; a compact select (2026-09-02) has no such gesture — picking
-    // the chosen row again is a no-op in every select in the app, and inventing
-    // an exception here would make this one control behave unlike the rest. The
-    // value that reaches the caller is still `""`, never the sentinel the row
-    // carries so Radix will accept it.
+    // …and ONE VALUE LEAVES ON ITS OWN, which is the gesture a single-select
+    // facet genuinely does not have: picking a row that is already on turns
+    // that row off and takes nothing else with it.
+    await pick("Type", "From a meeting")
+    await waitFor(() => expect(screen.getByTestId("values").textContent).toBe('{"kind":"note"}'))
+
+    // …and TURNING THE WHOLE FACET OFF is still its own row, "Any type", which
+    // is what the field says while nothing is on — the way out of four
+    // selections in one press rather than four. The value that reaches the
+    // caller is `""`, never the sentinel the row carries so Radix will accept
+    // it.
     await pick("Type", "Any type")
     await waitFor(() => expect(screen.getByTestId("values").textContent).toBe("{}"))
     openPanel()
@@ -632,10 +661,21 @@ describe("a filter that hangs off another (client ruling, 2026-09-09)", () => {
       accountId: "a1",
       appId: "p1",
     })
-    // The reader now picks a DIFFERENT client. The app they chose is no longer
-    // a pair that can match — her own fault, arriving from the other direction
-    // — so the toolbar drops it rather than holding an impossible combination.
+    // The reader now MOVES the client: adds a second, then drops the first.
+    // (Adding one no longer strands anything — a set of parents offers every
+    // child of any of them, which is the cascade running down an ownership edge
+    // that now has several ends.) Once the first client is gone the app they
+    // chose is no longer a pair that can match — her own fault, arriving from
+    // the other direction — so the toolbar drops it rather than holding an
+    // impossible combination.
     await pick("Client", "Northwind Traders International Holdings Ltd.")
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({
+        accountId: "a1,a2",
+        appId: "p1",
+      })
+    )
+    await pick("Client", "Bergman S.A.")
     await waitFor(() =>
       expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({ accountId: "a2" })
     )

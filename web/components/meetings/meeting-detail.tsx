@@ -17,7 +17,7 @@
 //
 //   HEAD        chips (id, status, department, app, account), title, the
 //               start time as subtitle, and the actions: Join (while the
-//               meeting is still to come), Google Calendar, the edit pen and
+//               meeting is still to come), Calendar, the edit pen and
 //               the overflow menu.
 //   MAIN        Agenda, inline-editable until the end passes; then what was
 //               actually said, faded rather than boxed.
@@ -134,7 +134,10 @@
 // this) to title"*. "Join the call" and "Open in Google Calendar" used to sit
 // at the top of the CALENDAR tab (`CalendarPanel`, below) — one tab away from
 // a person who opened the meeting to join it. They now read exactly "Join"
-// and "Google Calendar" and render in `actions`, which is the title's own
+// and "Calendar" (shortened again on her own second pass, 24 Sep 2026:
+// "rename google calendar to just 'calendar'" — the word Google was doing no
+// work beside an icon that already leaves the app) and render in `actions`,
+// which is the title's own
 // row: `RecordScreen` (record-chrome.tsx) hands that node to the kit's
 // `Title` as `[data-slot=title-actions]` and wears `RECORD_TITLE_TREATMENT`
 // (R52, shared/web/record-heading.tsx) — the 80%/shrink-0 split that keeps a
@@ -194,6 +197,9 @@ import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey
 import { usePermissions } from "@/lib/perms"
 import { RecordMark } from "@shared/web/record-mark"
 import { stripPictographs } from "@shared/text-clean"
+// A STAFF NAME IS A FIRST NAME (R54) — the one seam, never a `.split(" ")[0]`
+// of our own.
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
@@ -375,6 +381,45 @@ export function MeetingAgendaSection({
   )
 }
 
+/** WHAT TO CALL AN ATTENDEE — Aurora, 24 Sep 2026, verbatim: *"show name, not
+ * email"*.
+ *
+ * A GOOGLE CALENDAR GUEST IS AN ADDRESS. `MeetingGuest` carries `{ email,
+ * name }` and Google fills `name` only when the person has a profile it can
+ * see — an outside address invited by typing it in very often has none at all.
+ * So "show the name" is a question with three answers, in this order:
+ *
+ *   1 · ONE OF OURS, BY THEIR OWN RECORD. `memberName` comes off the link this
+ *       screen already resolves (`meetingPeople` matches the address against
+ *       the team's members), and it is the team's own spelling rather than
+ *       whatever Google holds. Run through `staffNameFromSnapshot` because a
+ *       staff name is a FIRST name everywhere else in this app (R54) — a
+ *       colleague who reads as "Ana" on every ticket must not read as "Ana
+ *       Ruiz" here.
+ *   2 · GOOGLE'S OWN DISPLAY NAME, for everybody else. A client contact's full
+ *       name, as they are known, un-trimmed: R54 is about OUR people.
+ *   3 · THE ADDRESS, IN FULL. The honest fallback for a guest who matches
+ *       nobody and whom Google cannot name — and it is the WHOLE address, never
+ *       a truncated one. "ana@…" is not a name, it is a name-shaped thing that
+ *       cannot be searched, copied or recognised; the address at least is all
+ *       three. A person reading it can see immediately that this is somebody we
+ *       do not know, which is the true state of affairs.
+ *
+ * NOT A TAG, EITHER WAY. The chip that used to say "One of us" or the client's
+ * account name beside each face is gone at her own ruling the same day —
+ * "rmeove the tag one of us, one of them - we know" — so this resolution is
+ * now the ONLY place that knowledge shows, which is why it leads with it. */
+export function attendeeName(
+  guest: { email: string; name?: string | null },
+  link: Pick<MeetingPersonLink, "memberName"> | undefined
+): string {
+  const ours = staffNameFromSnapshot(link?.memberName)
+  if (ours) return ours
+  const theirs = (guest.name ?? "").trim()
+  if (theirs) return theirs
+  return guest.email
+}
+
 /** IS THIS A PLACE, OR A LINK SOMEBODY PASTED? `meetings.location` is ONE
  * free-text column mirrored straight off Google's `event.location`
  * (`workers/content/src/lib/meetings.ts`'s sweep), and people put three
@@ -413,16 +458,22 @@ function locationIsAPlace(location: string | null | undefined): boolean {
  *     place, and normally no join link. Correct.
  *   · A PASTED VIDEO LINK in Location with no `conferenceData` would have read
  *     as in person on the pair alone. `locationIsAPlace` is what stops it.
- *   · A HYBRID meeting — a real room AND a Meet link — reads as NOT in person,
- *     because it has something to join. That is the brief's own rule applied
- *     honestly, and it is the case worth her word: the room is real and the
- *     section will not draw.
- *   · A STRONGER SIGNAL EXISTS AND IS DELIBERATELY NOT USED HERE. Google marks
- *     a booked room as a RESOURCE attendee (`MeetingGuest.resource`, the same
- *     flag the Attendees list subtracts), which is proof of a physical room in
- *     a way free text never is. Using it would change the hybrid answer above,
- *     which is a ruling rather than a refactor, so it is flagged instead of
- *     taken. */
+ *   · A MEETING WITH SOMETHING TO JOIN IS REMOTE, FULL STOP — and that is a
+ *     RULING now rather than this lane's reading of a brief. Aurora, 24 Sep
+ *     2026, verbatim: *"if there's videocall its remote meeting. theres no
+ *     hybrid."* The expression below ALREADY said exactly that (`&&
+ *     !m.googleJoinUrl`, unconditional, no room clause anywhere), so nothing
+ *     about the code changed when she settled it. What changed is this
+ *     paragraph: it used to HEDGE, calling a room-plus-a-link "the case worth
+ *     her word". It has her word. A booked room with a Meet link in it is a
+ *     remote meeting some people happen to sit together for, and it draws no
+ *     Location section.
+ *   · WHICH RETIRES THE STRONGER SIGNAL THIS LANE HELD BACK. Google marks a
+ *     booked room as a RESOURCE attendee (`MeetingGuest.resource`, the same
+ *     flag the Attendees list subtracts), and raising it was only ever worth
+ *     doing because it would have changed the hybrid answer. There is no
+ *     hybrid, so it would now change nothing a ruling has not already settled.
+ *     It stays unused, and this is the record of why it is not an oversight. */
 export function meetingIsInPerson(
   m: Pick<Meeting, "location" | "googleJoinUrl">
 ): boolean {
@@ -1066,7 +1117,7 @@ export function MeetingDetailScreen({
       ? [
           {
             key: "google-calendar",
-            label: t("Google Calendar"),
+            label: t("Calendar"),
             icon: <ArrowSquareOut className="size-3.5" />,
             onSelect: () =>
               window.open(safeHref(item.googleEventUrl ?? ""), "_blank", "noreferrer,noopener"),
@@ -1171,7 +1222,9 @@ export function MeetingDetailScreen({
       <div className="flex flex-wrap gap-3">
         {attendees.map((g) => {
           const known = linkFor.get(g.email)
-          const name = g.name || g.email
+          // THE NAME, NOT THE ADDRESS (her ruling) — `attendeeName` above
+          // holds the three-step resolution and the argument for each step.
+          const name = attendeeName(g, known)
           return (
             <PersonCard
               key={g.email}
@@ -1212,23 +1265,26 @@ export function MeetingDetailScreen({
               mark={nameInitials(name)}
               markName={name}
               title={<span className="text-sm">{name}</span>}
-              chip={
-                known?.memberName ? (
-                  <span className="text-micro text-muted-foreground uppercase">{t("One of us")}</span>
-                ) : known?.accountName ? (
-                  <span className="text-micro text-muted-foreground uppercase">{known.accountName}</span>
-                ) : g.organizer ? (
-                  <span className="text-micro text-muted-foreground uppercase">{t("Organiser")}</span>
-                ) : undefined
-              }
-              // WHAT THEY ANSWERED, in the words a person uses — Google's own
-              // `needsAction` is machine for "they have not replied", which is
-              // the single most useful thing on a guest list.
-              secondary={
-                <span className="text-muted-foreground text-xs">
-                  {RESPONSE[g.response] ?? g.response}
-                </span>
-              }
+              // NO CHIP AND NO SECONDARY LINE — Aurora, 24 Sep 2026, verbatim:
+              // "rmeove the tag one of us, one of them - we know. show name,
+              // not email. remove coming/noreply whatever - we can see it in
+              // calendar".
+              //
+              // WHAT WENT. The `chip` said "One of us", or the client's own
+              // account name, or "Organiser"; the `secondary` said what each
+              // person had answered ("Coming", "No reply yet"). Both were
+              // built on real facts and she wants neither: who is ours is
+              // something the reader already knows, and the RSVP is one press
+              // away in the calendar, which the title's own Calendar button
+              // opens. A face and a name is the whole row.
+              //
+              // NOTHING IS SUBTRACTED FROM WHAT WE KNOW, only from what is
+              // drawn. The link behind each guest is still resolved and still
+              // does two jobs: a colleague's own photograph (`picture`) and
+              // their own spelling of their name (`attendeeName`), and the
+              // `external` flag above still marks a client. The greyscale
+              // ruling and the faces from the round before are untouched —
+              // this strips the WORDS beside them, not the people.
             />
           )
         })}
@@ -1533,7 +1589,7 @@ export function MeetingDetailScreen({
               rel="noreferrer noopener"
               className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
             >
-              <ArrowSquareOut className="size-3.5" aria-hidden /> {t("Google Calendar")}
+              <ArrowSquareOut className="size-3.5" aria-hidden /> {t("Calendar")}
             </a>
           )}
           {/* NEVER BLACK OR MANGO (client ruling, 18 Sep 2026: "edit button
@@ -1643,13 +1699,13 @@ const FOUND_BY: Record<string, string> = {
   mail: "From a Google notice",
 }
 
-/** What each guest ANSWERED, in the words a person uses. Google's own four are
- * `accepted`, `declined`, `tentative` and `needsAction`, and the last of those
- * is the one worth translating hardest: "needsAction" is machine for "they have
- * not replied", which is the single most useful thing on a guest list. */
-const RESPONSE: Record<string, string> = {
-  accepted: "Coming",
-  declined: "Not coming",
-  tentative: "Maybe",
-  needsAction: "No reply yet",
-}
+/* NO `RESPONSE` MAP ANY MORE. It turned Google's own four answers
+ * (`accepted`/`declined`/`tentative`/`needsAction`) into the words a person
+ * uses, and its whole reason for existing was the line under each attendee's
+ * name. Aurora removed that line on 24 Sep 2026 — "remove coming/noreply
+ * whatever - we can see it in calendar" — so the map has no reader, and a
+ * translation table nothing reads is four sentences the catalogue carries and
+ * pays to translate for nobody. `MeetingGuest.response` is untouched on the
+ * row and still mirrored by every sweep; if the RSVP is ever wanted back, this
+ * is four lines, not a re-sync.
+ */

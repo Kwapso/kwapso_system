@@ -55,6 +55,29 @@ import { DOORS, doorBodyFields, doorParams, key, ROOT, WORKERS, type Door } from
  * which is what this census exists to end. Keyed "METHOD /path". */
 const TOOLLESS_DOORS: Record<string, string> = {
   /* ------------------------------- tenancy ------------------------------- */
+  // ── ARCHIVING AN APP, WHICH CASCADES ──────────────────────────────────────
+  //
+  // OFF THE MACHINE SURFACE ON PURPOSE, and the reason is the cascade rather
+  // than the app. `POST /api/tenancy/apps/archived` (migration 0123) archives
+  // the app AND everything the app owns — its tickets, meetings, tasks, to-dos,
+  // stories, phases, waves and process maps — each carrying its own archived
+  // state. That is a client's whole world made invisible from ONE call, and the
+  // machine surface has no turn to hang a confirm panel on: one `tools/call` is
+  // the whole conversation, which is the same argument R24 makes for refusing
+  // the money door outright.
+  //
+  // THE INACTIVE TOGGLE IS STILL OFFERED, through `RECORD_TOGGLES.app`
+  // (`/api/tenancy/apps/active`), and it is the weaker, non-cascading state a
+  // machine caller can safely reach: an app drops out of the value figures and
+  // everything under it stays exactly where it was. So the capability is not
+  // absent from the surface — the DESTRUCTIVE half of it is, deliberately.
+  //
+  // (Note for whoever revisits this: `RECORD_TOGGLES.app`'s own words say
+  // "Archive an app" for that weaker state, which predates the word having a
+  // stronger meaning. That is a vocabulary bug on the machine surface, filed
+  // rather than widened here.)
+  "POST /api/tenancy/apps/archived":
+    "archiving an app cascades to everything it owns, and one tools/call has no turn to confirm on; the non-cascading inactive toggle stays available as RECORD_TOGGLES.app",
   // ── READING A CALL INTO A PROPOSED MAP ────────────────────────────────────
   // Five doors, deliberately off the machine surface, and the reasoning is worth
   // reading before anybody "completes" it.

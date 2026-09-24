@@ -8654,6 +8654,171 @@ UPDATE work_log_kinds_backup
  WHERE cleared_at IS NULL;
 `,
   },
+  {
+    // ARCHIVING CASCADES, AND THE CASCADE REMEMBERS WHO CAUSED IT. Aurora's
+    // ruling, 23-24 Sep 2026, in two messages, verbatim:
+    //
+    //   "wdym by vanish? should stay in the system, but invisible. just in case
+    //    we need to in the future recover it. if ticket archive - story
+    //    archived as well"
+    //   "when archiving a parent item, always archive as well the child items"
+    //
+    // WHAT THIS REPLACES. 0117 gave `accounts` an archived state, and the round
+    // after it made a child of an archived parent invisible by FILTERING: the
+    // child's own row was untouched and a clause on every read hid it. That is
+    // not what she asked for. A cascaded child now carries its OWN archived
+    // state, so it is invisible for the reason anything archived is invisible,
+    // it can be found wherever archived things are found, and it can be
+    // recovered. The filter stays as a belt (R112) for the one case a cascade
+    // cannot reach: a child created AFTER its parent was archived.
+    //
+    // ── THE AUDIT FOUR, ON EIGHT MORE TABLES ────────────────────────────────
+    //
+    // `archived_at` + `archiver_id`/`archiver_email`/`archiver_name`, the exact
+    // shape 0117 gave `accounts` and 0011 gave `help`, because a cascaded row
+    // has to answer "who put this away, and when" like any other.
+    //
+    // WHICH EIGHT, and the rule that picked them: a table gains them if it sits
+    // on an OWNING edge below something archivable AND has its own door a
+    // person can reach. The sub-parts are deliberately absent — `help_threads`,
+    // `help_status_events`, `story_status_events`, `story_processes`,
+    // `wave_phase_days`, `process_steps`, `process_versions`,
+    // `client_tool_prices` and `knowledge_chunks` are never listed and never
+    // opened on their own, so hiding their parent hides them and a column would
+    // buy nothing but thirty more cascade steps.
+    //
+    // ── AND `work_logs` IS NOT HERE, AT ANY DEPTH, FROM ANY PARENT ──────────
+    //
+    // Aurora, 24 Sep 2026, verbatim: "never archive work logs, time is logged
+    // and we must always know where it went." It is a PRINCIPLE and not a
+    // preference, so it is written at the place that decides rather than
+    // inferred from an absence: the record of where time went must survive
+    // whatever happens to the thing it was spent on. `work_logs` gains no
+    // column here and appears in no edge in
+    // `shared/workers/archive-cascade.ts`, whose own check fails the build if
+    // it ever does.
+    //
+    // ── THE MARKER: WHO ARCHIVED THIS, NOT MERELY WHEN ──────────────────────
+    //
+    // `archived_via_table` + `archived_via_id`, on the eight above AND on
+    // `accounts` and `help`, which already had the audit four and can now
+    // themselves be archived BY something: an account by its parent account, a
+    // ticket by its account or its app.
+    //
+    // A TIMESTAMP IS NOT ENOUGH, and this pair is the whole reason why. If a
+    // story was archived on its own merits BEFORE its ticket was archived,
+    // un-archiving the ticket must not restore it, and nothing in a timestamp
+    // can tell those two stories apart. So the cascade records its cause, and
+    // three states fall out with no value overloaded onto one column, which is
+    // 0117's own argument for two independent timestamps over one three-value
+    // column:
+    //
+    //   archived_at IS NULL                          -> live
+    //   archived_at set, archived_via_table IS NULL  -> somebody archived THIS
+    //   archived_at set, archived_via_* set          -> the cascade from that
+    //                                                   row archived it
+    //
+    // TWO COLUMNS RATHER THAN ONE 'help:H_123' STRING, because a composite key
+    // is a second spelling that must be parsed before it can be compared, and
+    // because this base already has exactly this polymorphic pair and this
+    // matches it: `work_logs.target_table`/`target_id` (0014). A SIDE TABLE was
+    // the other candidate and loses for the reason `record-map.ts`'s own header
+    // gives about a shared attachments table — a polymorphic pair is something
+    // "no fence in this base is shaped to clause over" — and because every hot
+    // read would have grown a join to ask what a local column answers for free.
+    //
+    // THE PARTIAL INDEX is the restore's own query and nothing else
+    // (`WHERE archived_via_table = ? AND archived_via_id = ?`). Partial on
+    // `archived_via_id IS NOT NULL` because the overwhelming majority of rows
+    // are live and carry NULL, so the index holds only the rows a restore can
+    // ever visit.
+    //
+    // NUMBERED 0123, read live off this file's own tail at the moment of
+    // appending (CLAUDE.md: team migration numbers are read, never recalled):
+    // 0122 (`hand_typed_work_log_kinds_are_wiped`) is the highest on the local
+    // tree and on `origin/main`, and is already applied to both staging teams,
+    // so 0123 is the next free number.
+    version: "0123_archiving_cascades_to_the_children",
+    sql: `
+-- The audit four, on the eight tables that gain an archived state of their own.
+ALTER TABLE apps ADD COLUMN archived_at TEXT;
+ALTER TABLE apps ADD COLUMN archiver_id TEXT;
+ALTER TABLE apps ADD COLUMN archiver_email TEXT;
+ALTER TABLE apps ADD COLUMN archiver_name TEXT;
+ALTER TABLE meetings ADD COLUMN archived_at TEXT;
+ALTER TABLE meetings ADD COLUMN archiver_id TEXT;
+ALTER TABLE meetings ADD COLUMN archiver_email TEXT;
+ALTER TABLE meetings ADD COLUMN archiver_name TEXT;
+ALTER TABLE tasks ADD COLUMN archived_at TEXT;
+ALTER TABLE tasks ADD COLUMN archiver_id TEXT;
+ALTER TABLE tasks ADD COLUMN archiver_email TEXT;
+ALTER TABLE tasks ADD COLUMN archiver_name TEXT;
+ALTER TABLE todos ADD COLUMN archived_at TEXT;
+ALTER TABLE todos ADD COLUMN archiver_id TEXT;
+ALTER TABLE todos ADD COLUMN archiver_email TEXT;
+ALTER TABLE todos ADD COLUMN archiver_name TEXT;
+ALTER TABLE stories ADD COLUMN archived_at TEXT;
+ALTER TABLE stories ADD COLUMN archiver_id TEXT;
+ALTER TABLE stories ADD COLUMN archiver_email TEXT;
+ALTER TABLE stories ADD COLUMN archiver_name TEXT;
+ALTER TABLE sprints ADD COLUMN archived_at TEXT;
+ALTER TABLE sprints ADD COLUMN archiver_id TEXT;
+ALTER TABLE sprints ADD COLUMN archiver_email TEXT;
+ALTER TABLE sprints ADD COLUMN archiver_name TEXT;
+ALTER TABLE waves ADD COLUMN archived_at TEXT;
+ALTER TABLE waves ADD COLUMN archiver_id TEXT;
+ALTER TABLE waves ADD COLUMN archiver_email TEXT;
+ALTER TABLE waves ADD COLUMN archiver_name TEXT;
+ALTER TABLE processes ADD COLUMN archived_at TEXT;
+ALTER TABLE processes ADD COLUMN archiver_id TEXT;
+ALTER TABLE processes ADD COLUMN archiver_email TEXT;
+ALTER TABLE processes ADD COLUMN archiver_name TEXT;
+
+-- The marker, on those eight AND on the two that already had the audit four.
+ALTER TABLE apps ADD COLUMN archived_via_table TEXT;
+ALTER TABLE apps ADD COLUMN archived_via_id TEXT;
+ALTER TABLE meetings ADD COLUMN archived_via_table TEXT;
+ALTER TABLE meetings ADD COLUMN archived_via_id TEXT;
+ALTER TABLE tasks ADD COLUMN archived_via_table TEXT;
+ALTER TABLE tasks ADD COLUMN archived_via_id TEXT;
+ALTER TABLE todos ADD COLUMN archived_via_table TEXT;
+ALTER TABLE todos ADD COLUMN archived_via_id TEXT;
+ALTER TABLE stories ADD COLUMN archived_via_table TEXT;
+ALTER TABLE stories ADD COLUMN archived_via_id TEXT;
+ALTER TABLE sprints ADD COLUMN archived_via_table TEXT;
+ALTER TABLE sprints ADD COLUMN archived_via_id TEXT;
+ALTER TABLE waves ADD COLUMN archived_via_table TEXT;
+ALTER TABLE waves ADD COLUMN archived_via_id TEXT;
+ALTER TABLE processes ADD COLUMN archived_via_table TEXT;
+ALTER TABLE processes ADD COLUMN archived_via_id TEXT;
+ALTER TABLE accounts ADD COLUMN archived_via_table TEXT;
+ALTER TABLE accounts ADD COLUMN archived_via_id TEXT;
+ALTER TABLE help ADD COLUMN archived_via_table TEXT;
+ALTER TABLE help ADD COLUMN archived_via_id TEXT;
+
+-- The restore's own read, and nothing else.
+CREATE INDEX idx_apps_archived_via ON apps (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_meetings_archived_via ON meetings (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_tasks_archived_via ON tasks (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_todos_archived_via ON todos (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_stories_archived_via ON stories (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_sprints_archived_via ON sprints (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_waves_archived_via ON waves (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_processes_archived_via ON processes (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_accounts_archived_via ON accounts (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+CREATE INDEX idx_help_archived_via ON help (archived_via_table, archived_via_id)
+  WHERE archived_via_id IS NOT NULL;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

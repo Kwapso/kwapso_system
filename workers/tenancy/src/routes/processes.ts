@@ -22,6 +22,7 @@
 // is the assumption two leaks in this codebase were built on.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { splitFacet } from "@shared/facet-list"
 import { imageFieldLimit, optionalMark, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { TITLE_MAX_CHARS } from "@shared/types"
 import { MODULE_ICON_NAMES } from "@shared/module-icons"
@@ -48,12 +49,14 @@ import {
   listApps,
   listProcessComments,
   listProcesses,
+  type ProcessFilters,
   linkProcesses,
   listSavings,
   PROCESS_SORTS,
   removeStep,
   deleteStep,
   setAppActive,
+  setAppArchived,
   setAuditDate,
   setAppStaff,
   setAppStakeholders,
@@ -144,7 +147,14 @@ export async function getApps(request: Request, env: Env): Promise<Response> {
   const params = new URL(request.url).searchParams
   const accountId = queryText(params.get("accountId"), "Account")
   const q = queryText(params.get("q"), "Search")
-  const { rows, total } = await listApps(cfg, guard, scope, { accountId, q })
+  // THE ARCHIVED PILE, or the live one (0123). Matched against the two literals
+  // rather than trusted, exactly as the accounts door does it: this arrives off
+  // a query string, where `"false"` is truthy and anything at all is a string,
+  // so what reaches the statement is our own word and never the caller's text.
+  // Anything but `yes` reads as the live list, which is the safe default.
+  const rawArchived = queryText(params.get("archived"), "Archived")
+  const archived = rawArchived === "yes" ? "yes" : "no"
+  const { rows, total } = await listApps(cfg, guard, scope, { accountId, q, archived })
   return json({ apps: rows, total })
 }
 
@@ -318,6 +328,30 @@ export async function postAppActive(request: Request, env: Env): Promise<Respons
   return json({ ok: true })
 }
 
+/** POST /api/tenancy/apps/archived — archive / restore an app, her ARCHIVED, the
+ * stronger state beside `/apps/active`'s inactive.
+ *
+ * AGENCY ONLY, like every other write on this door: an app is the agency's own
+ * record of what it built, not a client's to put away. And this one CASCADES
+ * (her ruling, 24 Sep 2026: "yes, archiving th eparent archive the child"), so
+ * it is gated on `delete` rather than `update` — the same right `/apps/active`
+ * asks for, and the honest one for a write that reaches a whole app's world.
+ *
+ * ONE PING, on the app itself. The cascade touches rows across eight tables and
+ * publishing a change for each would be a storm aimed at screens that are about
+ * to refetch anyway; the app's own row moving is the event a listener needs, and
+ * the archived rows are gone from every list the same instant. */
+export async function postAppArchived(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "delete")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "App", TEXT_LIMITS.short)
+  if (typeof body.archived !== "boolean") return fail(400, "invalid_input", "Archive or restore?")
+  // R17: a repeat moves zero rows → no ping, no duplicate history, no cascade.
+  const changed = await setAppArchived(cfg, guard, scope, actor, id, body.archived)
+  if (changed) await publishChange(env, guard.teamId, "apps", id)
+  return json({ ok: true })
+}
+
 // ── modules ──────────────────────────────────────────────────────────────────
 
 /** GET /api/tenancy/app-modules[?id=][?appId=][&archived=all] — the sections of
@@ -439,11 +473,14 @@ export async function postAppModuleActive(request: Request, env: Env): Promise<R
  * `archived` is an allow-list of two words, checked HERE so nothing but our own
  * literal ever reaches a statement (R20); anything else means "don't narrow",
  * which is what this list has always answered. */
-function processQuery(url: URL): { q?: string; appId?: string; archived?: string } {
+function processQuery(url: URL): ProcessFilters {
   const archived = queryText(url.searchParams.get("archived"), "Archived")
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
-    appId: queryText(url.searchParams.get("appId"), "App"),
+    // A SET SINCE 24 SEP 2026 — the comma list is read off the ALREADY-VALIDATED
+    // string, so the boundary check stays where R20's census looks for it and
+    // the parameter's own name (R19's mirror) is unchanged.
+    appId: splitFacet(queryText(url.searchParams.get("appId"), "App")),
     archived: archived === "yes" || archived === "no" ? archived : undefined,
   }
 }

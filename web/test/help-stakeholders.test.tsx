@@ -271,6 +271,52 @@ describe("HelpStakeholders — Raised by, one tile", () => {
   })
 })
 
+// RAISED BY CARRIES THE EXTERNAL FLAG (R111, "a photograph always beats
+// initials", and Aurora's 23 Sep 2026 ruling on the same seam: "external
+// photos (from contacts) gray scale. keep staff nirmal."). A ticket's raiser
+// can be a client contact or one of our own colleagues raising it on their
+// behalf — `raiserIsClient`, read the same line away from
+// `raisedByContactName` that `help-detail.tsx`'s own conversation bubble
+// reads it, decides which. `RecordMark` (shared/web/record-mark.tsx) only
+// ever surfaces the fact through `data-external="true"` on the mark's own
+// box (written ONLY when true), so these tests read that attribute rather
+// than a pixel.
+describe("HelpStakeholders — Raised by carries the external flag", () => {
+  function raisedByTile(): HTMLElement {
+    return screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+  }
+
+  it("greys the mark when a named contact corrected the field (raisedByContactName set)", () => {
+    render(
+      <HelpStakeholders
+        stakeholders={[AURORA, MAX]}
+        raisedByContactId="contact-1"
+        raisedByContactName="Priya Contact"
+      />
+    )
+    const tile = screen.getByText("Priya Contact").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    expect(tile.querySelector('[data-external="true"]')).toBeTruthy()
+  })
+
+  it("greys the mark when the derived raiser is a client login (raiserIsClient), no contact override", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} raiserIsClient />)
+    const tile = raisedByTile()
+    expect(tile.querySelector('[data-external="true"]')).toBeTruthy()
+  })
+
+  it("does NOT grey the mark when a colleague raised it on the client's behalf (raiserIsClient false/absent)", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} raiserIsClient={false} />)
+    const tile = raisedByTile()
+    expect(tile.querySelector('[data-external="true"]')).toBeNull()
+  })
+
+  it("never greys a loop member — only the raiser can be a client", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} raiserIsClient />)
+    const loopCard = document.querySelector('[data-slot="loop-card"]') as HTMLElement
+    expect(loopCard.querySelector('[data-external="true"]')).toBeNull()
+  })
+})
+
 describe("HelpStakeholders — On the loop, one horizontal row", () => {
   it("labels the loop card 'On the loop' once, not per person", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)

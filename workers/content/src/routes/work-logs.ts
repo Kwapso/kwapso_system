@@ -17,6 +17,7 @@ import {
   requireText,
   TEXT_LIMITS,
 } from "@shared/workers/validate"
+import { splitFacet } from "@shared/facet-list"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -51,7 +52,11 @@ function logFilterFrom(url: URL): LogFilter {
     scope: queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all",
     targetTable: queryText(url.searchParams.get("targetTable"), "Target"),
     targetId: queryText(url.searchParams.get("targetId"), "Target"),
-    userId: queryText(url.searchParams.get("userId"), "Person"),
+    // A SET SINCE 24 SEP 2026 — see `shared/facet-list.ts` for the spelling.
+    // The comma list is read off the ALREADY-VALIDATED string, so the boundary
+    // check stays where R20's census looks for it and the parameter's own name
+    // (what R19 mirrors on the machine surface) is unchanged.
+    userId: splitFacet(queryText(url.searchParams.get("userId"), "Person")),
     // WITH OR WITHOUT MEETING TIME (9.3). Anything but the two words means all
     // of it — a fail-safe default, because "everything" is the answer a mistyped
     // parameter should land you in.
@@ -72,7 +77,7 @@ function logFilterFrom(url: URL): LogFilter {
     // place this door reads a filter, so the list, its totals and the dashboard
     // are all asked the same question (R16) and the machine surface has one
     // thing to mirror (R19).
-    accountId: queryText(url.searchParams.get("accountId"), "Account"),
+    accountId: splitFacet(queryText(url.searchParams.get("accountId"), "Account")),
   }
 }
 

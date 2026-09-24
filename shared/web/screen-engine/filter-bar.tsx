@@ -391,6 +391,7 @@ import {
   FilterOverlay,
   RangeFacet,
 } from "@shared/ui/components/filter-bar/filter-bar"
+import { joinFacet, splitFacet } from "@shared/facet-list"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
@@ -481,13 +482,14 @@ function useFilterBar<T>({
    * within the same render the parent was picked in (there is no Apply step on
    * this row: "the moment I select sth on a dropdown its applied", the client,
    * 2026-09-02). */
-  const parentValue = (f: FilterFacet): string =>
-    f.dependsOn ? (values[f.dependsOn.field] ?? "") : ""
+  const parentValues = (f: FilterFacet): string[] =>
+    f.dependsOn ? splitFacet(values[f.dependsOn.field] ?? "") : []
 
   /** THE FACET IS GATED — it hangs off another and that other is not answered
    * yet. Its control still draws (see the panel below); it just has nothing to
    * offer and says what to do first instead. */
-  const isGated = (f: FilterFacet): boolean => Boolean(f.dependsOn) && parentValue(f) === ""
+  const isGated = (f: FilterFacet): boolean =>
+    Boolean(f.dependsOn) && parentValues(f).length === 0
 
   /** WHAT THIS FACET MAY OFFER RIGHT NOW — the cascade, applied in the one place
    * every facet on both front doors passes through (the header carries the
@@ -514,13 +516,20 @@ function useFilterBar<T>({
   const optionsFor = (f: FilterFacet): FacetOption[] => {
     const dep = f.dependsOn
     if (!dep) return f.options ?? facetOptions(data, f.field)
-    const parent = values[dep.field] ?? ""
-    if (parent === "") return []
-    if (f.options) return f.options.filter((o) => o.within == null || o.within === parent)
+    // THE PARENT IS A SET NOW (24 Sep 2026). Three clients chosen above means
+    // this child offers every app of any of the three — the cascade runs down
+    // the ownership edge exactly as before, it is just that the edge now has
+    // several ends. `within == null` still survives every parent, for the
+    // reason `FacetOption.within` argues at length: our own systems are
+    // legitimately on a client's ticket.
+    const parents = splitFacet(values[dep.field] ?? "")
+    if (parents.length === 0) return []
+    if (f.options) return f.options.filter((o) => o.within == null || parents.includes(o.within))
     return facetOptions(
       data.filter((row) => {
         const owner = (row as Record<string, unknown>)[dep.field]
-        return owner == null || String(owner) === "" || String(owner) === parent
+        const said = String(owner ?? "")
+        return owner == null || said === "" || parents.includes(said)
       }),
       f.field
     )
@@ -555,9 +564,21 @@ function useFilterBar<T>({
      every call site passes) would re-fire the effect on every render. */
   const stranded = facets
     .filter((f) => f.dependsOn && (values[f.field] ?? "") !== "")
-    .filter((f) => !optionsFor(f).some((o) => o.value === values[f.field]))
-    .map((f) => ({
+    .map((f) => {
+      // ONLY THE VALUES THAT NO LONGER FIT GO. This used to drop the whole
+      // facet, which was the only possible answer while a facet held one
+      // value; with a set (24 Sep 2026) it would throw away two perfectly
+      // valid picks to correct a third. The kept subset is written back, so a
+      // reader who chose three of a client's apps and then added a second
+      // client keeps all three.
+      const offered = new Set(optionsFor(f).map((o) => o.value))
+      const had = splitFacet(values[f.field] ?? "")
+      return { facet: f, had, kept: had.filter((v) => offered.has(v)) }
+    })
+    .filter(({ had, kept }) => kept.length < had.length)
+    .map(({ facet: f, kept }) => ({
       field: f.field,
+      keep: joinFacet(kept),
       label: f.label,
       // The parent's own WORD, so the sentence reads "…the Client you picked"
       // rather than naming a query parameter at somebody. A `dependsOn` naming
@@ -577,7 +598,8 @@ function useFilterBar<T>({
     if (strandedFields === "") return
     const { stranded: gone, onChange: drop } = latest.current
     for (const s of gone) {
-      drop(s.field, "")
+      // The SUBSET that still fits, not "" — see `stranded` above.
+      drop(s.field, s.keep)
       // `t` is read from the enclosing render rather than through the ref
       // because the extractor's `t-call` position is an IDENTIFIER named `t`
       // (scripts/lib/i18n-source.mjs) — `latest.current.t("…")` is a property
@@ -770,11 +792,63 @@ function useFilterBar<T>({
                 const said = facetOptionList.find((o) => o.value === option.value)?.label ?? option.value
                 return said.toLowerCase().includes(query.trim().toLowerCase())
               }}
-              // `null` in, `""` out — the boundary conversion the header
-              // explains: the kit's own `null` means off, the app's own `""`
-              // does.
-              value={val === "" ? null : val}
-              onValueChange={(next) => onChange(f.field, next ?? "")}
+              // ── SEVERAL VALUES PER FACET — AURORA, 24 SEP 2026 ────────
+              // *"validated, but i shoudl be able to select multile for each
+              // filter type"*. Within one facet the chosen values mean OR;
+              // across facets the row still means AND, which is the doors'
+              // arithmetic (`inClause`, one `IN` per facet ANDed with the rest
+              // of the WHERE) and `selectRows`' (one predicate per facet,
+              // `every` across them, `includes` inside one).
+              //
+              // `single` IS THE NAMED EXCEPTION, and it is a fact about the
+              // VOCABULARY rather than a preference: a two-word facet whose
+              // words are opposites (Status active/inactive, Archived
+              // live/put-away) has nothing to multi-select, because ticking
+              // both is asking for no narrowing. `CollectionFacet.single`
+              // carries the argument and a census holds it to a two-option
+              // vocabulary, so a facet over records can never be pinned.
+              //
+              // THE BOUNDARY CONVERSION IS STILL THE ONLY THING HAPPENING
+              // HERE. The kit speaks `string[]`, the app's wire speaks one
+              // comma-joined parameter per field (`shared/facet-list.ts`), and
+              // `""` is off on this side exactly as `[]` is on that one.
+              //
+              // BOTH PAIRS ARE HANDED OVER, and that is not belt-and-braces:
+              // `multiple` chooses which one the kit reads, and a `single`
+              // facet drives `value`/`onValueChange` exactly as every facet
+              // did before today. Passing only the set pair left the three
+              // two-word facets (Status, Archived, the tickets view) wired to
+              // nothing — caught by this file's own single-select case, which
+              // is why that case exists.
+              multiple={!f.single}
+              values={splitFacet(val)}
+              onValuesChange={(next) => onChange(f.field, joinFacet(next))}
+              // `null` in, `""` out — the boundary conversion for the single
+              // half, unchanged since the day the kit's `CompactFacet` landed.
+              value={splitFacet(val)[0] ?? null}
+              onValueChange={(next) => onChange(f.field, next == null ? "" : joinFacet([next]))}
+              // WHAT THE CLOSED FIELD SAYS ABOVE ONE. The kit's own default is
+              // the first label and a bare ` +N`; this is the same sentence
+              // with a translator in front of it, which is the whole reason
+              // the kit made it a prop (R28: a sentence a person reads is in
+              // the catalogue, and a number glued to a label by the kit is
+              // not).
+              //
+              // IT READS THE APP'S OWN WORD, NEVER THE KIT-SHAPED LABEL. A
+              // facet that carries a `mark` (a ticket type's swatch, an app's
+              // own glyph — R93) hands the kit a composed NODE as its label,
+              // and a node cannot go into a translated sentence. The plain
+              // word is one lookup away in `facetOptionList`, which is the
+              // same list `filterOption` above already matches against for
+              // exactly this reason.
+              formatSummary={(chosen) =>
+                t("{what} +{count}", {
+                  what:
+                    facetOptionList.find((o) => o.value === chosen[0].value)?.label ??
+                    chosen[0].value,
+                  count: chosen.length - 1,
+                })
+              }
               // The dense control height, the height the kit's own facet
               // fields take when they stand in a panel rather than a form
               // (`CompactFacet`'s own `size` doc).
