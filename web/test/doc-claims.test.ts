@@ -140,6 +140,19 @@ const DOCS = [
   ...PLANS,
 ]
 
+/** UI-RULEBOOK.md moved its 281 rule bodies out to documents/ui-rulebook/*.md
+ * on 2026-09-24 (planner-authorized exception, feat/lean-foundation-pass-1) —
+ * the index file keeps only its front matter, the split-file table and the
+ * rule-count ledger. A header or an R-number citation can now live in either
+ * file, so the two checks below read the whole set, globbed rather than
+ * named, so a split file added later is covered without editing this test. */
+const uiRulebookFiles = () => {
+  const dir = join(ROOT, "documents", "ui-rulebook")
+  const split = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => join(dir, f)) : []
+  return [join(ROOT, "documents", "UI-RULEBOOK.md"), ...split]
+}
+const uiRulebookText = () => uiRulebookFiles().map((p) => read(p)).join("\n")
+
 const WORDS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
   seven: 7, eight: 8, nine: 9, ten: 10,
@@ -419,7 +432,7 @@ describe("docs agree with the roster on disk", () => {
         "shape. Fix the derivation, never this number: a scan over nothing reports all clear"
     ).toBeGreaterThan(20)
 
-    const book = read(join(ROOT, "documents", "UI-RULEBOOK.md"))
+    const book = uiRulebookText()
     const named = (id: string) => new RegExp(`\\b${id}\\b`).test(book)
 
     const undocumented = ui.filter((id) => !named(id))
@@ -464,8 +477,10 @@ describe("docs agree with the roster on disk", () => {
   // forgets either number is caught the day it happens rather than the next
   // time someone happens to run the grep by hand.
   it("UI-RULEBOOK's stated rule total agrees with its own headers and its own section table", () => {
-    const book = read(join(ROOT, "documents", "UI-RULEBOOK.md"))
-    const headers = book.match(/^### [A-Z]+\d+:/gm) ?? []
+    // Headers now live across the split files, not the index — glob them.
+    // The headline and the per-section table are still the index file's own,
+    // so they're read from it by name, not from the glob.
+    const headers = uiRulebookText().match(/^### [A-Z]+\d+:/gm) ?? []
     expect(
       headers.length,
       "the header scan came back almost empty — the rule heading format changed " +
@@ -473,16 +488,17 @@ describe("docs agree with the roster on disk", () => {
     ).toBeGreaterThan(50)
     const actual = headers.length
 
-    const headline = book.match(/\*\*(\d+) rules\.\*\*/)
+    const indexBook = read(join(ROOT, "documents", "UI-RULEBOOK.md"))
+    const headline = indexBook.match(/\*\*(\d+) rules\.\*\*/)
     expect(headline, 'UI-RULEBOOK.md must state its total as "**N rules.**" under Rule index').not.toBeNull()
     const stated = Number(headline![1])
     expect(
       stated,
-      `documents/UI-RULEBOOK.md says "**${stated} rules.**" but the file holds ${actual} ` +
+      `documents/UI-RULEBOOK.md says "**${stated} rules.**" but the split files hold ${actual} ` +
         `\`### <id>:\` headings. Fix the sentence, not the count.`
     ).toBe(actual)
 
-    const rows = [...book.matchAll(/\|\s*\d+\.[^|]*\|\s*[A-Z]+\d+ to [A-Z]+\d+ \((\d+)\)\s*\|/g)]
+    const rows = [...indexBook.matchAll(/\|\s*\d+\.[^|]*\|\s*[A-Z]+\d+ to [A-Z]+\d+ \((\d+)\)\s*\|/g)]
     expect(
       rows.length,
       "the per-section table (### Rule index) came back with no rows — its row shape changed; " +
