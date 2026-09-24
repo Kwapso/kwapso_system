@@ -118,9 +118,17 @@
      invisible one is. The kit ships 1.103, 1.111, 1.198 and 1.499 as answers,
      and two of the six `--dot-*` tones sit at 1.81 and 2.21 with a written
      argument behind them.
-   · IT DOES NOT ASSERT ANYTHING ABOUT STATES IT CANNOT ENTER. `hover:`,
-     `data-[state=open]:` and breakpoint-prefixed grounds are counted and
-     printed, never measured.
+   · IT DOES NOT ASSERT ANYTHING ABOUT A STATE'S GROUND. A `hover:` or
+     `data-[state=open]:` fill is not followed DOWN the tree: what a state's
+     paper does to the children standing on it is still counted and printed
+     rather than measured.
+     WHAT IT DOES ASSERT, SINCE 24 SEP 2026, IS THE ELEMENT'S OWN PAIR IN THAT
+     STATE — its fill against its own label, per state, in both palettes. That
+     is Aurora's ruling of the same day and the section that carries it is
+     `THE STATE PAIR`, in the walk. The distinction is the one this file draws
+     everywhere: an element's own two halves are both in the source, so the
+     pair is derived; what a moved ground does to somebody else's ink is a
+     claim about the tree in a state, and that is still declined.
    · IT DOES NOT ASSERT CO-OCCURRENCE IT CANNOT PROVE. Two conditional fills
      chosen inside ONE component are two props, and a `dot="shipped"` on a
      `variant="destructive"` badge is a product the source never writes. Those
@@ -324,19 +332,38 @@ for (const m of bridge.matchAll(/--text-([a-z0-9-]+)\s*:/g)) TEXT_UTILITY.add(m[
 const GROUND_REBIND = new Map();   // `bg-card` / `data-ground=page` -> Map(token -> value)
 {
   const css = model.raw.replace(/\/\*[\s\S]*?\*\//g, " ");
-  for (const m of css.matchAll(/(^|[};])\s*([^{}@;]+?)\s*\{([^{}]*)\}/g)) {
-    const parts = m[2].split(",").map((s) => s.trim()).filter(Boolean);
+  /* THE SEPARATOR IS LOOKED AT, NOT EATEN — fixed 24 Sep 2026.
+     This read `(^|[};])\s*…`, a capturing group, so the `}` that closed one
+     rule was CONSUMED as the opening context of its match. Two rules written
+     back to back therefore alternated: the next rule had no `}` or `;` left in
+     front of it and was skipped whole, and the one after it matched again on
+     the brace the skipped rule had left behind. §8 is written back to back.
+     MEASURED: of the two `.bg-surface-inverse` rules, only `.bg-surface-inverse
+     *` (the `--focus` flip) was in the map; the block beside it — `--hair`,
+     `--hair-strong`, the nine hairline shapes, and the ink ladder added
+     today — was not in it at all. A lookbehind reads the separator and leaves
+     it in place, so every rule is its own match. */
+  for (const m of css.matchAll(/(?<=^|[};])\s*([^{}@;]+?)\s*\{([^{}]*)\}/g)) {
+    const parts = m[1].split(",").map((s) => s.trim()).filter(Boolean);
     if (!parts.length) continue;
     const keys = [];
     for (const p of parts) {
       let k = null;
       if (/^\.[A-Za-z0-9_-]+$/.test(p)) k = p.slice(1);
-      else if (/^\[data-ground=["']?[A-Za-z0-9_-]+["']?\]$/.test(p)) k = p.slice(1, -1).replace(/["']/g, "");
+      /* `data-surface` joins `data-ground` here, 24 Sep 2026. A selector list
+         is accepted or rejected WHOLE — one unreadable part drops the rule —
+         and §8's inverse block is spelled `.bg-surface-inverse,
+         [data-surface="inverse"]`. So the `--hair` / `--hair-strong` flip that
+         block has carried since the hairline fix was never in this map, and
+         nor would any ink flip written beside it be. The data key is never
+         looked up (rebinds are found by CLASS, `GROUND_REBIND.get(bg.cls)`);
+         admitting it is only what stops it discarding the class half. */
+      else if (/^\[data-(?:ground|surface)=["']?[A-Za-z0-9_-]+["']?\]$/.test(p)) k = p.slice(1, -1).replace(/["']/g, "");
       if (!k) { keys.length = 0; break; }
       keys.push(k);
     }
     if (!keys.length) continue;
-    const decls = [...m[3].matchAll(/(--[A-Za-z0-9-]+)\s*:\s*([^;]+);/g)];
+    const decls = [...m[2].matchAll(/(--[A-Za-z0-9-]+)\s*:\s*([^;]+);/g)];
     if (!decls.length) continue;
     for (const k of keys) {
       const into = GROUND_REBIND.get(k) ?? new Map();
@@ -513,7 +540,7 @@ const counts = {
   nodes: 0, files: FILES.length, components: registry.size,
   conditionalGrounds: 0, unreadableClasses: new Map(),
   styleRebinds: 0, recursionStops: 0, expansions: 0, ambiguousInks: 0, crossBranchSkips: 0, continuations: 0,
-  strokes: 0,
+  strokes: 0, stateHalfPairs: 0,
 };
 const BUDGET = 400_000;
 let exhausted = false;
@@ -612,10 +639,91 @@ function classGroups(node, entry, inject) {
   return groups;
 }
 
+/* ----------------------------------------------------------------------------
+   THE STATE A CLASS IS WRITTEN FOR — `enabled:hover:bg-[…]` -> `hover`.
+
+   Split at the LAST top-level `:`, so the utility comes off whole and an
+   arbitrary value carrying its own colons (`bg-[color-mix(in_srgb,…)]`,
+   `max-[45rem]:`) is not cut in half.
+
+   `enabled:` AND `not-disabled:` ARE DROPPED FROM THE KEY, and that is the one
+   opinion in this function. They are not a state a person can be in; they are a
+   guard the kit wraps around the state so a disabled control does not light up
+   under the pointer (PATTERN.md line 208 says exactly that). To the pixel,
+   `enabled:hover:bg-x` and `hover:bg-y` are the SAME moment, and keying them
+   apart would file one element's fill and its own label in two different rows —
+   which is the failure this whole file exists to stop, one axis over.
+
+   The guard is kept on the side, in `guard`, because it is the difference
+   between a fill a call site can replace and one it cannot: tailwind-merge only
+   resolves two classes it recognises as the same group, and `enabled:hover:bg-`
+   and `hover:bg-` are not that. Both survive the merge, and `:enabled:hover`
+   carries one more pseudo-class than `:hover`, so the guarded one wins on
+   specificity no matter which order they are emitted in. MEASURED, with this
+   repo's own `tailwind-merge`:
+
+       twMerge("enabled:hover:bg-[var(--btn-secondary-hover)]",
+               "hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)]")
+         -> BOTH kept, and the guarded one paints
+       twMerge("hover:bg-[var(--btn-secondary-hover)]",
+               "hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)]")
+         -> the caller's, alone
+
+   PATTERN.md §1 promises "the caller's className goes last so a call site can
+   always win". For a colour in a state, the guard quietly made that untrue.
+   ------------------------------------------------------------------------- */
+const STATE_GUARD = /^(?:enabled|not-disabled)$/;
+
+function statePartsOf(raw) {
+  let depth = 0;
+  let last = -1;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === "[") depth++;
+    else if (ch === "]") depth--;
+    else if (ch === ":" && depth === 0) last = i;
+  }
+  if (last < 0) return null;
+  const segs = [];
+  let depth2 = 0;
+  let from = 0;
+  const head = raw.slice(0, last);
+  for (let i = 0; i <= head.length; i++) {
+    const ch = head[i];
+    if (ch === "[") depth2++;
+    else if (ch === "]") depth2--;
+    else if ((ch === ":" && depth2 === 0) || i === head.length) { segs.push(head.slice(from, i)); from = i + 1; }
+  }
+  const guard = segs.filter((s) => STATE_GUARD.test(s));
+  const state = segs.filter((s) => !STATE_GUARD.test(s)).join(":");
+  return { state, guard: guard.length > 0, util: raw.slice(last + 1) };
+}
+
 function readGroup(text) {
   const { kept, conditional } = splitClasses(text);
   const any = kept.length > 0;
   counts.conditionalGrounds += conditional.filter((c) => /:(bg|text)-/.test(c)).length;
+
+  /* WHAT THIS GROUP PAINTS IN A STATE IT IS NOT IN AT REST.
+     One entry per state, carrying whichever half of the pair that state
+     names. The half it does not name is the rest state's — which is the whole
+     subject: a fill that moves while its label stays. */
+  const states = new Map();
+  for (const raw of conditional) {
+    const p = statePartsOf(raw);
+    if (!p || !p.state) continue;
+    const bg = colourOf(p.util, "bg");
+    const tx = colourOf(p.util, "text");
+    const hasBg = Boolean(bg?.token || bg?.literal);
+    const hasTx = Boolean(tx?.token || tx?.literal);
+    if (!hasBg && !hasTx) continue;
+    const s = states.get(p.state) ?? { ground: null, ink: null, guard: false };
+    /* LAST WINS INSIDE ONE STATE, exactly as it does at rest. */
+    if (hasBg) s.ground = bg;
+    if (hasTx) s.ink = tx;
+    s.guard = s.guard || p.guard;
+    states.set(p.state, s);
+  }
   let ground = null;
   let stroke = null;
   const inks = [];
@@ -645,7 +753,7 @@ function readGroup(text) {
     if (tx?.token || tx?.literal) { inks.length = 0; inks.push(tx); }
     else if (tx?.unreadable) note(tx.unreadable);
   }
-  return { ground, stroke, inks, any, props };
+  return { ground, stroke, inks, any, props, states };
 }
 
 function note(cls) {
@@ -654,7 +762,7 @@ function note(cls) {
 
 const keyOf = (c) => (c ? c.token ?? c.literal : null);
 
-function record(kind, fg, bg, node, chain) {
+function record(kind, fg, bg, node, chain, state = null) {
   const fgKey = keyOf(fg);
   const bgKey = keyOf(bg);
   if (!fgKey || !bgKey) return;
@@ -692,7 +800,12 @@ function record(kind, fg, bg, node, chain) {
     const rb = GROUND_REBIND.get(bg.cls);
     if (rb) strokeExpr = strokeExpr.replace(/var\(\s*(--[A-Za-z0-9-]+)\s*\)/g, (all, t) => rb.get(t) ?? all);
   }
-  const key = `${kind}|${fgKey}|${bgKey}${rebound ? `|${fgExpr}|${bgExpr}` : ""}${strokeExpr ? `|+${strokeExpr}` : ""}`;
+  /* THE STATE IS PART OF THE KEY. A hover pair and a rest pair that happen to
+     name one fill are two different moments on the screen, and collapsing them
+     would let the rest state — which is almost always the correct one — answer
+     for the state nobody measured. That is the same first-wins accident as
+     `--surface-record-footer`, one axis over. */
+  const key = `${kind}|${state ?? ""}|${fgKey}|${bgKey}${rebound ? `|${fgExpr}|${bgExpr}` : ""}${strokeExpr ? `|+${strokeExpr}` : ""}`;
   const at = `${path.relative(ROOT, node.file)}:${node.line}`;
   const existing = pairs.get(key);
   if (existing) {
@@ -701,7 +814,8 @@ function record(kind, fg, bg, node, chain) {
     return;
   }
   pairs.set(key, {
-    kind, fg: fgKey, bg: bgKey, fgExpr, bgExpr, rebound, strokeExpr,
+    kind, state, fg: fgKey, bg: bgKey, fgExpr, bgExpr, rebound, strokeExpr,
+    guard: fg.guard || bg.guard || false,
     where: [at], seen: 1, chain: chain ?? "—",
     /* Whether either side is one option among several. A conditional pair is
        still a real pair — it is how a component behaves in one of its states —
@@ -854,6 +968,95 @@ function walk(node, grounds, entry, slots, inject, stack, consumed, chain, rebin
     }
   }
 
+  /* ==========================================================================
+     THE STATE PAIR — Aurora, 24 Sep 2026, verbatim:
+
+         "when button color is black, text should be white (i saw this on the
+          refresh button in dark mode when hover) fix it and make it rule"
+
+     WHY IT IS HERE AND NOT IN A FILE OF ITS OWN. This file's own list of what
+     it deliberately does not assert began, until today, with:
+
+         "IT DOES NOT ASSERT ANYTHING ABOUT STATES IT CANNOT ENTER. `hover:`,
+          `data-[state=open]:` and breakpoint-prefixed grounds are counted and
+          printed, never measured."
+
+     459 of them, on the run before this section was written. A fifth law
+     measuring the same tokens with the same resolver against the same tiers
+     would be a second opinion about what a token resolves to, which is the
+     exact failure the header of this file was written to refuse. So the state
+     is not a new subject. It is an AXIS on the subject this file already has:
+     a pair is a fill and the thing drawn on it, and an element has one of
+     those per state, not one in total.
+
+     AND THE KIT HAS ALREADY PAID FOR THIS ONCE. §8 of tokens.css carries the
+     post-mortem of a hover fill that was shadowed by a ground scope, with the
+     numbers still in it:
+
+         no ground scope      14.930    9.944  ✔
+         [data-ground=page]   14.930    1.165  ✘
+
+     "In dark the button rested at #1C1B18 and hovered to a near-white #F1ECE4
+     while its label stayed #FFFEF9 — the label disappeared on hover on every
+     secondary button on a scoped ground." That was found by a person looking,
+     it was fixed, and nothing was added that would find it again. This is the
+     thing that would have.
+
+     WHAT A STATE PAIR IS. For each state a group names, the fill is that
+     state's own `bg-` if it writes one and the rest state's otherwise, and the
+     label is that state's own `text-` if it writes one and the rest state's
+     otherwise. That asymmetry IS the bug class: a fill that moves under a
+     label that does not, or a label that moves over a fill that does not. A
+     state that changes neither half is not recorded, and a state whose pair is
+     identical to the rest pair is dropped, because the rest pair is measured
+     three lines above and one number printed twice reads as two findings.
+
+     NO STATE IS CROSSED WITH ANOTHER. `hover:bg-x` and `focus-visible:text-y`
+     are two moments, and the fill of one against the label of the other is a
+     screen nothing can draw — the same refusal `crossBranchSkips` already
+     makes for two props.
+     ====================================================================== */
+  for (const g of groups) {
+    if (!g.states?.size) continue;
+    /* The rest halves this group's states fall back to. A group with a ground
+       of its own is the honest base; otherwise the element's unconditional
+       ground, and otherwise the ground it stands on. The label is this group's
+       own, or the one the call site merged over it (`inject.inks` — the law
+       already models caller-wins for an ink, and a state does not change
+       that). */
+    /* A FALLBACK GROUND MUST BE TRUE IN EVERY BRANCH, or the state pair is two
+       branches crossed. `mode-toggle`'s selected segment is written as an ARRAY
+       constant, and §3b makes each string its own alternative — so
+       `"enabled:hover:text-ink-on-inverse"` arrives as a group with an ink and
+       no fill of its own, one line below the group that carries both. Falling
+       back to whatever ground stood above it measured that hover ink on the
+       DISABLED track (`--ink-on-inverse` on `--btn-disabled-fill`, 1.420 light
+       / 1.276 dark) — a selected, hovered segment inside a disabled group,
+       which `SEGMENT_DISABLED` replaces the ink of and no screen can draw.
+       So an ancestor ground is only borrowed when it is UNCONDITIONAL, which
+       is the same refusal the ink loop above makes and for the same reason. */
+    const firmGround = (c) => (c && !c.cond ? c : null);
+    const baseFill = withExpr(g.ground) ?? (unconditional ? withExpr(unconditional) : null)
+      ?? (inject?.grounds?.length === 1 ? firmGround(inject.grounds[0]) : null)
+      ?? (grounds.length === 1 ? firmGround(grounds[0]) : null);
+    const baseInk = g.inks.length
+      ? withExpr(g.inks[0])
+      : (inject?.inks?.length === 1 ? inject.inks[0] : null);
+
+    for (const [state, s] of g.states) {
+      const fill = s.ground ? withExpr(s.ground) : baseFill;
+      const ink = s.ink ? withExpr(s.ink) : baseInk;
+      /* A HALF IS NOT A PAIR. A state that moves a fill on an element whose
+         label is written somewhere this walker cannot see is counted, not
+         guessed at — the same answer this file gives everywhere else it
+         cannot prove the other side. */
+      if (!fill || !ink) { counts.stateHalfPairs++; continue; }
+      if (keyOf(fill) === keyOf(baseFill) && keyOf(ink) === keyOf(baseInk)) continue;
+      if (keyOf(fill) === keyOf(ink)) { /* same name both sides: still a pair, and a 1.000 one */ }
+      record("ink", { ...ink, guard: s.guard }, { ...fill, guard: s.guard }, node, nextChain, state);
+    }
+  }
+
   /* A registered component is EXPANDED in place: its own tree is walked here,
      carrying this ground, with this call site's variant and className applied
      to its root and this call site's children handed to its `{children}`. */
@@ -1000,6 +1203,28 @@ const EXEMPT = [
       "need to read; making it legible is how a disabled control stops " +
       "looking disabled.",
   },
+  {
+    /* ADDED 2026-09-24, with the state axis that produced it, and it is the
+       state axis that also DISCHARGES it. */
+    tier: "ink",
+    fg: /^--ink-on-inverse$/,
+    bg: ["--card"],
+    where: /components\/checkbox\/checkbox\.tsx/,
+    why:
+      "The mark is not drawn at rest. `checkboxVariants` writes " +
+      "`text-ink-on-inverse` on the Root so that the tick and the bar INHERIT " +
+      "it — the file says so in as many words, 'The tick and the bar inherit " +
+      "this' — and Radix renders `CheckboxPrimitive.Indicator`, the only thing " +
+      "that ink ever colours, ONLY in the checked and indeterminate states. " +
+      "In those states the fill is not `--card` at all: the same declaration " +
+      "block flips it to `--surface-inverse`, and this run measures that pair " +
+      "on its own two rows, 17.386 in BOTH palettes. So the rest pair is an " +
+      "ink with nothing to paint, and the pair a person can actually see is " +
+      "the highest-contrast pair in the kit. This is exempt because the glyph " +
+      "does not exist, not because 1.000 is acceptable — and it is keyed to " +
+      "this one component, so the same two tokens meeting anywhere else is " +
+      "still a finding.",
+  },
   /* ── THE SECOND ENTRY IS RETIRED, 21 SEP 2026, AND THIS CHECK IS WHAT
      CAUGHT IT. It read, in full:
 
@@ -1041,7 +1266,13 @@ function exemptionFor(pair, tier) {
     (e) =>
       e.tier === tier &&
       (e.fg instanceof RegExp ? e.fg.test(pair.fg) : e.fg === pair.fg) &&
-      (e.bg === null || e.bg.includes(pair.bg)),
+      (e.bg === null || e.bg.includes(pair.bg)) &&
+      /* `where` NARROWS an exemption to the component that argued for it, so a
+         pair of tokens excused in one file is still a finding everywhere else.
+         Matched against the FILE, never a line: a `file:line` key rots on the
+         next edit above it, and an exemption that silently stops matching is
+         the failure the "both ways" check below exists to catch. */
+      (!e.where || pair.where.some((w) => e.where.test(w))),
   );
 }
 
@@ -1427,7 +1658,7 @@ const banner = (s) => `\n${s}\n${"-".repeat(s.length)}`;
 const num = (n) => n.toFixed(3);
 
 const line = (r) =>
-  `  ${num(r.ratio).padStart(7)}  ${r.tier.padEnd(8)} ${r.theme.padEnd(5)} ` +
+  `  ${num(r.ratio).padStart(7)}  ${(r.state ? `${r.tier}:${r.state}` : r.tier).padEnd(8)} ${r.theme.padEnd(5)} ` +
   `${r.fg.padEnd(30)} ${r.fgHex}  on  ${r.bg.padEnd(24)} ${r.bgHex}\n` +
   `            ${r.where.join("  ")}${r.chain && r.chain !== "—" ? `   under  ${r.chain}` : ""}` +
   /* A rebound token is printed with the value it takes ON THIS GROUND, or the
@@ -1458,7 +1689,11 @@ for (const e of EXEMPT) if (!e.fired) hard.push(`ROTTEN EXEMPTION — ${e.tier} 
 console.log(banner("contrast law"));
 console.log(`  files walked             ${counts.files}`);
 console.log(`  components expanded      ${counts.components} definitions, ${counts.expansions} expansions, ${counts.nodes} nodes`);
+const statePairs = [...pairs.values()].filter((p) => p.state);
+const stateNames = [...new Set(statePairs.map((p) => p.state))].sort();
 console.log(`  pairs derived            ${pairs.size}  (${pairs.size * 2} measurements, both palettes)`);
+console.log(`  of those, state pairs    ${statePairs.length}  — a control's fill against its OWN label, per state`);
+console.log(`      states seen          ${stateNames.join(" · ") || "none"}`);
 console.log(`  tiers                    ink ${TIERS.ink.floor} · mark ${TIERS.mark.floor} · boundary ${TIERS.boundary.floor} · hairline ${TIERS.hairline.floor}`);
 console.log(`  regression set           ${REGRESSIONS.length} fixtures — pre-fix value, then the tree as it stands`);
 for (const r of REGRESSIONS)
@@ -1479,7 +1714,8 @@ for (const d of DISCHARGES)
 console.log(`  strokes read             ${counts.strokes}   (shadow-[…] classes resolved to a box-shadow)`);
 
 console.log(banner("what this run could not see"));
-console.log(`  state / breakpoint grounds   ${counts.conditionalGrounds}   (hover:, max-[45rem]:, data-[state=…]:)`);
+console.log(`  state / breakpoint grounds   ${counts.conditionalGrounds}   (hover:, max-[45rem]:, data-[state=…]: — as a ground for OTHER elements' ink)`);
+console.log(`  state halves with no partner ${counts.stateHalfPairs}   (a state that moves one half of a pair the source does not show both of)`);
 console.log(`  inline style / var rebinds   ${counts.styleRebinds}   (a ground changed by a custom property, not a class)`);
 console.log(`  cross-branch pairs declined  ${counts.crossBranchSkips + counts.ambiguousInks}   (both sides conditional; co-occurrence unproven)`);
 console.log(`  continuations (same token)   ${counts.continuations}   (a ground repeating its own ground: a mask, not a step)`);

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.166",
-  "sha": "98aeeb346461a73289d084df3810745495d176cd",
-  "syncedAt": "2026-09-23"
+  "tag": "v1.2.167",
+  "sha": "0980626015bcae890086bced18289c7e36b2f86b",
+  "syncedAt": "2026-09-24"
  },
- "generatedAt": "2026-09-23T18:48:19.708Z",
+ "generatedAt": "2026-09-24T07:06:32.102Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -18,8 +18,8 @@
   "typedBooleanProps": 323,
   "compositions": 47,
   "icons": 1514,
-  "tokens": 373,
-  "tokenDeclarations": 575,
+  "tokens": 376,
+  "tokenDeclarations": 587,
   "unresolved": 0
  },
  "components": [
@@ -1347,50 +1347,50 @@
     {
      "file": "components/button/button.tsx",
      "name": "buttonVariants",
-     "line": 64,
-     "base": "inline-flex shrink-0 items-center justify-center gap-2 border-0 cursor-pointer rounded-pill whitespace-nowrap select-none text-sm leading-none font-[var(--font-weight-medium)] transition-[background-color,color,text-decoration-color,transform] duration-[var(--duration-colour)] ease-kwapso [&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0 enabled:active:translate-y-[0.0625rem]",
+     "line": 136,
+     "base": "inline-flex shrink-0 items-center justify-center gap-2 border-0 cursor-pointer rounded-pill whitespace-nowrap select-none text-sm leading-none font-[var(--font-weight-medium)] transition-[background-color,color,text-decoration-color,transform] duration-[var(--duration-colour)] ease-kwapso [&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0 active:translate-y-[0.0625rem] disabled:active:translate-y-0",
      "groups": [
       {
        "name": "variant",
        "options": [
         {
          "name": "default",
-         "classes": "bg-[var(--btn-primary-fill)] text-[var(--btn-primary-label)] enabled:hover:bg-[var(--btn-primary-hover)] enabled:active:bg-[var(--btn-primary-pressed)]",
+         "classes": "bg-[var(--btn-primary-fill)] text-[var(--btn-primary-label)] hover:bg-[var(--btn-primary-hover)] active:bg-[var(--btn-primary-pressed)] disabled:hover:bg-[var(--btn-primary-fill)] disabled:active:bg-[var(--btn-primary-fill)]",
          "note": "`.kw-btn--primary` — mango fill, charcoal label. The one brand fill."
         },
         {
          "name": "secondary",
-         "classes": "bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)] enabled:hover:bg-[var(--btn-secondary-hover)]",
+         "classes": "bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)] hover:bg-[var(--btn-secondary-hover)] disabled:hover:bg-[var(--btn-secondary-fill)]",
          "note": "`.kw-btn--secondary` — a FILLED button in the other paper tone. Not an outline. Which tone \"the other\" is depends on the band the button sits in; a container re-resolves `--btn-secondary-fill` (kit GAP-10). No pressed token exists, so pressed is the nudge only."
         },
         {
          "name": "destructive",
-         "classes": "bg-[var(--btn-destructive-fill)] text-[var(--btn-destructive-label)] enabled:hover:bg-[var(--btn-destructive-hover)]",
+         "classes": "bg-[var(--btn-destructive-fill)] text-[var(--btn-destructive-label)] hover:bg-[var(--btn-destructive-hover)] disabled:hover:bg-[var(--btn-destructive-fill)]",
          "note": "`.kw-btn--destructive` — solid poppy, CHARCOAL label. Not white on red."
         },
         {
          "name": "text",
-         "classes": "bg-transparent text-foreground underline underline-offset-[0.1875rem] decoration-hair-strong enabled:hover:decoration-[var(--foreground)]",
+         "classes": "bg-transparent text-foreground underline underline-offset-[0.1875rem] decoration-hair-strong hover:decoration-[var(--foreground)] disabled:hover:decoration-hair-strong",
          "note": "`.kw-btn--text` — a quiet action. Ink, permanently underlined on a faint rule."
         },
         {
          "name": "ghost",
-         "classes": "bg-transparent text-ink-tertiary enabled:hover:text-foreground",
+         "classes": "bg-transparent text-ink-tertiary hover:text-foreground disabled:hover:text-ink-tertiary",
          "note": "ch26 · 01, verbatim: \"Ghost / text link. Muted ink (fg3), darkens to full ink on hover. Used for tertiary moves like 'Skip' or a breadcrumb crumb.\" So: tertiary ink, no fill, and the hover is the ink going to full — not a wash. The `--accent` wash this variant used to carry was derived, not drawn (GAPS.md BTN-1), and it is the chapter's stated treatment that wins. Logged as GAPS-TRACK1 BTN-2 because it also removes the only hover an icon-only ghost had, and ch26 says an icon-only control is `secondary` anyway."
         },
         {
          "name": "link",
-         "classes": "bg-transparent text-inherit no-underline underline-offset-[0.1875rem] enabled:hover:underline",
+         "classes": "bg-transparent text-inherit no-underline underline-offset-[0.1875rem] hover:underline disabled:hover:no-underline",
          "note": "`.kw-link` — inherits its ink, underlines on hover, occupies no box."
         },
         {
          "name": "inverse",
-         "classes": "bg-[var(--btn-inverse-fill)] text-[var(--btn-inverse-label)] enabled:hover:bg-[var(--btn-inverse-hover)]",
+         "classes": "bg-[var(--btn-inverse-fill)] text-[var(--btn-inverse-label)] hover:bg-[var(--btn-inverse-hover)] disabled:hover:bg-[var(--btn-inverse-fill)]",
          "note": "`.kw-btn--inverse` — charcoal fill, off-beige label. Flips with the palette."
         },
         {
          "name": "cancel",
-         "classes": "bg-[var(--btn-cancel-fill)] text-[var(--btn-cancel-label)] enabled:hover:bg-[var(--btn-cancel-hover)]",
+         "classes": "bg-[var(--btn-cancel-fill)] text-[var(--btn-cancel-label)] hover:bg-[var(--btn-cancel-hover)] disabled:hover:bg-[var(--btn-cancel-fill)]",
          "note": "`.kw-btn--cancel` — the quiet dismissal beside a primary."
         }
        ]
@@ -1436,7 +1436,7 @@
        "when": {
         "variant": "link"
        },
-       "classes": "h-auto p-0 enabled:active:translate-y-0"
+       "classes": "h-auto p-0 active:translate-y-0"
       }
      ],
      "unresolved": [],

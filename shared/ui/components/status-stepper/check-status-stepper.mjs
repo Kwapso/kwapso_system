@@ -67,22 +67,65 @@
    other `check-*.mjs` in this kit uses (no jsdom/testing-library here — a
    static read of the source, not a mounted render).
 
-   THE UNDERLINE, ADDED THE SAME DAY, IMMEDIATELY AFTER THE SECOND FIX. Her
-   second ruling is about what the MARK contains, nothing more, and removing
-   the number from it is correct on its own terms. But once neither the fill
-   nor the glyph told `isDone` from `isCurrent` apart, this ladder — whose
-   whole job is saying where a record stands — had no visible mark of
-   position left for a sighted reader glancing at the row. She did not ask
-   for that regression and would have noticed it inside a minute. The fix
-   is on the LABEL, not the mark: `isCurrent`'s label takes `underline
-   underline-offset-[0.1875rem] decoration-hair-strong` — the kit's own
-   existing "ink, underlined, never coloured" idiom (`button.tsx`'s
-   text-link variant, `article-body.tsx`'s in-copy links), not an invented
-   one, and not a colour — `--hair-strong` is a neutral ink-hairline token.
-   The mark stays exactly what the second fix leaves it: a tick on ink or an
-   empty grey circle, nothing added there.
+   THE UNDERLINE WAS ADDED THE SAME DAY, IMMEDIATELY AFTER THE SECOND FIX,
+   AND IT WAS TAKEN OUT AGAIN ON 24 SEP 2026 — SECTION 6 NOW REFUSES IT.
+   Her second ruling is about what the MARK contains, nothing more, and
+   removing the number from it is correct on its own terms. But once neither
+   the fill nor the glyph told `isDone` from `isCurrent` apart, the 23 Sep
+   pass judged the ladder had no visible mark of position left for a sighted
+   reader, and underlined `isCurrent`'s LABEL to put one back — the kit's own
+   "ink, underlined, never coloured" idiom, but nothing she asked for.
 
-   SIX SECTIONS. 1 pins the horizontal `steps` mark's fill and weight (the
+   THE THIRD RULING, VERBATIM, 24 SEP 2026: "on tickets stage, why is done
+   underlined? also date is missing. icon on completed stages shoudl be
+   phospor check regular."
+
+   A question about a mark she never asked for is a rejection, so the
+   underline is gone from BOTH `steps` windows and section 6 — which used to
+   REQUIRE it — now REFUSES it, while still requiring the weight class that
+   sat beside it and predates both 23 Sep rulings.
+
+   WHAT IS LEFT MARKING THE CURRENT STEP, MEASURED. `aria-current="step"`
+   (a screen reader only); `font-[var(--font-weight-medium)]` on the current
+   mark and label; and the row's own ordering. The weight is worth NOTHING in
+   `kwapso_system`: Saans ships two faces (300, 500), the app sets no base
+   font-weight, and CSS font matching resolves the UA's `normal` (400) to the
+   500 face. Measured in a browser against these two faces at 13px:
+   "In progress" is 50.375px wide at 300 and 51.984px at 400, at 500 and at
+   `normal` — three identical numbers. The kit's own demo sets body to
+   `--font-weight-light`, which is why the signal looks alive here and is dead
+   on the ticket screen. Filed back to Aurora rather than replaced with a
+   second uninvited mark; this check pins the absence, not a substitute.
+
+   THE GLYPH, HER THIRD SENTENCE. The mark drew `CheckFat` — Phosphor's
+   SEPARATE `check-fat` glyph at FILL weight, a tick knocked out of a plate.
+   It now draws `Check`, Phosphor's `check`, which this kit has shipped at
+   REGULAR weight since 6 Sep 2026 (`foundations/icons/ATTRIBUTION.md`
+   §Weight). No new exception was minted; what was wrong was the prose in
+   `icon-base.tsx` and `generate-icons.mjs` still claiming the exception list
+   was "three named exceptions — Plus, Power and Prohibit", 108 files out of
+   date. Section 7 pins the name AND the weight, the latter by reading
+   `foundations/icons/icon-art.manifest.json` — so a later edit cannot satisfy
+   "it says Check" while `Check.svg` has been flipped back to fill.
+
+   THE DATE, HER SECOND SENTENCE — WHAT THIS FILE CAN AND CANNOT PIN. The
+   date is not drawn by this kit. `kwapso_system`'s
+   `web/components/tickets/ticket-stages.tsx` hands each stage a `label` that
+   is TWO `block` children, the stage name over `formatStageMoment(rung.span
+   .from)`, and draws the second only for a rung with a recorded span. What
+   the KIT owes that drawing is the half section 8 pins: the `steps` label
+   renders the caller's whole `ReactNode` inside a `block w-full truncate`
+   box, so each `block` child takes its own line and its own ellipsis. A
+   later edit that clamped this label to one line, or rendered anything less
+   than `{stage.label}`, would delete the date from every ticket in the
+   product from inside this file. Measured, 24 Sep 2026, in a real render
+   (`web/test/ticket-stages-shrink.test.tsx`, passing, plus a throwaway probe
+   over three histories): the date is present on every rung that has a
+   recorded span and absent only where there is none — a stage the ticket
+   never stood on, or a ticket whose history predates team migration 0066.
+   Nothing in either 23 Sep fix touched it.
+
+   EIGHT SECTIONS. 1 pins the horizontal `steps` mark's fill and weight (the
    ticket ladder's own drawing). 2 pins the same for the vertical wizard
    rail's mark (the identical fill logic, checked separately so a fix
    applied to only one block cannot pass). 3 pins that `stages` is untouched
@@ -91,16 +134,23 @@
    `isDone` and `isCurrent` through the identical `CheckFat`-tick branch and
    REFUSES `formatNumber(index + 1)` appearing anywhere in either `steps`
    mark window, so a number cannot come back to this variant even by adding
-   a new branch rather than editing the old one. 6 pins the underline itself
-   — REQUIRES the exact class string on `isCurrent`'s LABEL in both `steps`
-   windows, so it cannot be deleted later as apparent leftover decoration;
-   it is the row's only remaining visible mark of position for a sighted
-   reader. Every REFUSES check in this file was proved to bite this pass by
-   putting the retired code back (the mango class in sections 1/2, a
-   `formatNumber` branch in section 5, the underline class removed in
-   section 6), confirming `npm run check`'s status-stepper step fails red
-   each time, then restoring `status-stepper.tsx` from a `cp` backup taken
-   before the edit.
+   a new branch rather than editing the old one. 6 is her third ruling's first half — it
+   REFUSES any `underline` / `decoration-` / `underline-offset-` on either
+   `steps` LABEL, and still REQUIRES the `font-[var(--font-weight-medium)]`
+   that predates both 23 Sep rulings, so the removal cannot be undone and the
+   weight cannot be dropped with it. 7 is her third ruling's second half: the
+   `steps` mark must draw `Check`, imported from `foundations/icons`, never
+   `CheckFat`, and `icon-art.manifest.json` must still record `Check` as
+   Phosphor's `check` at REGULAR weight — the name and the weight, pinned
+   apart. 8 is the kit's half of her second sentence: both `steps` labels must
+   render `{stage.label}` whole, the horizontal one inside `block w-full
+   truncate`, with no `line-clamp` anywhere in either label — the contract the
+   app's two-line name-over-date label depends on. Every REFUSES check in this
+   file was proved to bite by putting the retired code back (the mango class
+   in sections 1/2, a `formatNumber` branch in section 5, the underline class
+   in section 6, `CheckFat` and a fill-weight manifest entry in section 7, a
+   `line-clamp-1` in section 8), confirming the status-stepper step fails red
+   each time, then restoring from a `cp` backup taken before the edit.
    ========================================================================= */
 
 import fs from "node:fs";
@@ -146,6 +196,18 @@ const stagesPillWindow = pillClassesIdx === -1 ? "" : src.slice(pillClassesIdx);
 function markOnlyWindow(window) {
   const laterIdx = window.indexOf("!isDone && !isCurrent");
   return laterIdx === -1 ? window : window.slice(0, laterIdx);
+}
+
+/* The LABEL's own window inside a mark block — from its `data-slot` to the
+   end of the `cn(...)` + children that draw it. Sections 6 and 8 need the
+   label ALONE: the mark above it legitimately carries the weight class, and
+   `status-stepper.tsx`'s own prose around the mark now narrates the retired
+   underline at length. Cut positionally by the slot name, never by line. */
+function labelWindow(window) {
+  const start = window.indexOf('data-slot="status-stepper-label"');
+  if (start === -1) return "";
+  const end = window.indexOf("{stage.label}", start);
+  return end === -1 ? window.slice(start) : window.slice(start, end + "{stage.label}".length);
 }
 
 /* Block comments stripped before any DRIFT check — this file's own doc
@@ -282,7 +344,7 @@ for (const [label, window] of [
    whether by editing the old branch or by adding a new one beside it.
    ========================================================================= */
 const tickBranchRe =
-  /isDone \|\| isCurrent \? \(\s*<>\s*\{isDone \? <span className="sr-only">\{doneLabel\}<\/span> : null\}\s*<CheckFat size=\{16\} aria-hidden="true" \/>\s*<\/>\s*\) : null\}/;
+  /isDone \|\| isCurrent \? \(\s*<>\s*\{isDone \? <span className="sr-only">\{doneLabel\}<\/span> : null\}\s*<Check size=\{16\} aria-hidden="true" \/>\s*<\/>\s*\) : null\}/;
 for (const [label, rawWindow] of [
   ["horizontal steps", horizontalMarkWindow],
   ["vertical wizard rail", verticalMarkWindow],
@@ -300,7 +362,7 @@ for (const [label, rawWindow] of [
   if (!tickBranchRe.test(rawWindow)) {
     findings.push(
       `${rel}'s ${label} mark does not draw isDone and isCurrent through the identical ` +
-        '"isDone || isCurrent ? (…CheckFat…) : null" tick branch — Aurora, 23 Sep 2026 (second ruling, reviewing ' +
+        '"isDone || isCurrent ? (…Check…) : null" tick branch — Aurora, 23 Sep 2026 (second ruling, reviewing ' +
         'kit v1.2.164): "remove the numbers inside (they are not numbered) is either check or empty." A reached ' +
         "stage must draw a check on the ink fill; nothing else may distinguish it.",
     );
@@ -315,34 +377,184 @@ for (const [label, rawWindow] of [
 }
 
 /* ============================================================================
-   6 · THE UNDERLINE — added the SAME day as section 5's fix, once removing
-   the number left the row with no visible mark of position at all for a
-   sighted reader (see the law block's own bullet in status-stepper.tsx).
-   REQUIRES `isCurrent`'s LABEL, in both `steps` windows, to carry the exact
-   class string — comments stripped first, the same reason section 5 strips
-   them: this file's own doc prose quotes `decoration-hair-strong` while
-   explaining the fix, and that quotation must not satisfy the pin on its
-   own. This is the one thing standing between the ladder and a current step
-   nobody can find at a glance, so it is pinned as strictly as the fill and
-   the glyph are — a later "cleanup" that treats it as decoration is exactly
-   what this section exists to catch.
+   6 · NOTHING IS UNDERLINED — Aurora, 24 SEP 2026, verbatim: "on tickets
+   stage, why is done underlined?"
+
+   THIS SECTION USED TO REQUIRE THE OPPOSITE, AND THAT IS THE POINT OF THE
+   NOTE. It was written on 23 Sep 2026 to stop a later "cleanup" quietly
+   dropping an underline the same pass had just added — an underline no
+   ruling asked for, added because removing the number left `isDone` and
+   `isCurrent` drawing the identical fill and the identical glyph. She asked
+   why it was there. So the pin is inverted: the class is REFUSED, in both
+   `steps` LABEL windows, and the weight class that sat beside it (and
+   predates both 23 Sep rulings) is still REQUIRED, so the removal cannot be
+   undone by hand and the weight cannot be swept out with it.
+
+   Comments are stripped before the REFUSAL, the same reason sections 5 and 7
+   strip them: both this file's header and `status-stepper.tsx`'s own render-
+   site comment now narrate the underline at length, by name, in backticks,
+   and none of that prose may trip a guard about the working code.
    ========================================================================= */
-const underlineRe =
-  /isCurrent &&\s*\n\s*"font-\[var\(--font-weight-medium\)\] underline underline-offset-\[0\.1875rem\] decoration-hair-strong"/;
+const labelWeightRe = /isCurrent && "font-\[var\(--font-weight-medium\)\]"/;
 for (const [label, rawWindow] of [
   ["horizontal steps", horizontalMarkWindow],
   ["vertical wizard rail", verticalMarkWindow],
 ]) {
   if (rawWindow === "") {
-    findings.push(`Could not isolate the ${label} mark's full window in ${rel} to check section 6.`);
+    findings.push(`Could not isolate the ${label} step's full window in ${rel} to check section 6.`);
     continue;
   }
-  if (!underlineRe.test(codeOnly(rawWindow))) {
+  const window = codeOnly(labelWindow(rawWindow));
+  if (window === "") {
     findings.push(
-      `${rel}'s ${label} step's LABEL no longer carries isCurrent && "font-[var(--font-weight-medium)] underline ` +
-        'underline-offset-[0.1875rem] decoration-hair-strong" — once her second ruling took the number out of the ' +
-        "mark, this underline became the row's only remaining visible mark of position for a sighted reader; " +
-        "dropping it as apparent decoration leaves a ladder where nobody can tell where the record stands.",
+      `Could not isolate the ${label} step's LABEL window in ${rel} (no data-slot="status-stepper-label") to ` +
+        "check section 6.",
+    );
+    continue;
+  }
+  if (/underline|decoration-|underline-offset-/.test(window)) {
+    findings.push(
+      `${rel}'s ${label} step's LABEL is underlined again — Aurora, 24 Sep 2026: "on tickets stage, why is done ` +
+        'underlined?" That underline was added on 23 Sep 2026 by the pass that removed the number from the mark, ' +
+        "to replace the position signal the removal cost; she never asked for it and asking why it is there is a " +
+        "rejection. If a visible mark of position is put back, it needs her ruling and this pin rewritten to " +
+        "match — not an underline reintroduced under the old argument.",
+    );
+  }
+  if (!labelWeightRe.test(window)) {
+    findings.push(
+      `${rel}'s ${label} step's LABEL no longer carries isCurrent && "font-[var(--font-weight-medium)]" — that ` +
+        "weight predates both 23 Sep 2026 rulings and was not part of the underline; removing the underline must " +
+        "not take it too. (Measured 24 Sep 2026: it is a no-op in kwapso_system, whose <body> sets no " +
+        "font-weight, so the UA's normal resolves to Saans's 500 face and every label on the row is already " +
+        "Medium. It still reads in the kit's own demo, which sets body to --font-weight-light. The gap is filed " +
+        "back to Aurora, not patched here.)",
+    );
+  }
+}
+
+/* ============================================================================
+   7 · THE TICK IS PHOSPHOR'S `Check`, AT REGULAR WEIGHT — Aurora, 24 SEP
+   2026, verbatim: "icon on completed stages shoudl be phospor check
+   regular."
+
+   TWO PINS, DELIBERATELY APART. The NAME is pinned in this file's source
+   (the import, and the absence of `CheckFat` from either mark's code); the
+   WEIGHT is pinned against `foundations/icons/icon-art.manifest.json`, which
+   records every glyph's verified upstream name and weight as data and is
+   itself enforced offline by `check-icon-art.mjs`. Pinning only the name
+   would pass the day somebody re-drew `Check.svg` at fill weight, which is
+   exactly the defect ATTRIBUTION.md records shipping once before ("a rounded
+   rectangle 208 units across with the tick knocked out of it").
+
+   `CheckFat` IS NOT A HEAVIER `Check`. It is Phosphor's own separate glyph
+   `check-fat`, at fill weight. Her word is `check`, which is the name on
+   phosphor.dev, which is the name in this folder — no alias, no translation.
+   ========================================================================= */
+{
+  if (!/^import \{ Check \} from "\.\.\/\.\.\/foundations\/icons";$/m.test(src)) {
+    findings.push(
+      `${rel} does not import { Check } from "../../foundations/icons" — Aurora, 24 Sep 2026: "icon on completed ` +
+        'stages shoudl be phospor check regular." `Check` is Phosphor\'s `check`, which this kit ships at regular ' +
+        "weight; the glyph this file drew before her ruling, `CheckFat`, is Phosphor's separate `check-fat` at " +
+        "fill weight.",
+    );
+  }
+  for (const [label, rawWindow] of [
+    ["horizontal steps", horizontalMarkWindow],
+    ["vertical wizard rail", verticalMarkWindow],
+  ]) {
+    if (rawWindow !== "" && /CheckFat/.test(codeOnly(rawWindow))) {
+      findings.push(
+        `${rel}'s ${label} mark draws CheckFat again — the fill-weight plate her 24 Sep 2026 ruling replaced with ` +
+          "Phosphor's regular-weight `Check`.",
+      );
+    }
+  }
+
+  const manifestPath = path.join(HERE, "..", "..", "foundations", "icons", "icon-art.manifest.json");
+  let manifest = null;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  } catch (error) {
+    findings.push(
+      `Could not read foundations/icons/icon-art.manifest.json to check the tick's WEIGHT (${error.message}) — ` +
+        "section 7 pins the name and the weight separately on purpose, and without the manifest the weight half " +
+        "is unproven.",
+    );
+  }
+  if (manifest) {
+    const glyphs = manifest.glyphs ?? manifest;
+    const check = glyphs.Check;
+    if (!check) {
+      findings.push("icon-art.manifest.json no longer records a glyph named `Check` at all.");
+    } else if (check.upstream !== "check" || check.weight !== "regular") {
+      findings.push(
+        "icon-art.manifest.json records `Check` as " +
+          `{upstream: ${JSON.stringify(check.upstream)}, weight: ${JSON.stringify(check.weight)}} — it must be ` +
+          "Phosphor's `check` at REGULAR weight, which is what Aurora asked the stage mark to draw on 24 Sep " +
+          "2026 and what foundations/icons/ATTRIBUTION.md §Weight records. `check` at FILL weight is not a " +
+          "heavier tick; it is a rounded rectangle with the tick knocked out of it, and it has shipped as a " +
+          "filled square in this product once already.",
+      );
+    }
+  }
+}
+
+/* ============================================================================
+   8 · THE LABEL DRAWS WHATEVER THE CALLER HANDS IT, ON AS MANY LINES AS IT
+   HAS — the kit's half of Aurora's second sentence, 24 SEP 2026: "also date
+   is missing."
+
+   THE DATE IS NOT DRAWN HERE and cannot be pinned here directly.
+   `kwapso_system`'s `web/components/tickets/ticket-stages.tsx` hands each
+   stage a `label` of TWO `block` children — the stage name over
+   `formatStageMoment(rung.span.from)` — and draws the second only for a rung
+   with a recorded span. Measured 24 Sep 2026 over a real render: the date is
+   present on every rung that has a span and absent only where there is none.
+
+   WHAT THE KIT OWES THAT DRAWING is the contract this section pins: the
+   `steps` label renders `{stage.label}` WHOLE, inside a `block w-full
+   truncate` box, so each `block` child gets its own line and its own
+   ellipsis instead of one cutting the other short. A `line-clamp`, a height
+   cap, or a label narrowed to anything less than the caller's node would
+   delete the date from every ticket in the product from inside this file,
+   and would look like tidying while doing it.
+   ========================================================================= */
+for (const [label, rawWindow] of [
+  ["horizontal steps", horizontalMarkWindow],
+  ["vertical wizard rail", verticalMarkWindow],
+]) {
+  if (rawWindow === "") {
+    findings.push(`Could not isolate the ${label} step's full window in ${rel} to check section 8.`);
+    continue;
+  }
+  const raw = labelWindow(rawWindow);
+  if (raw === "") {
+    findings.push(`Could not isolate the ${label} step's LABEL window in ${rel} to check section 8.`);
+    continue;
+  }
+  if (!/\{stage\.label\}/.test(raw)) {
+    findings.push(
+      `${rel}'s ${label} step's LABEL no longer renders {stage.label} — the caller's whole node is the drawing. ` +
+        "`ticket-stages.tsx` hands this two block children, the stage name over its date; anything that renders " +
+        "less than the node deletes the second line from every ticket in the product.",
+    );
+  }
+  if (/line-clamp|max-h-|h-\[var\(--control-height/.test(codeOnly(raw))) {
+    findings.push(
+      `${rel}'s ${label} step's LABEL has grown a line clamp or a height cap — the label must grow to the node ` +
+        'it is handed. Aurora, 24 Sep 2026: "also date is missing." The date is the SECOND line of that node.',
+    );
+  }
+}
+{
+  const raw = labelWindow(horizontalMarkWindow);
+  if (raw !== "" && !/"block w-full truncate/.test(raw)) {
+    findings.push(
+      `${rel}'s horizontal \`steps\` LABEL is no longer "block w-full truncate …" — that exact shape is what lets ` +
+        "each `block` child of the caller's label take the full column width and its own ellipsis, which is how " +
+        "the ticket ladder draws a stage name above its date without one clipping the other.",
     );
   }
 }
@@ -355,11 +567,14 @@ if (findings.length > 0) {
 console.log(
   "OK status-stepper check: the `steps` variant's MARK (both horizontal — the ticket ladder's own drawing — and " +
     "vertical) paints a done and a current step with the SAME ink fill (bg-surface-inverse text-ink-on-inverse) " +
-    "and the SAME CheckFat tick glyph, with a later step an empty bg-surface-lift text-ink-tertiary circle and no " +
-    "glyph at all — Aurora, 23 Sep 2026 (two rulings, same day): \"on ticket stages, mark the active and past in " +
+    "and the SAME tick glyph, with a later step an empty bg-surface-lift text-ink-tertiary circle and no glyph " +
+    "at all — Aurora, 23 Sep 2026 (two rulings, same day): \"on ticket stages, mark the active and past in " +
     "black, only future are gray\" and \"remove the numbers inside (they are not numbered) is either check or " +
-    "empty\" — while the current step's LABEL carries the underline (decoration-hair-strong) added the same day " +
-    "so the row still has a visible mark of position for a sighted reader, alongside the current mark and " +
-    "label's own extra weight and aria-current — and the `stages` variant's hero pill, which no ruling named, " +
-    "still carries its own mango current fill and its own per-stage number unchanged.",
+    "empty\". That tick is Phosphor's `Check` at REGULAR weight (name pinned here, weight pinned against " +
+    "icon-art.manifest.json), never `CheckFat` — Aurora, 24 Sep 2026: \"icon on completed stages shoudl be " +
+    "phospor check regular\". NEITHER `steps` LABEL is underlined — same ruling, \"why is done underlined?\" — " +
+    "and both still carry the current step's own font-weight-medium, which predates it; both also still render " +
+    "{stage.label} whole inside an unclamped block w-full truncate box, which is what lets the ticket ladder " +
+    "draw a stage name above its date. And the `stages` variant's hero pill, which no ruling named, still " +
+    "carries its own mango current fill and its own per-stage number unchanged.",
 );

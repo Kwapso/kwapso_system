@@ -1,8 +1,10 @@
 # Where this art comes from
 
-The glyphs in this folder are **Phosphor** — 1,513 icons (the `fill` weight,
-plus two named regular-weight exceptions and one coexisting regular variant —
-see "Weight" below), MIT licensed, from
+The glyphs in this folder are **Phosphor** — 1,513 icons, mostly the `fill`
+weight, with a named list of regular-weight exceptions and one coexisting
+regular variant (see "Weight" below for the list, the rulings and the dates;
+`icon-art.manifest.json` for the machine-checked per-glyph truth — as of
+2026-09-24 that is 1,403 fill and 111 regular), MIT licensed, from
 [github.com/phosphor-icons/core](https://github.com/phosphor-icons/core)
 (© 2023 Phosphor Icons). The licence is beside this file as `LICENSE-phosphor`,
 and MIT permits redistribution inside this repository.
@@ -186,6 +188,32 @@ export.
 Both changes were made and verified by `--refresh` against the same pinned
 pack, `@phosphor-icons/core@2.1.1` — no version bump, no other glyph moved
 (`art changed 1 Waves`, `new glyphs 1 ChecksRegular`, `removed 0`).
+
+### 2026-09-24 — `Check` named again, by her, for the ticket stage mark
+
+Her ruling, verbatim: "on tickets stage, why is done underlined? also date is
+missing. icon on completed stages shoudl be phospor check regular."
+
+**No file in this folder changed and no exception was added.** `Check` has
+been regular here since 2026-09-06 (see above), the manifest has recorded
+`{"upstream": "check", "weight": "regular"}` for it ever since, and
+`foundations/icons/Check.svg` is byte-for-byte upstream `regular/check.svg`.
+What moved is a CALL SITE: `components/status-stepper/status-stepper.tsx`'s
+`steps` mark drew `CheckFat` — Phosphor's separate `check-fat` glyph, fill
+weight, a tick knocked out of a plate — and now draws `Check`. Her words are
+Phosphor's own name and weight, which is the contract this folder exists to
+keep, so nothing was translated on the way in.
+
+It is recorded here anyway, and this is the point of recording it: the entry
+this folder needed was not a new exception but a correction to two places that
+still claimed the list was **three**. `icon-base.tsx`'s header and
+`generate-icons.mjs`'s emitted header both said "three named exceptions —
+Plus, Power and Prohibit" on 2026-09-24, a count that had been wrong since
+2026-09-06 and was wrong by 108 files. Both now name no count and no list, and
+point at this section and at `icon-art.manifest.json` instead. That is the
+same lesson the `Asterisk`/`Check` paragraph above already states — a weight
+rule that lives in prose drifts from the art — applied to the prose that was
+still drifting.
 
 ## The folder is the contract
 
