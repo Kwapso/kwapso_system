@@ -4628,7 +4628,7 @@ export const STORED_FILES: {
     writtenIn: "workers/content/src/routes/help.ts",
     field: "HelpAttachment.url",
     shownIn: "web/components/records/record-attachments.tsx",
-    why: "what somebody attached to a ticket, on the ticket's Files and links tab. One panel serves both records since the fold; `tickets/help-attachments.tsx` is the ticket's door and copy, and passes no `fix`",
+    why: "what somebody attached to a ticket. This panel (`tickets/help-attachments.tsx`'s copy of it, no `fix`) is PARKED on the agency side (`PARKED[\"tickets/help-attachments\"]`, below) — the reachable render today is `help-detail.tsx`'s own `ticketFilesFor` (the description bubble's files, threadId-null rows only) and `help-form-dialog.tsx`'s edit-mode tiles, both fixed 25 Sep 2026; `triage-attachments.tsx`'s `TriageAttachments` reads the same door for the sitting. One panel still serves the portal and the story record",
   },
   {
     writtenIn: "workers/content/src/routes/stories.ts",
@@ -5389,13 +5389,20 @@ export const PARKED: Record<string, string> = {
     "biult the ui for that.' Parked, not dead: what she asked for is each MESSAGE " +
     "carrying its own attachments through the kit's `TicketThread` " +
     "(`ThreadMessage.attachments`/`media`, shared/ui/components/ticket-thread/" +
-    "ticket-thread.tsx), which needs a door change first — `help_attachments` " +
-    "(workers/tenancy/src/team-schema/migrations.ts) is keyed by `help_id` only, " +
-    "with no column to join a file to the one reply it was sent on. " +
-    "help-detail.tsx's own header carries the full account and the exact " +
-    "migration this needs. Delete this line and the file together only once " +
-    "something reaches it again with a real reader, never by re-adding the same " +
-    "ticket-wide tray this ruling removed.",
+    "ticket-thread.tsx) — that door change (`help_attachments.help_thread_id`, " +
+    "migration 0105) landed and every reply already draws this way " +
+    "(`messageFilesFor`, help-detail.tsx). WHAT WAS STILL MISSING, found " +
+    "25 Sep 2026 (a ticket raised through the MCP surface carried real images " +
+    "nobody on the agency side could see): the ticket's OWN opening message — " +
+    "raised with `help_thread_id` left NULL, never a reply — had no reader at " +
+    "all. Fixed the same shape, not this tray: `ticketFilesFor` (help-detail.tsx) " +
+    "is `messageFilesFor`'s twin for `threadId`-null rows, drawn on the " +
+    "description bubble; `help-form-dialog.tsx`'s edit mode shows the same rows " +
+    "as tiles, the story form's own shape. This panel stays parked — showing " +
+    "the WHOLE list a second time, replies included, is the exact duplication " +
+    "her ruling above pulled it for. Delete this line and the file together only " +
+    "once something reaches it again with a real reader, never by re-adding the " +
+    "same ticket-wide tray this ruling removed.",
   "work/moscow-chip":
     "the MoSCoW priority tag (`MoscowChip`), a story row/board card and the record's own Overview row used to " +
     "draw. Aurora's ruling, 21 Sep 2026, verbatim: \"pause everything to do with moscow, but remind me at later " +

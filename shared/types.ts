@@ -955,6 +955,13 @@ export type HelpAttachment = {
    * subselect the redaction above already runs. Staff by first name, a contact
    * in full. */
   addedByIsClient: boolean
+  /** null = attached to the TICKET ITSELF (raised with it, or added later from
+   * the edit form) — team migration 0105's `help_attachments.help_thread_id`.
+   * A value names the one reply it rode in on instead, and already shows under
+   * that reply's own bubble (`listReplies`'s `HelpMessage.attachments`) — a
+   * screen drawing the ticket's OWN files must exclude those or a picture
+   * would show twice. */
+  threadId: string | null
 }
 
 /** ONE THING A STORY SHOWS FOR ITSELF — a file in the shared media bucket, or a

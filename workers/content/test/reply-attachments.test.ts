@@ -127,6 +127,33 @@ describe("a reply's staged files round-trip through the door", () => {
     expect(read?.attachments).toEqual([expect.objectContaining({ id: attId, name: "board.png" })])
   })
 
+  it("the ticket-level door tells the two kinds of row apart by `threadId` (R40's other reader, help-detail.tsx's `ticketFilesFor`)", async () => {
+    const attId = await stageFile(IDS.staffUser, IDS.victimTicket, "board.png")
+
+    // BEFORE a reply claims it — an ordinary ticket-level file, same as one
+    // picked in `help-form-dialog.tsx`'s own upload zone.
+    const beforeRes = await call(IDS.staffUser, "GET /api/content/help/attachments", undefined, `?id=${IDS.victimTicket}`)
+    const before = (await beforeRes.json()) as { attachments: { id: string; threadId: string | null }[] }
+    expect(before.attachments.find((a) => a.id === attId)?.threadId).toBeNull()
+
+    const replyRes = await call(IDS.staffUser, "POST /api/content/help/reply", {
+      helpId: IDS.victimTicket,
+      body: "Here's what I mean",
+      attachmentIds: [attId],
+    })
+    expect(replyRes.status, await replyRes.clone().text()).toBe(200)
+    const replyBody = (await replyRes.json()) as { replies: { id: string; body: string }[] }
+    const replyId = replyBody.replies.find((r) => r.body === "Here's what I mean")?.id
+    expect(replyId).toBeTruthy()
+
+    // AFTER — the same row now names the reply it rode in on, so a screen
+    // drawing "what the ticket itself carries" can exclude it and leave it to
+    // that reply's own bubble.
+    const afterRes = await call(IDS.staffUser, "GET /api/content/help/attachments", undefined, `?id=${IDS.victimTicket}`)
+    const after = (await afterRes.json()) as { attachments: { id: string; threadId: string | null }[] }
+    expect(after.attachments.find((a) => a.id === attId)?.threadId).toBe(replyId)
+  })
+
   it("a reply with no attachmentIds carries none — the field is genuinely optional", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/help/reply", {
       helpId: IDS.victimTicket,

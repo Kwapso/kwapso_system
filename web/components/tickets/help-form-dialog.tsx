@@ -50,6 +50,8 @@
 
 import * as React from "react"
 
+import { LinkSimple, X } from "@shared/ui/foundations/icons"
+import { Button } from "@shared/ui/components/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -73,12 +75,12 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content, tenancy } from "@/lib/api"
-import { appModulesKey, appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
+import { appModulesKey, appsKey, helpAttachmentsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useCached } from "@shared/web/store"
+import { primeCache, useCached } from "@shared/web/store"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { HelpStakeholder } from "@shared/types"
+import type { HelpAttachment, HelpStakeholder } from "@shared/types"
 import { TITLE_MAX_CHARS } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
@@ -96,7 +98,7 @@ import { sprintIsRunning } from "@shared/sprint-state"
 import type { AppModule, AppRow } from "@shared/types"
 import { DEFAULT_MODULE_ICON } from "@shared/module-icons"
 import { readFileAsDataUrl } from "@shared/web/file"
-import { pickedFileId, usePickedFileItems } from "@shared/web/upload-items"
+import { pickedFileId, storedFileToUploadItem, usePickedFileItems } from "@shared/web/upload-items"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
 
@@ -479,13 +481,63 @@ export function HelpFormDialog({
   React.useEffect(() => {
     if (!open) setPending([])
   }, [open])
+  /** A pick that is in flight, on an EDIT (see `pick` below). Separate from
+   * `busy` (the whole form submitting) — the same split `story-form-dialog.tsx`
+   * makes, for the same reason: a person is still allowed to keep typing
+   * through this one. */
+  const [attachBusy, setAttachBusy] = React.useState(false)
+
+  // …AND WHAT IT ALREADY CARRIES — the other half of the SAME 26 Aug 2026 ask,
+  // and the exact gap the owner reported 25 Sep 2026: this form only ever
+  // ADDED, so reopening it on a ticket that already had files described it as
+  // having none. `helpId` is undefined on a create — there is nothing to read
+  // yet, which is the same reason `pending` exists at all.
+  //
+  // THROUGH THE SAME CACHE KEY the ticket page's own description bubble reads
+  // (`ticketFilesFor`, help-detail.tsx) and the Triage queue reads for its
+  // sitting — one key, so a file added here shows there the moment this
+  // dialog closes, and one removed there stops showing here without a second
+  // fetch of its own.
+  const attachedQ = useCached<HelpAttachment[]>(helpId ? helpAttachmentsKey(helpId) : null, () =>
+    content.helpAttachments(helpId as string).then((r) => {
+      primeCache(`total:${helpAttachmentsKey(helpId as string)}`, r.total)
+      return r.attachments
+    })
+  )
+  // ONLY THE TICKET'S OWN ROWS — a reply's own attachment (`threadId` set)
+  // is that message's to show and this dialog's to leave alone; drawing it
+  // here too would let the same picture be removed from the wrong place.
+  const attached = (attachedQ.data ?? []).filter((a) => !a.threadId)
   // THE TILES THE FIELD BELOW DRAWS — client ruling, 17 Sep 2026: "I can
-  // really see the images that I have already uploaded." Every picked file
-  // becomes a tile through the one shared seam (shared/web/upload-items.ts)
-  // every FileUpload call site now builds its items with; an image gets an
-  // object URL preview, everything else falls back to the kit's own
-  // icon-and-tag.
+  // really see the images that I have already uploaded." Both halves feed one
+  // grid, through the one shared seam every FileUpload call site now builds
+  // its items with (shared/web/upload-items.ts): what the ticket already
+  // carries (a served URL, safeSrc-checked) and what is still only picked in
+  // this browser (an object URL, revoked when it is removed or this dialog
+  // unmounts). A "link" attachment is not a file — `AttachmentPreview` never
+  // previews one either — so only `kind === "file"` rows join the grid.
+  const attachedFileItems = attached
+    .filter((a) => a.kind === "file")
+    .map((a) => storedFileToUploadItem({ id: a.id, name: a.label, href: a.url, mime: a.contentType, size: a.sizeBytes }))
   const pendingItems = usePickedFileItems(pending)
+  const fileTiles = [...attachedFileItems, ...pendingItems]
+
+  /** Keep the one cache both this field and the ticket page's own bubble read. */
+  function keepAttached(target: string, r: { attachments: HelpAttachment[]; total: number }) {
+    primeCache(helpAttachmentsKey(target), r.attachments)
+    primeCache(`total:${helpAttachmentsKey(target)}`, r.total)
+  }
+
+  /** Take one off from in here. `help:update` gates the door, and `canAttach`
+   * (this form's own prop) already answers whether this caller holds it. */
+  async function detachExisting(attachmentId: string) {
+    if (!helpId) return
+    try {
+      keepAttached(helpId, await content.removeHelpAttachment(helpId, attachmentId))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't take that off."))
+    }
+  }
   // T3655 — "when raising tickets or stories on any record from inside its
   // parent record… it does not make sense to select the app or the account."
   // The APP already answers this: every app has exactly one owning account
@@ -1162,18 +1214,44 @@ export function HelpFormDialog({
     }
   }
 
+  /** ONE FILE AT A TIME, and a failure here never fails the ticket — the ticket
+   * is already written (or already existed) by the time this runs, and turning
+   * a rejected upload into a thrown submit would close nothing, clear no draft,
+   * and tell somebody their ticket was not saved when it was. */
   async function attach(target: string, files: File[]) {
     for (const file of files) {
       try {
-        await content.addHelpAttachment({
-          id: target,
-          kind: "file",
-          label: file.name,
-          fileDataUrl: await readFileAsDataUrl(file),
-        })
+        keepAttached(
+          target,
+          await content.addHelpAttachment({
+            id: target,
+            kind: "file",
+            label: file.name,
+            fileDataUrl: await readFileAsDataUrl(file),
+          })
+        )
       } catch (err) {
         toast.error(err instanceof ApiFailure ? err.message : t("Couldn't attach that."))
       }
+    }
+  }
+
+  /** WHAT HAPPENS THE MOMENT SOMEBODY PICKS A FILE, on an EDIT — uploads now,
+   * the identical reasoning `story-form-dialog.tsx`'s own `pick` gives:
+   * deferring every upload to Save is what let a picked screenshot vanish on a
+   * reload before it ever reached the door. ON A CREATE there is still nothing
+   * to hang it on (R2 is addressed by the ticket's id, and the ticket does not
+   * exist yet), so those wait for the id `submit` hands back below. */
+  async function pick(files: File[]) {
+    if (!helpId) {
+      setPending((f) => [...f, ...files])
+      return
+    }
+    setAttachBusy(true)
+    try {
+      await attach(helpId, files)
+    } finally {
+      setAttachBusy(false)
     }
   }
 
@@ -1843,21 +1921,52 @@ export function HelpFormDialog({
           and a control that always refused would be worse than none. */}
       {canAttach && (
         <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
-          {/* THE HAND-ROLLED LIST IS GONE — SUPERSEDED BY THE KIT'S OWN TILE
-              GRID (file-upload.tsx's "OPTION B"): the moment a file lands,
-              the zone itself becomes the row of tiles this field used to
-              draw beside it by hand. `pendingItems` is `pending` run through
-              the one shared seam every FileUpload call site now builds its
-              items with (shared/web/upload-items.ts) — an object URL preview
-              for an image, the kit's icon-and-tag for anything else. */}
-          <FileUpload
-            multiple
-            files={pendingItems}
-            onFilesSelected={(files) => setPending((f) => [...f, ...files])}
-            onRemove={(id) => setPending((f) => f.filter((file) => pickedFileId(file) !== id))}
-            removeLabel={t("Take it off")}
-            className={busy ? "pointer-events-none opacity-60" : undefined}
-          />
+          <div className="flex flex-col gap-2">
+            {/* A LINK STAYS A PLAIN LIST — the tile grid below is for FILES,
+                and a link has no tile to become: `AttachmentPreview` never
+                previews one either. This form never creates one itself
+                (`pick`/`attach` only ever send `kind: "file"`), but one can
+                arrive on the same cache key from an MCP `add_help_attachment`
+                call or (once real) the ticket's own Files and links tab. */}
+            {attached.some((a) => a.kind === "link") && (
+              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+                {attached
+                  .filter((a) => a.kind === "link")
+                  .map((a) => (
+                    <li key={a.id} className="flex items-center gap-2 px-3 py-2">
+                      <LinkSimple className="text-muted-foreground size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        aria-label={t("Take it off")}
+                        disabled={busy || attachBusy}
+                        onClick={() => void detachExisting(a.id)}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+              </ul>
+            )}
+            {/* THE FILES THEMSELVES, AS TILES — client ruling, 17 Sep 2026.
+                `fileTiles` is what the ticket already carries (on an edit)
+                plus what is still only picked in this browser, both built
+                through the one shared seam (shared/web/upload-items.ts). */}
+            <FileUpload
+              multiple
+              files={fileTiles}
+              onFilesSelected={(files) => void pick(files)}
+              onRemove={(id) => {
+                if (attached.some((a) => a.id === id)) void detachExisting(id)
+                else setPending((f) => f.filter((file) => pickedFileId(file) !== id))
+              }}
+              removeLabel={t("Take it off")}
+              className={busy || attachBusy ? "pointer-events-none opacity-60" : undefined}
+            />
+          </div>
         </Field>
       )}
       {/* TYPE USED TO BE HERE, last and outside the sequence, with a note

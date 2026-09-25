@@ -49,6 +49,7 @@ type AttachmentRow = {
   created_at: string
   creator_name: string | null
   from_client: number
+  help_thread_id: string | null
 }
 
 /** WHOSE NAME TRAVELS ON AN ATTACHMENT — `listReplies`'s rule, one table along.
@@ -75,10 +76,11 @@ function toAttachment(r: AttachmentRow, scope: AccountScope): HelpAttachment {
     // dropped — the agency's own screen draws both populations in this one field
     // and shows a colleague by first name only.
     addedByIsClient: r.from_client === 1,
+    threadId: r.help_thread_id,
   }
 }
 
-const ATTACHMENT_COLS = `id, help_id, kind, label, url, content_type, size_bytes, created_at, creator_name,
+const ATTACHMENT_COLS = `id, help_id, kind, label, url, content_type, size_bytes, created_at, creator_name, help_thread_id,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help_attachments.creator_id) AS from_client`
 
 /** The ticket fence, expressed over `help_attachments.help_id`. */

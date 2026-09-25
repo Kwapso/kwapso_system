@@ -61,6 +61,23 @@
 // composer-staged file for the reply it rides with — see that function's own
 // header for the upload-first, link-second shape. The composer's own attach
 // button is back, for real, in `reply-composer.tsx`.
+//
+// …AND WHAT SHE ATTACHED WHILE RAISING IT — the one bubble `messageFilesFor`
+// never reached, because it was never a REPLY. Reported 25 Sep 2026: tickets
+// raised through the MCP surface (`create_help_ticket` + `add_help_attachment`,
+// no `help_thread_id` — a ticket-level file, same as one picked in
+// `help-form-dialog.tsx`'s own upload zone) carried real images nobody on the
+// agency side could see, on the ticket page OR its own edit screen. "Nowhere
+// left for a picked file to be shown" above was true of the CONVERSATION
+// only — `help-form-dialog.tsx`'s upload zone kept writing rows the whole time
+// (`content.addHelpAttachment`), same door, same table, `help_thread_id` left
+// NULL; nothing ever read them back. `ticketFilesFor` (below) is `messageFilesFor`'s
+// twin for exactly those rows — `HelpAttachment.threadId` (team migration 0105's
+// column, now carried on the type) tells the two apart, so a reply's own picture
+// never draws twice under the description as well. Fed onto the description
+// bubble the identical way every reply's own files already are. The edit dialog's
+// own gap is `help-form-dialog.tsx`'s to close, same day, same shape as the
+// story form already draws it.
 
 import * as React from "react"
 
@@ -177,7 +194,7 @@ import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 import { ReplyEditSheet } from "@/components/tickets/reply-edit-sheet"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { appsKey, listFetch, runningTimersKey, totalKey, triageKey } from "@/lib/live-resources"
+import { appsKey, helpAttachmentsKey, listFetch, runningTimersKey, totalKey, triageKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
@@ -298,6 +315,50 @@ function messageFilesFor(attachments: HelpMessageAttachment[] | undefined): {
   }
 }
 
+/** THE TICKET'S OWN OPENING ATTACHMENTS — files and links picked while RAISING
+ * it (kept here rather than folded into `messageFilesFor` because they come
+ * off a different door, in `HelpAttachment`'s own shape, not
+ * `HelpMessageAttachment`'s). Reply-attached rows (`threadId` set) are
+ * EXCLUDED: those already draw under their own bubble via `messageFilesFor`
+ * above, and a screen showing both would show the same picture twice — the
+ * exact duplication the client's own 18 Sep 2026 ruling pulled the ticket-wide
+ * tray for (this file's own header). What is left is exactly the description
+ * bubble's own files, drawn the SAME two ways a reply's already are: a pill
+ * chip per file/link, and a stacked image well for anything `hasPreview`
+ * calls a picture. */
+function ticketFilesFor(attachments: HelpAttachment[] | undefined): {
+  attachments?: ThreadAttachment[]
+  media?: React.ReactNode
+} {
+  const own = (attachments ?? []).filter((a) => !a.threadId)
+  if (!own.length) return {}
+  const pictures = own.filter((a) => hasPreview(a.kind, a.contentType))
+  return {
+    attachments: own.map((a) => {
+      const Glyph = fileTypeIcon(a.label)
+      const size = spellSize(a.sizeBytes)
+      return {
+        id: a.id,
+        name: (
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <Glyph aria-hidden="true" className="size-3.5 shrink-0" />
+            <span className="min-w-0 truncate">{a.label}</span>
+          </span>
+        ),
+        size: size || undefined,
+        href: isFollowable(a.url) ? a.url : undefined,
+      }
+    }),
+    media: pictures.length ? (
+      <div className="flex flex-col gap-2">
+        {pictures.map((a) => (
+          <AttachmentPreview key={a.id} kind={a.kind} url={a.url} contentType={a.contentType} />
+        ))}
+      </div>
+    ) : undefined,
+  }
+}
+
 export function HelpDetailScreen({
   teamId,
   helpId,
@@ -356,6 +417,20 @@ export function HelpDetailScreen({
       // than going stale the day something reads it again.
       primeCache(`total:help-thread:${helpId}`, r.total)
       return r.replies
+    })
+  )
+  // WHAT THIS TICKET ITSELF CARRIES — files (and links) picked while RAISING
+  // it, or added later from the edit form. `help-form-dialog.tsx`'s own
+  // `attach()` writes these through the identical door
+  // (`content.addHelpAttachment`, no `help_thread_id`), and the Triage queue
+  // already reads the same cache key for the identical reason
+  // (`triage-queue.tsx`'s own header). ONE key, so an attach or a remove from
+  // either screen reaches this one too — the live registry already patches it
+  // (`TEAM_RESOURCES.help`, web/lib/live-resources.ts), no extra wiring here.
+  const attachmentsQ = useCached<HelpAttachment[]>(helpAttachmentsKey(helpId), () =>
+    content.helpAttachments(helpId).then((r) => {
+      primeCache(`total:${helpAttachmentsKey(helpId)}`, r.total)
+      return r.attachments
     })
   )
   // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND. Everything below this line
@@ -2001,6 +2076,11 @@ export function HelpDetailScreen({
                       // on file right now. Either way the bubble is not ours.
                       external: Boolean(ticket.raisedByContactName) || ticket.raiserIsClient,
                       body: <RichText html={translation.of(ticket.description)} />,
+                      // WHAT THEY ATTACHED WHEN THEY RAISED IT (team migration
+                      // 0105's other half) — the ticket's own opening message
+                      // carries its own files exactly the way every reply
+                      // already carries theirs, below.
+                      ...ticketFilesFor(attachmentsQ.data),
                     },
                     /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
                        TOLD. `side: "mine"` is the bubble the kit paints

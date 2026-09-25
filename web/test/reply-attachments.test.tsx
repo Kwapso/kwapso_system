@@ -85,7 +85,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       sprints: async () => ({ sprints: [], total: 0 }),
       workLogs: async () => ({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false }),
       workLogSummary: async () => ({ total: 0, totalSeconds: 0, people: [], kinds: [], weeks: [] }),
-      helpAttachments: async () => ({ attachments: [], total: 0 }),
+      helpAttachments: async () => ({ attachments: api.attachments, total: api.attachments.length }),
       runningTimers: async () => ({ timers: [] }),
       addHelpAttachment: api.addHelpAttachment,
       replyHelp: api.replyHelp,
@@ -184,6 +184,7 @@ describe("the composer stages a file the instant it is picked", () => {
           createdAt: "2026-09-18T10:00:00.000Z",
           addedByName: "You",
           addedByIsClient: false,
+          threadId: null,
         },
       ],
       total: 1,
@@ -220,6 +221,7 @@ describe("Send claims the staged file for the reply it rides with", () => {
           createdAt: "2026-09-18T10:00:00.000Z",
           addedByName: "You",
           addedByIsClient: false,
+          threadId: null,
         },
       ],
       total: 1,
@@ -317,5 +319,102 @@ describe("a message renders the files it was sent with", () => {
     // does NOT get is a media well, i.e. no `<img>` anywhere on the message.
     expect(document.querySelector(`a[href="/media/team-1/ticket/att-4"]`)).toBeTruthy()
     expect(document.querySelector("img")).toBeNull()
+  })
+})
+
+// THE TICKET'S OWN OPENING ATTACHMENTS — the other half of team migration
+// 0105, found 25 Sep 2026: a ticket raised through the MCP surface
+// (`create_help_ticket` + `add_help_attachment`, `threadId` left NULL — no
+// reply exists yet) carried real images nobody on the agency side could see.
+// `ticketFilesFor` (help-detail.tsx) is `messageFilesFor`'s twin for exactly
+// these rows, fed onto the description bubble the identical way a reply's own
+// files already are — same door (`content.helpAttachments`), same two draws
+// (a pill chip, and a media well for a picture).
+describe("the description bubble draws what the ticket was raised with", () => {
+  it("a ticket-level image draws its own media well under the description", async () => {
+    api.attachments = [
+      {
+        id: "att-5",
+        ticketId: "help-1",
+        kind: "file",
+        label: "board.png",
+        url: "/media/team-1/ticket/att-5",
+        contentType: "image/png",
+        sizeBytes: 4096,
+        createdAt: "2026-08-18T09:00:00.000Z",
+        addedByName: "Marta Bergman",
+        addedByIsClient: true,
+        threadId: null,
+      },
+    ]
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    await screen.findByText("None of my drivers can see today's routes.")
+    expect(screen.getByText("board.png")).toBeTruthy()
+    expect(document.querySelector(`a[href="/media/team-1/ticket/att-5"] img`)).toBeTruthy()
+  })
+
+  it("a document raised with the ticket draws a chip with no media well", async () => {
+    api.attachments = [
+      {
+        id: "att-6",
+        ticketId: "help-1",
+        kind: "file",
+        label: "route-log.pdf",
+        url: "/media/team-1/ticket/att-6",
+        contentType: "application/pdf",
+        sizeBytes: 900,
+        createdAt: "2026-08-18T09:00:00.000Z",
+        addedByName: "Marta Bergman",
+        addedByIsClient: true,
+        threadId: null,
+      },
+    ]
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    await screen.findByText("None of my drivers can see today's routes.")
+    expect(screen.getByText("route-log.pdf")).toBeTruthy()
+    expect(document.querySelector("img")).toBeNull()
+  })
+
+  it("a reply's own attachment never shows twice, under the description as well", async () => {
+    // ONE DOOR HANDS BACK BOTH KINDS MIXED (`content.helpAttachments` makes no
+    // distinction) — `threadId` is what tells them apart, and this is the row
+    // the description bubble must EXCLUDE: it already draws under `reply-1`'s
+    // own bubble (`api.replies`, below), via `messageFilesFor`.
+    api.attachments = [
+      {
+        id: "att-7",
+        ticketId: "help-1",
+        kind: "file",
+        label: "invoice.pdf",
+        url: "/media/team-1/ticket/att-7",
+        contentType: "application/pdf",
+        sizeBytes: 900,
+        createdAt: "2026-09-18T10:00:05.000Z",
+        addedByName: "Aurora",
+        addedByIsClient: false,
+        threadId: "reply-1",
+      },
+    ]
+    api.replies = [
+      {
+        id: "reply-1",
+        ticketId: "help-1",
+        body: "Here's the invoice",
+        taggedUserIds: [],
+        isAgent: false,
+        authorId: "u-1",
+        authorName: "Aurora",
+        authorIsClient: false,
+        createdAt: "2026-09-18T10:00:05.000Z",
+        attachments: [{ id: "att-7", name: "invoice.pdf", href: "/media/team-1/ticket/att-7", mime: "application/pdf", size: 900 }],
+      },
+    ] as unknown as HelpMessage[]
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    await screen.findByText("Here's the invoice")
+    // Exactly one chip for it, not two.
+    expect(screen.getAllByText("invoice.pdf")).toHaveLength(1)
   })
 })
