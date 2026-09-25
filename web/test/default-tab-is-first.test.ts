@@ -34,12 +34,17 @@ describe("the ticket strip's default tab", () => {
     // letting TypeScript infer it from the default and dropping the argument
     // altogether — none of which changes which tab the strip opens on. The key
     // and the default constant are what the law compares.
+    // Desktop's default is now wrapped in `phoneFirstTab(recordTab, dashboardTab,
+    // isPhone)` (M8: on a phone the record tab leads instead) — the DESKTOP
+    // branch is `dashboardTab`, the second argument, and it must still agree
+    // with the strip's own leading tab exactly as it did before that wrapper
+    // existed.
     const remembered = src.match(
-      /useRemembered\s*(?:<[^>()]*>)?\(\s*"ticket-facet"\s*,\s*([A-Z_]+)\s*\)/
+      /useRemembered\s*(?:<[^>()]*>)?\(\s*"ticket-facet"\s*,\s*phoneFirstTab\(\s*[A-Z_]+\s*,\s*([A-Z_]+)\s*,\s*isPhone\s*\)\s*\)/
     )
     expect(
       remembered,
-      "could not find the remembered ticket facet — if `useRemembered(\"ticket-facet\", …)` was renamed or reshaped, teach this test the new spelling rather than deleting it"
+      "could not find the remembered ticket facet's phone-aware default — if `useRemembered(\"ticket-facet\", phoneFirstTab(…))` was renamed or reshaped, teach this test the new spelling rather than deleting it"
     ).not.toBeNull()
 
     // The first `{ value: X, label: …` inside the strip's own `tabs:` array.
@@ -50,8 +55,27 @@ describe("the ticket strip's default tab", () => {
 
     expect(
       remembered?.[1],
-      `the strip opens on ${firstTab?.[1]} but a page with nothing remembered defaults to ${remembered?.[1]}. ` +
+      `the strip opens on ${firstTab?.[1]} but a page with nothing remembered, on a desktop, defaults to ${remembered?.[1]}. ` +
         "The client's rule is that the leading tab is the default: move the tab, move the default."
     ).toBe(firstTab?.[1])
+  })
+
+  it("on a phone, opens on Triage instead — M8, the list is the page", () => {
+    // Alaap's 25 Sep 2026 ruling: Dashboard costs a phone the very screen real
+    // estate it doesn't have, so the record tab (Triage) leads there instead.
+    // Desktop keeps Dashboard first (the test above) — this only pins the
+    // phone branch of the same expression.
+    const src = readFileSync(join(WEB, "components/tickets/tickets-collection.tsx"), "utf8")
+    const remembered = src.match(
+      /useRemembered\s*(?:<[^>()]*>)?\(\s*"ticket-facet"\s*,\s*phoneFirstTab\(\s*([A-Z_]+)\s*,\s*[A-Z_]+\s*,\s*isPhone\s*\)\s*\)/
+    )
+    expect(
+      remembered,
+      "could not find the remembered ticket facet's phone-aware default"
+    ).not.toBeNull()
+    expect(
+      remembered?.[1],
+      "on a phone with nothing remembered, the ticket strip should open on TRIAGE, not the desktop's Dashboard default"
+    ).toBe("TRIAGE")
   })
 })

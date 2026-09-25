@@ -79,21 +79,48 @@ describe("the Accounts screen's Dashboard tab", () => {
         '"dhasbaprd always first card"'
     ).toBe("dashboard")
 
-    // A PAGE WITH NOTHING REMEMBERED OPENS THE TAB ON THE LEFT — the same
-    // rule `default-tab-is-first.test.ts` proves for Tickets. Accounts has
-    // no `useRemembered` of its own; its default is the LAST branch of the
-    // `accountTab` ternary chain, which fires when `tab` matches none of the
-    // named values (including when it is absent — the "nothing remembered"
-    // case itself).
+    // A PAGE WITH NOTHING REMEMBERED OPENS THE TAB ON THE LEFT, ON DESKTOP —
+    // the same rule `default-tab-is-first.test.ts` proves for Tickets.
+    // Accounts has no `useRemembered` of its own; its default is the LAST
+    // branch of the `accountTab` ternary chain, which fires when `tab`
+    // matches none of the named values (including when it is absent — the
+    // "nothing remembered" case itself). On a phone that branch is now
+    // `phoneFirstTab("active", "dashboard", isPhone)` (M8: the record tab
+    // leads on a phone) — the DESKTOP half is the second argument, and it
+    // must still agree with the strip's own leading tab exactly as it did
+    // before that wrapper existed.
     const derivedAt = src.indexOf("const accountTab =")
     expect(derivedAt, "could not find the `accountTab` derivation").toBeGreaterThan(-1)
     const derivation = src.slice(derivedAt, derivedAt + 600)
-    const fallback = derivation.match(/:\s*"([a-z]+)"\s*$/m)
-    expect(fallback, "the `accountTab` ternary's final fallback is not a plain string literal").not.toBeNull()
+    const fallback = derivation.match(
+      /:\s*phoneFirstTab\(\s*"[a-z]+"\s*,\s*"([a-z]+)"\s*,\s*isPhone\s*\)\s*$/m
+    )
+    expect(
+      fallback,
+      "the `accountTab` ternary's final fallback is not `phoneFirstTab(recordTab, dashboardTab, isPhone)`"
+    ).not.toBeNull()
     expect(
       fallback?.[1],
-      `the strip opens on "dashboard" but a page with nothing remembered defaults to "${fallback?.[1]}"`
+      `the strip opens on "dashboard" but a page with nothing remembered, on a desktop, defaults to "${fallback?.[1]}"`
     ).toBe("dashboard")
+  })
+
+  it("on a phone, opens on Active instead — M8, the list is the page", () => {
+    const src = readFileSync(SCREEN, "utf8")
+    const derivedAt = src.indexOf("const accountTab =")
+    expect(derivedAt, "could not find the `accountTab` derivation").toBeGreaterThan(-1)
+    const derivation = src.slice(derivedAt, derivedAt + 600)
+    const fallback = derivation.match(
+      /:\s*phoneFirstTab\(\s*"([a-z]+)"\s*,\s*"[a-z]+"\s*,\s*isPhone\s*\)\s*$/m
+    )
+    expect(
+      fallback,
+      "the `accountTab` ternary's final fallback is not `phoneFirstTab(recordTab, dashboardTab, isPhone)`"
+    ).not.toBeNull()
+    expect(
+      fallback?.[1],
+      "on a phone with nothing remembered, the Accounts strip should open on \"active\", not the desktop's Dashboard default"
+    ).toBe("active")
   })
 
   it("counts active companies only, at the door", () => {

@@ -171,21 +171,41 @@ describe("ruling 1 — 'tabs: dahsbaord, entries'", () => {
     ).toBe(2)
   })
 
-  it("opens on Dashboard when the address carries no tab at all", () => {
+  it("opens on Dashboard when the address carries no tab at all, on desktop", () => {
     // Her standing rule, and the same sentence `default-tab-is-first.test.ts`
     // makes about the ticket strip: the leading tab is what a page with nothing
     // remembered lands on. Here it is one expression rather than a
-    // `useRemembered` default, so the expression itself is what is read.
+    // `useRemembered` default, so the expression itself is what is read. On a
+    // phone the fallback is `phoneFirstTab(ENTRIES, DASHBOARD, isPhone)` (M8:
+    // the record tab leads there instead) — the DESKTOP half is the second
+    // argument, and it must still agree with the leading tab.
     const src = screenSrc()
-    const resolved = src.match(/const logsTab\s*=\s*tab === ([A-Z_]+) \? \1 : ([A-Z_]+)/)
+    const resolved = src.match(
+      /const logsTab\s*=\s*tab === ([A-Z_]+) \? \1 : phoneFirstTab\(\1,\s*([A-Z_]+),\s*isPhone\)/
+    )
     expect(
       resolved,
       "could not find the Logs screen's own `logsTab` resolution — if it was reshaped, teach this test the new spelling rather than deleting it"
     ).not.toBeNull()
     expect(
       resolved?.[2],
-      `a Logs URL with no \`tab\` lands on ${resolved?.[2]}, not on the leading tab`
+      `a Logs URL with no \`tab\` lands on ${resolved?.[2]}, not on the leading tab, on desktop`
     ).toBe("DASHBOARD")
+  })
+
+  it("on a phone, opens on Entries instead — M8, the list is the page", () => {
+    const src = screenSrc()
+    const resolved = src.match(
+      /const logsTab\s*=\s*tab === ([A-Z_]+) \? \1 : phoneFirstTab\(\1,\s*[A-Z_]+,\s*isPhone\)/
+    )
+    expect(
+      resolved,
+      "could not find the Logs screen's own `logsTab` resolution"
+    ).not.toBeNull()
+    expect(
+      resolved?.[1],
+      "on a phone with nothing remembered, the Logs screen should open on ENTRIES, not the desktop's Dashboard default"
+    ).toBe("ENTRIES")
   })
 
   it("drops `tab` from the address entirely when Dashboard is chosen", () => {

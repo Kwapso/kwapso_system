@@ -198,6 +198,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { PersonCard } from "@shared/web/person-card"
+import { useIsPhone } from "@/lib/use-is-phone"
 import { useCached, invalidate, primeCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
@@ -273,6 +274,13 @@ export function MembersGallery({
   canRemoveMembers: boolean
 }) {
   const t = useT()
+  // M8, below `sm`: the wall's own vertical card (mobile audit — 185px a row,
+  // no shared compact-row floor). `PersonCard` already carries a `horizontal`
+  // orientation for exactly this — "a narrow side panel has no room for a
+  // wide vertical tile" (person-card.tsx) applies just as well to a phone —
+  // so this reuses that existing seam rather than restyling the card by hand.
+  // Desktop keeps `vertical`, unchanged.
+  const isPhone = useIsPhone()
   const [query, setQuery] = React.useState("")
   // A→Z OR Z→A ON THE WALL, and it is the client's own later ruling applied to
   // the identical shape rather than a preference of this lane's. This gallery
@@ -769,7 +777,7 @@ export function MembersGallery({
                       href={`/t/${teamId}/members/${m.userId}`}
                       className="block"
                     >
-                    <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+                    <CardContent className="flex flex-col items-center gap-2 p-4 text-center max-sm:flex-row max-sm:text-left">
                       {/* THE CELL'S LAYOUT — `PersonCard` (shared/web/person-card.tsx),
                           extracted 18 Sep 2026 so the ticket's stakeholders panel
                           could draw the identical shape without a second
@@ -791,6 +799,7 @@ export function MembersGallery({
                             {m.email}
                           </span>
                         }
+                        orientation={isPhone ? "horizontal" : "vertical"}
                       />
                     </CardContent>
                     </InAppLink>

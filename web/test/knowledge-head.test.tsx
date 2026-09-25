@@ -85,10 +85,21 @@ describe("the knowledge head (knowledge-screen.tsx) — order", () => {
     expect(askButtonAt, "Ask leads").toBeLessThan(syncAt)
     expect(syncAt, "Sync sits between Ask and the gear").toBeLessThan(gearAt)
 
-    // HER WORDS: "the gear should be on the very far right" — nothing else in
-    // the head may follow it.
-    const afterGear = head.slice(gearAt + "<ModuleSettingsGear".length)
-    expect(afterGear, "no other button after the gear").not.toMatch(/<(Button|GoogleSyncButton)\b/)
+    // HER WORDS: "the gear should be on the very far right" — nothing else
+    // VISIBLE in the head may follow it. Below `sm` (M2/mobile audit cause 6)
+    // Sync and the gear also draw a second time, hidden until opened, inside
+    // a phone-only `<DropdownMenu>` overflow that itself sits after the
+    // visible pair — so the "nothing after" check stops at that menu's own
+    // opening tag rather than at the end of the head.
+    const dropdownAt = head.indexOf("<DropdownMenu>", gearAt)
+    const afterGear = head.slice(
+      gearAt + "<ModuleSettingsGear".length,
+      dropdownAt === -1 ? undefined : dropdownAt
+    )
+    expect(
+      afterGear,
+      "no other button after the gear, before the phone-only overflow menu"
+    ).not.toMatch(/<(Button|GoogleSyncButton)\b/)
   })
 
   it('the mango Ask button sits INSIDE CollectionHeading\'s own action prop, not beside it', () => {

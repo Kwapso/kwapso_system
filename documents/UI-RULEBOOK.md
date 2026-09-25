@@ -70,7 +70,7 @@ file stays the index: the front matter above, this table, and the rule-count led
 | 6. Forms and dialogs (part 2 of 2) | [documents/ui-rulebook/27-6-forms-and-dialogs-2.md](ui-rulebook/27-6-forms-and-dialogs-2.md) | Forms and dialogs — F18–F19 |
 | 7. Typography | [documents/ui-rulebook/28-7-typography.md](ui-rulebook/28-7-typography.md) | Typography — T1–T9 |
 | 8. Spacing, and the scale setting | [documents/ui-rulebook/29-8-spacing-and-the-scale-setting.md](ui-rulebook/29-8-spacing-and-the-scale-setting.md) | Spacing, and the scale setting — S1–S8 |
-| 9. Mobile | [documents/ui-rulebook/30-9-mobile.md](ui-rulebook/30-9-mobile.md) | Mobile — M1–M6 |
+| 9. Mobile | [documents/ui-rulebook/30-9-mobile.md](ui-rulebook/30-9-mobile.md) | Mobile — M1–M8 |
 | 10. Copy | [documents/ui-rulebook/31-10-copy.md](ui-rulebook/31-10-copy.md) | Copy — W1–W15 |
 | 11. Record type glyphs | [documents/ui-rulebook/32-11-record-type-glyphs.md](ui-rulebook/32-11-record-type-glyphs.md) | Record type glyphs — G1–G6 |
 | 12. Density: the glance budget (N1 to N12) (part 1 of 2) | [documents/ui-rulebook/33-12-density-the-glance-budget-n1-to-n12-1.md](ui-rulebook/33-12-density-the-glance-budget-n1-to-n12-1.md) | Density: the glance budget (N1 to N12) — N1–N10 |
@@ -86,7 +86,7 @@ file stays the index: the front matter above, this table, and the rule-count led
 
 ## Rule index
 
-**270 rules.**
+**272 rules.**
 
 | Section | Rules |
 |---|---|
@@ -98,7 +98,7 @@ file stays the index: the front matter above, this table, and the rule-count led
 | 6. Forms and dialogs | F1 to F19 (19) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S8 (8) |
-| 9. Mobile | M1 to M6 (6) |
+| 9. Mobile | M1 to M8 (8) |
 | 10. Copy | W1 to W15 (15) |
 | 11. Record type glyphs | G1 to G6 (6) |
 | 12. Density: the glance budget | N1 to N12 (12) |

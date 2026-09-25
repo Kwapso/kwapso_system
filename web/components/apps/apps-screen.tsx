@@ -251,8 +251,14 @@ function appGalleryCard(
           {/* THE ICON — `size="band"`, the same size accounts' own gallery
               draws (K18). Square by default (R35/R60): an app's mark is a
               rounded square, filling the box, never shrunk to fit inside
-              one. */}
-          <AppMark app={app} size="band" />
+              one. M8, below `sm`: this is the tallest single piece of the
+              card (mobile audit, cause 5 — 196px a row with no shared floor);
+              Apps has no separate List view to default to instead (unlike
+              Accounts), so the cover hides there and the badge/title/subtitle
+              carry the row alone. */}
+          <div className="hidden sm:block">
+            <AppMark app={app} size="band" />
+          </div>
           {/* THE STATUS CHIP, ABOVE THE TITLE (R65/K16) — "status" is the
               app's own STAGE; `AppRow` carries no separate status field, and
               `app-detail.tsx`'s own pills already draw this exact chip off

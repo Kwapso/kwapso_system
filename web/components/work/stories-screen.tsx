@@ -1122,7 +1122,12 @@ export function StoriesScreen({
     // "under the title." Kanban's `description` slot takes any node, so both
     // lines share it rather than needing a slot the kit does not offer.
     description: (
-      <span className="flex flex-col gap-1">
+      // M8, below `sm`: the phase line and the assignee line stacked as two
+      // rows, one of the taller shapes in the board's own card (mobile
+      // audit, cause 5 — no shared compact-row floor across modules). At `sm`
+      // and above this is untouched (`flex-col gap-1`, unconditional before);
+      // below it the same two lines wrap onto one row instead.
+      <span className="flex flex-col gap-1 max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:gap-y-0">
         <span className={s.sprintName ? "text-sm" : "text-sm italic opacity-55"}>
           {s.sprintName ?? t("No phase")}
         </span>

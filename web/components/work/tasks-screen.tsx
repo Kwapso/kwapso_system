@@ -830,8 +830,13 @@ export function TasksScreen({
         }
         percent={dueToday === 0 ? 100 : Math.round((doneToday / dueToday) * 100)}
       />
+      {/* M8, below `sm`: helper copy is hidden there (mobile audit — this
+          strip alone cost 39px of the ~430px phone budget; the caption is the
+          one line of it that is not the meter itself). The client's own
+          ruling above this section still holds — no container is added here,
+          only a visibility class on the existing line. */}
       {!seesEveryones && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground hidden text-xs sm:block">
           {t("These are the tasks assigned to you. Seeing everyone's is a separate access right.")}
         </p>
       )}

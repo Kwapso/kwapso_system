@@ -471,7 +471,17 @@ export function WaveFinder({
                 (`TOOLBAR_CONTROL_OWNERS` pins the divergence, R53), so a guarantee the
                 row makes and this copy does not is exactly the drift that registry
                 exists to keep readable. */}
-            <div className={TOOLBAR_SEARCH_SLOT}>
+            {/* M8, below `sm`: the shared floor (`TOOLBAR_SEARCH_SLOT`, ~160-
+                180px) still left search crowded by the filter pill/sort/view
+                controls sharing this one scrolling lane (mobile audit —
+                measured 110px on Waves, the narrowest of any screen tested).
+                Search is the lane's FIRST child, so raising its own floor to
+                200px on a phone guarantees it that much visible width before
+                anything else in the lane can crowd it — the rest of the lane
+                scrolls if it must, which this row already does (R63). Scoped
+                to this one call site, not the shared constant every other
+                toolbar also uses. */}
+            <div className={cn(TOOLBAR_SEARCH_SLOT, "max-sm:min-w-[200px]")}>
               <SearchInput
                 value={query.q}
                 onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}

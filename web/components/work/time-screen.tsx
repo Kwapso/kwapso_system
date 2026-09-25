@@ -53,7 +53,8 @@
 import * as React from "react"
 
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
-import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { renderFolderTabs, defaultTabsConfig, phoneFirstTab } from "@shared/web/screen-engine/tabs-view"
+import { useIsPhone } from "@/lib/use-is-phone"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { RecordMark } from "@shared/web/record-mark"
 import { useT } from "@shared/web/language"
@@ -100,7 +101,8 @@ export function TimeScreen({
   lang: Language
 }) {
   const t = useT()
-  const logsTab = tab === ENTRIES ? ENTRIES : DASHBOARD
+  const isPhone = useIsPhone()
+  const logsTab = tab === ENTRIES ? ENTRIES : phoneFirstTab(ENTRIES, DASHBOARD, isPhone)
 
   // WHO MAY HAVE LOGGED IT — the team's own staff. Never a client login:
   // `useAssignableMembers` already drops one, which agrees with the door

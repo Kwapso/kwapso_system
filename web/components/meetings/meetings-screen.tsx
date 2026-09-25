@@ -73,7 +73,12 @@ import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
 // NO `Rows` ANY MORE — it was the Agenda view's own switcher glyph, and the
 // Agenda view is removed (23 Sep 2026, the header block below).
-import { CalendarBlank, Columns, ListBullets, Plus } from "@shared/ui/foundations/icons"
+import { CalendarBlank, Columns, DotsThree, ListBullets, Plus } from "@shared/ui/foundations/icons"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider, CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -796,24 +801,62 @@ export function MeetingsScreen({
         total={total}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* M2, below `sm`: Sync alone (with the gear) was enough to
+                truncate the title to "M…" (mobile audit, cause 6) — there is
+                no Ask-equivalent primary action on this screen to keep, so
+                Sync folds into one overflow trigger there instead. R61 keeps
+                the gear to exactly one mount, so it stays inline, always, at
+                every width; only Sync (no such rule) also draws a second time
+                inside the menu. Desktop is untouched: the same Sync control,
+                at the same classes, inline. */}
             {canCreate && (
-              <GoogleSyncButton
-                teamId={teamId}
-                scope="both"
-                describe={false}
-                onCalendarResult={(r) => {
-                  setAhead(r.ahead)
-                  setCaughtUp(r.caughtUp)
-                }}
-                onSynced={() => {
-                  invalidate(meetingsKey(teamId))
-                  invalidate(meetingsKey(teamId, "mine-week"))
-                  // …AND MINE. A calendar sweep is the single biggest source of
-                  // new rows in this person's Mine. Every entry it brings in
-                  // carries the guest list that decides the tab.
-                  invalidate(meetingsKey(teamId, "mine"))
-                }}
-              />
+              <div className="hidden sm:block">
+                <GoogleSyncButton
+                  teamId={teamId}
+                  scope="both"
+                  describe={false}
+                  onCalendarResult={(r) => {
+                    setAhead(r.ahead)
+                    setCaughtUp(r.caughtUp)
+                  }}
+                  onSynced={() => {
+                    invalidate(meetingsKey(teamId))
+                    invalidate(meetingsKey(teamId, "mine-week"))
+                    // …AND MINE. A calendar sweep is the single biggest source of
+                    // new rows in this person's Mine. Every entry it brings in
+                    // carries the guest list that decides the tab.
+                    invalidate(meetingsKey(teamId, "mine"))
+                  }}
+                />
+              </div>
+            )}
+            {canCreate && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" size="icon" className="sm:hidden">
+                    <DotsThree className="size-4" />
+                    <span className="sr-only">{t("More")}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="sm:hidden w-64">
+                  <div className="p-2">
+                    <GoogleSyncButton
+                      teamId={teamId}
+                      scope="both"
+                      describe={false}
+                      onCalendarResult={(r) => {
+                        setAhead(r.ahead)
+                        setCaughtUp(r.caughtUp)
+                      }}
+                      onSynced={() => {
+                        invalidate(meetingsKey(teamId))
+                        invalidate(meetingsKey(teamId, "mine-week"))
+                        invalidate(meetingsKey(teamId, "mine"))
+                      }}
+                    />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <ModuleSettingsGear teamId={teamId} segment="meetings" />
           </div>

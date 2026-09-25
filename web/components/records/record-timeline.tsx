@@ -169,9 +169,15 @@ export function RecordTimeline({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-medium">{windowLabel}</div>
-        <div className="flex items-center gap-1">
+      {/* M8, below `sm`: this nav row plus the week-grid beneath it is chrome
+          no other collection screen carries (mobile audit — Waves' own
+          "date-range navigator/week strip"). `flex-wrap` let a long window
+          label push Today/◀/▶ onto a second line there; `flex-nowrap` plus a
+          truncatable label keeps it one line instead. `sm:flex-wrap` restores
+          the exact original behaviour at `sm` and above. */}
+      <div className="flex flex-nowrap items-center justify-between gap-2 sm:flex-wrap">
+        <div className="min-w-0 truncate text-sm font-medium">{windowLabel}</div>
+        <div className="flex shrink-0 items-center gap-1">
           {onToday ? (
             // R98 — a toolbar button is the kit's default height, never `sm`.
             <Button variant="secondary" onClick={onToday}>

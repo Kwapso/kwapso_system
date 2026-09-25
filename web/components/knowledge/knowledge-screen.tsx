@@ -77,7 +77,12 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Graph, ListBullets, Sparkle, UploadSimple } from "@shared/ui/foundations/icons"
+import { DotsThree, Graph, ListBullets, Sparkle, UploadSimple } from "@shared/ui/foundations/icons"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { formatCount } from "@shared/web/format-count"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -463,12 +468,40 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
                 <Sparkle className="size-4" aria-hidden />
                 {t("Ask")}
               </Button>
-              <GoogleSyncButton
-                teamId={teamId}
-                scope="knowledge"
-                describe={false}
-                onSynced={() => invalidate(knowledgeKey(teamId))}
-              />
+              {/* M2, below `sm`: Ask is the one primary action that stays;
+                  Sync crowded the row enough (with the gear) to truncate the
+                  title to "K…" (mobile audit, cause 6), so it folds into one
+                  overflow trigger there instead — R61 keeps the gear itself
+                  to exactly one mount, so the gear stays inline, always, at
+                  every width; only Sync (which carries no such rule) also
+                  draws a second time inside the menu. Desktop is untouched:
+                  the same Sync control, at the same classes, inline. */}
+              <div className="hidden sm:block">
+                <GoogleSyncButton
+                  teamId={teamId}
+                  scope="knowledge"
+                  describe={false}
+                  onSynced={() => invalidate(knowledgeKey(teamId))}
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" size="icon" className="sm:hidden">
+                    <DotsThree className="size-4" />
+                    <span className="sr-only">{t("More")}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="sm:hidden w-64">
+                  <div className="p-2">
+                    <GoogleSyncButton
+                      teamId={teamId}
+                      scope="knowledge"
+                      describe={false}
+                      onSynced={() => invalidate(knowledgeKey(teamId))}
+                    />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <ModuleSettingsGear teamId={teamId ?? null} segment="knowledge" />
             </div>
           }

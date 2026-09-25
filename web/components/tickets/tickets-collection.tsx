@@ -100,7 +100,8 @@ import * as React from "react"
 
 import { Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { defaultTabsConfig, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
+import { defaultTabsConfig, phoneFirstTab, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
+import { useIsPhone } from "@/lib/use-is-phone"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useRemembered } from "@shared/web/remembered"
 import { Button } from "@shared/ui/components/button/button"
@@ -948,7 +949,8 @@ export function TicketsCollection({
      again, this line changes with it, and the test that would have caught it
      is worth more than the comment: filed as a follow-up rather than pretended
      to be solved here. */
-  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", DASHBOARD)
+  const isPhone = useIsPhone()
+  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", phoneFirstTab(TRIAGE, DASHBOARD, isPhone))
   /* WHICH BODY EACH OF THE THREE MULTI-VIEW TABS IS SHOWING — Open and Ready
    * from the start, All since 17 Sep 2026 (see the third hook's own note,
    * just below).

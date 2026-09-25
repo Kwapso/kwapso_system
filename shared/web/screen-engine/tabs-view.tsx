@@ -107,6 +107,17 @@ export const defaultTabsConfig: TabsConfig = {
   fullWidth: false,
 }
 
+/** M8, on a phone the list is the page: a Dashboard-first module costs the
+ * phone the very screen real estate it doesn't have, so the record tab leads
+ * there instead. Desktop and tablet are untouched — this only decides what an
+ * UNCHOSEN tab resolves to, never overrides an explicit one, so a saved
+ * preference or an address that already names a tab is never second-guessed.
+ * One function so Tickets, Logs and Accounts make the same decision instead of
+ * three copies that can drift. */
+export function phoneFirstTab<T extends string>(recordTab: T, dashboardTab: T, isPhone: boolean): T {
+  return isPhone ? recordTab : dashboardTab
+}
+
 /** kebab-case name → the kit's icon component, or null for a name it cannot
  * draw. One resolution path, shared with `<Icon>` in ./icon. */
 export function kitIcon(name: string): React.ReactNode {

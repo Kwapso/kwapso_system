@@ -205,7 +205,8 @@ import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Plus, SquaresFour, ListBullets, MapTrifold } from "@shared/ui/foundations/icons"
 
-import { defaultTabsConfig, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
+import { defaultTabsConfig, phoneFirstTab, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
+import { useIsPhone } from "@/lib/use-is-phone"
 import {
   CollectionCreateActionProvider,
   CollectionFrame,
@@ -453,7 +454,15 @@ export function AccountsScreen({
   // reload, and the switch reads "gallery" again, her own first-load default.
   // WITHIN one mount it is ordinary React state, so switching tabs and back
   // (see `effectiveView` below) does remember which body was picked.
-  const [view, setView] = React.useState<"gallery" | "list" | "map">("gallery")
+  //
+  // ON A PHONE, THE FIRST LOAD IS "list" INSTEAD (M8: the list is the page) —
+  // her ruling names no order for a phone specifically, and Gallery's own
+  // card measured 131px a row on one tested there (mobile audit, cause 5),
+  // against List's already-compact `RecordTable` shape. Desktop's default is
+  // untouched; this is the one-time initial value, the same "first load"
+  // moment the comment above already describes.
+  const isPhone = useIsPhone()
+  const [view, setView] = React.useState<"gallery" | "list" | "map">(isPhone ? "list" : "gallery")
 
   // THE COUNTRY FACET'S OPTIONS — the team's own "Country" vocabulary
   // (`shared/selectable-groups.ts`), read through the SAME "selectable:all"
@@ -548,7 +557,7 @@ export function AccountsScreen({
           ? "inactive"
           : tab === "active"
             ? "active"
-            : "dashboard"
+            : phoneFirstTab("active", "dashboard", isPhone)
   const showMapView = accountTab === "active"
   const effectiveView = view === "map" && !showMapView ? "gallery" : view
 
