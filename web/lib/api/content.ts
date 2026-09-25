@@ -547,7 +547,9 @@ export const content = {
   helpOne: (id: string) =>
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
   helpThread: (id: string) =>
-    api<{ replies: HelpMessage[]; total: number }>(`/api/content/help/thread?id=${enc(id)}`),
+    api<{ replies: HelpMessage[]; total: number; attachments: HelpAttachment[] }>(
+      `/api/content/help/thread?id=${enc(id)}`
+    ),
   // `accountId` names the CLIENT the ticket is raised for. Staff only, and the
   // door decides that — a portal caller's account comes from the guard corridor
   // and the body is never consulted (workers/content/src/lib/help.ts).

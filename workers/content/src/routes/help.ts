@@ -314,7 +314,18 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   )
 }
 
-/** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first).
+/** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first),
+ * AND the ticket's own opening attachments — `threadId`-null rows, files and
+ * links picked while raising it, or added later from the edit form. Rides
+ * this same door rather than a call of its own: the ticket detail screen
+ * already fetches this on every cold open (`cold-screen-hops.test.tsx`'s own
+ * request-count ceiling), and every reply's OWN attachments already come back
+ * on `HelpMessage.attachments` here too — a sixth, separate round trip for
+ * the ticket's own would have bought nothing a concurrent server-side query
+ * doesn't already buy for free. `help-detail.tsx`'s `ticketFilesFor` reads
+ * this field; `content.helpAttachments` (the `/attachments` door) stays the
+ * one the Triage queue and the edit form read on their OWN first paint, where
+ * this request has not already happened.
  * Portal-ness decides WHOSE conversation, exactly as it decides whose tickets —
  * the fence rides the thread's own WHERE (lib/help threadFence). */
 export async function getHelpThread(request: Request, env: Env): Promise<Response> {
@@ -322,16 +333,17 @@ export async function getHelpThread(request: Request, env: Env): Promise<Respons
   const scope = await callerScope(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
-  // TWO AWAITS IN ONE OBJECT LITERAL ARE SEQUENTIAL, not concurrent — JavaScript
-  // evaluates properties in order, so this shape reads as though both go at once
-  // and queues them instead. Each is a separate HTTPS request to the D1 REST
-  // API, and neither needs the other's answer, so the second was pure waiting.
+  // THREE AWAITS IN ONE OBJECT LITERAL ARE SEQUENTIAL, not concurrent — JavaScript
+  // evaluates properties in order, so this shape reads as though they all go at
+  // once and queues them instead. Each is a separate HTTPS request to the D1 REST
+  // API, and neither needs another's answer, so the rest were pure waiting.
   // On the single most common action in the app: opening a ticket.
-  const [replies, total] = await Promise.all([
+  const [replies, total, attachments] = await Promise.all([
     listReplies(cfg, guard, scope, id),
     countReplies(cfg, guard, scope, id),
+    listAttachments(cfg, guard, scope, id),
   ])
-  return json({ replies, total })
+  return json({ replies, total, attachments: attachments.filter((a) => !a.threadId) })
 }
 
 /** POST /api/content/help — raise a ticket (help:create).

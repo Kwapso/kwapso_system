@@ -78,7 +78,11 @@ vi.mock("@/lib/api", async (importOriginal) => {
       ...actual.content,
       help: async () => ({ tickets: [api.ticket], total: 1, nextCursor: null, hasMore: false }),
       helpOne: async () => api.ticket,
-      helpThread: async () => ({ replies: api.replies, total: api.replies.length }),
+      helpThread: async () => ({
+        replies: api.replies,
+        total: api.replies.length,
+        attachments: api.attachments.filter((a) => !a.threadId),
+      }),
       helpStakeholders: async () => ({ stakeholders: [] }),
       helpStages: async () => EMPTY_STAGE_HISTORY,
       stories: async () => ({ stories: [] as Story[], total: 0, nextCursor: null, hasMore: false }),

@@ -416,23 +416,25 @@ export function HelpDetailScreen({
       // key (web/lib/live-resources.ts), so it stays primed for R15 rather
       // than going stale the day something reads it again.
       primeCache(`total:help-thread:${helpId}`, r.total)
+      // WHAT THIS TICKET ITSELF CARRIES — files (and links) picked while
+      // RAISING it, or added later from the edit form (`threadId`-null rows;
+      // `getHelpThread`, workers/content/src/routes/help.ts, already filters
+      // to exactly these). PRIMED here, off THIS SAME request, rather than
+      // fetched with a call of its own: this screen's cold-open request
+      // budget is a locked ceiling (cold-screen-hops.test.tsx), and a sixth
+      // round trip for something the door already hands over for free would
+      // have broken it for nothing. `help-form-dialog.tsx`'s own `attach()`
+      // writes these through the identical door (`content.addHelpAttachment`,
+      // no `help_thread_id`), and the Triage queue reads the same cache key
+      // for the identical reason (`triage-queue.tsx`'s own header) — ONE key,
+      // so an attach or a remove from either screen reaches this one too, the
+      // live registry already patches it (`TEAM_RESOURCES.help`,
+      // web/lib/live-resources.ts), no extra wiring here.
+      primeCache(helpAttachmentsKey(helpId), r.attachments)
       return r.replies
     })
   )
-  // WHAT THIS TICKET ITSELF CARRIES — files (and links) picked while RAISING
-  // it, or added later from the edit form. `help-form-dialog.tsx`'s own
-  // `attach()` writes these through the identical door
-  // (`content.addHelpAttachment`, no `help_thread_id`), and the Triage queue
-  // already reads the same cache key for the identical reason
-  // (`triage-queue.tsx`'s own header). ONE key, so an attach or a remove from
-  // either screen reaches this one too — the live registry already patches it
-  // (`TEAM_RESOURCES.help`, web/lib/live-resources.ts), no extra wiring here.
-  const attachmentsQ = useCached<HelpAttachment[]>(helpAttachmentsKey(helpId), () =>
-    content.helpAttachments(helpId).then((r) => {
-      primeCache(`total:${helpAttachmentsKey(helpId)}`, r.total)
-      return r.attachments
-    })
-  )
+  const attachmentsQ = useCachedValue<HelpAttachment[]>(helpAttachmentsKey(helpId))
   // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND. Everything below this line
   // is a picker, a badge or a panel BESIDE the record rather than the record —
   // and until 7 Sep 2026 every one of them left the browser in front of it
@@ -2080,7 +2082,7 @@ export function HelpDetailScreen({
                       // 0105's other half) — the ticket's own opening message
                       // carries its own files exactly the way every reply
                       // already carries theirs, below.
-                      ...ticketFilesFor(attachmentsQ.data),
+                      ...ticketFilesFor(attachmentsQ),
                     },
                     /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
                        TOLD. `side: "mine"` is the bubble the kit paints

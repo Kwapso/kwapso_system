@@ -122,9 +122,33 @@ describe("a reply's staged files round-trip through the door", () => {
     expect(threadRes.status).toBe(200)
     const thread = (await threadRes.json()) as {
       replies: { id: string; body: string; attachments?: { id: string; name: string }[] }[]
+      attachments: { id: string }[]
     }
     const read = thread.replies.find((r) => r.body === "Here's what I mean")
     expect(read?.attachments).toEqual([expect.objectContaining({ id: attId, name: "board.png" })])
+
+    // AND THE THREAD DOOR'S OWN TOP-LEVEL `attachments` — the ticket's own
+    // opening files, `threadId`-null only (help-detail.tsx's `ticketFilesFor`
+    // reads this; a second, separate `/attachments` call for the same screen
+    // would have cost a sixth request on its cold-open budget,
+    // cold-screen-hops.test.tsx). This one is CLAIMED now, so it must NOT
+    // appear here — it already came back on `read.attachments` above.
+    expect(thread.attachments.some((a) => a.id === attId)).toBe(false)
+  })
+
+  it("the thread door's own `attachments` names exactly the ticket's threadId-null rows", async () => {
+    const ticketLevel = await stageFile(IDS.staffUser, IDS.victimTicket, "board.png")
+    const claimed = await stageFile(IDS.staffUser, IDS.victimTicket, "invoice.pdf")
+    await call(IDS.staffUser, "POST /api/content/help/reply", {
+      helpId: IDS.victimTicket,
+      body: "Filed",
+      attachmentIds: [claimed],
+    })
+
+    const res = await call(IDS.staffUser, "GET /api/content/help/thread", undefined, `?id=${IDS.victimTicket}`)
+    const body = (await res.json()) as { attachments: { id: string; label: string; threadId: string | null }[] }
+    expect(body.attachments.map((a) => a.id)).toEqual([ticketLevel])
+    expect(body.attachments[0].threadId).toBeNull()
   })
 
   it("the ticket-level door tells the two kinds of row apart by `threadId` (R40's other reader, help-detail.tsx's `ticketFilesFor`)", async () => {
