@@ -49,3 +49,20 @@ the brand footer at `brand.css` `.nk-footer__bottom-wrapper` keeps its treatment
 changes direction at the mobile breakpoint (`flex-flow: column`).
 
 ---
+
+### M7: the phone look (client ruling, 25 Sep 2026)
+
+Alaap approved this for the agency app first; the portal follows after review. Nothing is
+added, removed or redesigned: only padding, scale and layout change below `sm`.
+
+- The content card runs edge to edge: no outer gutter, no card radius, no card inset.
+- The page title steps down one size.
+- The toolbar is one row: search takes the free width, the other controls go icon-only.
+- Tab strips scroll sideways (M3), never wrap.
+- Dialogs open as full-height sheets.
+- Every tap target is at least 44px.
+
+The tier lives in the design kit (Kwapso/kwapso-ui-ux), so every app that re-pulls the kit
+gets it; app-only fixes live in `web/` and `shared/web/screen-engine/`.
+
+Evidence: (client) Alaap's "Yes" to the six-point phone plan, 25 Sep 2026.
