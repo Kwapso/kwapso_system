@@ -66,3 +66,21 @@ The tier lives in the design kit (Kwapso/kwapso-ui-ux), so every app that re-pul
 gets it; app-only fixes live in `web/` and `shared/web/screen-engine/`.
 
 Evidence: (client) Alaap's "Yes" to the six-point phone plan, 25 Sep 2026.
+
+### M8: on a phone, the list is the page (client ruling, 25 Sep 2026)
+
+Every feature above a collection stays, but on a phone it collapses so the records start
+in the first screen: the first record at or above 200px and at least five records visible
+at 390x844.
+
+- KPI cards and charts become one sideways-scrolling strip, or a "Summary" disclosure
+  that is collapsed by default.
+- Filter, sort and view controls sit behind one icon button that opens a sheet; search
+  keeps the free width of the toolbar row.
+- Subtitles and helper copy are hidden below `sm`.
+- Rows are compact list rows: no card per row, two lines at most, meta on one line.
+
+Each collapse lives once, in the kit composition or the screen engine, never per screen.
+
+Evidence: (client) Alaap, 25 Sep 2026: phone real estate is too small; the collection is
+out of sight, search and title are hard to use, and one record shows per scroll.
