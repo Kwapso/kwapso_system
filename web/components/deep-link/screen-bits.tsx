@@ -58,6 +58,11 @@ import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning 
 import { Headline } from "@shared/ui/components/typography/typography"
 import { SortControl, type SortOption } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
+import {
+  ToolbarRowFold,
+  TOOLBAR_ROW_FOLD_CONTAINER,
+  TOOLBAR_ROW_FOLD_LANE,
+} from "@shared/ui/components/toolbar-row/toolbar-row"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
@@ -1187,7 +1192,16 @@ export function ToolbarRow({
              never a ref threaded through every screen with facets. It changes
              nothing about this element's own drawing. */
           data-filter-anchor=""
-          className={cn("flex flex-wrap items-center gap-2", className)}
+          /* `flex-nowrap` + `TOOLBAR_ROW_FOLD_CONTAINER`, 25 Sep 2026 (M7/M8).
+             This row is `ToolbarColumn`'s (paged-find.tsx) own twin, hand-copied
+             the same way and missing the identical class: the kit's own
+             `<ToolbarRow>` has folded its filters/sort/view lanes behind "···"
+             below its own 48rem container width all along, and this row —
+             every screen that calls `ToolbarRow` from THIS file, Tasks and
+             Tickets' Triage queue among them — never carried the one class that
+             turns that fold on. Reusing the kit's own exported values below,
+             same as `ToolbarColumn` now does, closes both copies at once. */
+          className={cn("flex flex-nowrap items-center gap-2", TOOLBAR_ROW_FOLD_CONTAINER, className)}
         >
           {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
               like in your atifact": her reference artifact's search element is
@@ -1205,8 +1219,12 @@ export function ToolbarRow({
               renders inline here — a normal flex child, wrapped in its own
               non-growing box internally, same as every other slot on this row.
               The facets it opens are not a second value and not a second
-              row: they ride with it, portaled, above the rows (R110). */}
-          {filters}
+              row: they ride with it, portaled, above the rows (R110).
+
+              BELOW 48REM THIS LANE FOLDS BEHIND THE TRIGGER INSTEAD OF
+              WRAPPING — M7/M8, 25 Sep 2026, the same `TOOLBAR_ROW_FOLD_LANE`
+              `<ToolbarRow>`'s own filters lane carries. */}
+          {filters ? <div className={TOOLBAR_ROW_FOLD_LANE}>{filters}</div> : null}
           {/* THE ROW DRAWS BOTH OF THESE (R53), from the configs above. Before
               this, both were `React.ReactNode` and eight call sites handed
               their `<SortControl>` to `search` instead — where it sat inside
@@ -1214,44 +1232,78 @@ export function ToolbarRow({
               typed, rather than in this non-growing one. The wrapper, the
               order, the name and the hidden label are this component's now, so
               every collection toolbar in the app draws the same chip in the
-              same place. */}
-          {sort && !sortHiddenByView && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <SortControl
-                options={sort.options}
-                value={sort.value}
-                onValueChange={sort.onValueChange}
-                direction={sort.direction}
-                onDirectionChange={sort.onDirectionChange}
-                label={t("Sort by")}
-                hideLabel
-                /* THE STANDING HEIGHT, SAME AS FILTER AND VIEW — client,
-                   2026-09-06: "filter sort and view should be same size, since
-                   last iteration sort is smaller, fix that."
+              same place.
 
-                   THIS LINE USED TO PASS `size="sm"`, and that was me reading her
-                   earlier note — "the sort component everywhere, I feel it's too
-                   big, could we make it a bit more compact" — as a question about
-                   HEIGHT. It was not. Measured on verify/toolbar-trio: the pill
-                   was the right height all along and carried 26 between its arrow
-                   and its label where `ViewSwitch` carries 8. She was describing
-                   the INSIDE of the control, and shrinking the whole thing to 32
-                   answered the wrong axis — it left the row of three uneven
-                   without touching what she was actually looking at.
+              SORT AND VIEW SHARE ONE FOLD LANE, 25 Sep 2026 — the same pair
+              `<ToolbarRow>`'s own `viewSwitch` slot already folds together. */}
+          {(sort && !sortHiddenByView) || view ? (
+            <div className={cn("flex min-w-0 items-center gap-2", TOOLBAR_ROW_FOLD_LANE)}>
+              {sort && !sortHiddenByView && (
+                <SortControl
+                  options={sort.options}
+                  value={sort.value}
+                  onValueChange={sort.onValueChange}
+                  direction={sort.direction}
+                  onDirectionChange={sort.onDirectionChange}
+                  label={t("Sort by")}
+                  hideLabel
+                  /* THE STANDING HEIGHT, SAME AS FILTER AND VIEW — client,
+                     2026-09-06: "filter sort and view should be same size, since
+                     last iteration sort is smaller, fix that."
 
-                   So the height goes back to the 40 its neighbours wear, and the
-                   compactness she asked for is now where it belongs: the kit's
-                   own `sort-control` drops its seam-side inset to `--space-2`,
-                   the same 8 `ViewSwitch` spends between glyph and label. Two
-                   axes, two fixes, neither standing in for the other. */
-              />
+                     THIS LINE USED TO PASS `size="sm"`, and that was me reading her
+                     earlier note — "the sort component everywhere, I feel it's too
+                     big, could we make it a bit more compact" — as a question about
+                     HEIGHT. It was not. Measured on verify/toolbar-trio: the pill
+                     was the right height all along and carried 26 between its arrow
+                     and its label where `ViewSwitch` carries 8. She was describing
+                     the INSIDE of the control, and shrinking the whole thing to 32
+                     answered the wrong axis — it left the row of three uneven
+                     without touching what she was actually looking at.
+
+                     So the height goes back to the 40 its neighbours wear, and the
+                     compactness she asked for is now where it belongs: the kit's
+                     own `sort-control` drops its seam-side inset to `--space-2`,
+                     the same 8 `ViewSwitch` spends between glyph and label. Two
+                     axes, two fixes, neither standing in for the other. */
+                />
+              )}
+              {view && (
+                <ViewSwitch views={view.views} value={view.value} onValueChange={view.onValueChange} label={t("View")} />
+              )}
             </div>
-          )}
-          {view && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <ViewSwitch views={view.views} value={view.value} onValueChange={view.onValueChange} label={t("View")} />
-            </div>
-          )}
+          ) : null}
+          {/* THE FOLD TRIGGER — "···", beside the actions, the same position
+              `<ToolbarRow>`'s own note gives it. Below 48rem it opens a popover
+              holding the two lanes above; at 48rem and up it renders nothing. */}
+          {filters || (sort && !sortHiddenByView) || view ? (
+            <ToolbarRowFold
+              filters={filters ?? undefined}
+              viewSwitch={
+                (sort && !sortHiddenByView) || view ? (
+                  <>
+                    {sort && !sortHiddenByView && (
+                      <SortControl
+                        options={sort.options}
+                        value={sort.value}
+                        onValueChange={sort.onValueChange}
+                        direction={sort.direction}
+                        onDirectionChange={sort.onDirectionChange}
+                        label={t("Sort by")}
+                        hideLabel
+                      />
+                    )}
+                    {view && (
+                      <ViewSwitch views={view.views} value={view.value} onValueChange={view.onValueChange} label={t("View")} />
+                    )}
+                  </>
+                ) : undefined
+              }
+              moreFiltersLabel={t("More filters and view options")}
+              filtersMenuLabel={t("Filters")}
+              viewSwitchMenuLabel={t("Sort & view")}
+            />
+          ) : null}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
       </div>
