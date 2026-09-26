@@ -2221,6 +2221,13 @@ export const TEAM_RESOURCES: Record<
       appAttachmentsKey(appId),
       `total:${appAttachmentsKey(appId)}`,
       ...recordCountDeps("app_attachments"),
+      // THE APP'S OWN ACTIVITY FEED (T3850 follow-up) — every write here logs
+      // through `logActivity` with `relatedTable: "apps"`, so the line lands
+      // under the APP's activity, not under a resource of that name. Missing
+      // this meant the Files tab's own key patched clean while the Activity
+      // tab beside it kept showing yesterday until an unrelated app ping (or a
+      // tab switch) happened to drop the same key by accident.
+      `activity:record:apps:${appId}`,
     ],
   },
   // APPS — row-level live now that they have a list and a record screen of their

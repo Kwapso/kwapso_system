@@ -16,9 +16,11 @@ import ts from "typescript"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { pagedFindWiredTo } from "@shared/rules/paged-find-scan"
+import { indexAllFunctions } from "@shared/rules/seam-scan"
 import { GLOSSARY } from "@shared/glossary"
 import {
   ACCOUNT_SCOPED_MODULES,
+  ACTIVITY_FEED_EXEMPT,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
   AUTH_PUBLISH_EXEMPT,
@@ -2211,6 +2213,133 @@ describe("RULES — the laws of the base", () => {
     expect(
       handRolled,
       `a per-record time cache key must come from recordTimeKey, not sliceKey (R15): ${handRolled.join(", ")}`
+    ).toEqual([])
+  })
+
+  // R15's THIRD CLAUSE (T3850, 26 Sep 2026) — a write that logs activity also
+  // invalidates that record's own activity feed.
+  //
+  // Uploading a file on an app's Files tab logs activity under
+  // `relatedTable: "apps"` (`addAppAttachment`, workers/tenancy/src/lib/
+  // app-attachments.ts) but the door published resource `app_attachments`
+  // (routes/app-attachments.ts) — a resource of its own, not "apps", because
+  // the Files panel is its own cache key. `app_attachments`'s TEAM_RESOURCES
+  // deps invalidated the Files list and its count and nothing else, so the
+  // Files tab patched clean and the Activity tab beside it kept showing
+  // yesterday until an unrelated `apps` ping (editing the app, or a process
+  // role change) happened to drop the same key — which is why switching tabs
+  // "fixed" it: the remount re-read cold.
+  //
+  // The first two clauses of R15 ask "does a published resource reach a
+  // listener at all". Neither one could have caught this: `app_attachments`
+  // DOES reach a listener — its own row, its own count — the gap is that it
+  // does not reach the ONE OTHER key its own write also changed. So the
+  // question here is narrower and different: for a table this scan finds a
+  // route LOGGING to, is that table covered by a resource that route also
+  // PUBLISHES.
+  //
+  // DERIVED, never hand-listed, off the same two vocabularies R15's other
+  // clauses and R18 already read literally off worker source
+  // (`publishChange(…, "resource"…)`, `relatedTable: "table"`) — reused here
+  // rather than reinvented. What is new is the WALK: every exported function
+  // in each mutating worker (tenancy, content, data-ops — the same three R1
+  // covers) is indexed by name, and for each one this asks "what does this
+  // function, or anything it calls (hop-limited, `indexAllFunctions` +
+  // `MAX_HOPS` shared with the activity seam's own call-graph walk), publish
+  // AND log". A function that reaches both is a real route (or a lib function
+  // a route's write runs through): `postAppAttachment` never calls
+  // `logActivity` itself, but it calls `addAppAttachment`, which does — the
+  // walk is what finds that without anybody naming the chain.
+  //
+  // For every such function, every relatedTable it reaches must be covered by
+  // AT LEAST ONE resource it also reaches — "covered" read off the registry
+  // ITSELF, by calling the real `deps`/`SIMPLE_INVALIDATIONS` function with
+  // sentinel arguments and checking the key it hands back, so this can never
+  // drift from what `app-shell.tsx` actually drops on a ping. A gap needs a
+  // fix in `web/lib/live-resources.ts`, or a reasoned `ACTIVITY_FEED_EXEMPT`
+  // entry for the rare case the activity line is read by something else.
+  it("live-collections: a write that logs activity keeps that record's activity feed live", () => {
+    const RESOURCE_RE = /publishChange\([^,]+,[^,]+,\s*"([a-z_]+)"/g
+    const TABLE_RE = /relatedTable: "([a-z_]+)"/g
+    const CALL_RE = /(?<![A-Za-z0-9_$.])(\w{4,})\s*\(/g
+    const MAX_HOPS = 4
+    const SENTINEL_TEAM = "sentinel-team"
+    const SENTINEL_ID = "sentinel-id"
+
+    // WHICH TABLES HAVE A LIVE ACTIVITY FEED AT ALL — derived off the registry
+    // itself, never hand-listed: every key ANY resource's own deps/simple
+    // invalidation actually drops, filtered to the `activity:record:<table>:`
+    // shape. Most tables here are settings/relationship rows (roles, tools,
+    // departments, invites, process drafts, selectable options…) with no
+    // record screen of their own and so no per-record feed for a ping to
+    // reach — flagging those would be noise, not a finding, because nothing
+    // reads the key this clause would demand they invalidate. Only a table
+    // that SOME resource already proves has a live feed can be a real gap
+    // when a DIFFERENT write to the same table forgets to reach it.
+    const activityFeedTables = new Set<string>()
+    for (const entry of Object.values(TEAM_RESOURCES))
+      for (const k of entry.deps?.(SENTINEL_TEAM, SENTINEL_ID) ?? [])
+        for (const m of k.matchAll(/^activity:record:([a-z_]+):/g)) activityFeedTables.add(m[1])
+    for (const simple of Object.values(SIMPLE_INVALIDATIONS))
+      for (const k of simple(SENTINEL_TEAM))
+        for (const m of k.matchAll(/^activity:record:([a-z_]+):/g)) activityFeedTables.add(m[1])
+
+    const offenders: string[] = []
+    let candidates = 0
+
+    for (const worker of MUTATING_WORKERS) {
+      const fns = indexAllFunctions(join(ROOT, "workers", worker, "src"))
+
+      // What does NAME, or anything it calls (within MAX_HOPS), publish and
+      // log — the same seen-guarded, hop-limited shape the activity seam's own
+      // `writesActivity` walk uses, asking for two sets instead of a boolean.
+      const reach = (name: string, seen: Set<string>, depth: number): { resources: Set<string>; tables: Set<string> } => {
+        const resources = new Set<string>()
+        const tables = new Set<string>()
+        if (depth > MAX_HOPS || seen.has(name)) return { resources, tables }
+        seen.add(name)
+        const body = fns.get(name)
+        if (!body) return { resources, tables }
+        const code = stripComments(body)
+        for (const m of code.matchAll(RESOURCE_RE)) resources.add(m[1])
+        for (const m of code.matchAll(TABLE_RE)) tables.add(m[1])
+        for (const m of code.matchAll(CALL_RE)) {
+          if (!fns.has(m[1])) continue
+          const sub = reach(m[1], seen, depth + 1)
+          for (const r of sub.resources) resources.add(r)
+          for (const t of sub.tables) tables.add(t)
+        }
+        return { resources, tables }
+      }
+
+      for (const name of fns.keys()) {
+        const { resources, tables } = reach(name, new Set(), 0)
+        if (resources.size === 0 || tables.size === 0) continue
+        candidates++
+        for (const table of tables) {
+          if (!activityFeedTables.has(table)) continue
+          const covered = [...resources].some((r) => {
+            const fromDeps = TEAM_RESOURCES[r]?.deps?.(SENTINEL_TEAM, SENTINEL_ID) ?? []
+            const fromSimple = SIMPLE_INVALIDATIONS[r]?.(SENTINEL_TEAM) ?? []
+            return [...fromDeps, ...fromSimple].some((k) => k.startsWith(`activity:record:${table}:`))
+          })
+          const key = `${worker}/${name}::${table}`
+          if (!covered && !ACTIVITY_FEED_EXEMPT[key]) offenders.push(key)
+        }
+      }
+    }
+
+    // Tripwire: a walk that finds no function reaching both a publish and a
+    // log has gone blind, the same shape R15's first clause guards itself
+    // with — a scan reporting "all clear" because it looked at nothing would
+    // read exactly like a scan that looked and found nothing wrong.
+    expect(
+      candidates,
+      "the activity-invalidation walk found no route that both publishes and logs — it has gone blind"
+    ).toBeGreaterThan(5)
+    expect(
+      offenders,
+      `a write logs activity under a table its published resource does not invalidate (R15) — add the activity key to that resource's deps in web/lib/live-resources.ts, or a reasoned ACTIVITY_FEED_EXEMPT entry: ${offenders.join(", ")}`
     ).toEqual([])
   })
 

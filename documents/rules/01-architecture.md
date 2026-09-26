@@ -9,3 +9,4 @@ existing ids by what they actually govern.
 
 - **R13** — Every module either registers as an import TargetDef or carries a reviewed exemption, and the catalogue self-heals against the code so a fresh environment's picker is never empty. (check: `catalog-coverage`, enforced)
 - **R37** — The whole post-auth app is one client-resolved shell; in-app links use soft navigation so a click never re-mounts the shell or drops the live cache. (check: `in-app-anchors`, enforced)
+- **R15** — Every published resource reaches a listener (never a deaf publish), and — its third clause, added for T3850 — a write that logs activity also invalidates that record's own activity feed, so a resource that patches its own row and count clean cannot leave the Activity tab beside it stale. Both halves DERIVED off the workers' own `publishChange`/`logActivity` calls, never hand-listed. (check: `live-collections`, enforced)

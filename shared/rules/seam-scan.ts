@@ -294,10 +294,11 @@ export function gatingSeam(worker: Worker & {
  * between exports. Same file walk, same stripComments contract; a different
  * question, and one where a private helper is exactly what is being looked for.
  *
- * NOT EXPORTED. It was, and nothing outside this file ever imported it — the
- * activity seam below is its only caller. An export nothing imports is a
- * contract nobody agreed to. */
-function indexAllFunctions(dir: string): Map<string, string> {
+ * EXPORTED for R15's activity-invalidation clause (web/test/rules.test.ts),
+ * which walks the same call graph one layer further out — into web/lib's own
+ * listener registry — to ask whether a table this walk finds a route logging
+ * to is a table the resource it publishes actually invalidates. */
+export function indexAllFunctions(dir: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const file of sourceFiles(dir, { extensions: [".ts"] })) {
     const starts = [...file.source.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)/gm)]

@@ -203,7 +203,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R15",
     dimension: "arch",
-    law: "No deaf publishers: every resource string any worker publishes must reach a listener (TEAM_RESOURCES / SIMPLE_INVALIDATIONS in web/lib/live-resources.ts, or the portal's own PORTAL_LISTENERS) or a reasoned DEAF_EXEMPT entry — the publisher set DERIVED by scanning publishChange calls, never hand-listed. Earned by: the dropdown manager staling because its worker pinged a resource nothing listened to. RETIRED HALF: this law also used to require every paged screen to hold a useLiveRefetch subscription. That clause detected paged screens by matching '/search?' or 'usePagedList' in web/components — zero files matched, so it could never fail, and the hook it protected had no call sites. The need was real and then went away: paging moved to opaque cursors over the SHARED STORE, so a paged list's rows now live in a cache key with its cursor in a sidecar — the very caches the row-level registry patches and the portal's listener map invalidates. No screen holds page state outside them any more, which was the hook's whole premise, so the clause and web/lib/use-live-refetch.ts were retired rather than re-detected.",
+    law: "No deaf publishers: every resource string any worker publishes must reach a listener (TEAM_RESOURCES / SIMPLE_INVALIDATIONS in web/lib/live-resources.ts, or the portal's own PORTAL_LISTENERS) or a reasoned DEAF_EXEMPT entry — the publisher set DERIVED by scanning publishChange calls, never hand-listed. Earned by: the dropdown manager staling because its worker pinged a resource nothing listened to. RETIRED HALF: this law also used to require every paged screen to hold a useLiveRefetch subscription. That clause detected paged screens by matching '/search?' or 'usePagedList' in web/components — zero files matched, so it could never fail, and the hook it protected had no call sites. The need was real and then went away: paging moved to opaque cursors over the SHARED STORE, so a paged list's rows now live in a cache key with its cursor in a sidecar — the very caches the row-level registry patches and the portal's listener map invalidates. No screen holds page state outside them any more, which was the hook's whole premise, so the clause and web/lib/use-live-refetch.ts were retired rather than re-detected. THIRD CLAUSE (T3850, 26 Sep 2026): a write that logs activity also invalidates that record's own activity feed. The first two clauses ask whether a published resource reaches a listener AT ALL — neither catches a resource that reaches a listener for its own row and count but not for the one other key its own write also changed. Earned by: uploading a file on an app's Files tab logged activity under relatedTable 'apps' (addAppAttachment) but published resource app_attachments, whose TEAM_RESOURCES deps invalidated the Files list and its count and nothing else — so the Files tab patched clean and the Activity tab beside it kept showing yesterday until an unrelated apps ping, or a tab switch that remounts and re-reads cold, happened to drop the same key by accident. DERIVED, never hand-listed: every exported function in the three mutating workers (MUTATING_WORKERS) is walked call-graph-wise (indexAllFunctions + a 4-hop ceiling, the same shape the activity seam's own walk uses) for what it publishes and what it logs, together; for every table some resource's own deps already prove has a live feed (derived off the registry itself, so a settings table with no record screen and no feed to invalidate is never flagged), every resource reaching that table must be one that covers it, or the gap needs a reasoned ACTIVITY_FEED_EXEMPT entry.",
     checkId: "live-collections",
     status: "enforced",
   },
@@ -4071,6 +4071,18 @@ export const DEAF_EXEMPT: Record<string, string> = {
   agent_usage:
     "the quota badge rides every chat response and the usage dialog fetches on open — there is no standing cache a ping could refresh",
 }
+
+/** R15's THIRD CLAUSE (T3850, 26 Sep 2026) — reviewed exemptions, keyed
+ * `<worker>/<function>::<relatedTable>` exactly as the scan names them: a
+ * function that both publishes a resource and (directly, or through
+ * something it calls) logs activity under a table that resource's own
+ * TEAM_RESOURCES/SIMPLE_INVALIDATIONS deps do not invalidate. Almost every
+ * entry here should be a bug fixed in web/lib/live-resources.ts instead — this
+ * exists for the rare case where the activity line is deliberately read by
+ * something OTHER than that record's own feed (there are none of those yet;
+ * the list starts empty on purpose, so the first entry has to argue for
+ * itself rather than inherit a precedent). */
+export const ACTIVITY_FEED_EXEMPT: Record<string, string> = {}
 
 /** R20 — reviewed exemptions: the request-body fields a door reads WITHOUT a
  * runtime check, keyed `<worker src path>::<var>.<field>` exactly as the scan
