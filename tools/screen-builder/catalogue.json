@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.168",
-  "sha": "d4350be204a9d0300038d62f10b8a928fffaab59",
-  "syncedAt": "2026-09-24"
+  "tag": "v1.2.169",
+  "sha": "6143af0dd6aa9ec61ced91e4e24a24e35b716b24",
+  "syncedAt": "2026-09-26"
  },
- "generatedAt": "2026-09-24T09:49:26.228Z",
+ "generatedAt": "2026-09-26T12:31:25.992Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -19,7 +19,7 @@
   "compositions": 47,
   "icons": 1514,
   "tokens": 390,
-  "tokenDeclarations": 615,
+  "tokenDeclarations": 618,
   "unresolved": 0
  },
  "components": [
@@ -8510,6 +8510,18 @@
      "file": "components/toolbar-row/toolbar-row.tsx"
     },
     {
+     "name": "TOOLBAR_ROW_FOLD_CONTAINER",
+     "file": "components/toolbar-row/toolbar-row.tsx"
+    },
+    {
+     "name": "TOOLBAR_ROW_FOLD_LANE",
+     "file": "components/toolbar-row/toolbar-row.tsx"
+    },
+    {
+     "name": "ToolbarRowFold",
+     "file": "components/toolbar-row/toolbar-row.tsx"
+    },
+    {
      "name": "ToolbarRow",
      "file": "components/toolbar-row/toolbar-row.tsx"
     }
@@ -8518,7 +8530,7 @@
     {
      "file": "components/toolbar-row/toolbar-row.tsx",
      "name": "toolbarRowVariants",
-     "line": 254,
+     "line": 318,
      "base": "flex min-w-0 flex-col @container",
      "groups": [
       {
@@ -8553,6 +8565,12 @@
     }
    ],
    "typedProps": [
+    {
+     "file": "components/toolbar-row/toolbar-row.tsx",
+     "type": "ToolbarRowFoldProps",
+     "variantsFrom": [],
+     "props": []
+    },
     {
      "file": "components/toolbar-row/toolbar-row.tsx",
      "type": "ToolbarRowProps",

@@ -1972,11 +1972,14 @@ const SCREEN = cn(
    `relative` is there so the index applies whatever the card's display ends
    up being, rather than relying on it being a flex item forever.
    -------------------------------------------------------------------------- */
+/* M7, 25 Sep 2026: below `sm` the card runs edge to edge — no radius, no
+   lifted edge (this kit has no separate border on the card; the elevation
+   shadow is the only edge treatment there is, so M7's "no side border"
+   drops that). `sm` and up are unchanged. */
 const CARD = cn(
   "relative z-[2] flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
-  "rounded-[var(--radius)]",
+  "max-sm:rounded-none max-sm:shadow-none sm:rounded-[var(--radius)] sm:shadow-[var(--shadow-lifted)]",
   "bg-[var(--surface-raised)] text-foreground",
-  "shadow-[var(--shadow-lifted)]",
   "[--btn-secondary-fill:var(--surface-panel)]",
   /* RENAMED FROM `--pill-fill`, 19 SEP 2026 — see this file's own header
      law and CHANGELOG v1.2.132. Same value. */
@@ -2184,7 +2187,10 @@ const BODY = cn(
      the page ends. Outside a pane both properties are simply absent and
      every reader falls back to what it drew before - see `RecordDetail`'s
      band for the fallbacks. */
-  "[--pane-inset-x:var(--space-6)]",
+  /* M7, 25 Sep 2026: steps with SHELL_CONTENT_INSET_X, the same two
+     variants, so a part that reads --pane-inset-x escapes by the right
+     number below `sm` too. */
+  "[--pane-inset-x:var(--space-4)] sm:[--pane-inset-x:var(--space-6)]",
   /* ── AND THE SAME NUMBER AGAIN UNDER A SECOND NAME, 22 SEP 2026, BECAUSE
      THE TWO READERS STOPPED AGREEING. `--pane-inset-x` answers "what does a
      part inside this pane owe its own text so it lands under the h1"; this
@@ -2197,7 +2203,7 @@ const BODY = cn(
      band's negative margin reads THIS property while its padding goes on
      reading `--pane-inset-x`. One number, two questions, and the rebinding
      is owned by the one element that knows which case it is. */
-  "[--pane-escape-x:var(--space-6)]",
+  "[--pane-escape-x:var(--space-4)] sm:[--pane-escape-x:var(--space-6)]",
   "[--radius-pane-edge:0px]",
 );
 
@@ -2680,9 +2686,13 @@ const DENSITY_ASIDE: Record<ScreenDensity, string> = {
    itself keep its own two edges equal, which it already did structurally)
    — `--shell-gutter` is `--space-4` (16px), `--rail-inset` is now
    `--space-2h` (10px), and neither drifting from the other is a defect. */
+/* EDGE TO EDGE BELOW `sm`, M7 (25 Sep 2026 client ruling, documents/
+   ui-rulebook/30-9-mobile.md) — "the content card runs edge to edge: no
+   outer gutter". `--shell-gutter` drops to 0 only below `sm`; both
+   densities keep `--space-4` at `sm` and up, unchanged. */
 const DENSITY_GUTTER: Record<ScreenDensity, string> = {
-  comfortable: "[--shell-gutter:var(--space-4)]",
-  calm: "[--shell-gutter:var(--space-4)]",
+  comfortable: "max-sm:[--shell-gutter:0px] sm:[--shell-gutter:var(--space-4)]",
+  calm: "max-sm:[--shell-gutter:0px] sm:[--shell-gutter:var(--space-4)]",
 };
 
 /* ----------------------------------------------------------------------------
@@ -2866,12 +2876,18 @@ const DENSITY_HEADER: Record<ScreenDensity, string> = {
    horizontal inset went to 0, and boxed it had been spending between 16 and
    32 - is in part two of that page and is not restated here.
 
-   ONE FIGURE AT EVERY WIDTH, NO PHONE STEP-DOWN. The page draws the chosen
-   value at 760 as well as 1440 and keeps 24 on both sides at both ("24 above
-   the nav, 24 on both sides, 24 before the band"), and the phone's own air
-   is `--shell-gutter`, OUTSIDE the pane, which this ruling does not touch.
-   A second figure below `md` would be a number nobody asked for. */
-const SHELL_CONTENT_INSET_X = "px-[var(--space-6)]";
+   ONE FIGURE AT EVERY WIDTH FROM `sm` UP; A PHONE STEP-DOWN BELOW IT, M7
+   (25 Sep 2026, client, documents/ui-rulebook/30-9-mobile.md). The 21 Sep
+   page's "no phone step-down" stood until M7 asked for one: below `sm` the
+   pane spends `--space-4` (16) instead of `--space-6` (24), the next rung
+   down on the same scale, so the inset still names one shell default —
+   there is no per-screen number, only the one width where the kit's own
+   scale steps. `--shell-gutter`, OUTSIDE the pane, is untouched by this;
+   it is `DENSITY_GUTTER`'s own ruling, above. `check-screen-shell.mjs`
+   still pins this identifier by name at every site `DENSITY_BODY` and
+   `DENSITY_TRAIL` read it. R109 (kwapso_system, RULES.md) carries the same
+   pin on the app side. */
+const SHELL_CONTENT_INSET_X = "px-[var(--space-4)] sm:px-[var(--space-6)]";
 
 const DENSITY_TRAIL: Record<ScreenDensity, string> = {
   comfortable: cn(SHELL_CONTENT_INSET_X, "pt-[var(--space-2h)]"),

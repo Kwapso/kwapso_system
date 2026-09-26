@@ -124,7 +124,25 @@ export function CollectionHeading({
     // that stays true forever. `min-w-0` on the wrapper lets the truncated
     // span actually shrink inside this flex row instead of pushing the badge
     // off the end.
-    <Headline as="h1" size="display-m" className="flex min-w-0 items-center gap-2">
+    //
+    // BELOW `sm`, ONE RUNG DOWN — M7/M8 (25 Sep 2026, Alaap, documents/
+    // ui-rulebook/30-9-mobile.md). `display-m` (56/500, `text-5xl`) measured
+    // 63px live on a phone at this account's scale setting and alone cost
+    // ~30px of the ~430px a phone screen has for the whole collection above
+    // the fold (mobile-audit findings-agency.md, cause 1). `max-sm:text-3xl`
+    // overrides it to the h2 rung (32/500) below `sm` only — one utility
+    // class beats another of the same group at the same specificity only
+    // because `cn` (tailwind-merge) drops the loser, and a breakpoint-scoped
+    // utility never conflicts with its unscoped sibling, so `sm` and up read
+    // `text-5xl` exactly as before this ruling. No second node, no fragment:
+    // the DOM here is unchanged, which is what keeps this element the
+    // card's own preceding sibling (`toolbar-lead-gap-card.test.tsx`) true
+    // at every width.
+    <Headline
+      as="h1"
+      size="display-m"
+      className="flex flex-wrap min-w-0 items-center gap-2 max-sm:text-3xl"
+    >
       {clampRecordHeading(t(title))}
       {badge ? <Badge variant="secondary">{badge}</Badge> : null}
     </Headline>

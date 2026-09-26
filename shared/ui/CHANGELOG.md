@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+### Changed - the phone shell, M7/M8 - 2026-09-25
+
+In plain words: below `sm` (640px) the shared chrome now fits a phone. The
+content pane runs edge to edge (no gutter, no card corners), the pane's
+own side padding steps down one rung on the same spacing scale, every
+button/toggle/chip/input reaches the 44px touch floor on a coarse pointer,
+and the toolbar's search-plus-"···" fold (already built for `ToolbarRow`)
+is now a named export any screen's own toolbar can reuse instead of
+re-copying it. The Roles permission grid's phone card collapses each
+module behind its own closed-by-default disclosure instead of showing
+every role at once. **`sm` and up are byte-for-byte unchanged** — every
+change here is either a `max-sm:`/bare class replaced by an `sm:`-gated
+pair, or a `@media (pointer: coarse)` block that a mouse never matches.
+
+Why: Alaap's M7 ("the phone look") and M8 ("on a phone, the list is the
+page") rulings, 25 Sep 2026 (documents/ui-rulebook/30-9-mobile.md in
+kwapso_system), approved for the agency app first — the portal follows
+after review. The measured cause list is kwapso_system's own
+`.worktrees/notes/mobile-audit/findings-agency.md`.
+
+What actually moved, for the next reader:
+- `SHELL_CONTENT_INSET_X` (screen-shell.tsx) — one constant, two widths now:
+  `px-[var(--space-4)] sm:px-[var(--space-6)]`. `check-screen-shell.mjs`
+  pins the new string.
+- `DENSITY_GUTTER` (screen-shell.tsx) — `--shell-gutter` is `0` below `sm`,
+  unchanged (`--space-4`) at `sm` and up.
+- `CARD` (screen-shell.tsx) — no radius, no elevation shadow below `sm`.
+- `foundations/tokens/tokens.css` — a new `@media (pointer: coarse)` block
+  raises `--control-height-field`/`-button`/`-pill` to 44px. The table row
+  height (`--control-height-row`, 56) is untouched on purpose.
+- `components/toolbar-row/toolbar-row.tsx` — the fold (container query,
+  lane-hidden classes, "···" trigger) is now also `TOOLBAR_ROW_FOLD_CONTAINER`,
+  `TOOLBAR_ROW_FOLD_LANE` and `ToolbarRowFold`, all exported; `ToolbarRow`
+  itself is just the first caller now.
+- `components/permission-matrix/permission-matrix.tsx` — the narrow
+  (<45rem) per-module card wraps its cell list in a `Collapsible`, closed
+  by default, below `sm` only; `sm`–45rem keeps the always-open list it
+  already had.
+
+What this does NOT touch: the app's own outer chrome (the fixed phone
+header and bottom tab bar) is drawn by `kwapso_system`'s own
+`web/components/shell/app-shell.tsx`, not by this kit — see that repo's
+own CHANGELOG for the matching entry.
+
 ### Added - `CompactFacet` takes several values at once - 2026-09-24
 
 Aurora, validating the filter overlay: *"validated, but i shoudl be able to select multile for each filter type"*. A facet takes a SET now: three clients, two stages. Within one facet those values mean OR; across facets a toolbar still means AND, which is the host's arithmetic and not this component's.

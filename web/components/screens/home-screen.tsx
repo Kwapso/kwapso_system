@@ -207,8 +207,21 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
               `line-clamp-2 break-words` is the same seam record-heading.tsx
               uses for a record's own name: it wraps to two lines rather than
               cutting mid-glyph, and `title` keeps the full string reachable
-              on a pointer or a screen reader once it clamps. */}
-          <Headline as="h1" size="display-m" className="line-clamp-2 break-words" title={ctx.team?.name}>
+              on a pointer or a screen reader once it clamps.
+
+              BELOW `sm`, ONE RUNG DOWN — M7/M8 (25 Sep 2026, Alaap): this
+              Headline measured 63px live on Home at this account's scale,
+              the same cause-1 defect collection-heading.tsx's own note
+              covers for every collection screen and fixes the same way:
+              `max-sm:text-3xl` overrides `display-m`'s own `text-5xl` to
+              the h2 rung below `sm` only, one node, no fragment — `sm` and
+              up read `text-5xl` exactly as before this ruling. */}
+          <Headline
+            as="h1"
+            size="display-m"
+            className="line-clamp-2 break-words max-sm:text-3xl"
+            title={ctx.team?.name}
+          >
             {ctx.team?.name}
           </Headline>
           <div className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">

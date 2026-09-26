@@ -1618,6 +1618,28 @@
   --grid-columns: 12;
 }
 
+/* ---- Coarse-pointer touch floor, M7 (25 Sep 2026, documents/ui-rulebook/
+   30-9-mobile.md: "every tap target is at least 44px") ---------------------
+   Every button, icon button, toggle/chip and input reads one of these three
+   tokens for its own height (ruling 28, above); raising the tokens here
+   raises every one of them in one place, on a coarse pointer only, rather
+   than each component carrying its own `@media` or a caller overriding a
+   size prop. `--control-height-input` is already 44 ("also the touch row")
+   and needs no change. `--control-height-row` (56, the table row) is
+   deliberately untouched — M7 raises tap targets, not row height.
+   `--control-height-dense` is untouched too: nothing that reads it is a tap
+   target this ruling names. The portal's own `@media (pointer: coarse)`
+   (web-portal/app/globals.css) sets a floor on raw selectors instead of a
+   token, because it predates this token existing at 44 anywhere; this is
+   the kit-level fix that portal rule was standing in for. */
+@media (pointer: coarse) {
+  :root {
+    --control-height-field:  2.75rem; /* 38 -> 44 */
+    --control-height-button: 2.75rem; /* 40 -> 44 */
+    --control-height-pill:   2.75rem; /* 26 -> 44 */
+  }
+}
+
 
 /* ============================================================================
    5 · TYPE — the thirteen steps, transcribed from kit ch03

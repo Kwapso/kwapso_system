@@ -169,8 +169,11 @@ const gutterFindings = [];
 // — exactly the kind of stale assertion this file's own header warns against.
 const GUTTER_SHAPES = [
   {
+    /* M7 (25 Sep 2026) STEPPED THIS AGAIN — edge to edge below `sm`, the
+       17 Sep value unchanged at `sm` and up. The pin now reads both
+       widths in one string, same as SHELL_CONTENT_INSET_X below. */
     name: "DENSITY_GUTTER (--shell-gutter)",
-    pattern: /const DENSITY_GUTTER: Record<ScreenDensity, string> = \{\s*comfortable: "\[--shell-gutter:var\(--space-4\)\]",\s*calm: "\[--shell-gutter:var\(--space-4\)\]",\s*\};/,
+    pattern: /const DENSITY_GUTTER: Record<ScreenDensity, string> = \{\s*comfortable: "max-sm:\[--shell-gutter:0px\] sm:\[--shell-gutter:var\(--space-4\)\]",\s*calm: "max-sm:\[--shell-gutter:0px\] sm:\[--shell-gutter:var\(--space-4\)\]",\s*\};/,
   },
   {
     name: "DENSITY_ASIDE (--aside-inset)",
@@ -763,11 +766,14 @@ if (!/const CARD_CONTENT_INSET_Y_DEFAULT = "py-6 lg:py-\[var\(--space-7\)\]";/.t
    21 SEP 2026 - see this block's own header. The value is pinned, not just
    the name: `--space-6` is the number the client chose out loud ("the same
    spacing thats now before the footer i want above nav and on sides"), and a
-   later edit that moved it should have to come back here and say so. */
-if (!/const SHELL_CONTENT_INSET_X = "px-\[var\(--space-6\)\]";/.test(src)) {
+   later edit that moved it should have to come back here and say so.
+   BELOW `sm` IT STEPS TO `--space-4`, M7 (25 Sep 2026) - still one pin,
+   now two widths of it. */
+if (!/const SHELL_CONTENT_INSET_X = "px-\[var\(--space-4\)\] sm:px-\[var\(--space-6\)\]";/.test(src)) {
   insetFindings.push(
-    `${rel} does not declare SHELL_CONTENT_INSET_X = "px-[var(--space-6)]" - the pane's own gutter, ruled ` +
-      "21 Sep 2026, and the one constant DENSITY_BODY and DENSITY_TRAIL must both be built on.",
+    `${rel} does not declare SHELL_CONTENT_INSET_X = "px-[var(--space-4)] sm:px-[var(--space-6)]" - the pane's ` +
+      "own gutter, ruled 21 Sep 2026 and stepped for phones by M7 25 Sep 2026, and the one constant DENSITY_BODY " +
+      "and DENSITY_TRAIL must both be built on.",
   );
 }
 /* AND THE OLD IMPORT MUST BE GONE. Leaving it behind would be the exact
@@ -1770,10 +1776,13 @@ if (!/cn\(CARD, CARD_FLUSH, breadcrumb \? CARD_JOINED : undefined\)/.test(src)) 
 /* 6 · THE PANE PUBLISHES ITS OWN GUTTER AND ITS OWN EDGE RADIUS, which is
    the only way a part inside it can span it without writing a literal or
    assuming which shell it is in. */
-if (!/"\[--pane-inset-x:var\(--space-6\)\]",/.test(src)) {
+if (
+  !/"\[--pane-inset-x:var\(--space-4\)\] sm:\[--pane-inset-x:var\(--space-6\)\]",/.test(src)
+) {
   airFindings.push(
-    `${rel}'s BODY does not publish [--pane-inset-x:var(--space-6)] - it must say its own gutter out loud, at ` +
-      "the same number DENSITY_BODY spends as padding, or the ink band cannot break out of it and pay it back.",
+    `${rel}'s BODY does not publish [--pane-inset-x:var(--space-4)] sm:[--pane-inset-x:var(--space-6)]` +
+      " - it must say its own gutter out loud, at the same number(s) DENSITY_BODY spends as padding (M7's " +
+      "25 Sep 2026 phone step included), or the ink band cannot break out of it and pay it back.",
   );
 }
 /* 6b · AND THE SAME NUMBER UNDER THE SECOND NAME, 22 SEP 2026. The pane's
@@ -1783,11 +1792,13 @@ if (!/"\[--pane-inset-x:var\(--space-6\)\]",/.test(src)) {
    edges (`--pane-escape-x`, 24 inside the padded stack and 0 in the footer
    slot, which already spans the pane). The pane declares the default; the
    slot's own wrapper rebinds it. */
-if (!/"\[--pane-escape-x:var\(--space-6\)\]",/.test(src)) {
+if (
+  !/"\[--pane-escape-x:var\(--space-4\)\] sm:\[--pane-escape-x:var\(--space-6\)\]",/.test(src)
+) {
   airFindings.push(
-    `${rel}'s BODY does not publish [--pane-escape-x:var(--space-6)] - the band's negative margin reads that ` +
-      "property, and without the declaration a band inside the padded stack falls back to --pane-inset-x and " +
-      "then to 0, which draws it inset 24px on both sides again.",
+    `${rel}'s BODY does not publish [--pane-escape-x:var(--space-4)] sm:[--pane-escape-x:var(--space-6)]` +
+      " - the band's negative margin reads that property, and without the declaration a band inside the " +
+      "padded stack falls back to --pane-inset-x and then to 0, which draws it inset on both sides again.",
   );
 }
 if (!/"\[--radius-pane-edge:0px\]",/.test(src)) {

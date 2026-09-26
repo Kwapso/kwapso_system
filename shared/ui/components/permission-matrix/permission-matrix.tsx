@@ -582,6 +582,8 @@ import {
   TooltipTrigger,
 } from "../tooltip/tooltip";
 import { ScreenRegister } from "../screen-renderer/screen-renderer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../collapsible/collapsible";
+import { CaretDown } from "../../foundations/icons";
 
 /* ============================================================================
    The capabilities — the client's four, and nothing beyond them
@@ -955,6 +957,15 @@ export interface PermissionMatrixProps
   loadingRows?: number;
   /** What a screen reader hears while the grid loads. */
   loadingLabel?: string;
+  /**
+   * M7/M8 (25 Sep 2026, client, documents/ui-rulebook/30-9-mobile.md): below
+   * `sm` each narrow-render row's own cell list collapses behind a
+   * disclosure, closed by default, rather than showing every role/module at
+   * once (the mobile audit measured this card at ~324px tall unopened). The
+   * trigger's own accessible name; `sm` and up are unchanged — the cells
+   * still render open, unconditionally, same as before this ruling.
+   */
+  narrowDisclosureLabel?: string;
   /** The empty register's sentence. */
   emptyTitle?: React.ReactNode;
   /** The line under it. */
@@ -1664,6 +1675,7 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
       nothingLabel = "nothing",
       loadingRows = 5,
       loadingLabel = "Loading…",
+      narrowDisclosureLabel = "Permissions",
       emptyTitle,
       emptyDescription,
       errorTitle,
@@ -1975,28 +1987,9 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
                 ))
               : resolved !== "ready"
                 ? register
-                : grid.map((row) => (
-                    <div
-                      key={row.key}
-                      {...row.attr}
-                      className="rounded-[var(--radius)] bg-surface-panel p-4"
-                    >
-                      {/* The name alone, 2026-09-17 — same retirement as the
-                          wide grid's name cell, immediately above. */}
-                      <div className="text-sm font-[var(--font-weight-medium)]">
-                        {row.label}
-                      </div>
-                      {row.description !== undefined && row.description !== null ? (
-                        <div className="mt-1 text-caption font-light text-ink-tertiary">
-                          {row.description}
-                        </div>
-                      ) : null}
-                      {/* ONE LINE PER CELL, which is one line per role in the
-                          kit's orientation and one per collection when the
-                          grid is turned — CH27.12's own instruction read on
-                          the axis the caller chose. Nothing is truncated and
-                          nothing scrolls sideways either way. */}
-                      <div className="mt-3 flex flex-col">
+                : grid.map((row) => {
+                    const cellsList = (
+                      <div className="flex flex-col">
                         {row.cells.map((cell) => (
                           <div
                             key={cell.key}
@@ -2013,8 +2006,55 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  ))}
+                    );
+                    return (
+                      <div
+                        key={row.key}
+                        {...row.attr}
+                        className="rounded-[var(--radius)] bg-surface-panel p-4"
+                      >
+                        {/* The name alone, 2026-09-17 — same retirement as the
+                            wide grid's name cell, immediately above. */}
+                        <div className="text-sm font-[var(--font-weight-medium)]">
+                          {row.label}
+                        </div>
+                        {row.description !== undefined && row.description !== null ? (
+                          <div className="mt-1 text-caption font-light text-ink-tertiary">
+                            {row.description}
+                          </div>
+                        ) : null}
+                        {/* ONE LINE PER CELL, which is one line per role in
+                            the kit's orientation and one per collection when
+                            the grid is turned — CH27.12's own instruction
+                            read on the axis the caller chose. Nothing is
+                            truncated and nothing scrolls sideways either way.
+
+                            BELOW `sm`, BEHIND ITS OWN DISCLOSURE, CLOSED BY
+                            DEFAULT — M7/M8 (25 Sep 2026, client). The mobile
+                            audit measured this card at ~324px unopened, one
+                            role/module per line with nothing folded; a phone
+                            reader now opens it on purpose. `sm` and up keep
+                            the unconditional list exactly as it was — two
+                            renders of the same `cellsList`, gated by class
+                            rather than by one Collapsible whose default-open
+                            state would have to vary by width, which Radix
+                            does not offer. */}
+                        <Collapsible className="mt-3 sm:hidden">
+                          <CollapsibleTrigger className="flex h-[var(--control-height-input)] w-full items-center justify-between gap-2 text-caption text-ink-tertiary">
+                            <span>{narrowDisclosureLabel}</span>
+                            <CaretDown
+                              aria-hidden="true"
+                              className="size-4 shrink-0 motion-disclosure-marker"
+                            />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="motion-disclosure-collapsible">
+                            {cellsList}
+                          </CollapsibleContent>
+                        </Collapsible>
+                        <div className="mt-3 hidden sm:block">{cellsList}</div>
+                      </div>
+                    );
+                  })}
           </div>
 
           {legend && resolved === "ready" ? (

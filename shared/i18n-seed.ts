@@ -1610,6 +1610,11 @@ export const SEED: Catalogue = {
   "Next": { de: "Weiter", es: "Siguiente", ca: "Següent" },
   "Sort": { de: "Sortieren", es: "Ordenar", ca: "Ordenar" },
   "Filters": { de: "Filter", es: "Filtros", ca: "Filtres" },
+  // ToolbarRowFold's two labels (PagedFind's own toolbar, M7/M8, 25 Sep
+  // 2026): the "···" trigger's accessible name, and the folded panel's
+  // sort/view group caption.
+  "More filters and view options": { de: "Weitere Filter- und Ansichtsoptionen", es: "Más opciones de filtro y vista", ca: "Més opcions de filtre i vista" },
+  "Sort & view": { de: "Sortieren & Ansicht", es: "Ordenar y vista", ca: "Ordenar i vista" },
   "Min": { de: "Min.", es: "Mín.", ca: "Mín." },
   "Max": { de: "Max.", es: "Máx.", ca: "Màx." },
   "Actions": { de: "Aktionen", es: "Acciones", ca: "Accions" },

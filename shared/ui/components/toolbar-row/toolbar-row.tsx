@@ -251,6 +251,70 @@ const FOLD_LABEL_CLASS =
   "text-micro uppercase font-[var(--font-weight-medium)] text-ink-tertiary px-3 pt-2 pb-[var(--space-1h)]";
 const FOLD_DIVIDER_CLASS = "mx-3 my-[var(--space-2h)] h-px bg-border";
 
+/**
+ * THE FOLD, EXPORTED — one container query, one pair of lane classes, one
+ * trigger, so a caller that hand-builds its own track (`kwapso_system`'s
+ * `PagedFind`/`ToolbarColumn` is the one that exists today) reuses exactly
+ * what this row already ships instead of copying the three pieces apart
+ * and letting them drift, which is what M7/M8 (25 Sep 2026, client,
+ * documents/ui-rulebook/30-9-mobile.md — the fold is cause 2 of the mobile
+ * audit's findings) found had already happened once.
+ *
+ * `TOOLBAR_ROW_FOLD_CONTAINER` goes on the same node `toolbarRowVariants`
+ * puts it on below (`@container`, inline-size only, no name — see that
+ * variant's own comment). `TOOLBAR_ROW_FOLD_LANE` goes on each lane this
+ * row hides once the fold trigger takes over (`filters`, `viewSwitch`
+ * below). `ToolbarRowFold` is the trigger itself, unchanged from what this
+ * row has always drawn — same `Popover`, not `DropdownMenu` (see its own
+ * note, restated only where it lives now).
+ */
+export const TOOLBAR_ROW_FOLD_CONTAINER = "@container";
+export const TOOLBAR_ROW_FOLD_LANE = "hidden @min-[48rem]:flex";
+
+export interface ToolbarRowFoldProps {
+  filters?: React.ReactNode;
+  viewSwitch?: React.ReactNode;
+  moreFiltersLabel?: string;
+  filtersMenuLabel?: string | null;
+  viewSwitchMenuLabel?: string | null;
+}
+
+export function ToolbarRowFold({
+  filters,
+  viewSwitch,
+  moreFiltersLabel = "More filters",
+  filtersMenuLabel,
+  viewSwitchMenuLabel,
+}: ToolbarRowFoldProps) {
+  if (!filters && !viewSwitch) return null;
+  return (
+    <div data-slot="toolbar-row-fold" className="flex shrink-0 items-center @min-[48rem]:hidden">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="secondary" size="icon" aria-label={moreFiltersLabel}>
+            <DotsThree aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-auto min-w-[var(--space-11)] p-0">
+          {filters ? (
+            <div data-slot="toolbar-row-fold-filters">
+              {filtersMenuLabel ? <div className={FOLD_LABEL_CLASS}>{filtersMenuLabel}</div> : null}
+              <div className="min-h-9 p-2">{filters}</div>
+            </div>
+          ) : null}
+          {filters && viewSwitch ? <div className={FOLD_DIVIDER_CLASS} /> : null}
+          {viewSwitch ? (
+            <div data-slot="toolbar-row-fold-view-switch">
+              {viewSwitchMenuLabel ? <div className={FOLD_LABEL_CLASS}>{viewSwitchMenuLabel}</div> : null}
+              <div className="min-h-9 p-2">{viewSwitch}</div>
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 const toolbarRowVariants = cva(
   [
     /* A COLUMN, not a row: the row itself is the track below, and what a
@@ -261,8 +325,11 @@ const toolbarRowVariants = cva(
     /* THE FOLD'S QUERY CONTAINER — the kit's first, see the file header's
        "A CONTAINER QUERY, NOT A VIEWPORT ONE". `container-type: inline-size`
        only; no `container-name`, so the descendants below query the nearest
-       ancestor rather than a name that would have to be kept in sync with it. */
-    "@container",
+       ancestor rather than a name that would have to be kept in sync with it.
+       Exported as `TOOLBAR_ROW_FOLD_CONTAINER`, above, so a caller that
+       builds its own track carries the identical value rather than a
+       second literal that can drift from this one. */
+    TOOLBAR_ROW_FOLD_CONTAINER,
   ],
   {
     variants: {
@@ -574,51 +641,21 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
        own, which is what the kit's OWN actions overflow gets away without —
        raw `Button`s, not `DropdownMenuItem`s — because a `Button` at least
        LOOKS like a command; a checkbox row does not. */
+    /* Drawn by the exported `ToolbarRowFold`, above — this row is now just
+       its first caller, not its only implementation. See that export's own
+       comment for why it exists as a named piece. Gated here too, not only
+       inside `ToolbarRowFold`: `(foldTrigger || actionGroup)` below decides
+       whether the trailing wrapper renders at all, and that check needs
+       `null`, not an element that will render nothing. */
     const foldTrigger =
       filters || viewSwitch ? (
-        <div
-          data-slot="toolbar-row-fold"
-          className="flex shrink-0 items-center @min-[48rem]:hidden"
-        >
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="secondary" size="icon" aria-label={moreFiltersLabel}>
-                <DotsThree aria-hidden="true" />
-              </Button>
-            </PopoverTrigger>
-            {/* `p-0`: `PopoverContent`'s own `--space-5` pad is right for its
-               one shipped shape (a title, a sentence, a button pair) and wrong
-               for two full-width groups, which want to run edge to edge and
-               pad themselves — the same reason the actions overflow's menu
-               above pads 10 instead. `w-auto` lets the panel size to `filters`'/
-               `viewSwitch`'s own content instead of the confirm-panel's fixed
-               300; `--space-11` (8rem) floors it so a single short row does
-               not collapse to a sliver. */}
-            <PopoverContent align="end" className="w-auto min-w-[var(--space-11)] p-0">
-              {filters ? (
-                <div data-slot="toolbar-row-fold-filters">
-                  {filtersMenuLabel ? <div className={FOLD_LABEL_CLASS}>{filtersMenuLabel}</div> : null}
-                  {/* 36 tall / 8 padded, the ruling's own figure for a folded
-                     row — `min-h-9` (36) and `p-2` (8), Tailwind's own numeric
-                     scale, matching this file's existing `py-1.5`/`gap-3`
-                     rather than reaching for a `--space-*` step that lands
-                     elsewhere (nearest are `--space-2` (8, right) and no scale
-                     step is 36). A FLOOR, not a fixed height: `filters` is
-                     `FilterBar`'s own chip row and may be taller than one line
-                     at this width, and 36 must not clip it. */}
-                  <div className="min-h-9 p-2">{filters}</div>
-                </div>
-              ) : null}
-              {filters && viewSwitch ? <div className={FOLD_DIVIDER_CLASS} /> : null}
-              {viewSwitch ? (
-                <div data-slot="toolbar-row-fold-view-switch">
-                  {viewSwitchMenuLabel ? <div className={FOLD_LABEL_CLASS}>{viewSwitchMenuLabel}</div> : null}
-                  <div className="min-h-9 p-2">{viewSwitch}</div>
-                </div>
-              ) : null}
-            </PopoverContent>
-          </Popover>
-        </div>
+        <ToolbarRowFold
+          filters={filters}
+          viewSwitch={viewSwitch}
+          moreFiltersLabel={moreFiltersLabel}
+          filtersMenuLabel={filtersMenuLabel}
+          viewSwitchMenuLabel={viewSwitchMenuLabel}
+        />
       ) : null;
 
     /* Prefer nothing (PATTERN §4). An empty row is a painted pill standing in
@@ -777,7 +814,7 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
                      and `foldTrigger` below. The class pair is the mirror of
                      `foldTrigger`'s own: hidden here is exactly where it is
                      visible there, and never both, never neither. */
-                  "hidden @min-[48rem]:flex",
+                  TOOLBAR_ROW_FOLD_LANE,
                   /* THE ROW'S OWN GUARANTEE, NOT A REQUEST OF THE CALL SITE.
                      Left to itself a `FilterBar` releases its chip row to
                      `flex-wrap` from `sm` up, and a wrapping row inside this
@@ -853,10 +890,10 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
                 className={cn(
                   "flex shrink-0 items-center",
                   /* THE FOLD — the mirror of `filters`' own gate above, and
-                     `foldTrigger`'s below. `viewSwitch` already carries
+                     `ToolbarRowFold`'s below. `viewSwitch` already carries
                      `SortControl` beside `ViewSwitch` (slot 4's own note),
                      so folding this one node is folding both. */
-                  "hidden @min-[48rem]:flex",
+                  TOOLBAR_ROW_FOLD_LANE,
                 )}
               >
                 {viewSwitch}

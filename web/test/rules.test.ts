@@ -3379,6 +3379,14 @@ describe("RULES — the laws of the base", () => {
       for (;;) {
         const at = src.indexOf("<ToolbarRow", from)
         if (at === -1) break
+        // NOT A REAL <ToolbarRow TAG — a name that merely starts with it,
+        // like <ToolbarRowFold> (the kit's own exported fold trigger,
+        // 25 Sep 2026, M7/M8). A real tag's own name ends right here: a
+        // space, a newline, or its closing >, never another word character.
+        if (/\w/.test(src[at + "<ToolbarRow".length] ?? "")) {
+          from = at + "<ToolbarRow".length
+          continue
+        }
         // A reference in prose (a backticked mention) rather than real JSX —
         // stripComments already removed // and /* */ comments, so what is left
         // here is either the genuine tag or, rarely, a JSDoc-style line this
@@ -3969,6 +3977,14 @@ describe("RULES — the laws of the base", () => {
       for (;;) {
         const at = src.indexOf("<ToolbarRow", from)
         if (at === -1) break
+        // NOT A REAL <ToolbarRow TAG — a name that merely starts with it,
+        // like <ToolbarRowFold> (the kit's own exported fold trigger,
+        // 25 Sep 2026, M7/M8). A real tag's own name ends right here: a
+        // space, a newline, or its closing >, never another word character.
+        if (/\w/.test(src[at + "<ToolbarRow".length] ?? "")) {
+          from = at + "<ToolbarRow".length
+          continue
+        }
         let i = at + "<ToolbarRow".length
         let braceDepth = 0
         while (i < src.length) {
@@ -4236,6 +4252,14 @@ describe("RULES — the laws of the base", () => {
         for (;;) {
           const at = src.indexOf("<ToolbarRow", from)
           if (at === -1) break
+          // NOT A REAL <ToolbarRow TAG — a name that merely starts with it,
+          // like <ToolbarRowFold> (the kit's own exported fold trigger,
+          // 25 Sep 2026, M7/M8). A real tag's own name ends right here: a
+          // space, a newline, or its closing >, never another word character.
+          if (/\w/.test(src[at + "<ToolbarRow".length] ?? "")) {
+            from = at + "<ToolbarRow".length
+            continue
+          }
           const tag = ownTag(src, at, "<ToolbarRow")
           const missing = !/\bempty\s*=/.test(tag)
           const literal = propIsLiteral(tag, "empty")
@@ -4475,6 +4499,14 @@ describe("RULES — the laws of the base", () => {
       for (;;) {
         const at = src.indexOf("<ToolbarRow", from)
         if (at === -1) break
+        // NOT A REAL <ToolbarRow TAG — a name that merely starts with it,
+        // like <ToolbarRowFold> (the kit's own exported fold trigger,
+        // 25 Sep 2026, M7/M8). A real tag's own name ends right here: a
+        // space, a newline, or its closing >, never another word character.
+        if (/\w/.test(src[at + "<ToolbarRow".length] ?? "")) {
+          from = at + "<ToolbarRow".length
+          continue
+        }
         // The same brace-depth walk to this tag's OWN closing `>` that R48,
         // R49 and R50 use, so a `search={<SearchInput onClear={() => …} />}`
         // prop's nested braces and tags cannot end the scan early.

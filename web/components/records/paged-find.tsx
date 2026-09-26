@@ -75,6 +75,11 @@ import { joinFacet, splitFacet } from "@shared/facet-list"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
+import {
+  ToolbarRowFold,
+  TOOLBAR_ROW_FOLD_CONTAINER,
+  TOOLBAR_ROW_FOLD_LANE,
+} from "@shared/ui/components/toolbar-row/toolbar-row"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
@@ -229,7 +234,15 @@ function ToolbarColumn({ children }: { children: React.ReactNode }) {
            each of the app's two toolbar tracks, never a ref threaded through
            every screen with facets. */
         data-filter-anchor=""
-        className="flex flex-wrap items-center gap-2"
+        /* `flex-nowrap` + `TOOLBAR_ROW_FOLD_CONTAINER`, 25 Sep 2026 (M7/M8,
+           mobile-audit findings-agency.md cause 2). This track used to
+           hand-copy `<ToolbarRow>`'s slot names (`toolbar-row-column`,
+           `toolbar-row-track`) without the one class that makes its fold
+           work, so at phone widths it wrapped into up to three rows instead
+           of folding filters/sort/view behind "···" the way `<ToolbarRow>`
+           already does. Reusing the kit's own exported container query and
+           lane class below closes that gap instead of copying it again. */
+        className={cn("flex flex-nowrap items-center gap-2", TOOLBAR_ROW_FOLD_CONTAINER)}
       >
         {/* THE TRACK — every control sits in one row. No fill, no radius and
             no inset of its own: the plain frame's own `CardContent` carries
@@ -801,39 +814,86 @@ export function PagedFind<T>({
                 returns (v1.2.27), replacing the single component whose OWN
                 markup this row and the column below it used to share through a
                 portal. */}
-            {showFilters && filterPill}
-            {/* THE ORDER, after search and the facet chips because the three are
-                asked with the same gesture — you type, you narrow, then you say
-                what order. What it changes is what the DOOR is asked, so the
-                answer spans the whole collection rather than the page in front
-                of you. */}
-            {showSort && (
-              <SortControl
-                options={sorts}
-                value={sortBy}
-                onValueChange={(by) => setSortBy(by)}
-                direction={sortDir ?? landsOn}
-                onDirectionChange={(dir) => setSortDir(dir)}
-                hideLabel
-              />
-            )}
-            {/* THE VIEW SWITCH, AFTER THE SORT AND BEFORE THE COUNT AND THE
-                ACTIONS — R53's fixed order, the same one `<ToolbarRow>` draws, so
-                a reader who learns the row on one screen has learned it on all of
-                them. Built HERE from the config rather than by the call site, for
-                the reason that law is a change of TYPE: a node slot accepts the
-                right control, no control, or the control belonging in a different
-                slot, and no census can tell which. */}
-            {view && (
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <ViewSwitch
-                  views={view.views}
-                  value={view.value}
-                  onValueChange={view.onValueChange}
-                  label={t("View")}
-                />
-              </div>
-            )}
+            {/* BELOW 48REM, `filterFoldNode` AND `sortAndViewFoldNode` MOVE
+                INTO THE `<ToolbarRowFold>` TRIGGER NEAR THE ACTIONS INSTEAD
+                OF WRAPPING — M7/M8, 25 Sep 2026 (mobile-audit
+                findings-agency.md, cause 2). Built once, each, and rendered
+                TWICE below (the inline lane, and again inside the fold's
+                popover), the same way `<ToolbarRow>` itself renders its own
+                `filters`/`viewSwitch` props twice — `TOOLBAR_ROW_FOLD_LANE`
+                hides whichever copy the container query says not to, so
+                only one is ever in layout at a width. */}
+            {(() => {
+              const filterFoldNode = showFilters && filterPill ? filterPill : null
+              // THE ORDER, after search and the facet chips because the three
+              // are asked with the same gesture — you type, you narrow, then
+              // you say what order. What it changes is what the DOOR is
+              // asked, so the answer spans the whole collection rather than
+              // the page in front of you.
+              //
+              // SORT AND VIEW SHARE ONE FOLD LANE, 25 Sep 2026 — the same
+              // pair `<ToolbarRow>`'s own `viewSwitch` slot already folds
+              // together (that slot's own note: "SortControl shares it").
+              const sortAndViewFoldNode =
+                showSort || view ? (
+                  <>
+                    {showSort && (
+                      <SortControl
+                        options={sorts}
+                        value={sortBy}
+                        onValueChange={(by) => setSortBy(by)}
+                        direction={sortDir ?? landsOn}
+                        onDirectionChange={(dir) => setSortDir(dir)}
+                        hideLabel
+                      />
+                    )}
+                    {/* THE VIEW SWITCH, AFTER THE SORT AND BEFORE THE COUNT
+                        AND THE ACTIONS — R53's fixed order, the same one
+                        `<ToolbarRow>` draws, so a reader who learns the row
+                        on one screen has learned it on all of them. Built
+                        HERE from the config rather than by the call site,
+                        for the reason that law is a change of TYPE: a node
+                        slot accepts the right control, no control, or the
+                        control belonging in a different slot, and no census
+                        can tell which. */}
+                    {view && (
+                      <ViewSwitch
+                        views={view.views}
+                        value={view.value}
+                        onValueChange={view.onValueChange}
+                        label={t("View")}
+                      />
+                    )}
+                  </>
+                ) : null
+              return (
+                <>
+                  {filterFoldNode ? (
+                    <div className={TOOLBAR_ROW_FOLD_LANE}>{filterFoldNode}</div>
+                  ) : null}
+                  {sortAndViewFoldNode ? (
+                    <div className={cn("flex min-w-0 items-center gap-2", TOOLBAR_ROW_FOLD_LANE)}>
+                      {sortAndViewFoldNode}
+                    </div>
+                  ) : null}
+                  {/* THE FOLD TRIGGER — "···", beside the actions, exactly
+                      where `<ToolbarRow>`'s own note puts it ("PINS BESIDE"
+                      the action group). Below 48rem it opens a popover
+                      holding the two lanes above; at 48rem and up it renders
+                      nothing (`ToolbarRowFold` returns `null` when both its
+                      slots are empty). */}
+                  {filterFoldNode || sortAndViewFoldNode ? (
+                    <ToolbarRowFold
+                      filters={filterFoldNode ?? undefined}
+                      viewSwitch={sortAndViewFoldNode ?? undefined}
+                      moreFiltersLabel={t("More filters and view options")}
+                      filtersMenuLabel={t("Filters")}
+                      viewSwitchMenuLabel={t("Sort & view")}
+                    />
+                  ) : null}
+                </>
+              )
+            })()}
             {/* THE FILTERED TOTAL — the exact server count of the question being
                 asked, through the one seam allowed to end in a "+" (the collection's
                 own count above is exact and never does). It appears only while

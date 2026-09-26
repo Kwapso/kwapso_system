@@ -305,15 +305,17 @@ describe("R109, every screen carries the app's content inset", () => {
     ).toBe(1)
   })
 
-  it("the kit's SHELL_CONTENT_INSET_X is pinned to px-[var(--space-6)] and both densities spend it", () => {
+  it("the kit's SHELL_CONTENT_INSET_X is pinned to px-[var(--space-4)] sm:px-[var(--space-6)] and both densities spend it", () => {
     const src = stripComments(
       read(join(ROOT, "shared", "ui", "compositions", "templates", "screen-shell.tsx"))
     )
     expect(
-      /const SHELL_CONTENT_INSET_X\s*=\s*"px-\[var\(--space-6\)\]"/.test(src),
-      "shared/ui's SHELL_CONTENT_INSET_X moved off px-[var(--space-6)] — the base inset every screen " +
-        "inherits changed size or identifier; re-measure live and update this pin (a kit change, so it " +
-        "lands upstream in kwapso-design, never edited here — see shared/ui/VERSION.json)"
+      /const SHELL_CONTENT_INSET_X\s*=\s*"px-\[var\(--space-4\)\] sm:px-\[var\(--space-6\)\]"/.test(src),
+      "shared/ui's SHELL_CONTENT_INSET_X moved off px-[var(--space-4)] sm:px-[var(--space-6)] — the base " +
+        "inset every screen inherits changed size or identifier; re-measure live and update this pin (a " +
+        "kit change, so it lands upstream in kwapso-design, never edited here — see shared/ui/VERSION.json). " +
+        "M7 (25 Sep 2026, documents/ui-rulebook/30-9-mobile.md) is why this is now one shell default at two " +
+        "widths rather than one width — still no per-screen number."
     ).toBe(true)
     const bodyIdx = src.indexOf("const DENSITY_BODY")
     expect(bodyIdx, "const DENSITY_BODY not found in screen-shell.tsx").toBeGreaterThan(-1)
